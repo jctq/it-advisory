@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import { resolveRedirectOrigin } from '@/lib/server/resolve-redirect-origin';
 
 const ADMIN_COOKIE_NAME = 'admin_token';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
@@ -25,7 +26,7 @@ function sanitizeNext(raw: string | null): string {
 }
 
 function buildLoginRedirect(request: Request, error: string, next: string): NextResponse {
-  const loginUrl = new URL('/admin/login', request.url);
+  const loginUrl = new URL('/admin/login', resolveRedirectOrigin(request));
   loginUrl.searchParams.set('error', error);
   if (next !== DEFAULT_NEXT) {
     loginUrl.searchParams.set('next', next);
@@ -48,7 +49,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!constantTimeEquals(tokenRaw, expected)) {
     return buildLoginRedirect(request, 'invalid', next);
   }
-  const destination = new URL(next, request.url);
+  const destination = new URL(next, resolveRedirectOrigin(request));
   const response = NextResponse.redirect(destination, { status: 303 });
   response.cookies.set({
     name: ADMIN_COOKIE_NAME,
