@@ -1,3 +1,5 @@
+import { SITUATION_OPTIONS } from '@/lib/marketing/situation-options';
+
 export type QuizStep = {
   readonly id: string;
   readonly question: string;
@@ -7,15 +9,8 @@ export type QuizStep = {
 export const QUIZ_STEPS: readonly QuizStep[] = [
   {
     id: 'situation',
-    question: 'What best describes the situation?',
-    options: [
-      'Vendor keeps missing timelines',
-      'Requirements keep changing',
-      'Users are unhappy with the system',
-      'Budget or scope is unclear',
-      'Leadership needs an independent view',
-      'Not sure yet — need clarity first',
-    ],
+    question: 'Describe your situation — guided intake',
+    options: [...SITUATION_OPTIONS],
   },
   {
     id: 'duration',

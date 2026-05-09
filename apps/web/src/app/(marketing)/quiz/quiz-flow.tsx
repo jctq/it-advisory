@@ -1,54 +1,186 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { QUIZ_STEPS, QUIZ_TOTAL_STEPS } from '@/lib/marketing/quiz-steps';
-import { cn } from '@/lib/utils';
+import {
+  GUIDED_DIAGNOSTIC_EMPTY,
+  applyGuidedGoBack,
+  buildDiagnosticThreadJson,
+  computeGuidedLinearStep,
+  parseGuidedDiagnosticJson,
+  serializeGuidedDiagnostic,
+  type GuidedDiagnosticV1,
+} from '@/lib/marketing/guided-diagnostic-types';
+import { GuidedDiagnosticWizard } from './guided-diagnostic-wizard';
+
+function buildAnswersPayload(guided: GuidedDiagnosticV1): Record<string, string | number | boolean | string[]> {
+  return {
+    guidedDiagnostic: serializeGuidedDiagnostic(guided),
+    situation: guided.outcome?.mappedSituation ?? '',
+    situationAdvisorSummary: guided.outcome?.advisorSummary ?? '',
+    situationDiagnosticThread: buildDiagnosticThreadJson(guided),
+  };
+}
+
+/**
+ * Mongo may return guidedDiagnostic as a string or as a nested document depending on how it was stored.
+ */
+function normalizeGuidedDiagnosticRaw(raw: unknown): string | undefined {
+  if (typeof raw === 'string') {
+    return raw;
+  }
+  if (raw !== undefined && raw !== null && typeof raw === 'object') {
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
 
 export function QuizFlow() {
   const router = useRouter();
-  const [stepIndex, setStepIndex] = useState<number>(0);
-  const [selections, setSelections] = useState<Record<string, string>>({});
-  const currentStep = QUIZ_STEPS[stepIndex];
-  const progressPercent = useMemo(
-    () => Math.round(((stepIndex + 1) / QUIZ_TOTAL_STEPS) * 100),
-    [stepIndex],
-  );
-  if (!currentStep) {
-    return null;
-  }
-  const selectedKey = currentStep.id;
-  const selectedValue = selections[selectedKey];
-
-  const executeSelectOption = (value: string): void => {
-    setSelections((previous) => ({ ...previous, [selectedKey]: value }));
-  };
-
-  const executeGoNext = (): void => {
-    if (stepIndex >= QUIZ_TOTAL_STEPS - 1) {
-      router.push('/recommendation');
+  const searchParams = useSearchParams();
+  const [guided, setGuided] = useState<GuidedDiagnosticV1>(GUIDED_DIAGNOSTIC_EMPTY);
+  const [isSessionReady, setIsSessionReady] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const hasHydratedRef = useRef<boolean>(false);
+  const persistGuided = useCallback(async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
+    const linearStep = computeGuidedLinearStep(next);
+    await fetch('/api/quiz/session', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        answers: buildAnswersPayload(next),
+        currentStep: linearStep,
+        completed,
+      }),
+    });
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    async function initializeSession(): Promise<void> {
+      if (searchParams.get('retake') === '1') {
+        await persistGuided(GUIDED_DIAGNOSTIC_EMPTY, false);
+        if (cancelled) {
+          return;
+        }
+        setGuided(GUIDED_DIAGNOSTIC_EMPTY);
+        hasHydratedRef.current = true;
+        setIsSessionReady(true);
+        router.replace('/quiz');
+        return;
+      }
+      try {
+        const response = await fetch('/api/quiz/session');
+        if (!response.ok || cancelled) {
+          return;
+        }
+        const data = (await response.json()) as {
+          session: { answers: Record<string, string | string[] | number | boolean>; currentStep: number } | null;
+        };
+        if (cancelled || !data.session) {
+          return;
+        }
+        const rawGuided = data.session.answers['guidedDiagnostic'];
+        const normalized = normalizeGuidedDiagnosticRaw(rawGuided);
+        const parsed =
+          normalized !== undefined && normalized !== '' ? parseGuidedDiagnosticJson(normalized) : null;
+        setGuided(parsed ?? GUIDED_DIAGNOSTIC_EMPTY);
+      } finally {
+        if (!cancelled) {
+          hasHydratedRef.current = true;
+          setIsSessionReady(true);
+        }
+      }
+    }
+    void initializeSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [persistGuided, router, searchParams]);
+  useEffect(() => {
+    if (!isSessionReady || !hasHydratedRef.current) {
       return;
     }
-    setStepIndex((previous) => previous + 1);
-  };
-
+    const handle = setTimeout(() => {
+      void persistGuided(guided, false);
+    }, 280);
+    return () => clearTimeout(handle);
+  }, [guided, isSessionReady, persistGuided]);
+  useEffect(() => {
+    if (!isSessionReady || typeof document === 'undefined') {
+      return;
+    }
+    function flushBeforeLeave(): void {
+      void persistGuided(guided, false);
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        flushBeforeLeave();
+      }
+    });
+    window.addEventListener('pagehide', flushBeforeLeave);
+    return () => {
+      document.removeEventListener('visibilitychange', flushBeforeLeave);
+      window.removeEventListener('pagehide', flushBeforeLeave);
+    };
+  }, [guided, isSessionReady, persistGuided]);
+  const progressPercent = useMemo(() => {
+    if (guided.outcome !== null) {
+      return 100;
+    }
+    const linear = computeGuidedLinearStep(guided);
+    return Math.min(94, 6 + linear * 9);
+  }, [guided]);
+  const progressHint = useMemo(() => {
+    if (guided.outcome !== null) {
+      return 'Summary';
+    }
+    if (guided.activeRound !== null) {
+      const prior = guided.completedBundles.reduce((acc, bundle) => acc + bundle.questions.length, 0);
+      const ord = prior + guided.activeRound.stepIndex + 1;
+      return `Question ${ord}`;
+    }
+    return 'Describe';
+  }, [guided]);
+  const canGoBack = computeGuidedLinearStep(guided) > 0;
+  const showRetakeLink =
+    guided.outcome !== null ||
+    guided.completedBundles.length > 0 ||
+    guided.activeRound !== null ||
+    guided.initialPrompt.trim().length > 0;
   const executeGoBack = (): void => {
-    if (stepIndex <= 0) {
-      return;
-    }
-    setStepIndex((previous) => previous - 1);
+    setGuided((previous) => applyGuidedGoBack(previous));
   };
-
+  const executeSeeRecommendation = async (): Promise<void> => {
+    setIsSaving(true);
+    try {
+      await persistGuided(guided, true);
+      router.push('/recommendation');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  if (!isSessionReady) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-12">
+        <div className="h-2 animate-pulse rounded-full bg-muted" aria-hidden />
+        <div className="mt-10 h-8 max-w-md animate-pulse rounded-md bg-muted" aria-hidden />
+        <div className="mt-4 h-4 max-w-lg animate-pulse rounded-md bg-muted/70" aria-hidden />
+        <p className="sr-only">Loading your diagnostic progress</p>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-2xl px-6 py-12">
       <div className="mb-8 space-y-3">
         <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
-          <span>
-            Step {stepIndex + 1} of {QUIZ_TOTAL_STEPS}
-          </span>
+          <span>{progressHint}</span>
           <span>{progressPercent}%</span>
         </div>
         <div
@@ -68,31 +200,10 @@ export function QuizFlow() {
         Guided diagnostic
       </h1>
       <p className="mt-2 text-pretty text-muted-foreground">
-        One question at a time — tap an answer to continue. Your recommendation updates based on what you
-        choose.
+        Tell us what is going on in plain language, then move through short multiple-choice screens until we can map
+        your situation and brief your advisor.
       </p>
-      <h2 className="mt-10 text-lg font-medium text-foreground">{currentStep.question}</h2>
-      <ul className="mt-4 grid gap-3 sm:grid-cols-2" role="list">
-        {currentStep.options.map((option) => {
-          const isSelected = selectedValue === option;
-          return (
-            <li key={option}>
-              <button
-                type="button"
-                onClick={() => executeSelectOption(option)}
-                className={cn(
-                  'flex w-full items-center rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors',
-                  isSelected
-                    ? 'border-primary bg-primary/5 text-foreground ring-2 ring-primary/30'
-                    : 'border-border bg-card text-foreground hover:border-primary/40 hover:bg-muted/50',
-                )}
-              >
-                {option}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <GuidedDiagnosticWizard guided={guided} onGuidedChange={setGuided} />
       <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
         <Button type="button" variant="ghost" asChild>
           <Link href="/" className="gap-1">
@@ -100,15 +211,22 @@ export function QuizFlow() {
             Home
           </Link>
         </Button>
-        <div className="flex flex-wrap gap-2">
-          {stepIndex > 0 ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {showRetakeLink ? (
+            <Button type="button" variant="outline" asChild>
+              <Link href="/quiz?retake=1">Retake diagnostic</Link>
+            </Button>
+          ) : null}
+          {canGoBack ? (
             <Button type="button" variant="outline" onClick={executeGoBack}>
               Back
             </Button>
           ) : null}
-          <Button type="button" onClick={executeGoNext} disabled={!selectedValue}>
-            {stepIndex >= QUIZ_TOTAL_STEPS - 1 ? 'See recommendation' : 'Continue'}
-          </Button>
+          {guided.outcome !== null ? (
+            <Button type="button" onClick={() => void executeSeeRecommendation()} disabled={isSaving}>
+              See recommendation
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

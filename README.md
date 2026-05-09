@@ -38,6 +38,7 @@ Suggested indexes (create in Atlas when you begin writing documents):
 - `bookings`: `{ startsAt: 1 }`, `{ leadId: 1 }`
 - `availability_slots`: `{ startsAt: 1, timezone: 1 }`
 - `email_sends`: `{ createdAt: -1 }`, `{ to: 1 }`
+- `diagnostic_round_cache`: `{ threadHash: 1 }` unique. For **semantic** reuse of similar prompts, add an Atlas **Vector Search** index on path `embedding` (1536 dimensions, cosine, matching `OPENAI_EMBEDDING_MODEL` / `OPENAI_EMBEDDING_DIMENSIONS`) and **filter** fields `cacheVersion`, `roundsCompleted`; set `DIAGNOSTIC_CACHE_VECTOR_INDEX_NAME` to that index name in `apps/web/.env.local`.
 
 ## Railway
 
@@ -57,4 +58,12 @@ Replace with Resend/SendGrid and Stripe/PayMongo when ready.
 
 ## Auth
 
-Admin and customer accounts are planned but not wired yet. Use `src/proxy.ts` (Next.js 16 network boundary) to enforce sessions once auth is added.
+Admin and customer accounts are planned but not wired yet. The current `src/proxy.ts` (Next.js 16 network boundary) enforces a single shared `ADMIN_TOKEN` for `/admin/...` and `/api/admin/...` routes. Swap for a real session/identity provider (NextAuth/Clerk) when ready.
+
+## Admin advisor
+
+Founder-facing strategic chat at `/admin/advisor`, separate from the customer diagnostic intake. Uses `streamText` (free-form prose, not JSON schema), no caching, and a stronger model.
+
+- **Model:** `OPENAI_ADVISOR_MODEL` (default `gpt-4.1`). Customer intake stays on `OPENAI_DIAGNOSTIC_MODEL` (default `gpt-4o-mini`) to keep the funnel cheap.
+- **System prompt:** rendered from typed `AdvisorContext` in `apps/web/src/lib/ai/advisor-prompt.ts` — no `[INSERT NAME]` literals at runtime.
+- **Auth:** set `ADMIN_TOKEN` to a long random string. Visit `/admin/login`, paste the token; the server sets an HttpOnly cookie. Unset in production yields 503; in development the gate is permissive so you can iterate locally.

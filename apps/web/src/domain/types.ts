@@ -79,3 +79,69 @@ export type EmailSendDocument = {
   status: 'mock_sent' | 'failed';
   createdAt: Date;
 };
+
+/** How the diagnostic response was resolved (exact hash, vector neighbor, or fresh AI). */
+export type DiagnosticRoundMatchTier = 'exact' | 'semantic' | 'ai';
+
+/** Server/client metadata: cache vs AI and optional semantic/exact tier. */
+export type DiagnosticRoundDebugMeta = {
+  readonly source: 'cache' | 'ai';
+  readonly matchTier: DiagnosticRoundMatchTier;
+  /** Hash of the cache document served (exact key or semantic neighbor). */
+  readonly threadHash: string;
+  /** Hash for this request’s normalized thread (differs from `threadHash` when `matchTier` is `semantic`). */
+  readonly queryThreadHash: string;
+  readonly cacheVersion: string;
+  /** Model id used when `source` is `ai`, or the model recorded when the cache row was written. */
+  readonly model: string | null;
+  /** Atlas vector similarity score when `matchTier` is `semantic`. */
+  readonly semanticScore: number | null;
+};
+
+/** Stored JSON body for diagnostic-round responses (after server normalization). */
+export type DiagnosticRoundCachedPayload =
+  | {
+      readonly complete: true;
+      readonly mappedSituation: string;
+      readonly summaryForAdvisor: string;
+      readonly guidance: string | null;
+      readonly questions: readonly [];
+    }
+  | {
+      readonly complete: false;
+      readonly guidance: string | null;
+      readonly questions: ReadonlyArray<{
+        readonly id: string;
+        readonly prompt: string;
+        readonly options: readonly string[];
+      }>;
+    };
+
+/** Singleton document `_id: app` — persisted via admin `/admin/settings`. */
+export type AppSettingsDocument = {
+  _id: string;
+  diagnosticMaxRounds: number;
+  diagnosticQuestionsPerRound: number;
+  /** Added after initial deploy; omitted on older rows. */
+  diagnosticOptionsPerQuestion?: number;
+  diagnosticCacheDebugEnabled: boolean;
+  updatedAt: Date;
+};
+
+/** Exact + semantic cache for diagnostic AI rounds — keyed by SHA-256 of normalized thread + cache version. */
+export type DiagnosticRoundCacheDocument = {
+  _id?: ObjectId;
+  threadHash: string;
+  cacheVersion: string;
+  /** Number of completed rounds when this row was written (vector filter). Omitted on legacy rows. */
+  roundsCompleted?: number;
+  normalizedThread: string;
+  model: string;
+  response: DiagnosticRoundCachedPayload;
+  /** OpenAI embedding of `normalizedThread`; dimensions match `embeddingModel`. */
+  embedding?: readonly number[];
+  embeddingModel?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  hitCount: number;
+};

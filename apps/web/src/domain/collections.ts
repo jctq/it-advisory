@@ -9,4 +9,8 @@ export const COLLECTIONS = {
   availabilitySlots: 'availability_slots',
   emailSends: 'email_sends',
   users: 'users',
+  /** Diagnostic cache for `/api/quiz/diagnostic-round`: unique `{ threadHash: 1 }`; Vector Search on `embedding` optional. */
+  diagnosticRoundCache: 'diagnostic_round_cache',
+  /** Singleton `{ _id: 'app' }` — diagnostic quiz tuning (admin). */
+  appSettings: 'app_settings',
 } as const;

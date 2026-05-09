@@ -53,9 +53,14 @@ export default function RecommendationPage() {
         </ul>
       </div>
       <p className="mt-8 text-center text-sm text-muted-foreground">
-        Prefer to revisit your answers?{' '}
         <Link href="/quiz" className="font-medium text-primary underline-offset-4 hover:underline">
-          Retake the diagnostic
+          Review your diagnostic answers
+        </Link>
+        <span className="mx-2 text-muted-foreground/80" aria-hidden>
+          ·
+        </span>
+        <Link href="/quiz?retake=1" className="font-medium text-primary underline-offset-4 hover:underline">
+          Retake diagnostic (start over)
         </Link>
       </p>
     </main>

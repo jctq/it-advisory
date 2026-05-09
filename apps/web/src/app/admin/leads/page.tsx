@@ -11,9 +11,14 @@ export default async function AdminLeadsPage() {
           <p className="text-sm text-muted-foreground">CRM</p>
           <h1 className="text-3xl font-semibold tracking-tight">Leads</h1>
         </div>
-        <Link href="/admin/bookings" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
-          Bookings
-        </Link>
+        <div className="flex gap-4">
+          <Link href="/admin/bookings" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+            Bookings
+          </Link>
+          <Link href="/admin/settings" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+            Settings
+          </Link>
+        </div>
       </div>
       <LeadsTable initialData={leads} />
     </main>
