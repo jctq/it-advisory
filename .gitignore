@@ -1,0 +1,17 @@
+node_modules
+.pnp
+.pnp.js
+dist
+build
+.next
+out
+.turbo
+.env
+.env*.local
+npm-debug.log*
+pnpm-debug.log*
+.idea
+.vscode
+.DS_Store
+.vercel
+*.tsbuildinfo
