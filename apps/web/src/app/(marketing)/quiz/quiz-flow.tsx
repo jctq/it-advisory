@@ -16,6 +16,8 @@ import {
 } from '@/lib/marketing/guided-diagnostic-types';
 import { GuidedDiagnosticWizard } from './guided-diagnostic-wizard';
 
+const QUIZ_SESSION_API_URL = '/api/quiz/session';
+
 function buildAnswersPayload(guided: GuidedDiagnosticV1): Record<string, string | number | boolean | string[]> {
   return {
     guidedDiagnostic: serializeGuidedDiagnostic(guided),
@@ -51,7 +53,7 @@ export function QuizFlow() {
   const hasHydratedRef = useRef<boolean>(false);
   const persistGuided = useCallback(async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
     const linearStep = computeGuidedLinearStep(next);
-    await fetch('/api/quiz/session', {
+    await fetch(QUIZ_SESSION_API_URL, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -76,7 +78,7 @@ export function QuizFlow() {
         return;
       }
       try {
-        const response = await fetch('/api/quiz/session');
+        const response = await fetch(QUIZ_SESSION_API_URL);
         if (!response.ok || cancelled) {
           return;
         }

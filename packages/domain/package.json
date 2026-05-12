@@ -1,0 +1,16 @@
+{
+  "name": "@it-advisory/domain",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./collections": "./src/collections.ts",
+    "./diagnostic-settings-bounds": "./src/diagnostic-settings-bounds.ts",
+    "./types": "./src/types.ts",
+    "./visitor-session": "./src/visitor-session.ts"
+  },
+  "dependencies": {
+    "mongodb": "^6.16.0"
+  }
+}

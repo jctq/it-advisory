@@ -1,0 +1,17 @@
+{
+  "name": "@it-advisory/diagnostic-core",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./diagnostic-cache-debug": "./src/diagnostic-cache-debug.ts",
+    "./diagnostic-thread": "./src/diagnostic-thread.ts",
+    "./guided-diagnostic-types": "./src/guided-diagnostic-types.ts",
+    "./quiz-steps": "./src/quiz-steps.ts",
+    "./situation-options": "./src/situation-options.ts"
+  },
+  "dependencies": {
+    "@it-advisory/domain": "workspace:*"
+  }
+}

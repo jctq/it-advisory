@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { buildApiUrl } from '@/lib/config/build-api-url';
 
 type SearchParams = { readonly next?: string; readonly error?: string };
 
@@ -10,7 +11,9 @@ export default async function AdminLoginPage(props: {
   readonly searchParams: Promise<SearchParams>;
 }) {
   const params = await props.searchParams;
-  const next = typeof params.next === 'string' && params.next.length > 0 ? params.next : '/admin/leads';
+  const adminLoginAction = buildApiUrl('/api/admin/login');
+  const next =
+    typeof params.next === 'string' && params.next.length > 0 ? params.next : '/admin/diagnostic-templates';
   const errorMessage = resolveErrorMessage(params.error);
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-6 py-12">
@@ -31,7 +34,7 @@ export default async function AdminLoginPage(props: {
         </div>
       )}
       <form
-        action="/api/admin/login"
+        action={adminLoginAction}
         method="post"
         className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-xs"
       >

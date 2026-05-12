@@ -1,0 +1,10 @@
+{
+  "name": "@it-advisory/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./diagnostic-api-client": "./src/diagnostic-api-client.ts"
+  }
+}

@@ -8,6 +8,7 @@ export async function GET(): Promise<NextResponse> {
   try {
     const settings = await getAppSettings();
     return NextResponse.json({
+      diagnosticAiEnabled: settings.diagnosticAiEnabled,
       diagnosticMaxRounds: settings.diagnosticMaxRounds,
       diagnosticQuestionsPerRound: settings.diagnosticQuestionsPerRound,
       diagnosticOptionsPerQuestion: settings.diagnosticOptionsPerQuestion,
@@ -16,6 +17,7 @@ export async function GET(): Promise<NextResponse> {
   } catch {
     return NextResponse.json(
       {
+        diagnosticAiEnabled: false,
         diagnosticMaxRounds: 4,
         diagnosticQuestionsPerRound: 5,
         diagnosticOptionsPerQuestion: 4,

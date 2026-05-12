@@ -6,6 +6,7 @@ Monorepo for a Philippines-first IT advisory funnel: quiz → recommendation →
 
 - **Turborepo** + **pnpm** workspaces
 - **Next.js 16** (App Router) in `apps/web`
+- **Expo / React Native** native app in `apps/native`
 - **Tailwind CSS v4**, **shadcn/ui**-style primitives (`components.json`, `Button`)
 - **TanStack Query** + **TanStack Table** (10 rows per page on admin lists)
 - **MongoDB** (Atlas) via the official driver and a process-wide client singleton tuned for **Railway**
@@ -19,15 +20,17 @@ pnpm build
 pnpm lint
 ```
 
-Dev runs the Next app via Turbo (`apps/web`).
+Dev runs the Next app via Turbo (`apps/web`). The native app runs separately with Expo from `apps/native`.
 
 ## Environment
 
 Copy `apps/web/.env.example` to `apps/web/.env.local` and set `MONGODB_URI` from Atlas. Allow your Railway egress IPs (or `0.0.0.0/0` for a prototype) in Atlas Network Access.
 
+Copy `apps/native/.env.example` to `apps/native/.env.local` and set `EXPO_PUBLIC_API_BASE_URL` to a reachable Railway or LAN URL for the web backend.
+
 ## Data model (MongoDB)
 
-Collection names live in `apps/web/src/domain/collections.ts`. Types in `domain/types.ts`.
+Collection names and shared persisted types live in `packages/domain/src`.
 
 Suggested indexes (create in Atlas when you begin writing documents):
 
@@ -46,8 +49,20 @@ Suggested indexes (create in Atlas when you begin writing documents):
 2. **Build command:** `pnpm install && pnpm build`
 3. **Start command:** `pnpm --filter web start`
 4. Set `MONGODB_URI`, `MONGODB_DB_NAME`, and `NEXT_PUBLIC_APP_URL` to your Railway URL.
+5. Leave `NEXT_PUBLIC_API_BASE_URL` unset for normal same-origin Railway deploys, or set it only for split-origin scenarios.
 
 Node **>= 22** matches `package.json` engines.
+
+## Native app
+
+`apps/native` is the real React Native / Expo client for iOS and Android.
+
+- `pnpm --filter native run check-types`
+- `pnpm --filter native run ios`
+- `pnpm --filter native run android`
+- `pnpm --filter native run web`
+
+The native app talks to the existing Next.js backend and persists anonymous quiz progress with the `X-Device-Id` header instead of browser cookies.
 
 ## Mock integrations
 

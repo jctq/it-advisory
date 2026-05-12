@@ -1,4 +1,5 @@
 import { openai } from '@ai-sdk/openai';
+import { normalizeDiagnosticOptionLabels } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
 import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -78,6 +79,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   const { initialPrompt, rounds } = parsed.data;
   const roundsCompleted = rounds.length;
   const settings = await getAppSettings();
+  if (!settings.diagnosticAiEnabled) {
+    return NextResponse.json(
+      {
+        error: 'AI diagnostic is currently disabled.',
+        code: 'disabled',
+      },
+      { status: 409 },
+    );
+  }
   const debugOptions = { attachDebugPayload: settings.diagnosticCacheDebugEnabled };
   const maxQuestionsPerRound = settings.diagnosticQuestionsPerRound;
   const optionsPerQuestion = settings.diagnosticOptionsPerQuestion;
@@ -196,7 +206,20 @@ When complete=false: set mappedSituation and summaryForAdvisor to null; fill que
         { status: 502 },
       );
     }
-    const questions = object.questions.slice(0, maxQuestionsPerRound);
+    const questions = object.questions
+      .slice(0, maxQuestionsPerRound)
+      .flatMap((question) => {
+        const options = normalizeDiagnosticOptionLabels(question.options);
+        if (options.length === 0) {
+          return [];
+        }
+        return [
+          {
+            ...question,
+            options,
+          },
+        ];
+      });
     if (questions.length === 0) {
       return NextResponse.json(
         {

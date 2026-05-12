@@ -13,6 +13,7 @@ import { getDb } from '@/lib/mongodb';
 export const APP_SETTINGS_DOCUMENT_ID = 'app';
 
 export type AppSettingsValues = {
+  readonly diagnosticAiEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;
@@ -32,6 +33,7 @@ function clampInt(value: number, min: number, max: number, fallback: number): nu
 
 function defaultSettings(): AppSettingsValues {
   return {
+    diagnosticAiEnabled: false,
     diagnosticMaxRounds: 4,
     diagnosticQuestionsPerRound: 5,
     diagnosticOptionsPerQuestion: 4,
@@ -45,6 +47,8 @@ function mergeDocument(doc: AppSettingsDocument | null): AppSettingsValues {
     return base;
   }
   return {
+    diagnosticAiEnabled:
+      typeof doc.diagnosticAiEnabled === 'boolean' ? doc.diagnosticAiEnabled : base.diagnosticAiEnabled,
     diagnosticMaxRounds: clampInt(
       doc.diagnosticMaxRounds,
       DIAGNOSTIC_MAX_ROUNDS_MIN,
@@ -84,6 +88,8 @@ export async function getAppSettings(): Promise<AppSettingsValues> {
 export async function updateAppSettings(patch: Partial<AppSettingsValues>): Promise<AppSettingsValues> {
   const current = await getAppSettings();
   const next: AppSettingsValues = {
+    diagnosticAiEnabled:
+      patch.diagnosticAiEnabled !== undefined ? patch.diagnosticAiEnabled : current.diagnosticAiEnabled,
     diagnosticMaxRounds:
       patch.diagnosticMaxRounds !== undefined
         ? clampInt(

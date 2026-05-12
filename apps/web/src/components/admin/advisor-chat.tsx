@@ -6,9 +6,10 @@ import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Streamdown } from 'streamdown';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { buildApiUrl } from '@/lib/config/build-api-url';
 import { cn } from '@/lib/utils';
 
-const ADVISOR_API = '/api/admin/advisor/chat';
+const ADVISOR_API_URL: string = buildApiUrl('/api/admin/advisor/chat');
 
 type Role = 'system' | 'user' | 'assistant';
 
@@ -45,7 +46,7 @@ function isStreaming(parts: ReadonlyArray<{ readonly type: string }>): boolean {
 }
 
 export function AdvisorChat() {
-  const transport = useMemo(() => new DefaultChatTransport({ api: ADVISOR_API }), []);
+  const transport = useMemo(() => new DefaultChatTransport({ api: ADVISOR_API_URL }), []);
   const { messages, sendMessage, status, error, stop, regenerate } = useChat({
     transport,
   });

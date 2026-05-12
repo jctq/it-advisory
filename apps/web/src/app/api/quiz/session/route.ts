@@ -9,8 +9,8 @@ const patchBodySchema = z.object({
   completed: z.boolean().optional(),
 });
 
-export async function GET(): Promise<NextResponse> {
-  const visitorId = await readOrCreateVisitorId();
+export async function GET(request: Request): Promise<NextResponse> {
+  const visitorId = await readOrCreateVisitorId(request);
   const session = await findLatestQuizSession(visitorId);
   if (!session) {
     return NextResponse.json({
@@ -26,7 +26,7 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  const visitorId = await readOrCreateVisitorId();
+  const visitorId = await readOrCreateVisitorId(request);
   let json: unknown;
   try {
     json = await request.json();

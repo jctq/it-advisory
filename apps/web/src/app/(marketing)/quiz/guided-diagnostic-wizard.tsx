@@ -1,9 +1,14 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
+import {
+  buildActiveRoundFromTemplate,
+  buildTemplateDiagnosticOutcome,
+} from '@/lib/marketing/diagnostic-template-flow';
 import type { DiagnosticRoundDebugMeta } from '@/domain/types';
 import { extractDiagnosticRoundDebugFromResponse } from '@/lib/marketing/diagnostic-cache-debug';
 import {
@@ -13,6 +18,7 @@ import {
   type GuidedDiagnosticV1,
   buildDiagnosticTranscript,
   formatGuidedQuestionAnswer,
+  normalizeDiagnosticOptionLabels,
   toApiRoundsFromBundles,
 } from '@/lib/marketing/guided-diagnostic-types';
 import { getSituationSeed } from '@/lib/marketing/situation-options';
@@ -21,6 +27,10 @@ import { cn } from '@/lib/utils';
 const MIN_PROMPT_LENGTH = 8;
 const MAX_ANSWER_NOTE_LENGTH = 2000;
 const SITUATION_SEED_CHIPS: readonly string[] = getSituationSeed();
+const DIAGNOSTIC_CONFIG_API_URL = '/api/quiz/diagnostic-config';
+const DIAGNOSTIC_ROUND_API_URL = '/api/quiz/diagnostic-round';
+const DIAGNOSTIC_TEMPLATE_API_URL = '/api/quiz/diagnostic-template';
+const DIAGNOSTIC_TEMPLATE_SUMMARY_API_URL = '/api/quiz/diagnostic-template-summary';
 
 function togglePromptWithSeed(currentPrompt: string, phrase: string): string {
   const trimmedCurrent = currentPrompt.trim();
@@ -69,7 +79,7 @@ function DiagnosticCacheDebugPanel(props: {
   }
   const callWord = props.entries.length === 1 ? 'call' : 'calls';
   return (
-    <details className="mb-6 rounded-xl border border-dashed border-amber-500/50 bg-amber-500/[0.06] px-4 py-3 text-left">
+    <details className="mb-6 rounded-xl border border-dashed border-amber-500/50 bg-amber-500/6 px-4 py-3 text-left">
       <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-amber-950 dark:text-amber-100">
         Diagnostic cache debug ({props.entries.length} API {callWord})
       </summary>
@@ -167,7 +177,21 @@ function buildBundleFromActive(active: GuidedDiagnosticV1['activeRound']): Compl
 }
 
 type DiagnosticPublicConfig = {
+  readonly diagnosticAiEnabled: boolean;
   readonly diagnosticCacheDebugEnabled: boolean;
+};
+
+type DiagnosticTemplateApiBody = {
+  readonly template: PublicDiagnosticTemplateValue | null;
+  readonly error?: string;
+  readonly details?: string;
+};
+
+type DiagnosticTemplateSummaryApiBody = {
+  readonly summaryForAdvisor?: string;
+  readonly mappedSituation?: string;
+  readonly error?: string;
+  readonly details?: string;
 };
 
 export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): ReactElement {
@@ -176,23 +200,68 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   const [isAwaitingApi, setIsAwaitingApi] = useState<boolean>(false);
   const [diagnosticDebugLog, setDiagnosticDebugLog] = useState<DiagnosticDebugLogEntry[]>([]);
   const [cacheDebugUiEnabled, setCacheDebugUiEnabled] = useState<boolean>(false);
+  const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
+  const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
+  const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(true);
+  const initialTemplateRound = useMemo(() => {
+    if (activeTemplate === null) {
+      return null;
+    }
+    return buildActiveRoundFromTemplate(activeTemplate, 0);
+  }, [activeTemplate]);
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/quiz/diagnostic-config')
-      .then(async (response) => {
-        const data = (await response.json()) as DiagnosticPublicConfig;
-        return data;
-      })
-      .then((data) => {
-        if (!cancelled && typeof data.diagnosticCacheDebugEnabled === 'boolean') {
-          setCacheDebugUiEnabled(data.diagnosticCacheDebugEnabled);
+    async function loadDiagnosticMode(): Promise<void> {
+      try {
+        const configResponse = await fetch(DIAGNOSTIC_CONFIG_API_URL);
+        const configData = (await configResponse.json()) as DiagnosticPublicConfig;
+        if (cancelled) {
+          return;
         }
-      })
-      .catch(() => {});
+        setDiagnosticAiEnabled(typeof configData.diagnosticAiEnabled === 'boolean' ? configData.diagnosticAiEnabled : false);
+        if (typeof configData.diagnosticCacheDebugEnabled === 'boolean') {
+          setCacheDebugUiEnabled(configData.diagnosticCacheDebugEnabled);
+        }
+        if (configData.diagnosticAiEnabled) {
+          setActiveTemplate(null);
+          return;
+        }
+        const templateResponse = await fetch(DIAGNOSTIC_TEMPLATE_API_URL);
+        const templateData = (await templateResponse.json()) as DiagnosticTemplateApiBody;
+        if (cancelled) {
+          return;
+        }
+        setActiveTemplate(templateData.template);
+      } catch {
+        if (!cancelled) {
+          setActiveTemplate(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingConfig(false);
+        }
+      }
+    }
+    void loadDiagnosticMode();
     return () => {
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    if (diagnosticAiEnabled || isLoadingConfig || initialTemplateRound === null) {
+      return;
+    }
+    if (guided.activeRound !== null || guided.completedBundles.length > 0 || guided.outcome !== null) {
+      return;
+    }
+    onGuidedChange({
+      ...guided,
+      initialPrompt: '',
+      completedBundles: [],
+      activeRound: initialTemplateRound,
+      outcome: null,
+    });
+  }, [diagnosticAiEnabled, guided, initialTemplateRound, isLoadingConfig, onGuidedChange]);
   const executeUpdatePrompt = useCallback(
     (value: string): void => {
       onGuidedChange({
@@ -254,7 +323,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   const executeFetchRound = useCallback(
     async (completedBundles: CompletedRoundBundle[]): Promise<void> => {
       const trimmed = guided.initialPrompt.trim();
-      const response = await fetch('/api/quiz/diagnostic-round', {
+      const response = await fetch(DIAGNOSTIC_ROUND_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -309,7 +378,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       const mappedQuestions: DiagnosticQuestionBlock[] = questions.map((row) => ({
         id: row.id,
         prompt: row.prompt,
-        options: row.options,
+        options: normalizeDiagnosticOptionLabels(row.options),
       }));
       onGuidedChange({
         ...guided,
@@ -325,6 +394,42 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       });
     },
     [cacheDebugUiEnabled, guided, onGuidedChange],
+  );
+  const executeFetchTemplateSummary = useCallback(
+    async (completedBundles: CompletedRoundBundle[]): Promise<GuidedDiagnosticOutcome> => {
+      if (activeTemplate === null) {
+        return buildTemplateDiagnosticOutcome(
+          guided.initialPrompt,
+          completedBundles,
+          {
+            id: 'missing-template',
+            name: 'Diagnostic template',
+            rounds: [],
+          },
+          '',
+        );
+      }
+      const response = await fetch(DIAGNOSTIC_TEMPLATE_SUMMARY_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateName: activeTemplate.name,
+          initialPrompt: guided.initialPrompt,
+          rounds: toApiRoundsFromBundles(completedBundles),
+        }),
+      });
+      const data = (await response.json()) as DiagnosticTemplateSummaryApiBody;
+      if (!response.ok) {
+        throw new Error(data.details ?? data.error ?? 'Failed to generate advisor summary.');
+      }
+      return buildTemplateDiagnosticOutcome(
+        guided.initialPrompt,
+        completedBundles,
+        activeTemplate,
+        data.summaryForAdvisor ?? '',
+      );
+    },
+    [activeTemplate, guided.initialPrompt],
   );
   const executeStartFromPrompt = useCallback(async (): Promise<void> => {
     setErrorMessage(null);
@@ -372,13 +477,44 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       return;
     }
     const nextCompleted = [...guided.completedBundles, bundle];
+    if (!diagnosticAiEnabled) {
+      if (activeTemplate === null) {
+        setErrorMessage('AI Diagnostic is off, but no active template is ready yet.');
+        return;
+      }
+      const nextRound = buildActiveRoundFromTemplate(activeTemplate, nextCompleted.length);
+      if (nextRound !== null) {
+        onGuidedChange({
+          ...guided,
+          completedBundles: nextCompleted,
+          activeRound: nextRound,
+          outcome: null,
+        });
+        return;
+      }
+      setIsAwaitingApi(true);
+      try {
+        const outcome = await executeFetchTemplateSummary(nextCompleted);
+        onGuidedChange({
+          ...guided,
+          completedBundles: nextCompleted,
+          activeRound: null,
+          outcome,
+        });
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
+      } finally {
+        setIsAwaitingApi(false);
+      }
+      return;
+    }
     setIsAwaitingApi(true);
     try {
       await executeFetchRound(nextCompleted);
     } finally {
       setIsAwaitingApi(false);
     }
-  }, [executeFetchRound, guided, onGuidedChange]);
+  }, [activeTemplate, diagnosticAiEnabled, executeFetchRound, executeFetchTemplateSummary, guided, onGuidedChange]);
   if (guided.outcome !== null) {
     const { mappedSituation, advisorSummary } = guided.outcome;
     const transcript = buildDiagnosticTranscript(guided);
@@ -396,10 +532,12 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         <div className="mt-10 rounded-2xl border border-border bg-card p-6 shadow-xs">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Intake complete</p>
           <h2 className="mt-4 text-base font-semibold text-foreground">What you shared</h2>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">Your situation (in your words)</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-            {transcript.initialPrompt.trim().length > 0 ? transcript.initialPrompt : '—'}
-          </p>
+          {transcript.initialPrompt.trim().length > 0 ? (
+            <>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">Your situation (in your words)</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{transcript.initialPrompt}</p>
+            </>
+          ) : null}
           {transcript.rounds.map((round) => {
             const label = `Round ${round.roundIndex + 1}`;
             return (
@@ -443,6 +581,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     const question = activeRound.questions[activeRound.stepIndex];
     const selected =
       question !== undefined ? (activeRound.answers[question.id] ?? undefined) : undefined;
+    const questionOptions = question !== undefined ? normalizeDiagnosticOptionLabels(question.options) : [];
     const showGuidance = activeRound.stepIndex === 0 && activeRound.guidance !== null && activeRound.guidance.length > 0;
     const positionInRound = activeRound.stepIndex + 1;
     const roundSize = activeRound.questions.length;
@@ -467,11 +606,11 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           <fieldset className="mt-8 space-y-4">
             <legend className="text-lg font-medium text-foreground">{question.prompt}</legend>
             <div className="grid gap-3 sm:grid-cols-2" role="group">
-              {question.options.map((option) => {
+              {questionOptions.map((option) => {
                 const isSelected = selected === option;
                 return (
                   <button
-                    key={option}
+                    key={`${question.id}-${option}`}
                     type="button"
                     onClick={() => executeSelectOption(question.id, option)}
                     className={cn(
@@ -521,7 +660,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         {isAwaitingApi ? (
           <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
-            Updating your diagnostic…
+            {diagnosticAiEnabled ? 'Updating your diagnostic…' : 'Preparing your advisor summary…'}
           </div>
         ) : (
           <div className="mt-8">
@@ -533,6 +672,31 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       </div>
     );
   }
+  if (!diagnosticAiEnabled) {
+    if (isLoadingConfig || initialTemplateRound !== null) {
+      return (
+        <div>
+          <p className="mt-2 text-pretty text-muted-foreground">
+            Preparing your diagnostic template and saving your progress automatically.
+          </p>
+          <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
+            Opening the active template…
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <p className="mt-2 text-pretty text-muted-foreground">
+          Template mode is active, but there is no usable active template yet.
+        </p>
+        <div className="mt-4 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Ask an admin to create and activate a diagnostic template before customers start this flow.
+        </div>
+      </div>
+    );
+  }
   return (
     <div>
       <DiagnosticCacheDebugPanel
@@ -541,9 +705,21 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         onClear={() => setDiagnosticDebugLog([])}
       />
       <p className="mt-2 text-pretty text-muted-foreground">
-        Describe the problem in your own words. We will ask short guided questions—tap options and/or type your exact
-        answer—until we have enough context to map your case.
+        {diagnosticAiEnabled
+          ? 'Describe the problem in your own words. We will ask short guided questions until we have enough context to map your case.'
+          : 'Describe the problem in your own words. We will guide you through the active diagnostic template your advisor configured for customer-facing intake.'}
       </p>
+      {!diagnosticAiEnabled ? (
+        <div className="mt-4 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          {activeTemplate !== null ? (
+            <span>
+              Template mode is active: <span className="font-medium text-foreground">{activeTemplate.name}</span>.
+            </span>
+          ) : (
+            'Template mode is active, but no usable diagnostic template is available yet.'
+          )}
+        </div>
+      ) : null}
       <label htmlFor="diagnostic-prompt" className="mt-6 block text-sm font-medium text-foreground">
         Your situation
       </label>
@@ -597,12 +773,20 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       {isAwaitingApi ? (
         <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
-          Preparing your first questions…
+          {diagnosticAiEnabled ? 'Preparing your first questions…' : 'Preparing your first template round…'}
         </div>
       ) : (
         <div className="mt-6">
-          <Button type="button" onClick={() => void executeStartFromPrompt()} disabled={guided.initialPrompt.trim().length < MIN_PROMPT_LENGTH}>
-            Start guided questions
+          <Button
+            type="button"
+            onClick={() => void executeStartFromPrompt()}
+            disabled={
+              guided.initialPrompt.trim().length < MIN_PROMPT_LENGTH ||
+              isLoadingConfig ||
+              (!diagnosticAiEnabled && activeTemplate === null)
+            }
+          >
+            {diagnosticAiEnabled ? 'Start guided questions' : 'Start diagnostic template'}
           </Button>
         </div>
       )}

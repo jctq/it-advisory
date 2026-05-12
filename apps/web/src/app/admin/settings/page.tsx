@@ -1,3 +1,4 @@
+import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { AdminSettingsForm } from '@/components/admin/admin-settings-form';
 
 export const metadata = {
@@ -6,8 +7,13 @@ export const metadata = {
 
 export default function AdminSettingsPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
+    <section className="mx-auto max-w-6xl space-y-8">
+      <AdminPageHeader
+        eyebrow="Configuration"
+        title="Settings"
+        description="Control how customer-facing diagnostic intake behaves across the web and native front-facing experiences."
+      />
       <AdminSettingsForm />
-    </main>
+    </section>
   );
 }
