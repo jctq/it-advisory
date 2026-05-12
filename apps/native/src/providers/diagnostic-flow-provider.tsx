@@ -683,15 +683,22 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     setErrorMessage(null);
     setIsBusy(true);
     try {
-      setGuided(GUIDED_DIAGNOSTIC_EMPTY);
-      await executePersistGuided(GUIDED_DIAGNOSTIC_EMPTY, false);
+      const resetGuided: GuidedDiagnosticV1 =
+        !diagnosticAiEnabled && initialTemplateRound !== null
+          ? {
+              ...GUIDED_DIAGNOSTIC_EMPTY,
+              activeRound: initialTemplateRound,
+            }
+          : GUIDED_DIAGNOSTIC_EMPTY;
+      setGuided(resetGuided);
+      await executePersistGuided(resetGuided, false);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } catch (error: unknown) {
       setErrorMessage(readErrorMessage(error));
     } finally {
       setIsBusy(false);
     }
-  }, [executePersistGuided]);
+  }, [diagnosticAiEnabled, executePersistGuided, initialTemplateRound]);
 
   const progress = useMemo(() => buildDiagnosticProgress(guided), [guided]);
   const value = useMemo<DiagnosticFlowContextValue>(() => ({
