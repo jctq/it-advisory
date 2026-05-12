@@ -1,4 +1,3 @@
-import { SortableList } from '@botjaeger/expo-dnd';
 import {
   buildDiagnosticAnswerLookup,
   createEmptyDiagnosticQuestionSelection,
@@ -391,7 +390,7 @@ function RankedOptionsQuestionCard(props: {
   return (
     <View style={styles.optionGroup}>
       <Text style={[styles.variantHint, { color: theme.textMuted }]}>
-        Pick your top {props.rankedOptionLimit} outcomes, then press and hold a ranked card to drag it into place.
+        Pick your top {props.rankedOptionLimit} outcomes, then use the move buttons below to adjust their order.
       </Text>
       {props.options.map((option) => {
         const selectedRankIndex = selectedRankLookup.get(option.id);
@@ -440,58 +439,48 @@ function RankedOptionsQuestionCard(props: {
         </View>
         {selectedOptions.length > 0 ? (
           <View style={styles.detailOptionGroup}>
-            <SortableList
-              data={selectedOptions}
-              direction="vertical"
-              dragEffect="pickup"
-              keyExtractor={(item: DiagnosticQuestionOption): string => item.id}
-              longPressDuration={180}
-              activeDragStyle={{ opacity: 0.18 }}
-              onReorder={(nextOptions: DiagnosticQuestionOption[]): void => {
-                updateRankedOptionIds(nextOptions.map((option) => option.id));
-              }}
-              renderItem={({ item, index, isDragging }: { item: DiagnosticQuestionOption; index: number; isDragging: boolean }) => (
-                <View
-                  style={[
-                    styles.rankSelectionCard,
-                    {
-                      backgroundColor: isDragging ? theme.primarySoft : theme.surface,
-                      borderColor: isDragging ? theme.primary : theme.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.rankSelectionHeader}>
-                    <View style={[styles.rankIndexPill, { backgroundColor: theme.primary }]}>
-                      <Text style={styles.rankIndexText}>{index + 1}</Text>
-                    </View>
-                    <View style={styles.optionContentWrap}>
-                      <Text style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(item)}</Text>
-                      {getDisplayOptionSupportingText(item) !== null ? (
-                        <Text style={[styles.optionDescription, { color: theme.textMuted }]}>{getDisplayOptionSupportingText(item)}</Text>
-                      ) : null}
-                    </View>
-                    <View style={[styles.dragHintBadge, { backgroundColor: theme.primarySoft, borderColor: theme.border }]}>
-                      <Text style={[styles.dragHintText, { color: theme.primary }]}>DRAG</Text>
-                    </View>
+            {selectedOptions.map((item, index) => (
+              <View
+                key={item.id}
+                style={[
+                  styles.rankSelectionCard,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={styles.rankSelectionHeader}>
+                  <View style={[styles.rankIndexPill, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.rankIndexText}>{index + 1}</Text>
                   </View>
-                  <View style={styles.rankActionsRow}>
-                    <AppButton disabled={index === 0} onPress={() => executeMoveOption(item.id, -1)} variant="secondary">
-                      Move up
-                    </AppButton>
-                    <AppButton
-                      disabled={index >= selectedOptions.length - 1}
-                      onPress={() => executeMoveOption(item.id, 1)}
-                      variant="secondary"
-                    >
-                      Move down
-                    </AppButton>
-                    <AppButton onPress={() => executeRemoveOption(item.id)} variant="ghost">
-                      Remove
-                    </AppButton>
+                  <View style={styles.optionContentWrap}>
+                    <Text style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(item)}</Text>
+                    {getDisplayOptionSupportingText(item) !== null ? (
+                      <Text style={[styles.optionDescription, { color: theme.textMuted }]}>{getDisplayOptionSupportingText(item)}</Text>
+                    ) : null}
+                  </View>
+                  <View style={[styles.rankStatusBadge, { backgroundColor: theme.primarySoft, borderColor: theme.border }]}>
+                    <Text style={[styles.rankStatusText, { color: theme.primary }]}>SELECTED</Text>
                   </View>
                 </View>
-              )}
-            />
+                <View style={styles.rankActionsRow}>
+                  <AppButton disabled={index === 0} onPress={() => executeMoveOption(item.id, -1)} variant="secondary">
+                    Move up
+                  </AppButton>
+                  <AppButton
+                    disabled={index >= selectedOptions.length - 1}
+                    onPress={() => executeMoveOption(item.id, 1)}
+                    variant="secondary"
+                  >
+                    Move down
+                  </AppButton>
+                  <AppButton onPress={() => executeRemoveOption(item.id)} variant="ghost">
+                    Remove
+                  </AppButton>
+                </View>
+              </View>
+            ))}
           </View>
         ) : (
           <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
@@ -1060,14 +1049,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  dragHintBadge: {
+  rankStatusBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  dragHintText: {
+  rankStatusText: {
     fontSize: 11,
     fontWeight: '800',
     lineHeight: 14,
