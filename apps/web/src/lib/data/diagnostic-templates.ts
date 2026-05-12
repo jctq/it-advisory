@@ -2,13 +2,20 @@ import { randomUUID } from 'node:crypto';
 import { ObjectId, type Collection } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type {
+  DiagnosticTemplateChildQuestionOptionDocument,
+  DiagnosticTemplateChildQuestionDocument,
   DiagnosticTemplateDocument,
+  DiagnosticTemplateOptionPresentationDocument,
   DiagnosticTemplateOptionDocument,
   DiagnosticTemplateQuestionDocument,
   DiagnosticTemplateRoundDocument,
+  DiagnosticTemplateVisibilityRuleDocument,
 } from '@/domain/types';
 import type {
   DiagnosticTemplateInput,
+  DiagnosticTemplateQuestionType,
+  DiagnosticTemplateSelectionMode,
+  DiagnosticTemplateVisibilityRule,
   DiagnosticTemplateValue,
   PublicDiagnosticTemplateValue,
 } from '@/lib/diagnostic-template-types';
@@ -19,11 +26,29 @@ type DiagnosticTemplateStoredDocument = DiagnosticTemplateDocument & {
 };
 
 const MIN_PUBLIC_OPTIONS_PER_QUESTION = 2;
+const DEFAULT_RANKED_OPTION_LIMIT = 3;
+
+function sortChildOptions(
+  options: readonly DiagnosticTemplateChildQuestionOptionDocument[],
+): readonly DiagnosticTemplateChildQuestionOptionDocument[] {
+  return [...options].sort((left, right) => left.order - right.order);
+}
 
 function sortOptions(
   options: readonly DiagnosticTemplateOptionDocument[],
 ): readonly DiagnosticTemplateOptionDocument[] {
-  return [...options].sort((left, right) => left.order - right.order);
+  return [...options]
+    .sort((left, right) => left.order - right.order)
+    .map((option) => ({
+      ...option,
+      childQuestion:
+        option.childQuestion === undefined || option.childQuestion === null
+          ? null
+          : {
+              ...option.childQuestion,
+              options: [...sortChildOptions(option.childQuestion.options)],
+            },
+    }));
 }
 
 function sortQuestions(
@@ -36,6 +61,108 @@ function sortRounds(rounds: readonly DiagnosticTemplateRoundDocument[]): readonl
   return [...rounds].sort((left, right) => left.order - right.order);
 }
 
+function normalizeQuestionType(value: string | undefined): DiagnosticTemplateQuestionType {
+  if (value === 'nested-options' || value === 'ranked-options') {
+    return value;
+  }
+  return 'multiple-choice';
+}
+
+function normalizeRankedOptionLimit(
+  value: number | null | undefined,
+  questionType: DiagnosticTemplateQuestionType,
+): number | null {
+  if (questionType !== 'ranked-options') {
+    return null;
+  }
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 2) {
+    return value;
+  }
+  return DEFAULT_RANKED_OPTION_LIMIT;
+}
+
+function normalizeOptionalString(value: string | null | undefined): string | null {
+  const trimmedValue = value?.trim() ?? '';
+  return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
+function normalizeExampleBullets(value: readonly string[] | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((candidate) => candidate.trim()).filter((candidate) => candidate.length > 0);
+}
+
+function normalizeVisibilityMatchMode(value: string | null | undefined): 'any' | 'all' {
+  return value === 'all' ? 'all' : 'any';
+}
+
+function mapVisibilityRuleValue(
+  rule: DiagnosticTemplateVisibilityRuleDocument | null | undefined,
+): DiagnosticTemplateVisibilityRule {
+  if (rule === undefined || rule === null) {
+    return null;
+  }
+  const sourceQuestionId = rule.sourceQuestionId.trim();
+  const optionIds = rule.optionIds
+    .map((optionId) => optionId.trim())
+    .filter((optionId, index, optionIds) => optionId.length > 0 && optionIds.indexOf(optionId) === index);
+  if (sourceQuestionId.length === 0 || optionIds.length === 0) {
+    return null;
+  }
+  return {
+    sourceQuestionId,
+    optionIds,
+    match: normalizeVisibilityMatchMode(rule.match),
+  };
+}
+
+function buildVisibilityRuleDocument(rule: DiagnosticTemplateVisibilityRule): DiagnosticTemplateVisibilityRuleDocument | null {
+  if (rule === null) {
+    return null;
+  }
+  const sourceQuestionId = rule.sourceQuestionId.trim();
+  const optionIds = rule.optionIds
+    .map((optionId) => optionId.trim())
+    .filter((optionId, index, optionIds) => optionId.length > 0 && optionIds.indexOf(optionId) === index);
+  if (sourceQuestionId.length === 0 || optionIds.length === 0) {
+    return null;
+  }
+  return {
+    sourceQuestionId,
+    optionIds,
+    match: normalizeVisibilityMatchMode(rule.match),
+  };
+}
+
+function mapOptionPresentationValue(
+  presentation: DiagnosticTemplateOptionPresentationDocument | undefined,
+): DiagnosticTemplateValue['rounds'][number]['questions'][number]['options'][number]['presentation'] {
+  return {
+    icon: normalizeOptionalString(presentation?.icon),
+    badgeText: normalizeOptionalString(presentation?.badgeText),
+    eyebrow: normalizeOptionalString(presentation?.eyebrow),
+    title: normalizeOptionalString(presentation?.title),
+    supportingText: normalizeOptionalString(presentation?.supportingText),
+    exampleBullets: normalizeExampleBullets(presentation?.exampleBullets),
+    panelTitle: normalizeOptionalString(presentation?.panelTitle),
+  };
+}
+
+function buildOptionPresentationDocument(
+  input: DiagnosticTemplateInput['rounds'][number]['questions'][number]['options'][number]['presentation'],
+): DiagnosticTemplateOptionPresentationDocument {
+  return {
+    icon: normalizeOptionalString(input.icon),
+    badgeText: normalizeOptionalString(input.badgeText),
+    eyebrow: normalizeOptionalString(input.eyebrow),
+    title: normalizeOptionalString(input.title),
+    supportingText: normalizeOptionalString(input.supportingText),
+    exampleBullets: normalizeExampleBullets(input.exampleBullets),
+    panelTitle: normalizeOptionalString(input.panelTitle),
+  };
+}
+
 function mapTemplateDocument(doc: DiagnosticTemplateStoredDocument): DiagnosticTemplateValue {
   return {
     id: doc._id.toString(),
@@ -46,28 +173,78 @@ function mapTemplateDocument(doc: DiagnosticTemplateStoredDocument): DiagnosticT
       title: round.title,
       guidance: round.guidance,
       order: round.order,
-      questions: sortQuestions(round.questions).map((question) => ({
-        id: question.id,
-        prompt: question.prompt,
-        description: question.description ?? null,
-        order: question.order,
-        options: sortOptions(question.options).map((option) => ({
-          id: option.id,
-          label: option.label,
-          description: option.description ?? null,
-          order: option.order,
-        })),
-      })),
+      showWhen: mapVisibilityRuleValue(round.showWhen),
+      questions: sortQuestions(round.questions).map((question) => {
+        const questionType = normalizeQuestionType(question.type);
+        return {
+          id: question.id,
+          prompt: question.prompt,
+          description: question.description ?? null,
+          order: question.order,
+          showWhen: mapVisibilityRuleValue(question.showWhen),
+          type: questionType,
+          rankedOptionLimit: normalizeRankedOptionLimit(question.rankedOptionLimit, questionType),
+          selectionMode: questionType === 'ranked-options' ? 'multiple' : normalizeSelectionMode(question.selectionMode),
+          options: sortOptions(question.options).map((option) => ({
+            id: option.id,
+            label: option.label,
+            description: option.description ?? null,
+            order: option.order,
+            showWhen: mapVisibilityRuleValue(option.showWhen),
+            presentation: mapOptionPresentationValue(option.presentation),
+            childQuestion:
+              option.childQuestion === undefined || option.childQuestion === null
+                ? null
+                : {
+                    id: option.childQuestion.id,
+                    prompt: option.childQuestion.prompt,
+                    description: option.childQuestion.description ?? null,
+                    selectionMode: option.childQuestion.selectionMode,
+                    options: sortChildOptions(option.childQuestion.options).map((childOption) => ({
+                      id: childOption.id,
+                      label: childOption.label,
+                      description: childOption.description ?? null,
+                      order: childOption.order,
+                    })),
+                  },
+          })),
+        };
+      }),
     })),
     createdAtIso: doc.createdAt.toISOString(),
     updatedAtIso: doc.updatedAt.toISOString(),
   };
 }
 
-function buildOptionDocument(
-  input: DiagnosticTemplateInput['rounds'][number]['questions'][number]['options'][number],
+function normalizeSelectionMode(value: string | undefined): DiagnosticTemplateSelectionMode {
+  return value === 'multiple' ? 'multiple' : 'single';
+}
+
+function buildChildQuestionDocument(
+  input:
+    | DiagnosticTemplateInput['rounds'][number]['questions'][number]['options'][number]['childQuestion']
+    | null,
+): DiagnosticTemplateChildQuestionDocument | null {
+  if (input === null) {
+    return null;
+  }
+  const prompt = input.prompt.trim();
+  const description = input.description?.trim() ?? '';
+  return {
+    id: input.id.trim().length > 0 ? input.id.trim() : randomUUID(),
+    prompt,
+    description: description.length > 0 ? description : null,
+    selectionMode: normalizeSelectionMode(input.selectionMode),
+    options: input.options.map((option, optionIndex) => buildChildOptionDocument(option, optionIndex)),
+  };
+}
+
+function buildChildOptionDocument(
+  input: NonNullable<
+    DiagnosticTemplateInput['rounds'][number]['questions'][number]['options'][number]['childQuestion']
+  >['options'][number],
   order: number,
-): DiagnosticTemplateOptionDocument {
+): DiagnosticTemplateChildQuestionOptionDocument {
   const label = input.label.trim();
   const description = input.description?.trim() ?? '';
   return {
@@ -78,16 +255,39 @@ function buildOptionDocument(
   };
 }
 
+function buildOptionDocument(
+  input: DiagnosticTemplateInput['rounds'][number]['questions'][number]['options'][number],
+  order: number,
+): DiagnosticTemplateOptionDocument {
+  const label = input.label.trim();
+  const description = input.description?.trim() ?? '';
+  const childQuestion = buildChildQuestionDocument(input.childQuestion);
+  return {
+    id: input.id.trim().length > 0 ? input.id.trim() : randomUUID(),
+    label,
+    description: description.length > 0 ? description : null,
+    order,
+    showWhen: buildVisibilityRuleDocument(input.showWhen),
+    presentation: buildOptionPresentationDocument(input.presentation),
+    childQuestion,
+  };
+}
+
 function buildQuestionDocument(
   input: DiagnosticTemplateInput['rounds'][number]['questions'][number],
   order: number,
 ): DiagnosticTemplateQuestionDocument {
   const description = input.description?.trim() ?? '';
+  const questionType = normalizeQuestionType(input.type);
   return {
     id: input.id.trim().length > 0 ? input.id.trim() : randomUUID(),
     prompt: input.prompt.trim(),
     description: description.length > 0 ? description : null,
     order,
+    showWhen: buildVisibilityRuleDocument(input.showWhen),
+    type: questionType,
+    rankedOptionLimit: normalizeRankedOptionLimit(input.rankedOptionLimit, questionType),
+    selectionMode: questionType === 'ranked-options' ? 'multiple' : normalizeSelectionMode(input.selectionMode),
     options: input.options.map((option, optionIndex) => buildOptionDocument(option, optionIndex)),
   };
 }
@@ -102,6 +302,7 @@ function buildRoundDocument(
     title: input.title.trim().length > 0 ? input.title.trim() : `Round ${order + 1}`,
     guidance: guidance === null || guidance.length === 0 ? null : guidance,
     order,
+    showWhen: buildVisibilityRuleDocument(input.showWhen),
     questions: input.questions.map((question, questionIndex) => buildQuestionDocument(question, questionIndex)),
   };
 }
@@ -142,24 +343,67 @@ function isValidPublicQuestion(question: DiagnosticTemplateValue['rounds'][numbe
   return prompt.length > 0 && validOptions.length >= MIN_PUBLIC_OPTIONS_PER_QUESTION;
 }
 
+function isValidPublicChildQuestion(
+  childQuestion: DiagnosticTemplateValue['rounds'][number]['questions'][number]['options'][number]['childQuestion'],
+): childQuestion is NonNullable<
+  DiagnosticTemplateValue['rounds'][number]['questions'][number]['options'][number]['childQuestion']
+> {
+  if (childQuestion === null) {
+    return false;
+  }
+  const prompt = childQuestion.prompt.trim();
+  const validOptions = childQuestion.options.filter((option) => option.label.trim().length > 0);
+  return prompt.length > 0 && validOptions.length >= MIN_PUBLIC_OPTIONS_PER_QUESTION;
+}
+
 function toPublicTemplate(template: DiagnosticTemplateValue): PublicDiagnosticTemplateValue | null {
   const rounds = template.rounds
     .map((round) => ({
       id: round.id,
       title: round.title,
       guidance: round.guidance,
+      showWhen: round.showWhen,
       questions: round.questions
         .filter((question) => isValidPublicQuestion(question))
         .map((question) => ({
           id: question.id,
           prompt: question.prompt.trim(),
           description: question.description?.trim() ? question.description.trim() : null,
+          showWhen: question.showWhen,
+          type: question.type,
+          rankedOptionLimit: normalizeRankedOptionLimit(question.rankedOptionLimit, question.type),
+          selectionMode: question.type === 'ranked-options' ? 'multiple' : question.selectionMode,
           options: question.options
             .filter((option) => option.label.trim().length > 0)
             .map((option) => ({
               id: option.id,
               label: option.label.trim(),
               description: option.description?.trim() ? option.description.trim() : null,
+              showWhen: option.showWhen,
+              presentation: {
+                icon: normalizeOptionalString(option.presentation.icon),
+                badgeText: normalizeOptionalString(option.presentation.badgeText),
+                eyebrow: normalizeOptionalString(option.presentation.eyebrow),
+                title: normalizeOptionalString(option.presentation.title),
+                supportingText: normalizeOptionalString(option.presentation.supportingText),
+                exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
+                panelTitle: normalizeOptionalString(option.presentation.panelTitle),
+              },
+              childQuestion: isValidPublicChildQuestion(option.childQuestion)
+                ? {
+                    id: option.childQuestion.id,
+                    prompt: option.childQuestion.prompt.trim(),
+                    description: option.childQuestion.description?.trim() ? option.childQuestion.description.trim() : null,
+                    selectionMode: option.childQuestion.selectionMode,
+                    options: option.childQuestion.options
+                      .filter((childOption) => childOption.label.trim().length > 0)
+                      .map((childOption) => ({
+                        id: childOption.id,
+                        label: childOption.label.trim(),
+                        description: childOption.description?.trim() ? childOption.description.trim() : null,
+                      })),
+                  }
+                : null,
             })),
         })),
     }))
@@ -183,6 +427,24 @@ export async function listDiagnosticTemplates(): Promise<readonly DiagnosticTemp
   return docs
     .filter((doc): doc is DiagnosticTemplateStoredDocument => doc._id !== undefined)
     .map((doc) => mapTemplateDocument(doc));
+}
+
+export async function getDiagnosticTemplateById(templateId: string): Promise<DiagnosticTemplateValue | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  try {
+    const doc = await findTemplateDocumentById(templateId);
+    if (doc === null) {
+      return null;
+    }
+    return mapTemplateDocument(doc);
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'Invalid diagnostic template id.') {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function createDiagnosticTemplate(name?: string): Promise<DiagnosticTemplateValue> {

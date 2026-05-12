@@ -1,4 +1,4 @@
-import { DiagnosticTemplatesManager } from '@/components/admin/diagnostic-templates-manager';
+import { DiagnosticTemplatesList } from '@/components/admin/diagnostic-templates-list';
 import { listDiagnosticTemplates } from '@/lib/data/diagnostic-templates';
 
 export const metadata = {
@@ -9,5 +9,5 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminDiagnosticTemplatesPage() {
   const templates = await listDiagnosticTemplates();
-  return <DiagnosticTemplatesManager initialTemplates={templates} />;
+  return <DiagnosticTemplatesList initialTemplates={templates} />;
 }

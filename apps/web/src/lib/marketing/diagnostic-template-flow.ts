@@ -5,7 +5,10 @@ import type {
   GuidedDiagnosticOutcome,
 } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
 import {
+  buildDiagnosticAnswerLookup,
+  findFirstVisibleQuestionIndex,
   formatGuidedQuestionAnswer,
+  isVisibilityRuleMatched,
   normalizeDiagnosticOptions,
 } from '@/lib/marketing/guided-diagnostic-types';
 import { getSituationDisplayList } from '@/lib/marketing/situation-options';
@@ -23,7 +26,11 @@ function buildSituationHint(initialPrompt: string, bundles: readonly CompletedRo
   return bundles
     .flatMap((bundle) =>
       bundle.questions.map((question) =>
-        formatGuidedQuestionAnswer(bundle.answers[question.id] ?? '', bundle.answerNotes[question.id] ?? ''),
+        formatGuidedQuestionAnswer({
+          question,
+          selection: bundle.answers[question.id],
+          detailNote: bundle.answerNotes[question.id] ?? '',
+        }),
       ),
     )
     .filter((value) => value.trim().length > 0)
@@ -88,24 +95,92 @@ export function buildTemplateFallbackAdvisorSummary(
 export function buildActiveRoundFromTemplate(
   template: PublicDiagnosticTemplateValue,
   roundIndex: number,
+  completedBundles: readonly CompletedRoundBundle[] = [],
 ): ActiveGuidedRound | null {
   const round = template.rounds[roundIndex];
-  if (round === undefined) {
+  if (
+    round === undefined ||
+    !isVisibilityRuleMatched({
+      answers: buildDiagnosticAnswerLookup({
+        completedBundles,
+      }),
+      rule: round.showWhen,
+    })
+  ) {
+    return null;
+  }
+  const questions = round.questions.map((question) => ({
+    id: question.id,
+    prompt: question.prompt,
+    description: question.description,
+    showWhen: question.showWhen,
+    type: question.type,
+    rankedOptionLimit: question.rankedOptionLimit,
+    selectionMode: question.selectionMode,
+    options: normalizeDiagnosticOptions(question.options),
+  }));
+  const stepIndex = findFirstVisibleQuestionIndex({
+    questions,
+    baseAnswers: buildDiagnosticAnswerLookup({
+      completedBundles,
+    }),
+    answers: {},
+  });
+  if (stepIndex === null) {
     return null;
   }
   return {
     roundIndex,
-    questions: round.questions.map((question) => ({
-      id: question.id,
-      prompt: question.prompt,
-      description: question.description,
-      options: normalizeDiagnosticOptions(question.options),
-    })),
+    roundTitle: round.title,
+    questions,
     answers: {},
     answerNotes: {},
-    stepIndex: 0,
+    stepIndex,
     guidance: round.guidance,
   };
+}
+
+export function buildNextTemplateRoundFromState(params: {
+  readonly completedBundles: readonly CompletedRoundBundle[];
+  readonly startRoundIndex: number;
+  readonly template: PublicDiagnosticTemplateValue;
+}): ActiveGuidedRound | null {
+  for (let roundIndex = params.startRoundIndex; roundIndex < params.template.rounds.length; roundIndex += 1) {
+    const activeRound = buildActiveRoundFromTemplate(params.template, roundIndex, params.completedBundles);
+    if (activeRound !== null) {
+      return activeRound;
+    }
+  }
+  return null;
+}
+
+export function listVisibleTemplateRoundSummaries(params: {
+  readonly activeRound: ActiveGuidedRound | null;
+  readonly completedBundles: readonly CompletedRoundBundle[];
+  readonly template: PublicDiagnosticTemplateValue;
+}): readonly {
+  readonly authoredRoundIndex: number;
+  readonly id: string;
+  readonly title: string;
+}[] {
+  const answers = buildDiagnosticAnswerLookup({
+    completedBundles: params.completedBundles,
+    activeRound: params.activeRound,
+  });
+  return params.template.rounds.flatMap((round, roundIndex) =>
+    isVisibilityRuleMatched({
+      answers,
+      rule: round.showWhen,
+    })
+      ? [
+          {
+            authoredRoundIndex: roundIndex,
+            id: round.id,
+            title: round.title,
+          },
+        ]
+      : [],
+  );
 }
 
 export function buildTemplateDiagnosticOutcome(

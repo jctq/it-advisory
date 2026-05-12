@@ -5,11 +5,13 @@ import {
   computeGuidedLinearStep,
   normalizeDiagnosticOptions,
   parseGuidedDiagnosticJson,
+  toggleQuestionOptionSelection,
   toApiRoundsFromBundles,
   type CompletedRoundBundle,
   type DiagnosticQuestionBlock,
   type GuidedDiagnosticOutcome,
   type GuidedDiagnosticV1,
+  validateGuidedQuestionResponse,
 } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
 import {
   buildActiveRoundFromTemplate,
@@ -30,7 +32,6 @@ import {
 import { readOrCreateDeviceId } from '../lib/device-id';
 import {
   buildCompletedRoundBundle,
-  buildCurrentAnswerText,
   buildDiagnosticProgress,
   buildQuizAnswersPayload,
   MIN_PROMPT_LENGTH,
@@ -55,7 +56,7 @@ type DiagnosticFlowContextValue = {
   executeFinalizeDiagnostic(): Promise<void>;
   executeGoBack(): void;
   executeReset(): Promise<void>;
-  executeSelectOption(questionId: string, option: string): void;
+  executeSelectOption(question: DiagnosticQuestionBlock, optionId: string): void;
   executeStartDiagnostic(): Promise<void>;
   executeUpdateAnswerNote(questionId: string, value: string): void;
   executeUpdatePrompt(value: string): void;
@@ -155,6 +156,10 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
           id: hasQuestionId ? question.id.trim() : `question-${index + 1}`,
           prompt: question.prompt.trim(),
           description: null,
+          showWhen: null,
+          type: 'multiple-choice',
+          rankedOptionLimit: null,
+          selectionMode: 'single',
           options,
         },
       ];
@@ -167,6 +172,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
       completedBundles: [...completedBundles],
       activeRound: {
         roundIndex: completedBundles.length,
+        roundTitle: `Round ${completedBundles.length + 1}`,
         questions,
         answers: {},
         answerNotes: {},
@@ -307,19 +313,24 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     void Haptics.selectionAsync();
   }, []);
 
-  const executeSelectOption = useCallback((questionId: string, option: string): void => {
+  const executeSelectOption = useCallback((question: DiagnosticQuestionBlock, optionId: string): void => {
     setErrorMessage(null);
     setGuided((previous) => {
       if (previous.activeRound === null) {
         return previous;
       }
+      const nextSelection = toggleQuestionOptionSelection({
+        question,
+        selection: previous.activeRound.answers[question.id],
+        optionId,
+      });
       return {
         ...previous,
         activeRound: {
           ...previous.activeRound,
           answers: {
             ...previous.activeRound.answers,
-            [questionId]: option,
+            [question.id]: nextSelection,
           },
         },
       };
@@ -382,9 +393,17 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     if (guided.activeRound === null) {
       return;
     }
-    const currentAnswer = buildCurrentAnswerText(guided);
-    if (currentAnswer.length === 0) {
-      setErrorMessage('Select an option or add a short note before continuing.');
+    const currentQuestion = guided.activeRound.questions[guided.activeRound.stepIndex];
+    if (currentQuestion === undefined) {
+      return;
+    }
+    const validation = validateGuidedQuestionResponse({
+      question: currentQuestion,
+      selection: guided.activeRound.answers[currentQuestion.id],
+      detailNote: guided.activeRound.answerNotes[currentQuestion.id] ?? '',
+    });
+    if (!validation.isValid) {
+      setErrorMessage(validation.message ?? 'Select an option or add a short note before continuing.');
       return;
     }
     const activeRound = guided.activeRound;

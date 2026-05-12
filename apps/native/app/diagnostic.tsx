@@ -194,12 +194,13 @@ export default function DiagnosticScreen() {
           <View style={styles.optionGroup}>
             {currentOptions.length > 0 ? (
               currentOptions.map((option) => {
-                const isSelected = activeRound.answers[currentQuestion.id] === option.label;
+                const isSelected =
+                  activeRound.answers[currentQuestion.id]?.selectedOptionIds.includes(option.id) ?? false;
                 return (
                   <Pressable
-                    key={option.label}
+                    key={option.id}
                     accessibilityRole="button"
-                    onPress={() => executeSelectOption(currentQuestion.id, option.label)}
+                    onPress={() => executeSelectOption(currentQuestion, option.id)}
                     style={({ pressed }) => [
                       styles.optionButton,
                       {

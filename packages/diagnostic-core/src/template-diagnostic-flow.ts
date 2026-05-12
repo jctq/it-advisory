@@ -3,9 +3,35 @@ import {
   normalizeDiagnosticOptions,
   type ActiveGuidedRound,
   type CompletedRoundBundle,
+  type DiagnosticVisibilityRule,
+  type DiagnosticSelectionMode,
   type DiagnosticThreadRound,
 } from './guided-diagnostic-types';
 import { getSituationDisplayList } from './situation-options';
+
+export type PublicDiagnosticTemplateQuestionType = 'multiple-choice' | 'nested-options' | 'ranked-options';
+
+export type PublicDiagnosticTemplateOptionPresentationValue = {
+  readonly icon: string | null;
+  readonly badgeText: string | null;
+  readonly eyebrow: string | null;
+  readonly title: string | null;
+  readonly supportingText: string | null;
+  readonly exampleBullets: readonly string[];
+  readonly panelTitle: string | null;
+};
+
+export type PublicDiagnosticTemplateChildQuestionValue = {
+  readonly id: string;
+  readonly prompt: string;
+  readonly description: string | null;
+  readonly selectionMode: DiagnosticSelectionMode;
+  readonly options: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly description: string | null;
+  }[];
+};
 
 export type PublicDiagnosticTemplateValue = {
   readonly id: string;
@@ -14,14 +40,22 @@ export type PublicDiagnosticTemplateValue = {
     readonly id: string;
     readonly title: string;
     readonly guidance: string | null;
+    readonly showWhen: DiagnosticVisibilityRule;
     readonly questions: readonly {
       readonly id: string;
       readonly prompt: string;
       readonly description: string | null;
+      readonly showWhen: DiagnosticVisibilityRule;
+      readonly type: PublicDiagnosticTemplateQuestionType;
+      readonly rankedOptionLimit: number | null;
+      readonly selectionMode: DiagnosticSelectionMode;
       readonly options: readonly {
         readonly id: string;
         readonly label: string;
         readonly description: string | null;
+        readonly showWhen: DiagnosticVisibilityRule;
+        readonly presentation: PublicDiagnosticTemplateOptionPresentationValue;
+        readonly childQuestion: PublicDiagnosticTemplateChildQuestionValue | null;
       }[];
     }[];
   }[];
@@ -35,7 +69,11 @@ function buildSituationHint(initialPrompt: string, bundles: readonly CompletedRo
   return bundles
     .flatMap((bundle) =>
       bundle.questions.map((question) =>
-        formatGuidedQuestionAnswer(bundle.answers[question.id] ?? '', bundle.answerNotes[question.id] ?? ''),
+        formatGuidedQuestionAnswer({
+          question,
+          selection: bundle.answers[question.id],
+          detailNote: bundle.answerNotes[question.id] ?? '',
+        }),
       ),
     )
     .filter((value) => value.trim().length > 0)
@@ -63,10 +101,15 @@ export function buildActiveRoundFromTemplate(
   }
   return {
     roundIndex,
+    roundTitle: round.title,
     questions: round.questions.map((question) => ({
       id: question.id,
       prompt: question.prompt,
       description: question.description,
+      showWhen: question.showWhen,
+      type: question.type,
+      rankedOptionLimit: question.rankedOptionLimit,
+      selectionMode: question.selectionMode,
       options: normalizeDiagnosticOptions(question.options),
     })),
     answers: {},

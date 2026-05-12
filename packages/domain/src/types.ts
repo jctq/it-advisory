@@ -80,11 +80,51 @@ export type EmailSendDocument = {
   createdAt: Date;
 };
 
+export type DiagnosticTemplateChildQuestionOptionDocument = {
+  id: string;
+  label: string;
+  description?: string | null;
+  order: number;
+};
+
+export type DiagnosticTemplateQuestionType = 'multiple-choice' | 'nested-options' | 'ranked-options';
+
+export type DiagnosticTemplateVisibilityMatchMode = 'any' | 'all';
+
+export type DiagnosticTemplateVisibilityRuleDocument = {
+  sourceQuestionId: string;
+  optionIds: string[];
+  match: DiagnosticTemplateVisibilityMatchMode;
+};
+
+export type DiagnosticTemplateOptionPresentationDocument = {
+  icon?: string | null;
+  badgeText?: string | null;
+  eyebrow?: string | null;
+  title?: string | null;
+  supportingText?: string | null;
+  exampleBullets?: string[];
+  panelTitle?: string | null;
+};
+
 export type DiagnosticTemplateOptionDocument = {
   id: string;
   label: string;
   description?: string | null;
   order: number;
+  showWhen?: DiagnosticTemplateVisibilityRuleDocument | null;
+  presentation?: DiagnosticTemplateOptionPresentationDocument;
+  childQuestion?: DiagnosticTemplateChildQuestionDocument | null;
+};
+
+export type DiagnosticTemplateSelectionMode = 'single' | 'multiple';
+
+export type DiagnosticTemplateChildQuestionDocument = {
+  id: string;
+  prompt: string;
+  description?: string | null;
+  selectionMode: DiagnosticTemplateSelectionMode;
+  options: DiagnosticTemplateChildQuestionOptionDocument[];
 };
 
 export type DiagnosticTemplateQuestionDocument = {
@@ -92,6 +132,10 @@ export type DiagnosticTemplateQuestionDocument = {
   prompt: string;
   description?: string | null;
   order: number;
+  showWhen?: DiagnosticTemplateVisibilityRuleDocument | null;
+  type?: DiagnosticTemplateQuestionType;
+  rankedOptionLimit?: number | null;
+  selectionMode: DiagnosticTemplateSelectionMode;
   options: DiagnosticTemplateOptionDocument[];
 };
 
@@ -100,6 +144,7 @@ export type DiagnosticTemplateRoundDocument = {
   title: string;
   guidance: string | null;
   order: number;
+  showWhen?: DiagnosticTemplateVisibilityRuleDocument | null;
   questions: DiagnosticTemplateQuestionDocument[];
 };
 

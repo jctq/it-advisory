@@ -1,5 +1,13 @@
 type QuizAnswers = Readonly<Record<string, string | string[] | number | boolean>>;
 
+type PublicDiagnosticTemplateQuestionType = 'multiple-choice' | 'nested-options' | 'ranked-options';
+
+type PublicDiagnosticTemplateVisibilityRule = {
+  readonly sourceQuestionId: string;
+  readonly optionIds: readonly string[];
+  readonly match: 'any' | 'all';
+} | null;
+
 type PublicDiagnosticTemplateValue = {
   readonly id: string;
   readonly name: string;
@@ -7,14 +15,40 @@ type PublicDiagnosticTemplateValue = {
     readonly id: string;
     readonly title: string;
     readonly guidance: string | null;
+    readonly showWhen: PublicDiagnosticTemplateVisibilityRule;
     readonly questions: readonly {
       readonly id: string;
       readonly prompt: string;
       readonly description: string | null;
+      readonly showWhen: PublicDiagnosticTemplateVisibilityRule;
+      readonly type: PublicDiagnosticTemplateQuestionType;
+      readonly rankedOptionLimit: number | null;
+      readonly selectionMode: 'single' | 'multiple';
       readonly options: readonly {
         readonly id: string;
         readonly label: string;
         readonly description: string | null;
+        readonly showWhen: PublicDiagnosticTemplateVisibilityRule;
+        readonly presentation: {
+          readonly icon: string | null;
+          readonly badgeText: string | null;
+          readonly eyebrow: string | null;
+          readonly title: string | null;
+          readonly supportingText: string | null;
+          readonly exampleBullets: readonly string[];
+          readonly panelTitle: string | null;
+        };
+        readonly childQuestion: {
+          readonly id: string;
+          readonly prompt: string;
+          readonly description: string | null;
+          readonly selectionMode: 'single' | 'multiple';
+          readonly options: readonly {
+            readonly id: string;
+            readonly label: string;
+            readonly description: string | null;
+          }[];
+        } | null;
       }[];
     }[];
   }[];

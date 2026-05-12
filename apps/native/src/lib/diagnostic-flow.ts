@@ -96,6 +96,7 @@ export function buildCompletedRoundBundle(activeRound: ActiveGuidedRound | null)
   }
   return {
     roundIndex: activeRound.roundIndex,
+    roundTitle: activeRound.roundTitle,
     questions: activeRound.questions,
     answers: { ...activeRound.answers },
     answerNotes: { ...activeRound.answerNotes },
@@ -114,8 +115,9 @@ export function buildCurrentAnswerText(guided: GuidedDiagnosticV1): string {
   if (currentQuestion === undefined) {
     return '';
   }
-  return formatGuidedQuestionAnswer(
-    guided.activeRound.answers[currentQuestion.id] ?? '',
-    guided.activeRound.answerNotes[currentQuestion.id] ?? '',
-  );
+  return formatGuidedQuestionAnswer({
+    question: currentQuestion,
+    selection: guided.activeRound.answers[currentQuestion.id],
+    detailNote: guided.activeRound.answerNotes[currentQuestion.id] ?? '',
+  });
 }
