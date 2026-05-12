@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import { findLatestQuizSession, upsertQuizProgress } from '@/lib/data/quiz-sessions';
 import { readOrCreateVisitorId } from '@/lib/server/visitor-cookie';
 
@@ -8,6 +9,13 @@ const patchBodySchema = z.object({
   currentStep: z.number().int().min(0),
   completed: z.boolean().optional(),
 });
+
+const RESET_QUIZ_ANSWERS = {
+  guidedDiagnostic: serializeGuidedDiagnostic(GUIDED_DIAGNOSTIC_EMPTY),
+  situation: '',
+  situationAdvisorSummary: '',
+  situationDiagnosticThread: buildDiagnosticThreadJson(GUIDED_DIAGNOSTIC_EMPTY),
+} as const;
 
 export async function GET(request: Request): Promise<NextResponse> {
   const visitorId = await readOrCreateVisitorId(request);
@@ -47,5 +55,31 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   return NextResponse.json({
     sessionId: result.sessionId ?? null,
     persisted: result.persisted,
+  });
+}
+
+export async function DELETE(request: Request): Promise<NextResponse> {
+  const visitorId = await readOrCreateVisitorId(request);
+  const latestSession = await findLatestQuizSession(visitorId);
+
+  if (!latestSession) {
+    return NextResponse.json({
+      persisted: false,
+      reset: false,
+      sessionId: null,
+    });
+  }
+
+  const result = await upsertQuizProgress({
+    visitorId,
+    answers: RESET_QUIZ_ANSWERS,
+    currentStep: 0,
+    isComplete: false,
+  });
+
+  return NextResponse.json({
+    persisted: result.persisted,
+    reset: true,
+    sessionId: result.sessionId ?? null,
   });
 }

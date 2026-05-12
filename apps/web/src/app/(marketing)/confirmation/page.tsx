@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { CalendarClock, CheckCircle2, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
+import { QuizSessionResetOnMount } from './quiz-session-reset-on-mount';
 
 export const metadata: Metadata = {
   title: 'Booking confirmed · IT Advisory',
@@ -35,6 +36,7 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
 
   return (
     <main className="mx-auto max-w-xl px-6 py-20 text-center md:py-28">
+      <QuizSessionResetOnMount />
       <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
         <CheckCircle2 className="size-9" aria-hidden />
       </div>

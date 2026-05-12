@@ -60,7 +60,7 @@ type DiagnosticFlowContextValue = {
   executeAdvance(): Promise<void>;
   executeFinalizeDiagnostic(): Promise<void>;
   executeGoBack(): void;
-  executeReset(): Promise<void>;
+  executeReset(params?: ResetDiagnosticParams): Promise<void>;
   executeSelectChildOption(question: DiagnosticQuestionBlock, parentOptionId: string, childOptionId: string): void;
   executeSelectOption(question: DiagnosticQuestionBlock, optionId: string): void;
   executeSetQuestionSelection(questionId: string, nextSelection: DiagnosticQuestionSelection): void;
@@ -68,6 +68,10 @@ type DiagnosticFlowContextValue = {
   executeUpdateAnswerNote(questionId: string, value: string): void;
   executeUpdatePrompt(value: string): void;
   executeUsePromptSeed(phrase: string): void;
+};
+
+type ResetDiagnosticParams = {
+  readonly shouldNotify?: boolean;
 };
 
 const ANSWER_NOTE_LIMIT = 2000;
@@ -679,10 +683,11 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     }
   }, [executePersistGuided, guided]);
 
-  const executeReset = useCallback(async (): Promise<void> => {
+  const executeReset = useCallback(async (params: ResetDiagnosticParams = {}): Promise<void> => {
     setErrorMessage(null);
     setIsBusy(true);
     try {
+      const shouldNotify = params.shouldNotify ?? true;
       const resetGuided: GuidedDiagnosticV1 =
         !diagnosticAiEnabled && initialTemplateRound !== null
           ? {
@@ -692,7 +697,9 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
           : GUIDED_DIAGNOSTIC_EMPTY;
       setGuided(resetGuided);
       await executePersistGuided(resetGuided, false);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      if (shouldNotify) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
     } catch (error: unknown) {
       setErrorMessage(readErrorMessage(error));
     } finally {

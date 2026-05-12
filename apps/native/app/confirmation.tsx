@@ -1,8 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
+import { useDiagnosticFlow } from '../src/providers/diagnostic-flow-provider';
 import { useAppTheme } from '../src/theme/use-app-theme';
 
 const PRIMARY_TIMEZONE = 'Asia/Manila';
@@ -30,8 +32,18 @@ export default function ConfirmationScreen() {
   const router = useRouter();
   const theme = useAppTheme();
   const params = useLocalSearchParams<{ date?: string; time?: string }>();
+  const { executeReset } = useDiagnosticFlow();
+  const hasResetRef = useRef<boolean>(false);
   const displayDate = formatDisplayDate(params.date);
   const displayTime = params.time ?? 'your selected time';
+
+  useEffect((): void => {
+    if (hasResetRef.current) {
+      return;
+    }
+    hasResetRef.current = true;
+    void executeReset({ shouldNotify: false });
+  }, [executeReset]);
 
   return (
     <AppScreen
