@@ -1,4 +1,5 @@
 import {
+  buildDiagnosticAnswerLookup,
   buildDiagnosticThreadJson,
   computeGuidedLinearStep,
   formatGuidedQuestionAnswer,
@@ -67,6 +68,7 @@ export function buildDiagnosticProgress(guided: GuidedDiagnosticV1): {
   readonly hint: string;
   readonly percent: number;
 } {
+  const linearStep = computeGuidedLinearStep(guided);
   if (guided.outcome !== null) {
     return {
       hint: 'Summary',
@@ -74,16 +76,14 @@ export function buildDiagnosticProgress(guided: GuidedDiagnosticV1): {
     };
   }
   if (guided.activeRound !== null) {
-    const completedQuestions = guided.completedBundles.reduce((sum, bundle) => sum + bundle.questions.length, 0);
-    const ordinal = completedQuestions + guided.activeRound.stepIndex + 1;
     return {
-      hint: `Question ${ordinal}`,
-      percent: Math.min(94, 6 + computeGuidedLinearStep(guided) * 9),
+      hint: `Question ${linearStep}`,
+      percent: Math.min(94, 6 + linearStep * 9),
     };
   }
   return {
     hint: 'Describe',
-    percent: Math.min(94, 6 + computeGuidedLinearStep(guided) * 9),
+    percent: Math.min(94, 6 + linearStep * 9),
   };
 }
 
@@ -116,6 +116,10 @@ export function buildCurrentAnswerText(guided: GuidedDiagnosticV1): string {
     return '';
   }
   return formatGuidedQuestionAnswer({
+    baseAnswers: buildDiagnosticAnswerLookup({
+      completedBundles: guided.completedBundles,
+      activeRound: guided.activeRound,
+    }),
     question: currentQuestion,
     selection: guided.activeRound.answers[currentQuestion.id],
     detailNote: guided.activeRound.answerNotes[currentQuestion.id] ?? '',

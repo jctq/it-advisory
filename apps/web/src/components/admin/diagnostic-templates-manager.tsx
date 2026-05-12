@@ -225,6 +225,14 @@ function isInteractiveRowTarget(target: EventTarget | null): boolean {
   return target.closest(ROW_INTERACTIVE_ELEMENT_SELECTOR) !== null;
 }
 
+function parseExampleBulletsInput(input: string): readonly string[] {
+  return input.split('\n');
+}
+
+function normalizeExampleBullets(exampleBullets: readonly string[]): readonly string[] {
+  return exampleBullets.map((exampleBullet) => exampleBullet.trim()).filter((exampleBullet) => exampleBullet.length > 0);
+}
+
 function normalizeVisibilityRuleValue(rule: DiagnosticTemplateVisibilityRule): DiagnosticTemplateVisibilityRule {
   if (rule === null) {
     return null;
@@ -561,9 +569,7 @@ function reindexTemplate(template: DiagnosticTemplateValue): DiagnosticTemplateV
             eyebrow: option.presentation.eyebrow?.trim() ?? null,
             title: option.presentation.title?.trim() ?? null,
             supportingText: option.presentation.supportingText?.trim() ?? null,
-            exampleBullets: option.presentation.exampleBullets
-              .map((exampleBullet) => exampleBullet.trim())
-              .filter((exampleBullet) => exampleBullet.length > 0),
+            exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
             panelTitle: option.presentation.panelTitle?.trim() ?? null,
           },
           childQuestion:
@@ -631,7 +637,7 @@ function buildTemplatePatchBody(template: DiagnosticTemplateValue): string {
             eyebrow: option.presentation.eyebrow,
             title: option.presentation.title,
             supportingText: option.presentation.supportingText,
-            exampleBullets: option.presentation.exampleBullets,
+            exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
             panelTitle: option.presentation.panelTitle,
           },
           childQuestion:
@@ -2023,10 +2029,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                     ...option,
                     presentation: {
                       ...option.presentation,
-                      exampleBullets: event.target.value
-                        .split('\n')
-                        .map((exampleBullet) => exampleBullet.trim())
-                        .filter((exampleBullet) => exampleBullet.length > 0),
+                      exampleBullets: parseExampleBulletsInput(event.target.value),
                     },
                   }),
                 })

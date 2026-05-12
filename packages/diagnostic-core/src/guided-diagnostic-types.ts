@@ -190,6 +190,7 @@ function createEmptyDiagnosticOptionPresentation(): DiagnosticOptionPresentation
 }
 
 export function toggleQuestionOptionSelection(params: {
+  readonly baseAnswers?: Readonly<Record<string, DiagnosticQuestionSelection>>;
   readonly question: DiagnosticQuestionBlock;
   readonly selection: DiagnosticQuestionSelection | undefined;
   readonly optionId: string;
@@ -206,6 +207,7 @@ export function toggleQuestionOptionSelection(params: {
       Object.entries(currentSelection.childSelections).filter(([optionId]) => selectedOptionIds.includes(optionId)),
     );
     return pruneQuestionOptionSelection({
+      baseAnswers: params.baseAnswers,
       question: params.question,
       selection: {
         selectedOptionIds,
@@ -216,6 +218,7 @@ export function toggleQuestionOptionSelection(params: {
   if (isSelected) {
     const { [params.optionId]: _removed, ...remainingChildSelections } = currentSelection.childSelections;
     return pruneQuestionOptionSelection({
+      baseAnswers: params.baseAnswers,
       question: params.question,
       selection: {
       selectedOptionIds: currentSelection.selectedOptionIds.filter((candidateId) => candidateId !== params.optionId),
@@ -224,6 +227,7 @@ export function toggleQuestionOptionSelection(params: {
     });
   }
   return pruneQuestionOptionSelection({
+    baseAnswers: params.baseAnswers,
     question: params.question,
     selection: {
     selectedOptionIds: [...currentSelection.selectedOptionIds, params.optionId],
@@ -233,6 +237,7 @@ export function toggleQuestionOptionSelection(params: {
 }
 
 export function toggleChildQuestionOptionSelection(params: {
+  readonly baseAnswers?: Readonly<Record<string, DiagnosticQuestionSelection>>;
   readonly question: DiagnosticQuestionBlock;
   readonly selection: DiagnosticQuestionSelection | undefined;
   readonly parentOptionId: string;
@@ -264,6 +269,7 @@ export function toggleChildQuestionOptionSelection(params: {
           [params.parentOptionId]: nextChildOptionIds,
         };
   return pruneQuestionOptionSelection({
+    baseAnswers: params.baseAnswers,
     question: params.question,
     selection: {
     selectedOptionIds: currentSelection.selectedOptionIds,
@@ -640,6 +646,7 @@ function normalizeChildSelections(
 
 function normalizeQuestionSelection(
   input: unknown,
+  baseAnswers: Readonly<Record<string, DiagnosticQuestionSelection>> | undefined,
   question: DiagnosticQuestionBlock,
 ): DiagnosticQuestionSelection {
   if (isNonEmptyString(input)) {
@@ -648,6 +655,7 @@ function normalizeQuestionSelection(
       return createEmptyDiagnosticQuestionSelection();
     }
     return pruneQuestionOptionSelection({
+      baseAnswers,
       question,
       selection: {
       selectedOptionIds: [matchedOption.id],
@@ -657,6 +665,7 @@ function normalizeQuestionSelection(
   }
   if (Array.isArray(input)) {
     return pruneQuestionOptionSelection({
+      baseAnswers,
       question,
       selection: {
       selectedOptionIds: normalizeOptionIds(input, question),
@@ -679,6 +688,7 @@ function normalizeQuestionSelection(
       : [];
   const childSelections = normalizeChildSelections(selection.childSelections, question);
   return pruneQuestionOptionSelection({
+    baseAnswers,
     question,
     selection: {
       selectedOptionIds,
@@ -688,6 +698,7 @@ function normalizeQuestionSelection(
 }
 
 function normalizeQuestionAnswers(
+  baseAnswers: Readonly<Record<string, DiagnosticQuestionSelection>> | undefined,
   input: unknown,
   questions: readonly DiagnosticQuestionBlock[],
 ): Record<string, DiagnosticQuestionSelection> {
@@ -698,7 +709,7 @@ function normalizeQuestionAnswers(
   return Object.fromEntries(
     questions.map((question) => [
       question.id,
-      normalizeQuestionSelection(candidateAnswers[question.id], question),
+      normalizeQuestionSelection(candidateAnswers[question.id], baseAnswers, question),
     ]),
   );
 }
@@ -1033,16 +1044,19 @@ function buildBundleAnswerLookup(bundles: readonly CompletedRoundBundle[]): Read
 }
 
 function buildSelectedOptionLabels(
+  baseAnswers: Readonly<Record<string, DiagnosticQuestionSelection>> | undefined,
   question: DiagnosticQuestionBlock,
   selection: DiagnosticQuestionSelection,
 ): readonly string[] {
   const prunedSelection = pruneQuestionOptionSelection({
+    baseAnswers,
     question,
     selection,
   });
   const selectedOptionIds =
     question.selectionMode === 'single'
       ? getEffectiveSelectedOptionIds({
+          baseAnswers,
           question,
           selection: prunedSelection,
         })
@@ -1072,12 +1086,13 @@ function buildSelectedOptionLabels(
  * Combines structured multiple-choice selections and optional typed detail for API/thread payloads.
  */
 export function formatGuidedQuestionAnswer(params: {
+  readonly baseAnswers?: Readonly<Record<string, DiagnosticQuestionSelection>>;
   readonly question: DiagnosticQuestionBlock;
   readonly selection: DiagnosticQuestionSelection | undefined;
   readonly detailNote: string;
 }): string {
   const selection = params.selection ?? createEmptyDiagnosticQuestionSelection();
-  const selectedOptionLabels = buildSelectedOptionLabels(params.question, selection);
+  const selectedOptionLabels = buildSelectedOptionLabels(params.baseAnswers, params.question, selection);
   const trimmedNote = params.detailNote.trim();
   const flattenedSelection =
     params.question.type === 'ranked-options'
@@ -1165,7 +1180,7 @@ function normalizeGuidedDiagnostic(parsed: GuidedDiagnosticV1): GuidedDiagnostic
         continue;
       }
       const priorAnswers = buildBundleAnswerLookup(bundles);
-      const normalizedAnswers = normalizeQuestionAnswers(rawBundle.answers, questions);
+      const normalizedAnswers = normalizeQuestionAnswers(priorAnswers, rawBundle.answers, questions);
       const normalizedAnswerNotes = normalizeAnswerNotes(rawBundle.answerNotes);
       const prunedAnswers = pruneHiddenAnswers({
         questions,
@@ -1196,7 +1211,7 @@ function normalizeGuidedDiagnostic(parsed: GuidedDiagnosticV1): GuidedDiagnostic
       activeRound = null;
     } else {
       const priorAnswers = buildBundleAnswerLookup(bundles);
-      const normalizedAnswers = normalizeQuestionAnswers(parsed.activeRound.answers, questions);
+      const normalizedAnswers = normalizeQuestionAnswers(priorAnswers, parsed.activeRound.answers, questions);
       const normalizedAnswerNotes = normalizeAnswerNotes(parsed.activeRound.answerNotes);
       const prunedAnswers = pruneHiddenAnswers({
         questions,
@@ -1360,6 +1375,7 @@ export function toApiRoundsFromBundles(bundles: readonly CompletedRoundBundle[])
         questionId: question.id,
         question: question.prompt,
         answer: formatGuidedQuestionAnswer({
+          baseAnswers: buildBundleAnswerLookup(previousBundles),
           question,
           selection: bundle.answers[question.id],
           detailNote: bundle.answerNotes[question.id] ?? '',
@@ -1407,6 +1423,7 @@ export function buildDiagnosticTranscript(state: GuidedDiagnosticV1): Diagnostic
         question: question.prompt,
         description: question.description,
         answer: formatGuidedQuestionAnswer({
+          baseAnswers: buildBundleAnswerLookup(previousBundles),
           question,
           selection: bundle.answers[question.id],
           detailNote: bundle.answerNotes[question.id] ?? '',
@@ -1464,6 +1481,7 @@ export function buildDiagnosticThreadJson(state: GuidedDiagnosticV1): string {
       questionId: question.id,
       question: question.prompt,
       answer: formatGuidedQuestionAnswer({
+        baseAnswers: buildBundleAnswerLookup(state.completedBundles),
         question,
         selection: activeRound.answers[question.id],
         detailNote: activeRound.answerNotes[question.id] ?? '',

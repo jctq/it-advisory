@@ -1001,6 +1001,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         return;
       }
       const nextSelection = toggleQuestionOptionSelection({
+        baseAnswers: buildDiagnosticAnswerLookup({
+          completedBundles: guided.completedBundles,
+          activeRound: guided.activeRound,
+        }),
         question,
         selection: guided.activeRound.answers[question.id],
         optionId,
@@ -1028,6 +1032,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         return;
       }
       const nextSelection = toggleChildQuestionOptionSelection({
+        baseAnswers: buildDiagnosticAnswerLookup({
+          completedBundles: guided.completedBundles,
+          activeRound: guided.activeRound,
+        }),
         question,
         selection: guided.activeRound.answers[question.id],
         parentOptionId,

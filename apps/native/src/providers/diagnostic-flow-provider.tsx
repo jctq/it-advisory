@@ -2,10 +2,15 @@ import { DiagnosticApiClient } from '@it-advisory/api-client/diagnostic-api-clie
 import {
   GUIDED_DIAGNOSTIC_EMPTY,
   applyGuidedGoBack,
+  buildDiagnosticAnswerLookup,
   computeGuidedLinearStep,
+  getVisibleQuestionIndexes,
   normalizeDiagnosticOptions,
   parseGuidedDiagnosticJson,
+  pruneHiddenAnswers,
+  type DiagnosticQuestionSelection,
   toggleQuestionOptionSelection,
+  toggleChildQuestionOptionSelection,
   toApiRoundsFromBundles,
   type CompletedRoundBundle,
   type DiagnosticQuestionBlock,
@@ -15,6 +20,7 @@ import {
 } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
 import {
   buildActiveRoundFromTemplate,
+  buildNextTemplateRoundFromState,
   type PublicDiagnosticTemplateValue,
 } from '@it-advisory/diagnostic-core/template-diagnostic-flow';
 import * as Haptics from 'expo-haptics';
@@ -31,7 +37,6 @@ import {
 } from 'react';
 import { readOrCreateDeviceId } from '../lib/device-id';
 import {
-  buildCompletedRoundBundle,
   buildDiagnosticProgress,
   buildQuizAnswersPayload,
   MIN_PROMPT_LENGTH,
@@ -56,7 +61,9 @@ type DiagnosticFlowContextValue = {
   executeFinalizeDiagnostic(): Promise<void>;
   executeGoBack(): void;
   executeReset(): Promise<void>;
+  executeSelectChildOption(question: DiagnosticQuestionBlock, parentOptionId: string, childOptionId: string): void;
   executeSelectOption(question: DiagnosticQuestionBlock, optionId: string): void;
+  executeSetQuestionSelection(questionId: string, nextSelection: DiagnosticQuestionSelection): void;
   executeStartDiagnostic(): Promise<void>;
   executeUpdateAnswerNote(questionId: string, value: string): void;
   executeUpdatePrompt(value: string): void;
@@ -86,6 +93,91 @@ function buildHydratedGuidedState(rawSession: {
   return parseGuidedDiagnosticJson(normalized) ?? GUIDED_DIAGNOSTIC_EMPTY;
 }
 
+function resolveVisibleStepIndex(params: {
+  readonly activeRound: GuidedDiagnosticV1['activeRound'];
+  readonly completedBundles: readonly CompletedRoundBundle[];
+}): number {
+  const activeRound = params.activeRound;
+  if (activeRound === null) {
+    return 0;
+  }
+  const visibleQuestionIndexes = getVisibleQuestionIndexes({
+    questions: activeRound.questions,
+    baseAnswers: buildDiagnosticAnswerLookup({
+      completedBundles: params.completedBundles,
+    }),
+    answers: activeRound.answers,
+  });
+  if (visibleQuestionIndexes.length === 0) {
+    return 0;
+  }
+  const nextVisibleQuestionIndex = visibleQuestionIndexes.find((questionIndex) => questionIndex >= activeRound.stepIndex);
+  return nextVisibleQuestionIndex ?? visibleQuestionIndexes[visibleQuestionIndexes.length - 1] ?? 0;
+}
+
+function synchronizeActiveRound(params: {
+  readonly activeRound: GuidedDiagnosticV1['activeRound'];
+  readonly completedBundles: readonly CompletedRoundBundle[];
+}): GuidedDiagnosticV1['activeRound'] {
+  if (params.activeRound === null) {
+    return null;
+  }
+  const prunedAnswers = pruneHiddenAnswers({
+    questions: params.activeRound.questions,
+    baseAnswers: buildDiagnosticAnswerLookup({
+      completedBundles: params.completedBundles,
+    }),
+    answers: params.activeRound.answers,
+    answerNotes: params.activeRound.answerNotes,
+  });
+  const stepIndex = resolveVisibleStepIndex({
+    activeRound: {
+      ...params.activeRound,
+      answers: prunedAnswers.answers,
+      answerNotes: prunedAnswers.answerNotes,
+    },
+    completedBundles: params.completedBundles,
+  });
+  return {
+    ...params.activeRound,
+    answers: prunedAnswers.answers,
+    answerNotes: prunedAnswers.answerNotes,
+    stepIndex,
+  };
+}
+
+function buildVisibleBundleFromActive(params: {
+  readonly activeRound: GuidedDiagnosticV1['activeRound'];
+  readonly completedBundles: readonly CompletedRoundBundle[];
+}): CompletedRoundBundle | null {
+  const synchronizedRound = synchronizeActiveRound(params);
+  if (synchronizedRound === null) {
+    return null;
+  }
+  const visibleQuestionIndexes = getVisibleQuestionIndexes({
+    questions: synchronizedRound.questions,
+    baseAnswers: buildDiagnosticAnswerLookup({
+      completedBundles: params.completedBundles,
+    }),
+    answers: synchronizedRound.answers,
+  });
+  const visibleQuestions = visibleQuestionIndexes.flatMap((questionIndex) => {
+    const question = synchronizedRound.questions[questionIndex];
+    return question === undefined ? [] : [question];
+  });
+  if (visibleQuestions.length === 0) {
+    return null;
+  }
+  return {
+    roundIndex: synchronizedRound.roundIndex,
+    roundTitle: synchronizedRound.roundTitle,
+    questions: visibleQuestions,
+    answers: { ...synchronizedRound.answers },
+    answerNotes: { ...synchronizedRound.answerNotes },
+    guidance: synchronizedRound.guidance,
+  };
+}
+
 /**
  * Provides the full guided-diagnostic state machine for the Expo app.
  */
@@ -104,7 +196,14 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     if (activeTemplate === null) {
       return null;
     }
-    return buildActiveRoundFromTemplate(activeTemplate, 0);
+    return synchronizeActiveRound({
+      activeRound: buildNextTemplateRoundFromState({
+        template: activeTemplate,
+        completedBundles: [],
+        startRoundIndex: 0,
+      }),
+      completedBundles: [],
+    });
   }, [activeTemplate]);
 
   const executePersistGuided = useCallback(async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
@@ -170,15 +269,18 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     setGuided({
       ...guided,
       completedBundles: [...completedBundles],
-      activeRound: {
-        roundIndex: completedBundles.length,
-        roundTitle: `Round ${completedBundles.length + 1}`,
-        questions,
-        answers: {},
-        answerNotes: {},
-        stepIndex: 0,
-        guidance: response.guidance,
-      },
+      activeRound: synchronizeActiveRound({
+        activeRound: {
+          roundIndex: completedBundles.length,
+          roundTitle: `Round ${completedBundles.length + 1}`,
+          questions,
+          answers: {},
+          answerNotes: {},
+          stepIndex: 0,
+          guidance: response.guidance,
+        },
+        completedBundles,
+      }),
     });
     void Haptics.selectionAsync();
   }, [guided]);
@@ -320,19 +422,85 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
         return previous;
       }
       const nextSelection = toggleQuestionOptionSelection({
+        baseAnswers: buildDiagnosticAnswerLookup({
+          completedBundles: previous.completedBundles,
+          activeRound: previous.activeRound,
+        }),
         question,
         selection: previous.activeRound.answers[question.id],
         optionId,
       });
       return {
         ...previous,
-        activeRound: {
-          ...previous.activeRound,
-          answers: {
-            ...previous.activeRound.answers,
-            [question.id]: nextSelection,
+        activeRound: synchronizeActiveRound({
+          activeRound: {
+            ...previous.activeRound,
+            answers: {
+              ...previous.activeRound.answers,
+              [question.id]: nextSelection,
+            },
           },
-        },
+          completedBundles: previous.completedBundles,
+        }),
+      };
+    });
+    void Haptics.selectionAsync();
+  }, []);
+
+  const executeSelectChildOption = useCallback(
+    (question: DiagnosticQuestionBlock, parentOptionId: string, childOptionId: string): void => {
+      setErrorMessage(null);
+      setGuided((previous) => {
+        if (previous.activeRound === null) {
+          return previous;
+        }
+        const nextSelection = toggleChildQuestionOptionSelection({
+          baseAnswers: buildDiagnosticAnswerLookup({
+            completedBundles: previous.completedBundles,
+            activeRound: previous.activeRound,
+          }),
+          question,
+          selection: previous.activeRound.answers[question.id],
+          parentOptionId,
+          childOptionId,
+        });
+        return {
+          ...previous,
+          activeRound: synchronizeActiveRound({
+            activeRound: {
+              ...previous.activeRound,
+              answers: {
+                ...previous.activeRound.answers,
+                [question.id]: nextSelection,
+              },
+            },
+            completedBundles: previous.completedBundles,
+          }),
+        };
+      });
+      void Haptics.selectionAsync();
+    },
+    [],
+  );
+
+  const executeSetQuestionSelection = useCallback((questionId: string, nextSelection: DiagnosticQuestionSelection): void => {
+    setErrorMessage(null);
+    setGuided((previous) => {
+      if (previous.activeRound === null) {
+        return previous;
+      }
+      return {
+        ...previous,
+        activeRound: synchronizeActiveRound({
+          activeRound: {
+            ...previous.activeRound,
+            answers: {
+              ...previous.activeRound.answers,
+              [questionId]: nextSelection,
+            },
+          },
+          completedBundles: previous.completedBundles,
+        }),
       };
     });
     void Haptics.selectionAsync();
@@ -390,36 +558,53 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
 
   const executeAdvance = useCallback(async (): Promise<void> => {
     setErrorMessage(null);
-    if (guided.activeRound === null) {
+    const activeRound = synchronizeActiveRound({
+      activeRound: guided.activeRound,
+      completedBundles: guided.completedBundles,
+    });
+    if (activeRound === null) {
       return;
     }
-    const currentQuestion = guided.activeRound.questions[guided.activeRound.stepIndex];
+    const currentQuestion = activeRound.questions[activeRound.stepIndex];
     if (currentQuestion === undefined) {
       return;
     }
     const validation = validateGuidedQuestionResponse({
+      baseAnswers: buildDiagnosticAnswerLookup({
+        completedBundles: guided.completedBundles,
+        activeRound,
+      }),
       question: currentQuestion,
-      selection: guided.activeRound.answers[currentQuestion.id],
-      detailNote: guided.activeRound.answerNotes[currentQuestion.id] ?? '',
+      selection: activeRound.answers[currentQuestion.id],
+      detailNote: activeRound.answerNotes[currentQuestion.id] ?? '',
     });
     if (!validation.isValid) {
       setErrorMessage(validation.message ?? 'Select an option or add a short note before continuing.');
       return;
     }
-    const activeRound = guided.activeRound;
-    const isLastQuestion = activeRound.stepIndex >= activeRound.questions.length - 1;
-    if (!isLastQuestion) {
+    const visibleQuestionIndexes = getVisibleQuestionIndexes({
+      questions: activeRound.questions,
+      baseAnswers: buildDiagnosticAnswerLookup({
+        completedBundles: guided.completedBundles,
+      }),
+      answers: activeRound.answers,
+    });
+    const nextQuestionIndex = visibleQuestionIndexes.find((questionIndex) => questionIndex > activeRound.stepIndex) ?? null;
+    if (nextQuestionIndex !== null) {
       setGuided({
         ...guided,
         activeRound: {
           ...activeRound,
-          stepIndex: activeRound.stepIndex + 1,
+          stepIndex: nextQuestionIndex,
         },
       });
       void Haptics.selectionAsync();
       return;
     }
-    const completedBundle = buildCompletedRoundBundle(activeRound);
+    const completedBundle = buildVisibleBundleFromActive({
+      activeRound,
+      completedBundles: guided.completedBundles,
+    });
     if (completedBundle === null) {
       return;
     }
@@ -429,7 +614,14 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
         return;
       }
       const nextCompletedBundles = [...guided.completedBundles, completedBundle];
-      const nextRound = buildActiveRoundFromTemplate(activeTemplate, nextCompletedBundles.length);
+      const nextRound = synchronizeActiveRound({
+        activeRound: buildNextTemplateRoundFromState({
+          template: activeTemplate,
+          completedBundles: nextCompletedBundles,
+          startRoundIndex: activeRound.roundIndex + 1,
+        }),
+        completedBundles: nextCompletedBundles,
+      });
       if (nextRound !== null) {
         setGuided({
           ...guided,
@@ -504,7 +696,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
   const progress = useMemo(() => buildDiagnosticProgress(guided), [guided]);
   const value = useMemo<DiagnosticFlowContextValue>(() => ({
     activeTemplateName: activeTemplate?.name ?? null,
-    canGoBack: computeLinearStep(guided) > 0,
+    canGoBack: computeLinearStep(guided) > 1,
     diagnosticAiEnabled,
     errorMessage,
     hasUsableActiveTemplate: initialTemplateRound !== null,
@@ -518,7 +710,9 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     executeFinalizeDiagnostic,
     executeGoBack,
     executeReset,
+    executeSelectChildOption,
     executeSelectOption,
+    executeSetQuestionSelection,
     executeStartDiagnostic,
     executeUpdateAnswerNote,
     executeUpdatePrompt,
@@ -531,7 +725,9 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     executeFinalizeDiagnostic,
     executeGoBack,
     executeReset,
+    executeSelectChildOption,
     executeSelectOption,
+    executeSetQuestionSelection,
     executeStartDiagnostic,
     executeUpdateAnswerNote,
     executeUpdatePrompt,
