@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getPublicActiveDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(): Promise<NextResponse> {
   try {
     const template = await getPublicActiveDiagnosticTemplate();

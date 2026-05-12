@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createDiagnosticTemplate, listDiagnosticTemplates } from '@/lib/data/diagnostic-templates';
 
+export const dynamic = 'force-dynamic';
+
 const createTemplateSchema = z.object({
   name: z.string().trim().max(120).optional(),
 });
