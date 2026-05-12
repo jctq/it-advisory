@@ -3,7 +3,7 @@ import {
   GUIDED_DIAGNOSTIC_EMPTY,
   applyGuidedGoBack,
   computeGuidedLinearStep,
-  normalizeDiagnosticOptionLabels,
+  normalizeDiagnosticOptions,
   parseGuidedDiagnosticJson,
   toApiRoundsFromBundles,
   type CompletedRoundBundle,
@@ -11,6 +11,10 @@ import {
   type GuidedDiagnosticOutcome,
   type GuidedDiagnosticV1,
 } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
+import {
+  buildActiveRoundFromTemplate,
+  type PublicDiagnosticTemplateValue,
+} from '@it-advisory/diagnostic-core/template-diagnostic-flow';
 import * as Haptics from 'expo-haptics';
 import { AppState } from 'react-native';
 import {
@@ -37,9 +41,13 @@ import { readNativeAppConfig } from '../lib/native-app-config';
 
 type DiagnosticFlowContextValue = {
   readonly canGoBack: boolean;
+  readonly diagnosticAiEnabled: boolean;
   readonly errorMessage: string | null;
+  readonly hasUsableActiveTemplate: boolean;
+  readonly activeTemplateName: string | null;
   readonly guided: GuidedDiagnosticV1;
   readonly isBusy: boolean;
+  readonly isConfigReady: boolean;
   readonly isHydrated: boolean;
   readonly progressHint: string;
   readonly progressPercent: number;
@@ -87,7 +95,16 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
   const [guided, setGuided] = useState<GuidedDiagnosticV1>(GUIDED_DIAGNOSTIC_EMPTY);
   const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [isBusy, setIsBusy] = useState<boolean>(false);
+  const [isConfigReady, setIsConfigReady] = useState<boolean>(false);
+  const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(true);
+  const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const initialTemplateRound = useMemo(() => {
+    if (activeTemplate === null) {
+      return null;
+    }
+    return buildActiveRoundFromTemplate(activeTemplate, 0);
+  }, [activeTemplate]);
 
   const executePersistGuided = useCallback(async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
     const client = clientRef.current;
@@ -128,7 +145,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
       const hasQuestionId = typeof question.id === 'string' && question.id.trim().length > 0;
       const hasPrompt = typeof question.prompt === 'string' && question.prompt.trim().length > 0;
       const options = Array.isArray(question.options)
-        ? normalizeDiagnosticOptionLabels(question.options)
+        ? normalizeDiagnosticOptions(question.options)
         : [];
       if (!hasPrompt || options.length === 0) {
         return [];
@@ -137,6 +154,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
         {
           id: hasQuestionId ? question.id.trim() : `question-${index + 1}`,
           prompt: question.prompt.trim(),
+          description: null,
           options,
         },
       ];
@@ -159,6 +177,25 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     void Haptics.selectionAsync();
   }, [guided]);
 
+  const executeFetchTemplateSummary = useCallback(
+    async (completedBundles: readonly CompletedRoundBundle[]): Promise<GuidedDiagnosticOutcome> => {
+      const client = clientRef.current;
+      if (client === null || activeTemplate === null) {
+        throw new Error('The app is still connecting to the diagnostic service.');
+      }
+      const response = await client.createDiagnosticTemplateSummary({
+        templateName: activeTemplate.name,
+        initialPrompt: guided.initialPrompt,
+        rounds: toApiRoundsFromBundles(completedBundles),
+      });
+      return {
+        mappedSituation: response.mappedSituation,
+        advisorSummary: response.summaryForAdvisor,
+      };
+    },
+    [activeTemplate, guided.initialPrompt],
+  );
+
   useEffect(() => {
     let isMounted = true;
     async function hydrateSession(): Promise<void> {
@@ -171,9 +208,22 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
           apiOrigin: config.apiBaseUrl,
           deviceId,
         });
-        const sessionPayload = await clientRef.current.fetchQuizSession();
+        const [sessionPayload, diagnosticConfig] = await Promise.all([
+          clientRef.current.fetchQuizSession(),
+          clientRef.current.fetchDiagnosticConfig(),
+        ]);
         if (!isMounted) {
           return;
+        }
+        setDiagnosticAiEnabled(diagnosticConfig.diagnosticAiEnabled);
+        if (!diagnosticConfig.diagnosticAiEnabled) {
+          const templatePayload = await clientRef.current.fetchActiveDiagnosticTemplate();
+          if (!isMounted) {
+            return;
+          }
+          setActiveTemplate(templatePayload.template);
+        } else {
+          setActiveTemplate(null);
         }
         setGuided(buildHydratedGuidedState(sessionPayload.session));
       } catch (error: unknown) {
@@ -182,6 +232,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
         }
       } finally {
         if (isMounted) {
+          setIsConfigReady(true);
           hasHydratedRef.current = true;
           setIsHydrated(true);
         }
@@ -192,6 +243,28 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
       isMounted = false;
     };
   }, [config.apiBaseUrl]);
+
+  useEffect(() => {
+    if (!isHydrated || !isConfigReady || diagnosticAiEnabled || initialTemplateRound === null) {
+      return;
+    }
+    setGuided((previous) => {
+      if (
+        previous.activeRound !== null ||
+        previous.completedBundles.length > 0 ||
+        previous.outcome !== null
+      ) {
+        return previous;
+      }
+      return {
+        ...previous,
+        initialPrompt: '',
+        completedBundles: [],
+        activeRound: initialTemplateRound,
+        outcome: null,
+      };
+    });
+  }, [diagnosticAiEnabled, initialTemplateRound, isConfigReady, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated || !hasHydratedRef.current) {
@@ -275,6 +348,21 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
 
   const executeStartDiagnostic = useCallback(async (): Promise<void> => {
     setErrorMessage(null);
+    if (!diagnosticAiEnabled) {
+      if (initialTemplateRound === null) {
+        setErrorMessage('No active diagnostic template is available right now.');
+        return;
+      }
+      setGuided((previous) => ({
+        ...previous,
+        initialPrompt: '',
+        completedBundles: [],
+        activeRound: initialTemplateRound,
+        outcome: null,
+      }));
+      void Haptics.selectionAsync();
+      return;
+    }
     if (guided.initialPrompt.trim().length < MIN_PROMPT_LENGTH) {
       setErrorMessage(`Add a bit more detail first (at least ${MIN_PROMPT_LENGTH} characters).`);
       return;
@@ -287,7 +375,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     } finally {
       setIsBusy(false);
     }
-  }, [executeFetchRound, guided.initialPrompt]);
+  }, [diagnosticAiEnabled, executeFetchRound, guided.initialPrompt, initialTemplateRound]);
 
   const executeAdvance = useCallback(async (): Promise<void> => {
     setErrorMessage(null);
@@ -316,6 +404,40 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     if (completedBundle === null) {
       return;
     }
+    if (!diagnosticAiEnabled) {
+      if (activeTemplate === null) {
+        setErrorMessage('No active diagnostic template is available right now.');
+        return;
+      }
+      const nextCompletedBundles = [...guided.completedBundles, completedBundle];
+      const nextRound = buildActiveRoundFromTemplate(activeTemplate, nextCompletedBundles.length);
+      if (nextRound !== null) {
+        setGuided({
+          ...guided,
+          completedBundles: nextCompletedBundles,
+          activeRound: nextRound,
+          outcome: null,
+        });
+        void Haptics.selectionAsync();
+        return;
+      }
+      setIsBusy(true);
+      try {
+        const outcome = await executeFetchTemplateSummary(nextCompletedBundles);
+        setGuided({
+          ...guided,
+          completedBundles: nextCompletedBundles,
+          activeRound: null,
+          outcome,
+        });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (error: unknown) {
+        setErrorMessage(readErrorMessage(error));
+      } finally {
+        setIsBusy(false);
+      }
+      return;
+    }
     setIsBusy(true);
     try {
       await executeFetchRound([...guided.completedBundles, completedBundle]);
@@ -324,7 +446,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     } finally {
       setIsBusy(false);
     }
-  }, [executeFetchRound, guided]);
+  }, [activeTemplate, diagnosticAiEnabled, executeFetchRound, executeFetchTemplateSummary, guided]);
 
   const executeGoBack = useCallback((): void => {
     setErrorMessage(null);
@@ -362,10 +484,14 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
 
   const progress = useMemo(() => buildDiagnosticProgress(guided), [guided]);
   const value = useMemo<DiagnosticFlowContextValue>(() => ({
+    activeTemplateName: activeTemplate?.name ?? null,
     canGoBack: computeLinearStep(guided) > 0,
+    diagnosticAiEnabled,
     errorMessage,
+    hasUsableActiveTemplate: initialTemplateRound !== null,
     guided,
     isBusy,
+    isConfigReady,
     isHydrated,
     progressHint: progress.hint,
     progressPercent: progress.percent,
@@ -379,7 +505,9 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     executeUpdatePrompt,
     executeUsePromptSeed,
   }), [
+    activeTemplate?.name,
     errorMessage,
+    diagnosticAiEnabled,
     executeAdvance,
     executeFinalizeDiagnostic,
     executeGoBack,
@@ -390,7 +518,9 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     executeUpdatePrompt,
     executeUsePromptSeed,
     guided,
+    initialTemplateRound,
     isBusy,
+    isConfigReady,
     isHydrated,
     progress.hint,
     progress.percent,

@@ -9,7 +9,8 @@
     "./diagnostic-thread": "./src/diagnostic-thread.ts",
     "./guided-diagnostic-types": "./src/guided-diagnostic-types.ts",
     "./quiz-steps": "./src/quiz-steps.ts",
-    "./situation-options": "./src/situation-options.ts"
+    "./situation-options": "./src/situation-options.ts",
+    "./template-diagnostic-flow": "./src/template-diagnostic-flow.ts"
   },
   "dependencies": {
     "@it-advisory/domain": "workspace:*"

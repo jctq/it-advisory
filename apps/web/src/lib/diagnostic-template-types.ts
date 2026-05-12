@@ -1,12 +1,14 @@
 export type DiagnosticTemplateOptionValue = {
   readonly id: string;
   readonly label: string;
+  readonly description: string | null;
   readonly order: number;
 };
 
 export type DiagnosticTemplateQuestionValue = {
   readonly id: string;
   readonly prompt: string;
+  readonly description: string | null;
   readonly order: number;
   readonly options: readonly DiagnosticTemplateOptionValue[];
 };
@@ -37,9 +39,11 @@ export type DiagnosticTemplateInput = {
     readonly questions: readonly {
       readonly id: string;
       readonly prompt: string;
+      readonly description: string | null;
       readonly options: readonly {
         readonly id: string;
         readonly label: string;
+        readonly description: string | null;
       }[];
     }[];
   }[];
@@ -55,9 +59,11 @@ export type PublicDiagnosticTemplateValue = {
     readonly questions: readonly {
       readonly id: string;
       readonly prompt: string;
+      readonly description: string | null;
       readonly options: readonly {
         readonly id: string;
         readonly label: string;
+        readonly description: string | null;
       }[];
     }[];
   }[];

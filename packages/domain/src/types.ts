@@ -83,12 +83,14 @@ export type EmailSendDocument = {
 export type DiagnosticTemplateOptionDocument = {
   id: string;
   label: string;
+  description?: string | null;
   order: number;
 };
 
 export type DiagnosticTemplateQuestionDocument = {
   id: string;
   prompt: string;
+  description?: string | null;
   order: number;
   options: DiagnosticTemplateOptionDocument[];
 };

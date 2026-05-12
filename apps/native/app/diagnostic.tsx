@@ -17,7 +17,9 @@ export default function DiagnosticScreen() {
   const router = useRouter();
   const theme = useAppTheme();
   const {
+    activeTemplateName,
     canGoBack,
+    diagnosticAiEnabled,
     errorMessage,
     executeAdvance,
     executeFinalizeDiagnostic,
@@ -29,7 +31,9 @@ export default function DiagnosticScreen() {
     executeUpdatePrompt,
     executeUsePromptSeed,
     guided,
+    hasUsableActiveTemplate,
     isBusy,
+    isConfigReady,
     isHydrated,
     progressHint,
     progressPercent,
@@ -52,13 +56,17 @@ export default function DiagnosticScreen() {
         </AppButton>
       ) : activeRound !== null ? (
         <AppButton disabled={isBusy} onPress={() => void executeAdvance()}>
-          {activeRound.stepIndex >= activeRound.questions.length - 1 ? 'Submit round' : 'Next question'}
+          {activeRound.stepIndex >= activeRound.questions.length - 1
+            ? diagnosticAiEnabled
+              ? 'Submit round'
+              : 'Continue'
+            : 'Next question'}
         </AppButton>
-      ) : (
+      ) : diagnosticAiEnabled ? (
         <AppButton disabled={isBusy || !isHydrated} onPress={() => void executeStartDiagnostic()}>
           Start diagnostic
         </AppButton>
-      )}
+      ) : null}
       {canGoBack ? (
         <AppButton disabled={isBusy} onPress={executeGoBack} variant="secondary">
           Back
@@ -75,7 +83,11 @@ export default function DiagnosticScreen() {
   return (
     <AppScreen
       title="Guided diagnostic"
-      subtitle="Move from confusion to a clear next step with short, structured prompts."
+      subtitle={
+        diagnosticAiEnabled
+          ? 'Move from confusion to a clear next step with short, structured prompts.'
+          : 'Follow the active diagnostic template your advisor configured for this intake flow.'
+      }
       footer={footer}
     >
       <AppCard>
@@ -97,7 +109,7 @@ export default function DiagnosticScreen() {
           <Text style={[styles.errorText, { color: theme.danger }]}>{errorMessage}</Text>
         </AppCard>
       ) : null}
-      {guided.outcome === null && activeRound === null ? (
+      {guided.outcome === null && activeRound === null && diagnosticAiEnabled ? (
         <AppCard>
           <Text style={[styles.sectionHeading, { color: theme.text }]}>What is going on right now?</Text>
           <Text style={[styles.helperText, { color: theme.textMuted }]}>
@@ -144,6 +156,27 @@ export default function DiagnosticScreen() {
           </View>
         </AppCard>
       ) : null}
+      {guided.outcome === null && activeRound === null && !diagnosticAiEnabled ? (
+        <AppCard>
+          {!isConfigReady || hasUsableActiveTemplate ? (
+            <>
+              <Text style={[styles.sectionHeading, { color: theme.text }]}>Preparing your diagnostic</Text>
+              <Text style={[styles.helperText, { color: theme.textMuted }]}>
+                {activeTemplateName !== null
+                  ? `Loading the active template: ${activeTemplateName}.`
+                  : 'Loading the active diagnostic template.'}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.sectionHeading, { color: theme.text }]}>Template unavailable</Text>
+              <Text style={[styles.helperText, { color: theme.textMuted }]}>
+                No active diagnostic template is ready yet. Ask an admin to create and activate one first.
+              </Text>
+            </>
+          )}
+        </AppCard>
+      ) : null}
       {activeRound !== null && currentQuestion !== undefined ? (
         <AppCard>
           {activeRound.guidance !== null ? (
@@ -153,15 +186,20 @@ export default function DiagnosticScreen() {
             Question {activeRound.stepIndex + 1} of {activeRound.questions.length}
           </Text>
           <Text style={[styles.questionTitle, { color: theme.text }]}>{currentQuestion.prompt}</Text>
+          {currentQuestion.description !== null ? (
+            <Text style={[styles.helperText, styles.questionDescription, { color: theme.textMuted }]}>
+              {currentQuestion.description}
+            </Text>
+          ) : null}
           <View style={styles.optionGroup}>
             {currentOptions.length > 0 ? (
               currentOptions.map((option) => {
-                const isSelected = activeRound.answers[currentQuestion.id] === option;
+                const isSelected = activeRound.answers[currentQuestion.id] === option.label;
                 return (
                   <Pressable
-                    key={option}
+                    key={option.label}
                     accessibilityRole="button"
-                    onPress={() => executeSelectOption(currentQuestion.id, option)}
+                    onPress={() => executeSelectOption(currentQuestion.id, option.label)}
                     style={({ pressed }) => [
                       styles.optionButton,
                       {
@@ -171,7 +209,12 @@ export default function DiagnosticScreen() {
                       },
                     ]}
                   >
-                    <Text style={[styles.optionLabel, { color: theme.text }]}>{option}</Text>
+                    <Text style={[styles.optionLabel, { color: theme.text }]}>{option.label}</Text>
+                    {option.description !== null ? (
+                      <Text style={[styles.optionDescription, { color: isSelected ? theme.text : theme.textMuted }]}>
+                        {option.description}
+                      </Text>
+                    ) : null}
                   </Pressable>
                 );
               })
@@ -288,6 +331,9 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     marginTop: 10,
   },
+  questionDescription: {
+    marginTop: 8,
+  },
   optionGroup: {
     gap: 12,
     marginTop: 18,
@@ -304,6 +350,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     lineHeight: 22,
+  },
+  optionDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
   },
   noteInput: {
     borderRadius: 18,

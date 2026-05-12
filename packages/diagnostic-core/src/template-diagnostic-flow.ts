@@ -1,19 +1,31 @@
-import type {
-  ActiveGuidedRound,
-  CompletedRoundBundle,
-  DiagnosticThreadRound,
-  GuidedDiagnosticOutcome,
-} from '@it-advisory/diagnostic-core/guided-diagnostic-types';
 import {
   formatGuidedQuestionAnswer,
   normalizeDiagnosticOptions,
-} from '@/lib/marketing/guided-diagnostic-types';
-import { getSituationDisplayList } from '@/lib/marketing/situation-options';
-import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
+  type ActiveGuidedRound,
+  type CompletedRoundBundle,
+  type DiagnosticThreadRound,
+} from './guided-diagnostic-types';
+import { getSituationDisplayList } from './situation-options';
 
-function countAnsweredQuestions(bundles: readonly CompletedRoundBundle[]): number {
-  return bundles.reduce((total, bundle) => total + bundle.questions.length, 0);
-}
+export type PublicDiagnosticTemplateValue = {
+  readonly id: string;
+  readonly name: string;
+  readonly rounds: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly guidance: string | null;
+    readonly questions: readonly {
+      readonly id: string;
+      readonly prompt: string;
+      readonly description: string | null;
+      readonly options: readonly {
+        readonly id: string;
+        readonly label: string;
+        readonly description: string | null;
+      }[];
+    }[];
+  }[];
+};
 
 function buildSituationHint(initialPrompt: string, bundles: readonly CompletedRoundBundle[]): string {
   const trimmedPrompt = initialPrompt.trim();
@@ -39,6 +51,29 @@ function buildSituationHintFromRounds(initialPrompt: string, rounds: readonly Di
     .flatMap((round) => round.qa.map((row) => row.answer))
     .filter((value) => value.trim().length > 0)
     .join('\n');
+}
+
+export function buildActiveRoundFromTemplate(
+  template: PublicDiagnosticTemplateValue,
+  roundIndex: number,
+): ActiveGuidedRound | null {
+  const round = template.rounds[roundIndex];
+  if (round === undefined) {
+    return null;
+  }
+  return {
+    roundIndex,
+    questions: round.questions.map((question) => ({
+      id: question.id,
+      prompt: question.prompt,
+      description: question.description,
+      options: normalizeDiagnosticOptions(question.options),
+    })),
+    answers: {},
+    answerNotes: {},
+    stepIndex: 0,
+    guidance: round.guidance,
+  };
 }
 
 export function buildTemplateMappedSituation(
@@ -83,41 +118,4 @@ export function buildTemplateFallbackAdvisorSummary(
       ? `Captured selections:\n- ${topSelections.join('\n- ')}`
       : 'Captured selections were limited, so the advisor should review the transcript directly during the call.';
   return `${contextLead}\n\n${selectionLead}\n\nUse the transcript below to confirm specifics, clarify timeline and impact, and identify the first practical next step.`;
-}
-
-export function buildActiveRoundFromTemplate(
-  template: PublicDiagnosticTemplateValue,
-  roundIndex: number,
-): ActiveGuidedRound | null {
-  const round = template.rounds[roundIndex];
-  if (round === undefined) {
-    return null;
-  }
-  return {
-    roundIndex,
-    questions: round.questions.map((question) => ({
-      id: question.id,
-      prompt: question.prompt,
-      description: question.description,
-      options: normalizeDiagnosticOptions(question.options),
-    })),
-    answers: {},
-    answerNotes: {},
-    stepIndex: 0,
-    guidance: round.guidance,
-  };
-}
-
-export function buildTemplateDiagnosticOutcome(
-  initialPrompt: string,
-  bundles: readonly CompletedRoundBundle[],
-  template: PublicDiagnosticTemplateValue,
-  advisorSummary: string,
-): GuidedDiagnosticOutcome {
-  return {
-    mappedSituation: buildTemplateMappedSituation(initialPrompt, bundles),
-    advisorSummary: advisorSummary.trim().length > 0
-      ? advisorSummary.trim()
-      : `Completed the "${template.name}" diagnostic template with ${bundles.length} rounds and ${countAnsweredQuestions(bundles)} questions.`,
-  };
 }

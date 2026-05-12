@@ -1,5 +1,25 @@
 type QuizAnswers = Readonly<Record<string, string | string[] | number | boolean>>;
 
+type PublicDiagnosticTemplateValue = {
+  readonly id: string;
+  readonly name: string;
+  readonly rounds: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly guidance: string | null;
+    readonly questions: readonly {
+      readonly id: string;
+      readonly prompt: string;
+      readonly description: string | null;
+      readonly options: readonly {
+        readonly id: string;
+        readonly label: string;
+        readonly description: string | null;
+      }[];
+    }[];
+  }[];
+};
+
 type DiagnosticThreadRound = {
   readonly roundIndex: number;
   readonly qa: readonly {
@@ -49,6 +69,31 @@ type DiagnosticRoundPayload =
         readonly options: readonly string[];
       }>;
     };
+
+type DiagnosticConfigPayload = {
+  readonly diagnosticAiEnabled: boolean;
+  readonly diagnosticMaxRounds: number;
+  readonly diagnosticQuestionsPerRound: number;
+  readonly diagnosticOptionsPerQuestion: number;
+  readonly diagnosticCacheDebugEnabled: boolean;
+};
+
+type DiagnosticTemplatePayload = {
+  readonly template: PublicDiagnosticTemplateValue | null;
+};
+
+type DiagnosticTemplateSummaryInput = {
+  readonly templateName: string;
+  readonly initialPrompt: string;
+  readonly rounds: readonly DiagnosticThreadRound[];
+};
+
+type DiagnosticTemplateSummaryPayload = {
+  readonly mappedSituation: string;
+  readonly summaryForAdvisor: string;
+  readonly source: 'ai' | 'fallback';
+  readonly model: string | null;
+};
 
 type JsonRequestOptions = {
   readonly body?: unknown;
@@ -101,6 +146,37 @@ export class DiagnosticApiClient {
   public async createDiagnosticRound(input: DiagnosticRoundInput): Promise<DiagnosticRoundPayload> {
     return this.executeJsonRequest<DiagnosticRoundPayload>({
       pathname: '/api/quiz/diagnostic-round',
+      method: 'POST',
+      body: input,
+    });
+  }
+
+  /**
+   * Loads customer-safe diagnostic configuration for mobile flows.
+   */
+  public async fetchDiagnosticConfig(): Promise<DiagnosticConfigPayload> {
+    return this.executeJsonRequest<DiagnosticConfigPayload>({
+      pathname: '/api/quiz/diagnostic-config',
+    });
+  }
+
+  /**
+   * Loads the current active diagnostic template for customer-facing template mode.
+   */
+  public async fetchActiveDiagnosticTemplate(): Promise<DiagnosticTemplatePayload> {
+    return this.executeJsonRequest<DiagnosticTemplatePayload>({
+      pathname: '/api/quiz/diagnostic-template',
+    });
+  }
+
+  /**
+   * Requests the final advisor summary for a completed template-based diagnostic flow.
+   */
+  public async createDiagnosticTemplateSummary(
+    input: DiagnosticTemplateSummaryInput,
+  ): Promise<DiagnosticTemplateSummaryPayload> {
+    return this.executeJsonRequest<DiagnosticTemplateSummaryPayload>({
+      pathname: '/api/quiz/diagnostic-template-summary',
       method: 'POST',
       body: input,
     });

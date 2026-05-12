@@ -1,10 +1,16 @@
+export type DiagnosticQuestionOption = {
+  readonly label: string;
+  readonly description: string | null;
+};
+
 /**
  * Persisted guided quiz (replaces static QUIZ_STEPS). Stored as answers.guidedDiagnostic JSON.
  */
 export type DiagnosticQuestionBlock = {
   readonly id: string;
   readonly prompt: string;
-  readonly options: readonly string[];
+  readonly description: string | null;
+  readonly options: readonly DiagnosticQuestionOption[];
 };
 
 export type DiagnosticThreadRound = {
@@ -83,29 +89,61 @@ function buildDiagnosticOptionKey(value: string): string {
 }
 
 /**
- * Trims diagnostic option labels and removes duplicates while preserving order.
+ * Trims diagnostic options and removes duplicate labels while preserving order.
  */
-export function normalizeDiagnosticOptionLabels(input: readonly unknown[]): string[] {
+export function normalizeDiagnosticOptions(input: readonly unknown[]): DiagnosticQuestionOption[] {
   const seen = new Set<string>();
   return input.flatMap((option) => {
-    if (!isNonEmptyString(option)) {
+    if (isNonEmptyString(option)) {
+      const label = option.trim().replace(/\s+/g, ' ');
+      const key = buildDiagnosticOptionKey(label);
+      if (seen.has(key)) {
+        return [];
+      }
+      seen.add(key);
+      return [{ label, description: null }];
+    }
+    if (option === null || typeof option !== 'object') {
       return [];
     }
-    const label = option.trim().replace(/\s+/g, ' ');
+    const candidate = option as {
+      readonly description?: unknown;
+      readonly label?: unknown;
+    };
+    if (!isNonEmptyString(candidate.label)) {
+      return [];
+    }
+    const label = candidate.label.trim().replace(/\s+/g, ' ');
     const key = buildDiagnosticOptionKey(label);
     if (seen.has(key)) {
       return [];
     }
     seen.add(key);
-    return [label];
+    const normalizedDescription =
+      typeof candidate.description === 'string'
+        ? candidate.description.trim().replace(/\s+/g, ' ')
+        : '';
+    return [
+      {
+        label,
+        description: normalizedDescription.length > 0 ? normalizedDescription : null,
+      },
+    ];
   });
 }
 
-function normalizeQuestionOptions(input: unknown): string[] {
+/**
+ * Returns only option labels, preserving the existing AI-round API contract.
+ */
+export function normalizeDiagnosticOptionLabels(input: readonly unknown[]): string[] {
+  return normalizeDiagnosticOptions(input).map((option) => option.label);
+}
+
+function normalizeQuestionOptions(input: unknown): DiagnosticQuestionOption[] {
   if (!Array.isArray(input)) {
     return [];
   }
-  return normalizeDiagnosticOptionLabels(input);
+  return normalizeDiagnosticOptions(input);
 }
 
 function normalizeDiagnosticQuestionBlocks(input: unknown): DiagnosticQuestionBlock[] {
@@ -117,6 +155,7 @@ function normalizeDiagnosticQuestionBlocks(input: unknown): DiagnosticQuestionBl
       return [];
     }
     const question = candidate as {
+      readonly description?: unknown;
       readonly id?: unknown;
       readonly options?: unknown;
       readonly prompt?: unknown;
@@ -132,6 +171,10 @@ function normalizeDiagnosticQuestionBlocks(input: unknown): DiagnosticQuestionBl
       {
         id: isNonEmptyString(question.id) ? question.id.trim() : `question-${index + 1}`,
         prompt: question.prompt.trim(),
+        description:
+          typeof question.description === 'string' && question.description.trim().length > 0
+            ? question.description.trim().replace(/\s+/g, ' ')
+            : null,
         options,
       },
     ];
@@ -302,6 +345,7 @@ export function toApiRoundsFromBundles(bundles: readonly CompletedRoundBundle[])
 
 export type DiagnosticTranscriptQa = {
   readonly question: string;
+  readonly description: string | null;
   readonly answer: string;
 };
 
@@ -325,6 +369,7 @@ export function buildDiagnosticTranscript(state: GuidedDiagnosticV1): Diagnostic
     guidance: bundle.guidance,
     items: bundle.questions.map((question) => ({
       question: question.prompt,
+      description: question.description,
       answer: formatGuidedQuestionAnswer(
         bundle.answers[question.id] ?? '',
         bundle.answerNotes[question.id] ?? '',

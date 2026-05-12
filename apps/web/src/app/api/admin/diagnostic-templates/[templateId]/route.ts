@@ -6,11 +6,13 @@ import type { DiagnosticTemplateInput } from '@/lib/diagnostic-template-types';
 const optionSchema = z.object({
   id: z.string().max(120),
   label: z.string().max(240),
+  description: z.string().max(320).nullable().default(null),
 });
 
 const questionSchema = z.object({
   id: z.string().max(120),
   prompt: z.string().max(700),
+  description: z.string().max(320).nullable().default(null),
   options: z.array(optionSchema),
 });
 
@@ -21,7 +23,7 @@ const roundSchema = z.object({
   questions: z.array(questionSchema),
 });
 
-const updateTemplateSchema: z.ZodType<DiagnosticTemplateInput> = z.object({
+const updateTemplateSchema = z.object({
   name: z.string().max(120),
   rounds: z.array(roundSchema),
 });
@@ -43,9 +45,27 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
+  const input: DiagnosticTemplateInput = {
+    name: parsed.data.name,
+    rounds: parsed.data.rounds.map((round) => ({
+      id: round.id,
+      title: round.title,
+      guidance: round.guidance,
+      questions: round.questions.map((question) => ({
+        id: question.id,
+        prompt: question.prompt,
+        description: question.description ?? null,
+        options: question.options.map((option) => ({
+          id: option.id,
+          label: option.label,
+          description: option.description ?? null,
+        })),
+      })),
+    })),
+  };
   const { templateId } = await context.params;
   try {
-    const template = await updateDiagnosticTemplate(templateId, parsed.data);
+    const template = await updateDiagnosticTemplate(templateId, input);
     return NextResponse.json({ template });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

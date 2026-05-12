@@ -1,7 +1,7 @@
 export const ADMIN_COLOR_MODE_STORAGE_KEY = 'it-advisory-admin-color-mode';
 export const ADMIN_COLOR_THEME_STORAGE_KEY = 'it-advisory-admin-color-theme';
 
-export const ADMIN_COLOR_MODES = ['system', 'light', 'dark'] as const;
+export const ADMIN_COLOR_MODES = ['light', 'dark', 'system'] as const;
 export const ADMIN_COLOR_THEMES = ['indigo', 'emerald', 'amber', 'rose'] as const;
 
 export type AdminColorMode = (typeof ADMIN_COLOR_MODES)[number];

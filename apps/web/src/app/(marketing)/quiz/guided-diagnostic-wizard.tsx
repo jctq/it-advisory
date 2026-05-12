@@ -18,7 +18,7 @@ import {
   type GuidedDiagnosticV1,
   buildDiagnosticTranscript,
   formatGuidedQuestionAnswer,
-  normalizeDiagnosticOptionLabels,
+  normalizeDiagnosticOptions,
   toApiRoundsFromBundles,
 } from '@/lib/marketing/guided-diagnostic-types';
 import { getSituationSeed } from '@/lib/marketing/situation-options';
@@ -378,7 +378,8 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       const mappedQuestions: DiagnosticQuestionBlock[] = questions.map((row) => ({
         id: row.id,
         prompt: row.prompt,
-        options: normalizeDiagnosticOptionLabels(row.options),
+        description: null,
+        options: normalizeDiagnosticOptions(row.options),
       }));
       onGuidedChange({
         ...guided,
@@ -555,6 +556,9 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
                           Question {ordinal}
                         </p>
                         <p className="mt-1 text-sm leading-snug text-foreground">{item.question}</p>
+                        {item.description !== null ? (
+                          <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
+                        ) : null}
                         <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Your answer</p>
                         <p className="mt-1 text-sm font-medium text-foreground">{item.answer.length > 0 ? item.answer : '—'}</p>
                       </li>
@@ -581,7 +585,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     const question = activeRound.questions[activeRound.stepIndex];
     const selected =
       question !== undefined ? (activeRound.answers[question.id] ?? undefined) : undefined;
-    const questionOptions = question !== undefined ? normalizeDiagnosticOptionLabels(question.options) : [];
+    const questionOptions = question !== undefined ? normalizeDiagnosticOptions(question.options) : [];
     const showGuidance = activeRound.stepIndex === 0 && activeRound.guidance !== null && activeRound.guidance.length > 0;
     const positionInRound = activeRound.stepIndex + 1;
     const roundSize = activeRound.questions.length;
@@ -605,22 +609,30 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         {question !== undefined ? (
           <fieldset className="mt-8 space-y-4">
             <legend className="text-lg font-medium text-foreground">{question.prompt}</legend>
+            {question.description !== null ? (
+              <p className="text-sm text-muted-foreground">{question.description}</p>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2" role="group">
               {questionOptions.map((option) => {
-                const isSelected = selected === option;
+                const isSelected = selected === option.label;
                 return (
                   <button
-                    key={`${question.id}-${option}`}
+                    key={`${question.id}-${option.label}`}
                     type="button"
-                    onClick={() => executeSelectOption(question.id, option)}
+                    onClick={() => executeSelectOption(question.id, option.label)}
                     className={cn(
-                      'flex w-full items-center rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors',
+                      'flex w-full flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-colors',
                       isSelected
                         ? 'border-primary bg-primary/5 text-foreground ring-2 ring-primary/30'
                         : 'border-border bg-card text-foreground hover:border-primary/40 hover:bg-muted/50',
                     )}
                   >
-                    {option}
+                    <span className="text-sm font-medium">{option.label}</span>
+                    {option.description !== null ? (
+                      <span className={cn('text-xs font-normal', isSelected ? 'text-foreground/75' : 'text-muted-foreground')}>
+                        {option.description}
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}

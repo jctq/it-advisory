@@ -49,10 +49,12 @@ function mapTemplateDocument(doc: DiagnosticTemplateStoredDocument): DiagnosticT
       questions: sortQuestions(round.questions).map((question) => ({
         id: question.id,
         prompt: question.prompt,
+        description: question.description ?? null,
         order: question.order,
         options: sortOptions(question.options).map((option) => ({
           id: option.id,
           label: option.label,
+          description: option.description ?? null,
           order: option.order,
         })),
       })),
@@ -67,9 +69,11 @@ function buildOptionDocument(
   order: number,
 ): DiagnosticTemplateOptionDocument {
   const label = input.label.trim();
+  const description = input.description?.trim() ?? '';
   return {
     id: input.id.trim().length > 0 ? input.id.trim() : randomUUID(),
     label,
+    description: description.length > 0 ? description : null,
     order,
   };
 }
@@ -78,9 +82,11 @@ function buildQuestionDocument(
   input: DiagnosticTemplateInput['rounds'][number]['questions'][number],
   order: number,
 ): DiagnosticTemplateQuestionDocument {
+  const description = input.description?.trim() ?? '';
   return {
     id: input.id.trim().length > 0 ? input.id.trim() : randomUUID(),
     prompt: input.prompt.trim(),
+    description: description.length > 0 ? description : null,
     order,
     options: input.options.map((option, optionIndex) => buildOptionDocument(option, optionIndex)),
   };
@@ -147,11 +153,13 @@ function toPublicTemplate(template: DiagnosticTemplateValue): PublicDiagnosticTe
         .map((question) => ({
           id: question.id,
           prompt: question.prompt.trim(),
+          description: question.description?.trim() ? question.description.trim() : null,
           options: question.options
             .filter((option) => option.label.trim().length > 0)
             .map((option) => ({
               id: option.id,
               label: option.label.trim(),
+              description: option.description?.trim() ? option.description.trim() : null,
             })),
         })),
     }))

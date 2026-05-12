@@ -58,6 +58,7 @@ function createDraftQuestion(questionIndex: number): DiagnosticTemplateValue['ro
   return {
     id: crypto.randomUUID(),
     prompt: '',
+    description: null,
     order: questionIndex,
     options: [
       createDraftOption(0),
@@ -72,6 +73,7 @@ function createDraftOption(
   return {
     id: crypto.randomUUID(),
     label: '',
+    description: null,
     order: optionIndex,
   };
 }
@@ -137,9 +139,11 @@ function buildTemplatePatchBody(template: DiagnosticTemplateValue): string {
       questions: round.questions.map((question) => ({
         id: question.id,
         prompt: question.prompt,
+        description: question.description,
         options: question.options.map((option) => ({
           id: option.id,
           label: option.label,
+          description: option.description,
         })),
       })),
     })),
@@ -151,6 +155,7 @@ type SortableOptionRowProps = {
   readonly optionIndex: number;
   readonly optionsCount: number;
   readonly onChangeLabel: (nextLabel: string) => void;
+  readonly onChangeDescription: (nextDescription: string) => void;
   readonly onMoveUp: () => void;
   readonly onMoveDown: () => void;
   readonly onRemove: () => void;
@@ -160,6 +165,7 @@ type OptionRowContentProps = {
   readonly dragHandle: ReactNode;
   readonly isDragging: boolean;
   readonly onChangeLabel: (nextLabel: string) => void;
+  readonly onChangeDescription: (nextDescription: string) => void;
   readonly onRemove: () => void;
   readonly option: DiagnosticTemplateOptionValue;
   readonly optionIndex: number;
@@ -169,24 +175,38 @@ function OptionRowContent(props: OptionRowContentProps): ReactElement {
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 rounded-xl border border-border bg-background px-3 py-3 md:flex-row md:items-center',
+        'flex flex-col gap-3 rounded-xl border border-border bg-background px-3 py-3',
         props.isDragging && 'border-primary/40 bg-primary/5 shadow-sm',
       )}
     >
-      <div className="flex items-center gap-2 text-muted-foreground">
-        {props.dragHandle}
-        <span className="text-xs font-medium">Option {props.optionIndex + 1}</span>
-      </div>
-      <Input
-        value={props.option.label}
-        onChange={(event) => props.onChangeLabel(event.target.value)}
-        placeholder="Short tap label"
-        className="flex-1"
-      />
-      <div className="flex flex-wrap gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {props.dragHandle}
+          <span className="text-xs font-medium">Option {props.optionIndex + 1}</span>
+        </div>
         <Button type="button" variant="outline" size="sm" onClick={props.onRemove}>
           Remove
         </Button>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Label</p>
+          <Input
+            value={props.option.label}
+            onChange={(event) => props.onChangeLabel(event.target.value)}
+            placeholder="Short tap label"
+          />
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Subtext</p>
+          <Textarea
+            value={props.option.description ?? ''}
+            onChange={(event) => props.onChangeDescription(event.target.value)}
+            placeholder="Optional supporting text shown below the option label"
+            rows={2}
+            className="min-h-20"
+          />
+        </div>
       </div>
     </div>
   );
@@ -218,6 +238,7 @@ function SortableOptionRow(props: SortableOptionRowProps): ReactElement {
         option={props.option}
         optionIndex={props.optionIndex}
         onChangeLabel={props.onChangeLabel}
+        onChangeDescription={props.onChangeDescription}
         onRemove={props.onRemove}
       />
     </div>
@@ -239,6 +260,7 @@ function StaticOptionRow(props: SortableOptionRowProps): ReactElement {
       option={props.option}
       optionIndex={props.optionIndex}
       onChangeLabel={props.onChangeLabel}
+      onChangeDescription={props.onChangeDescription}
       onRemove={props.onRemove}
     />
   );
@@ -643,7 +665,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                       </div>
                       <div className="space-y-2">
                         <label htmlFor={`round-guidance-${round.id}`} className="text-sm font-medium text-foreground">
-                          Round guidance
+                          Round subtext
                         </label>
                         <Textarea
                           id={`round-guidance-${round.id}`}
@@ -662,7 +684,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                               ),
                             }))
                           }
-                          placeholder="Optional context shown before the first question in this round."
+                          placeholder="Optional supporting text shown before the first question in this round."
                         />
                       </div>
                     </div>
@@ -783,6 +805,37 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                               placeholder="Example: Which part of the system is hurting most?"
                             />
                           </div>
+                          <div className="mt-4 space-y-2">
+                            <label htmlFor={`question-description-${question.id}`} className="text-sm font-medium text-foreground">
+                              Question subtext
+                            </label>
+                            <Textarea
+                              id={`question-description-${question.id}`}
+                              rows={2}
+                              value={question.description ?? ''}
+                              onChange={(event) =>
+                                updateSelectedTemplate((template) => ({
+                                  ...template,
+                                  rounds: template.rounds.map((candidateRound) =>
+                                    candidateRound.id === round.id
+                                      ? {
+                                          ...candidateRound,
+                                          questions: candidateRound.questions.map((candidateQuestion) =>
+                                            candidateQuestion.id === question.id
+                                              ? {
+                                                  ...candidateQuestion,
+                                                  description: event.target.value,
+                                                }
+                                              : candidateQuestion,
+                                          ),
+                                        }
+                                      : candidateRound,
+                                  ),
+                                }))
+                              }
+                              placeholder="Optional supporting text shown below the question prompt."
+                            />
+                          </div>
                           <div className="mt-4 space-y-3">
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-sm font-medium text-foreground">Options</p>
@@ -857,6 +910,33 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                                                 ? {
                                                                     ...candidateOption,
                                                                     label: nextLabel,
+                                                                  }
+                                                                : candidateOption,
+                                                            ),
+                                                          }
+                                                        : candidateQuestion,
+                                                    ),
+                                                  }
+                                                : candidateRound,
+                                            ),
+                                          }))
+                                        }
+                                        onChangeDescription={(nextDescription) =>
+                                          updateSelectedTemplate((template) => ({
+                                            ...template,
+                                            rounds: template.rounds.map((candidateRound) =>
+                                              candidateRound.id === round.id
+                                                ? {
+                                                    ...candidateRound,
+                                                    questions: candidateRound.questions.map((candidateQuestion) =>
+                                                      candidateQuestion.id === question.id
+                                                        ? {
+                                                            ...candidateQuestion,
+                                                            options: candidateQuestion.options.map((candidateOption) =>
+                                                              candidateOption.id === option.id
+                                                                ? {
+                                                                    ...candidateOption,
+                                                                    description: nextDescription,
                                                                   }
                                                                 : candidateOption,
                                                             ),
@@ -966,6 +1046,33 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                                               ? {
                                                                   ...candidateOption,
                                                                   label: nextLabel,
+                                                                }
+                                                              : candidateOption,
+                                                          ),
+                                                        }
+                                                      : candidateQuestion,
+                                                  ),
+                                                }
+                                              : candidateRound,
+                                          ),
+                                        }))
+                                      }
+                                      onChangeDescription={(nextDescription) =>
+                                        updateSelectedTemplate((template) => ({
+                                          ...template,
+                                          rounds: template.rounds.map((candidateRound) =>
+                                            candidateRound.id === round.id
+                                              ? {
+                                                  ...candidateRound,
+                                                  questions: candidateRound.questions.map((candidateQuestion) =>
+                                                    candidateQuestion.id === question.id
+                                                      ? {
+                                                          ...candidateQuestion,
+                                                          options: candidateQuestion.options.map((candidateOption) =>
+                                                            candidateOption.id === option.id
+                                                              ? {
+                                                                  ...candidateOption,
+                                                                  description: nextDescription,
                                                                 }
                                                               : candidateOption,
                                                           ),
