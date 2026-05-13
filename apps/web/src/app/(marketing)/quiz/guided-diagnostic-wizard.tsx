@@ -882,14 +882,16 @@ export type GuidedDiagnosticWizardProps = {
   readonly canGoBack: boolean;
   readonly guided: GuidedDiagnosticV1;
   /**
-   * When true, do not inject the first template round into an empty guided state. Use for `/quiz?sessionId=…` so a
+   * When true, do not inject the first template round into an empty guided state. Use for `/quiz/[sessionRef]` so a
    * brief empty render (or Strict Mode fetch abort) is never overwritten before session hydration applies.
    */
   readonly suppressEmptyTemplateBootstrap?: boolean;
   /** Booking-linked session: review only, no API writes or starting a new run from this screen. */
   readonly sessionReadOnly?: boolean;
-  /** Destination for “Book this session” from the outcome panel (include `?sessionId=` when the quiz URL targets a row). */
+  /** Destination for “Book this session” from the outcome panel (`/book/[sessionRef]` when the quiz URL targets a row). */
   readonly marketingBookHref?: string;
+  /** Destination for “Review diagnostic” (use `/quiz/[sessionRef]` when the quiz URL targets a persisted row). */
+  readonly reviewDiagnosticHref?: string;
   readonly onGoBack: () => void;
   readonly onGuidedChange: (next: GuidedDiagnosticV1) => void;
 };
@@ -1013,6 +1015,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     suppressEmptyTemplateBootstrap = false,
     sessionReadOnly = false,
     marketingBookHref = '/book',
+    reviewDiagnosticHref = '/quiz',
   } = props;
   const executeGoBackWithScroll = useCallback((): void => {
     onGoBack();
@@ -1693,8 +1696,9 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             </>
           ) : (
             <>
-              Here is the session we recommend from your answers — the same details you will see on the service page. Use{' '}
-              <span className="font-medium text-foreground">Continue</span> below to book or open the full page.
+              Here is the session we recommend from your answers. Use{' '}
+              <span className="font-medium text-foreground">Book this session</span> below to reserve your consultation, or{' '}
+              <span className="font-medium text-foreground">Review diagnostic</span> to revisit your answers in this session.
             </>
           )}
         </p>
@@ -1708,7 +1712,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-xs">
               <h3 className="text-lg font-semibold text-foreground">Your advisor summary</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Pulled from your diagnostic — you will also see this when you open the full service page.
+                Pulled from your diagnostic — the same summary you see at the end of this guided flow.
               </p>
               <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{advisorSummary}</p>
             </div>
@@ -1749,7 +1753,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               </Button>
             )}
             <Button asChild variant="outline" className="mt-3 w-full">
-              <Link href="/service">Full service page</Link>
+              <Link href={reviewDiagnosticHref}>Review diagnostic</Link>
             </Button>
           </aside>
         </div>

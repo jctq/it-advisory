@@ -43,6 +43,8 @@ export type LeadDocument = {
   _id?: ObjectId;
   visitorId: string;
   name: string;
+  /** Set when the visitor completes the marketing checkout form; omitted on legacy placeholder leads. */
+  email?: string;
   company: string;
   phone: string;
   source: string;
@@ -57,6 +59,8 @@ export type BookingDocument = {
   startsAt: Date;
   timezone: string;
   status: 'pending' | 'confirmed' | 'cancelled';
+  /** Human-readable payment method from checkout (e.g. GCash); optional for legacy bookings. */
+  paymentMethodLabel?: string | null;
   meetingUrl?: string;
   /** Raw guided diagnostic JSON (string or legacy object stringified) at booking time — full rounds, questions, options. */
   guidedDiagnosticSnapshot?: string | null;

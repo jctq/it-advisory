@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { insertBlankQuizSessionForVisitor, listQuizSessionsForVisitor } from '@/lib/data/quiz-sessions';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
+import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
 /**
  * Lists quiz session snapshots for the signed-in marketing account (`acct:<userId>` rows).
@@ -28,5 +29,5 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (sessionId === null) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
   }
-  return NextResponse.json({ sessionId });
+  return NextResponse.json({ sessionId: encodeQuizSessionRefForMarketingUrl(sessionId) });
 }

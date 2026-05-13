@@ -6,6 +6,7 @@ import { getDb } from '@/lib/mongodb';
 export type LeadRow = {
   id: string;
   name: string;
+  email: string;
   company: string;
   phone: string;
   source: string;
@@ -13,9 +14,12 @@ export type LeadRow = {
 };
 
 function mapLead(doc: LeadDocument & { _id: { toString: () => string } }): LeadRow {
+  const emailRaw = doc.email;
+  const email = typeof emailRaw === 'string' && emailRaw.trim().length > 0 ? emailRaw.trim() : '—';
   return {
     id: doc._id.toString(),
     name: doc.name,
+    email,
     company: doc.company,
     phone: doc.phone,
     source: doc.source,
@@ -37,23 +41,44 @@ export async function listLeads(limit = 500): Promise<LeadRow[]> {
   return docs.map((doc) => mapLead(doc as LeadDocument & { _id: { toString: () => string } }));
 }
 
+export type MarketingBookingLeadContact = {
+  readonly name: string;
+  readonly email: string;
+  readonly company: string;
+  readonly phone: string;
+};
+
 /**
- * Inserts a minimal lead row for an anonymous marketing booking (ties booking to visitor).
+ * Inserts a lead row for a marketing booking. Uses placeholder copy when {@link contact} is omitted (legacy funnel).
  */
-export async function insertMarketingBookingLead(visitorId: string): Promise<ObjectId | null> {
+export async function insertMarketingBookingLead(
+  visitorId: string,
+  contact?: MarketingBookingLeadContact | null,
+): Promise<ObjectId | null> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
   const db = await getDb();
   const now = new Date();
-  const doc: Omit<LeadDocument, '_id'> = {
-    visitorId,
-    name: 'Booking (funnel)',
-    company: '—',
-    phone: '—',
-    source: 'marketing-booking',
-    createdAt: now,
-  };
+  const doc: Omit<LeadDocument, '_id'> =
+    contact !== undefined && contact !== null
+      ? {
+          visitorId,
+          name: contact.name.trim(),
+          email: contact.email.trim(),
+          company: contact.company.trim().length > 0 ? contact.company.trim() : '—',
+          phone: contact.phone.trim(),
+          source: 'marketing-booking',
+          createdAt: now,
+        }
+      : {
+          visitorId,
+          name: 'Booking (funnel)',
+          company: '—',
+          phone: '—',
+          source: 'marketing-booking',
+          createdAt: now,
+        };
   const result = await db.collection<LeadDocument>(COLLECTIONS.leads).insertOne(doc);
   return result.insertedId;
 }

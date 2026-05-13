@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
+import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-sessions';
 
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
@@ -31,14 +32,14 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps): Re
   }, []);
   const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(true, onNavigateError);
   const executeDelete = useCallback(
-    async (sessionId: string): Promise<void> => {
+    async (marketingSessionRef: string): Promise<void> => {
       if (!window.confirm('Delete this diagnostic permanently? This cannot be undone.')) {
         return;
       }
       setActionError(null);
-      setDeletingId(sessionId);
+      setDeletingId(marketingSessionRef);
       try {
-        const response = await fetch(`${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(sessionId)}`, {
+        const response = await fetch(`${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(marketingSessionRef)}`, {
           method: 'DELETE',
           credentials: 'include',
         });
@@ -154,11 +155,11 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps): Re
                       <div className="flex flex-wrap justify-end gap-2">
                         {row.isBooked ? (
                           <Button type="button" variant="outline" size="sm" asChild>
-                            <Link href={`/quiz?sessionId=${encodeURIComponent(row.id)}`}>View</Link>
+                            <Link href={buildMarketingQuizSessionPath(row.marketingSessionRef)}>View</Link>
                           </Button>
                         ) : (
                           <Button type="button" variant="outline" size="sm" asChild>
-                            <Link href={`/quiz?sessionId=${encodeURIComponent(row.id)}`}>Continue</Link>
+                            <Link href={buildMarketingQuizSessionPath(row.marketingSessionRef)}>Continue</Link>
                           </Button>
                         )}
                         {!row.isBooked ? (
@@ -167,10 +168,10 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps): Re
                             variant="ghost"
                             size="sm"
                             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            disabled={deletingId === row.id}
-                            onClick={() => void executeDelete(row.id)}
+                            disabled={deletingId === row.marketingSessionRef}
+                            onClick={() => void executeDelete(row.marketingSessionRef)}
                           >
-                            {deletingId === row.id ? 'Deleting…' : 'Delete'}
+                            {deletingId === row.marketingSessionRef ? 'Deleting…' : 'Delete'}
                           </Button>
                         ) : null}
                       </div>

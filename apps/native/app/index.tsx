@@ -42,8 +42,8 @@ export default function HomeScreen() {
       footer={
         <View style={styles.footerGroup}>
           <AppButton onPress={() => router.push('/diagnostic')}>Start guided diagnostic</AppButton>
-          <AppButton onPress={() => router.push('/service')} variant="secondary">
-            View service details
+          <AppButton onPress={() => router.push('/booking')} variant="secondary">
+            Book a session
           </AppButton>
         </View>
       }

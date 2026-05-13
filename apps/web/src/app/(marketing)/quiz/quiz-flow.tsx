@@ -1,7 +1,7 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,12 @@ import {
 import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
 import { listVisibleTemplateRoundSummaries } from '@/lib/marketing/diagnostic-template-flow';
 import { cn } from '@/lib/utils';
+import {
+  buildMarketingBookSessionPath,
+  buildMarketingQuizRetakePath,
+  buildMarketingQuizSessionPath,
+  isPlausibleMarketingQuizSessionRef,
+} from '@/lib/marketing/quiz-session-marketing-ref';
 import { GuidedDiagnosticWizard } from './guided-diagnostic-wizard';
 
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
@@ -179,16 +185,42 @@ function normalizeGuidedDiagnosticRaw(raw: unknown): string | undefined {
   return undefined;
 }
 
-export function QuizFlow() {
+export type QuizFlowProps = {
+  /** When set (from `/quiz/[sessionRef]`), targets that persisted session; legacy `?sessionId=` on `/quiz` is redirected here. */
+  readonly pathSessionRef?: string | null;
+};
+
+export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
+  const { pathSessionRef } = props;
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  useLayoutEffect(() => {
+    const hasPathRef =
+      pathSessionRef !== undefined && pathSessionRef !== null && pathSessionRef.trim().length > 0;
+    if (hasPathRef) {
+      return;
+    }
+    if (pathname !== '/quiz') {
+      return;
+    }
+    const fromQuery = searchParams.get('sessionId')?.trim() ?? '';
+    if (!isPlausibleMarketingQuizSessionRef(fromQuery)) {
+      return;
+    }
+    const retakeSuffix = searchParams.get('retake') === '1' ? '?retake=1' : '';
+    router.replace(`${buildMarketingQuizSessionPath(fromQuery)}${retakeSuffix}`);
+  }, [pathSessionRef, pathname, router, searchParams]);
   const sessionTargetId = useMemo((): string | null => {
+    if (pathSessionRef !== undefined && pathSessionRef !== null) {
+      const trimmed = pathSessionRef.trim();
+      return isPlausibleMarketingQuizSessionRef(trimmed) ? trimmed : null;
+    }
     const raw = searchParams.get('sessionId')?.trim() ?? '';
-    return /^[a-f\d]{24}$/i.test(raw) ? raw : null;
-  }, [searchParams]);
+    return isPlausibleMarketingQuizSessionRef(raw) ? raw : null;
+  }, [pathSessionRef, searchParams]);
   const [guided, setGuided] = useState<GuidedDiagnosticV1>(GUIDED_DIAGNOSTIC_EMPTY);
   const [isSessionReady, setIsSessionReady] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [targetSessionError, setTargetSessionError] = useState<string | null>(null);
   const [sessionReadOnly, setSessionReadOnly] = useState<boolean>(false);
   const sessionReadOnlyRef = useRef<boolean>(false);
@@ -234,7 +266,7 @@ export function QuizFlow() {
         hasHydratedRef.current = true;
         setIsSessionReady(true);
         const nextPath =
-          sessionTargetId !== null ? `/quiz?sessionId=${encodeURIComponent(sessionTargetId)}` : '/quiz';
+          sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/quiz';
         router.replace(nextPath);
         return;
       }
@@ -288,7 +320,7 @@ export function QuizFlow() {
     return () => {
       cancelled = true;
     };
-  }, [persistGuided, router, searchParams, sessionTargetId]);
+  }, [persistGuided, router, searchParams, sessionTargetId, pathSessionRef]);
   useEffect(() => {
     let cancelled = false;
     async function loadProgressMetadata(): Promise<void> {
@@ -487,18 +519,6 @@ export function QuizFlow() {
     },
     [diagnosticAiEnabled, guided, visibleTemplateRounds],
   );
-  const executeContinueToService = async (): Promise<void> => {
-    if (sessionReadOnlyRef.current) {
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await persistGuided(guided, true);
-      router.push('/service');
-    } finally {
-      setIsSaving(false);
-    }
-  };
   if (!isSessionReady) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
@@ -656,7 +676,7 @@ export function QuizFlow() {
                       ) : null}
                     </>
                   );
-                  const rowClassName = 'flex min-h-11 w-full min-w-0 items-start gap-3';
+                  const rowClassName = 'flex min-h-11 w-full min-w-0 items-center gap-3';
                   if (isJumpTarget) {
                     return (
                       <button
@@ -722,7 +742,10 @@ export function QuizFlow() {
         suppressEmptyTemplateBootstrap={sessionTargetId !== null && !isSessionReady}
         sessionReadOnly={sessionReadOnly}
         marketingBookHref={
-          sessionTargetId !== null ? `/book?sessionId=${encodeURIComponent(sessionTargetId)}` : '/book'
+          sessionTargetId !== null ? buildMarketingBookSessionPath(sessionTargetId) : '/book'
+        }
+        reviewDiagnosticHref={
+          sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/quiz'
         }
         onGoBack={executeGoBack}
         onGuidedChange={setGuided}
@@ -738,11 +761,7 @@ export function QuizFlow() {
           {showRetakeLink && !sessionReadOnly ? (
             <Button type="button" variant="outline" asChild>
               <Link
-                href={
-                  sessionTargetId !== null
-                    ? `/quiz?retake=1&sessionId=${encodeURIComponent(sessionTargetId)}`
-                    : '/quiz?retake=1'
-                }
+                href={buildMarketingQuizRetakePath(sessionTargetId)}
               >
                 Retake diagnostic
               </Link>

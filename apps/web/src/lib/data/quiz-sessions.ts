@@ -10,6 +10,7 @@ import type {
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import { getDb } from '@/lib/mongodb';
+import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
 const DEFAULT_QUIZ_SESSION_LIST_LIMIT = 500;
 const DEFAULT_QUIZ_AUDIT_LIST_LIMIT = 200;
@@ -260,7 +261,7 @@ export async function findLatestQuizSession(visitorId: string): Promise<QuizSess
 }
 
 /**
- * Session to attach at booking time: prefers `visitor_sessions.latestSessionId` (matches `/quiz?sessionId=…` saves)
+ * Session to attach at booking time: prefers `visitor_sessions.latestSessionId` (matches `/quiz/[sessionRef]` saves)
  * over a raw `updatedAt` sort, which can pick a different row if multiple sessions exist.
  */
 export async function findQuizSessionForBookingSnapshot(visitorId: string): Promise<QuizSessionDocument | null> {
@@ -285,6 +286,8 @@ export async function findQuizSessionForBookingSnapshot(visitorId: string): Prom
 
 export type VisitorQuizSessionSummary = {
   readonly id: string;
+  /** Value for `/quiz/[sessionRef]` links and quiz session API calls (opaque when `QUIZ_SESSION_URL_SECRET` is set). */
+  readonly marketingSessionRef: string;
   readonly currentStep: number;
   readonly updatedAtIso: string;
   readonly completedAtIso: string | null;
@@ -298,8 +301,10 @@ function mapVisitorQuizSessionSummary(
   isBooked: boolean,
 ): VisitorQuizSessionSummary {
   const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
+  const idHex = doc._id.toString();
   return {
-    id: doc._id.toString(),
+    id: idHex,
+    marketingSessionRef: encodeQuizSessionRefForMarketingUrl(idHex),
     currentStep: doc.currentStep,
     updatedAtIso: doc.updatedAt.toISOString(),
     completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,

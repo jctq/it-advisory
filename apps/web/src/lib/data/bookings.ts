@@ -113,6 +113,7 @@ export type CreateMarketingBookingInput = {
   readonly leadId: ObjectId;
   readonly quizSessionId: ObjectId | null;
   readonly guidedDiagnosticSnapshot: string | null;
+  readonly paymentMethodLabel?: string | null;
 };
 
 export async function insertMarketingBooking(input: CreateMarketingBookingInput): Promise<ObjectId | null> {
@@ -128,6 +129,7 @@ export async function insertMarketingBooking(input: CreateMarketingBookingInput)
     startsAt: input.startsAt,
     timezone: input.timezone,
     status: 'pending',
+    paymentMethodLabel: input.paymentMethodLabel ?? null,
     guidedDiagnosticSnapshot: input.guidedDiagnosticSnapshot,
     quizSessionId: input.quizSessionId,
     createdAt: now,
@@ -149,6 +151,7 @@ export async function createBookingWithLatestQuizSnapshot(input: {
   readonly timezone: string;
   readonly leadId: ObjectId;
   readonly preferredQuizSessionId?: string | null;
+  readonly paymentMethodLabel?: string | null;
 }): Promise<{ readonly bookingId: ObjectId; readonly quizSessionId: ObjectId | null } | null> {
   if (!process.env.MONGODB_URI) {
     return null;
@@ -174,6 +177,7 @@ export async function createBookingWithLatestQuizSnapshot(input: {
     leadId: input.leadId,
     quizSessionId,
     guidedDiagnosticSnapshot: snapshot,
+    paymentMethodLabel: input.paymentMethodLabel ?? null,
   });
   if (bookingId === null) {
     return null;

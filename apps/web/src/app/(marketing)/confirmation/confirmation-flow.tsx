@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { CalendarClock, CheckCircle2, Loader2, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
+import { isPlausibleMarketingQuizSessionRef } from '@/lib/marketing/quiz-session-marketing-ref';
 
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const BOOKINGS_API_URL = '/api/bookings';
@@ -49,7 +50,7 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
           time: trimmedTime,
           serviceKey: 'project-rescue',
         };
-        if (/^[a-f\d]{24}$/i.test(trimmedQuizSessionId)) {
+        if (isPlausibleMarketingQuizSessionRef(trimmedQuizSessionId)) {
           body.quizSessionId = trimmedQuizSessionId;
         }
         const response = await fetch(BOOKINGS_API_URL, {

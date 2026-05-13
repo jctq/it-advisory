@@ -9,12 +9,16 @@ import {
   upsertQuizProgress,
 } from '@/lib/data/quiz-sessions';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
+import {
+  encodeQuizSessionRefForMarketingUrl,
+  resolveQuizSessionObjectIdHexFromMarketingRef,
+} from '@/lib/server/quiz-session-marketing-ref-crypto';
 
 const patchBodySchema = z.object({
   answers: z.record(z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])),
   currentStep: z.number().int().min(0),
   completed: z.boolean().optional(),
-  sessionId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
+  sessionId: z.string().min(1).max(512).optional(),
 });
 
 const RESET_QUIZ_ANSWERS = {
@@ -27,17 +31,18 @@ const RESET_QUIZ_ANSWERS = {
 type OptionalSessionIdQuery =
   | { readonly status: 'absent' }
   | { readonly status: 'invalid' }
-  | { readonly status: 'ok'; readonly sessionId: string };
+  | { readonly status: 'ok'; readonly objectIdHex: string };
 
 function parseSessionIdQuery(request: Request): OptionalSessionIdQuery {
   const raw = new URL(request.url).searchParams.get('sessionId')?.trim() ?? '';
   if (raw.length === 0) {
     return { status: 'absent' };
   }
-  if (!/^[a-f\d]{24}$/i.test(raw)) {
+  const objectIdHex = resolveQuizSessionObjectIdHexFromMarketingRef(raw);
+  if (objectIdHex === null) {
     return { status: 'invalid' };
   }
-  return { status: 'ok', sessionId: raw };
+  return { status: 'ok', objectIdHex };
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -48,7 +53,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
   const session =
     parsedId.status === 'ok'
-      ? await findQuizSessionForVisitor(visitorId, parsedId.sessionId)
+      ? await findQuizSessionForVisitor(visitorId, parsedId.objectIdHex)
       : await findLatestQuizSession(visitorId);
   if (parsedId.status === 'ok' && session === null) {
     return NextResponse.json({ error: 'Session not found', code: 'quiz_session_not_found' }, { status: 404 });
@@ -56,6 +61,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!session) {
     return NextResponse.json({
       session: null,
+      sessionId: null,
     });
   }
   if (session._id === undefined) {
@@ -65,6 +71,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         currentStep: session.currentStep,
       },
       readOnly: false,
+      sessionId: null,
     });
   }
   const bookedCount = await countBookingsByQuizSessionId(session._id);
@@ -74,6 +81,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       currentStep: session.currentStep,
     },
     readOnly: bookedCount > 0,
+    sessionId: encodeQuizSessionRefForMarketingUrl(session._id.toString()),
   });
 }
 
@@ -89,10 +97,18 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
-  const { answers, currentStep, completed, sessionId } = parsed.data;
+  const { answers, currentStep, completed, sessionId: sessionIdRaw } = parsed.data;
+  let resolvedTargetSessionHex: string | undefined;
+  if (sessionIdRaw !== undefined) {
+    const resolved = resolveQuizSessionObjectIdHexFromMarketingRef(sessionIdRaw);
+    if (resolved === null) {
+      return NextResponse.json({ error: 'Invalid sessionId', code: 'quiz_session_invalid_id' }, { status: 400 });
+    }
+    resolvedTargetSessionHex = resolved;
+  }
   let targetForBooking: Awaited<ReturnType<typeof findLatestQuizSession>> = null;
-  if (sessionId !== undefined) {
-    targetForBooking = await findQuizSessionForVisitor(visitorId, sessionId);
+  if (resolvedTargetSessionHex !== undefined) {
+    targetForBooking = await findQuizSessionForVisitor(visitorId, resolvedTargetSessionHex);
   } else {
     targetForBooking = await findLatestQuizSession(visitorId);
   }
@@ -113,13 +129,14 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     answers,
     currentStep,
     isComplete: completed ?? false,
-    targetSessionId: sessionId,
+    targetSessionId: resolvedTargetSessionHex,
   });
-  if (!result.persisted && sessionId !== undefined) {
+  if (!result.persisted && resolvedTargetSessionHex !== undefined) {
     return NextResponse.json({ error: 'Session not found', code: 'quiz_session_not_found' }, { status: 404 });
   }
   return NextResponse.json({
-    sessionId: result.sessionId ?? null,
+    sessionId:
+      result.sessionId !== undefined ? encodeQuizSessionRefForMarketingUrl(result.sessionId) : null,
     persisted: result.persisted,
   });
 }
@@ -131,7 +148,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid sessionId', code: 'quiz_session_invalid_id' }, { status: 400 });
   }
   if (parsedId.status === 'ok') {
-    const outcome = await deleteQuizSessionForVisitor(visitorId, parsedId.sessionId);
+    const outcome = await deleteQuizSessionForVisitor(visitorId, parsedId.objectIdHex);
     if (outcome.ok === false) {
       if (outcome.code === 'has_booking') {
         return NextResponse.json(
@@ -144,7 +161,10 @@ export async function DELETE(request: Request): Promise<NextResponse> {
       }
       return NextResponse.json({ error: 'Session not found', code: 'quiz_session_not_found' }, { status: 404 });
     }
-    return NextResponse.json({ deleted: true as const, sessionId: parsedId.sessionId });
+    return NextResponse.json({
+      deleted: true as const,
+      sessionId: encodeQuizSessionRefForMarketingUrl(parsedId.objectIdHex),
+    });
   }
   const latestSession = await findLatestQuizSession(visitorId);
 
@@ -166,7 +186,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
       return NextResponse.json({
         persisted: false,
         reset: false,
-        sessionId: latestSession._id.toString(),
+        sessionId: encodeQuizSessionRefForMarketingUrl(latestSession._id.toString()),
       });
     }
   }
@@ -181,6 +201,6 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   return NextResponse.json({
     persisted: result.persisted,
     reset: true,
-    sessionId: result.sessionId ?? null,
+    sessionId: result.sessionId !== undefined ? encodeQuizSessionRefForMarketingUrl(result.sessionId) : null,
   });
 }

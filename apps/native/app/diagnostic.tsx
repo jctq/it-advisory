@@ -608,10 +608,10 @@ export default function DiagnosticScreen() {
         <AppButton
           disabled={isBusy}
           onPress={() => {
-            void executeFinalizeDiagnostic().then(() => router.push('/service')).catch(() => {});
+            void executeFinalizeDiagnostic().then(() => router.push('/booking')).catch(() => {});
           }}
         >
-          Continue to service
+          Book this session
         </AppButton>
       ) : activeRound !== null ? (
         <AppButton disabled={isBusy} onPress={() => void executeAdvance()}>
