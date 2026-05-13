@@ -15,7 +15,7 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
     notFound();
   }
   return (
-    <section className="mx-auto max-w-4xl space-y-8">
+    <section className="mx-auto space-y-8">
       <AdminPageHeader
         eyebrow="CRM"
         title="Booking details"

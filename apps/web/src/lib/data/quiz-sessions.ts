@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type {
+  BookingDocument,
   QuizAnswers,
   QuizAuditDocument,
   QuizSessionDocument,
@@ -21,6 +22,16 @@ export type QuizSessionListRow = {
   readonly completedAtIso: string | null;
   readonly hasGuidedDiagnostic: boolean;
   readonly situationPreview: string | null;
+  /** True when a booking references this session (`bookings.quizSessionId`). */
+  readonly isBooked: boolean;
+  /** First linked booking id for admin, when `isBooked`. */
+  readonly bookingId: string | null;
+};
+
+export type QuizSessionLinkedBooking = {
+  readonly id: string;
+  readonly startsAtIso: string;
+  readonly status: BookingDocument['status'];
 };
 
 export type QuizSessionDetail = {
@@ -32,6 +43,7 @@ export type QuizSessionDetail = {
   readonly completedAtIso: string | null;
   readonly guidedDiagnosticRaw: string | null;
   readonly situationDiagnosticThread: string | null;
+  readonly linkedBookings: readonly QuizSessionLinkedBooking[];
 };
 
 export type QuizAuditAdminRow = {
@@ -66,6 +78,7 @@ function resolveSituationDiagnosticThread(answers: QuizAnswers): string | null {
 
 function mapQuizSessionListRow(
   doc: QuizSessionDocument & { _id: ObjectId },
+  bookingId: string | null,
 ): QuizSessionListRow {
   const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
   return {
@@ -76,7 +89,34 @@ function mapQuizSessionListRow(
     completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
     hasGuidedDiagnostic: guidedRaw !== null,
     situationPreview: resolveSituationPreview(doc.answers),
+    isBooked: bookingId !== null,
+    bookingId,
   };
+}
+
+async function fetchPrimaryBookingIdByQuizSessionIds(sessionIds: readonly ObjectId[]): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  if (sessionIds.length === 0) {
+    return result;
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<BookingDocument>(COLLECTIONS.bookings)
+    .find(
+      { quizSessionId: { $in: [...sessionIds] } },
+      { projection: { _id: 1, quizSessionId: 1 } },
+    )
+    .toArray();
+  for (const doc of docs) {
+    if (doc._id === undefined || doc.quizSessionId === undefined || doc.quizSessionId === null) {
+      continue;
+    }
+    const sessionKey = doc.quizSessionId.toString();
+    if (!result.has(sessionKey)) {
+      result.set(sessionKey, doc._id.toString());
+    }
+  }
+  return result;
 }
 
 /**
@@ -95,9 +135,12 @@ export async function listQuizSessionsForAdmin(
     .sort({ updatedAt: -1 })
     .limit(limit);
   const docs = await cursor.toArray();
-  return docs
-    .filter((doc): doc is QuizSessionDocument & { _id: ObjectId } => doc._id !== undefined)
-    .map(mapQuizSessionListRow);
+  const validDocs = docs.filter((doc): doc is QuizSessionDocument & { _id: ObjectId } => doc._id !== undefined);
+  const sessionIds = validDocs.map((doc) => doc._id);
+  const bookingIdBySessionId = await fetchPrimaryBookingIdByQuizSessionIds(sessionIds);
+  return validDocs.map((doc) =>
+    mapQuizSessionListRow(doc, bookingIdBySessionId.get(doc._id.toString()) ?? null),
+  );
 }
 
 /**
@@ -119,6 +162,18 @@ export async function findQuizSessionById(sessionId: string): Promise<QuizSessio
     return null;
   }
   const guidedDiagnosticRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
+  const linkedBookingDocs = await db
+    .collection<BookingDocument>(COLLECTIONS.bookings)
+    .find({ quizSessionId: objectId })
+    .sort({ startsAt: -1 })
+    .toArray();
+  const linkedBookings: QuizSessionLinkedBooking[] = linkedBookingDocs
+    .filter((b): b is BookingDocument & { _id: ObjectId } => b._id !== undefined)
+    .map((b) => ({
+      id: b._id.toString(),
+      startsAtIso: b.startsAt.toISOString(),
+      status: b.status,
+    }));
   return {
     id: doc._id.toString(),
     visitorId: doc.visitorId,
@@ -128,6 +183,7 @@ export async function findQuizSessionById(sessionId: string): Promise<QuizSessio
     completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
     guidedDiagnosticRaw,
     situationDiagnosticThread: resolveSituationDiagnosticThread(doc.answers),
+    linkedBookings,
   };
 }
 

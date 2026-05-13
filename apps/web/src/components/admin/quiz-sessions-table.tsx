@@ -34,9 +34,22 @@ export function QuizSessionsTable(props: QuizSessionsTableProps): ReactElement {
           return value !== null ? DATE_TIME_FORMATTER.format(new Date(value)) : '—';
         },
       }),
-      columnHelper.accessor('hasGuidedDiagnostic', {
-        header: 'Diagnostic',
-        cell: (info) => (info.getValue() ? 'Yes' : '—'),
+      columnHelper.accessor('isBooked', {
+        header: 'Booked',
+        cell: (info) => {
+          const row = info.row.original;
+          if (!row.isBooked || row.bookingId === null) {
+            return '—';
+          }
+          return (
+            <Link
+              href={`/admin/bookings/${row.bookingId}`}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Yes
+            </Link>
+          );
+        },
       }),
       columnHelper.accessor('situationPreview', {
         header: 'Situation',

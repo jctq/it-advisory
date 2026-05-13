@@ -11,11 +11,11 @@ export const dynamic = 'force-dynamic';
 export default async function AdminQuizSessionsPage() {
   const sessions = await listQuizSessionsForAdmin();
   return (
-    <section className="mx-auto max-w-6xl space-y-8">
+    <section className="mx-auto space-y-8">
       <AdminPageHeader
         eyebrow="Intake"
         title="Quiz sessions"
-        description="Latest persisted guided diagnostic state per visitor cookie (quiz_sessions). Each save overwrites the visitor’s current row; use Save history on a session for append-only audit rows."
+        description="Latest persisted guided diagnostic per visitor (quiz_sessions). Booked = a web booking stored this session id when the slot was reserved. Each save overwrites the visitor row; open a session for Save history (audit)."
       />
       <QuizSessionsTable initialData={sessions} />
     </section>

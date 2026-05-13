@@ -30,11 +30,11 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
   }
   const auditRows = await listQuizAuditForSession(new ObjectId(session.id));
   return (
-    <section className="mx-auto space-y-8">
+    <section className="mx-auto max-w-6xl space-y-8">
       <AdminPageHeader
         eyebrow="Intake"
         title="Quiz session"
-        description="Visitor quiz snapshot from MongoDB: metadata, full guided diagnostic rendering, optional diagnostic thread JSON, and append-only save history."
+        description="Visitor quiz snapshot from MongoDB. Booked = a booking row points at this session id. Table: diagnostic thread, guided diagnostic tabs, save history."
       />
       <div className="flex flex-wrap gap-3 text-sm">
         <Link href="/admin/quiz-sessions" className="font-medium text-primary underline-offset-4 hover:underline">
@@ -76,11 +76,51 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
             </dd>
           </div>
           <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Booked</dt>
+            <dd className="mt-1 text-sm text-foreground">
+              {session.linkedBookings.length === 0 ? (
+                'No — no booking references this quiz session id yet.'
+              ) : (
+                <span>
+                  Yes — {session.linkedBookings.length} booking
+                  {session.linkedBookings.length === 1 ? '' : 's'} (see below).
+                </span>
+              )}
+            </dd>
+          </div>
+          <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guided diagnostic</dt>
             <dd className="mt-1 text-sm text-foreground">{session.guidedDiagnosticRaw !== null ? 'Stored' : 'Not stored'}</dd>
           </div>
         </dl>
       </div>
+      {session.linkedBookings.length > 0 ? (
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
+          <h2 className="text-lg font-semibold text-foreground">Linked bookings</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Web bookings that stored this quiz session id (`bookings.quizSessionId`).
+          </p>
+          <ul className="mt-4 space-y-2">
+            {session.linkedBookings.map((booking) => (
+              <li
+                key={booking.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  {DATE_TIME_FORMATTER.format(new Date(booking.startsAtIso))} ·{' '}
+                  <span className="font-medium text-foreground">{booking.status}</span>
+                </span>
+                <Link
+                  href={`/admin/bookings/${booking.id}`}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Open booking
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {session.situationDiagnosticThread !== null ? (
         <details className="rounded-2xl border border-border bg-card p-6 shadow-xs">
           <summary className="cursor-pointer text-lg font-semibold text-foreground">Diagnostic thread JSON</summary>

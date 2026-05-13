@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function AdminSettingsPage() {
   return (
-    <section className="mx-auto max-w-6xl space-y-8">
+    <section className="mx-auto space-y-8">
       <AdminPageHeader
         eyebrow="Configuration"
         title="Settings"

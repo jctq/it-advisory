@@ -23,6 +23,23 @@ export function BookingsTable({ initialData }: BookingsTableProps) {
       }),
       columnHelper.accessor('status', { header: 'Status' }),
       columnHelper.accessor('visitorId', { header: 'Visitor' }),
+      columnHelper.accessor('quizSessionId', {
+        header: 'Quiz session',
+        cell: (info) => {
+          const id = info.getValue();
+          if (id === null || id.length === 0) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <Link
+              href={`/admin/quiz-sessions/${id}`}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              View
+            </Link>
+          );
+        },
+      }),
       columnHelper.display({
         id: 'details',
         header: 'Details',

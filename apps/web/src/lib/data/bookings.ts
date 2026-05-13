@@ -15,11 +15,15 @@ export type BookingRow = {
   status: BookingDocument['status'];
   meetingUrl?: string;
   hasDiagnosticSnapshot: boolean;
+  /** Quiz session document id captured at booking time, when Mongo had a session row. */
+  quizSessionId: string | null;
 };
 
 function mapBooking(
   doc: BookingDocument & { _id: { toString: () => string }; leadId: { toString: () => string } },
 ): BookingRow {
+  const quizSessionId =
+    doc.quizSessionId !== undefined && doc.quizSessionId !== null ? doc.quizSessionId.toString() : null;
   return {
     id: doc._id.toString(),
     leadId: doc.leadId.toString(),
@@ -31,10 +35,12 @@ function mapBooking(
     meetingUrl: doc.meetingUrl,
     hasDiagnosticSnapshot:
       typeof doc.guidedDiagnosticSnapshot === 'string' && doc.guidedDiagnosticSnapshot.trim().length > 0,
+    quizSessionId,
   };
 }
 
-export async function listBookings(limit = 500): Promise<BookingRow[]> {
+/** Admin list: high default cap so the paginated client table can page through all stored bookings. */
+export async function listBookings(limit = 10_000): Promise<BookingRow[]> {
   if (!process.env.MONGODB_URI) {
     return [];
   }

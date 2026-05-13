@@ -343,7 +343,7 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
           <p>{statusMessage}</p>
         </div>
       ) : null}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-xs">
+      <section>
         <div className="flex flex-col gap-4 border-b border-border pb-4">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
