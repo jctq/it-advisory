@@ -40,6 +40,8 @@ export type DiagnosticTemplateOptionValue = {
   readonly label: string;
   readonly description: string | null;
   readonly order: number;
+  /** When true, the customer-facing detail textbox appears only if this option is selected. Only one option per question may be true. */
+  readonly requestDetailNoteWhenSelected: boolean;
   readonly showWhen: DiagnosticTemplateVisibilityRule;
   readonly presentation: DiagnosticTemplateOptionPresentationValue;
   readonly childQuestion: DiagnosticTemplateChildQuestionValue | null;
@@ -94,6 +96,7 @@ export type DiagnosticTemplateInput = {
         readonly id: string;
         readonly label: string;
         readonly description: string | null;
+        readonly requestDetailNoteWhenSelected: boolean;
         readonly showWhen: DiagnosticTemplateVisibilityRule;
         readonly presentation: {
           readonly icon: string | null;
@@ -140,6 +143,7 @@ export type PublicDiagnosticTemplateValue = {
         readonly id: string;
         readonly label: string;
         readonly description: string | null;
+        readonly requestDetailNoteWhenSelected: boolean;
         readonly showWhen: DiagnosticTemplateVisibilityRule;
         readonly presentation: {
           readonly icon: string | null;

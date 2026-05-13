@@ -97,7 +97,7 @@ const SERVICE_TEASERS: readonly { readonly title: string; readonly blurb: string
 export default function HomePage() {
   return (
     <main>
-      <section className="border-b border-border bg-gradient-to-b from-muted/40 to-background px-6 py-20 md:py-28">
+      <section className="border-b border-border bg-linear-to-b from-muted/40 to-background px-6 py-20 md:py-28">
         <div className="mx-auto max-w-6xl">
           <p className="text-sm font-medium tracking-wide text-primary">Philippines · Asia/Manila</p>
           <h1 className="mt-4 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-foreground md:text-5xl">

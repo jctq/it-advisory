@@ -18,6 +18,7 @@ import { type ReactNode, useCallback, useMemo, useState, type ReactElement } fro
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import type {
   DiagnosticTemplateQuestionType,
@@ -183,6 +184,7 @@ function createDraftOption(
     label: '',
     description: null,
     showWhen: null,
+    requestDetailNoteWhenSelected: false,
     presentation: {
       icon: null,
       badgeText: null,
@@ -208,6 +210,19 @@ function moveArrayItem<T>(items: readonly T[], fromIndex: number, toIndex: numbe
   }
   next.splice(toIndex, 0, item);
   return next;
+}
+
+function normalizeSingleRequestDetailNoteTriggerForQuestionOptions<T extends { requestDetailNoteWhenSelected: boolean }>(
+  options: readonly T[],
+): T[] {
+  const firstIndex = options.findIndex((option) => option.requestDetailNoteWhenSelected);
+  if (firstIndex === -1) {
+    return options.map((option) => ({ ...option, requestDetailNoteWhenSelected: false }));
+  }
+  return options.map((option, index) => ({
+    ...option,
+    requestDetailNoteWhenSelected: index === firstIndex,
+  }));
 }
 
 function countTemplateQuestions(template: DiagnosticTemplateValue): number {
@@ -551,39 +566,42 @@ function reindexTemplate(template: DiagnosticTemplateValue): DiagnosticTemplateV
               ? 3
               : null,
         selectionMode: question.selectionMode === 'single' ? 'single' : 'multiple',
-        options: question.options.map((option, optionIndex) => ({
-          ...option,
-          order: optionIndex,
-          showWhen: sanitizeOptionVisibilityRule({
-            questionReferences: templateQuestionReferences,
-            roundIndex,
-            questionIndex,
-            questionId: question.id,
-            optionIds: question.options.map((candidateOption) => candidateOption.id),
-            optionIndex,
-            rule: option.showWhen,
-          }),
-          presentation: {
-            icon: option.presentation.icon?.trim() ?? null,
-            badgeText: option.presentation.badgeText?.trim() ?? null,
-            eyebrow: option.presentation.eyebrow?.trim() ?? null,
-            title: option.presentation.title?.trim() ?? null,
-            supportingText: option.presentation.supportingText?.trim() ?? null,
-            exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
-            panelTitle: option.presentation.panelTitle?.trim() ?? null,
-          },
-          childQuestion:
-            option.childQuestion === null
-              ? null
-              : {
-                  ...option.childQuestion,
-                  selectionMode: option.childQuestion.selectionMode === 'multiple' ? 'multiple' : 'single',
-                  options: option.childQuestion.options.map((childOption, childOptionIndex) => ({
-                    ...childOption,
-                    order: childOptionIndex,
-                  })),
-                },
-        })),
+        options: normalizeSingleRequestDetailNoteTriggerForQuestionOptions(
+          question.options.map((option, optionIndex) => ({
+            ...option,
+            order: optionIndex,
+            requestDetailNoteWhenSelected: option.requestDetailNoteWhenSelected === true,
+            showWhen: sanitizeOptionVisibilityRule({
+              questionReferences: templateQuestionReferences,
+              roundIndex,
+              questionIndex,
+              questionId: question.id,
+              optionIds: question.options.map((candidateOption) => candidateOption.id),
+              optionIndex,
+              rule: option.showWhen,
+            }),
+            presentation: {
+              icon: option.presentation.icon?.trim() ?? null,
+              badgeText: option.presentation.badgeText?.trim() ?? null,
+              eyebrow: option.presentation.eyebrow?.trim() ?? null,
+              title: option.presentation.title?.trim() ?? null,
+              supportingText: option.presentation.supportingText?.trim() ?? null,
+              exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
+              panelTitle: option.presentation.panelTitle?.trim() ?? null,
+            },
+            childQuestion:
+              option.childQuestion === null
+                ? null
+                : {
+                    ...option.childQuestion,
+                    selectionMode: option.childQuestion.selectionMode === 'multiple' ? 'multiple' : 'single',
+                    options: option.childQuestion.options.map((childOption, childOptionIndex) => ({
+                      ...childOption,
+                      order: childOptionIndex,
+                    })),
+                  },
+          })),
+        ),
       })),
     })),
   };
@@ -631,6 +649,7 @@ function buildTemplatePatchBody(template: DiagnosticTemplateValue): string {
           label: option.label,
           description: option.description,
           showWhen: option.showWhen,
+          requestDetailNoteWhenSelected: option.requestDetailNoteWhenSelected === true,
           presentation: {
             icon: option.presentation.icon,
             badgeText: option.presentation.badgeText,
@@ -662,11 +681,8 @@ function buildTemplatePatchBody(template: DiagnosticTemplateValue): string {
 
 type SortableOptionRowProps = {
   readonly children?: ReactNode;
-  readonly option: DiagnosticTemplateOptionValue;
   readonly optionIndex: number;
   readonly optionsCount: number;
-  readonly onChangeLabel: (nextLabel: string) => void;
-  readonly onChangeDescription: (nextDescription: string) => void;
   readonly onMoveUp: () => void;
   readonly onMoveDown: () => void;
   readonly onRemove: () => void;
@@ -678,12 +694,9 @@ type OptionRowContentProps = {
   readonly children?: ReactNode;
   readonly dragHandle: ReactNode;
   readonly isDragging: boolean;
-  readonly onChangeLabel: (nextLabel: string) => void;
-  readonly onChangeDescription: (nextDescription: string) => void;
   readonly onMoveDown: () => void;
   readonly onMoveUp: () => void;
   readonly onRemove: () => void;
-  readonly option: DiagnosticTemplateOptionValue;
   readonly optionIndex: number;
 };
 
@@ -712,26 +725,6 @@ function OptionRowContent(props: OptionRowContentProps): ReactElement {
           </Button>
         </div>
       </div>
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Label</p>
-          <Input
-            value={props.option.label}
-            onChange={(event) => props.onChangeLabel(event.target.value)}
-            placeholder="Short tap label"
-          />
-        </div>
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Subtext</p>
-          <Textarea
-            value={props.option.description ?? ''}
-            onChange={(event) => props.onChangeDescription(event.target.value)}
-            placeholder="Optional supporting text shown below the option label"
-            rows={2}
-            className="min-h-20"
-          />
-        </div>
-      </div>
       {props.children}
     </div>
   );
@@ -749,12 +742,9 @@ function StaticOptionRow(props: SortableOptionRowProps): ReactElement {
         </span>
       }
       isDragging={false}
-      option={props.option}
       optionIndex={props.optionIndex}
       canMoveUp={props.optionIndex > 0}
       canMoveDown={props.optionIndex < props.optionsCount - 1}
-      onChangeLabel={props.onChangeLabel}
-      onChangeDescription={props.onChangeDescription}
       onMoveUp={props.onMoveUp}
       onMoveDown={props.onMoveDown}
       onRemove={props.onRemove}
@@ -1407,18 +1397,28 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
         readonly label: string;
       }[];
     }[];
+    readonly embedded?: boolean;
     readonly onChange: (nextRule: DiagnosticTemplateVisibilityRule) => void;
     readonly rule: DiagnosticTemplateVisibilityRule;
   }): ReactElement {
     const rule = params.rule;
     const selectedSource = rule === null ? null : params.availableSources.find((source) => source.id === rule.sourceQuestionId) ?? null;
+    const isEmbedded = params.embedded === true;
     return (
-      <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-4">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">Option visibility</p>
-          <p className="text-xs text-muted-foreground">
-            Reveal this option from an earlier question or from the selected path inside this question.
+      <div className={isEmbedded ? 'space-y-3' : 'rounded-xl border border-dashed border-border bg-muted/20 px-4 py-4'}>
+        <div className={isEmbedded ? 'space-y-1' : 'space-y-1'}>
+          <p className={isEmbedded ? 'text-xs font-medium text-muted-foreground' : 'text-sm font-medium text-foreground'}>
+            Option visibility
           </p>
+          {!isEmbedded ? (
+            <p className="text-xs text-muted-foreground">
+              Reveal this option from an earlier question or from the selected path inside this question.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Control when this option appears based on earlier answers or the path within this question.
+            </p>
+          )}
         </div>
         {params.availableSources.length === 0 ? (
           <div className="mt-4 rounded-xl border border-border/70 bg-background px-4 py-3 text-sm text-muted-foreground">
@@ -1586,14 +1586,22 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
   }
 
   function renderChildQuestionEditor(params: {
+    readonly embedded?: boolean;
     readonly option: DiagnosticTemplateOptionValue;
     readonly questionId: string;
     readonly roundId: string;
   }): ReactElement {
     const childQuestion = params.option.childQuestion;
+    const isEmbedded = params.embedded === true;
     if (childQuestion === null) {
       return (
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3">
+        <div
+          className={
+            isEmbedded
+              ? 'rounded-lg border border-dashed border-border/70 bg-muted/15 px-3 py-3'
+              : 'rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3'
+          }
+        >
           <Button
             type="button"
             variant="outline"
@@ -1614,10 +1622,12 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       );
     }
     return (
-      <div className="rounded-xl border border-border/70 bg-muted/30 px-4 py-4">
+      <div className={isEmbedded ? 'space-y-3' : 'rounded-xl border border-border/70 bg-muted/30 px-4 py-4'}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-foreground">Follow-up question</p>
+            <p className={isEmbedded ? 'text-xs font-medium text-foreground' : 'text-sm font-medium text-foreground'}>
+              Follow-up question
+            </p>
             <p className="text-xs text-muted-foreground">
               This appears only when customers choose this parent option.
             </p>
@@ -1837,6 +1847,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
   }
 
   function renderOptionPresentationEditor(params: {
+    readonly embedded?: boolean;
     readonly option: DiagnosticTemplateOptionValue;
     readonly questionId: string;
     readonly question: DiagnosticTemplateQuestionValue;
@@ -1845,12 +1856,17 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
     const shouldShowExampleBullets = params.question.type === 'multiple-choice';
     const shouldShowPanelTitle = params.question.type === 'nested-options';
     const exampleBulletsValue = params.option.presentation.exampleBullets.join('\n');
+    const isEmbedded = params.embedded === true;
     return (
-      <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-4">
+      <div className={isEmbedded ? 'space-y-3' : 'rounded-xl border border-dashed border-border bg-muted/20 px-4 py-4'}>
         <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">Card presentation</p>
+          <p className={isEmbedded ? 'text-xs font-medium text-muted-foreground' : 'text-sm font-medium text-foreground'}>
+            Card presentation
+          </p>
           <p className="text-xs text-muted-foreground">
-            These fields shape the customer-facing card without changing the saved answer value.
+            {isEmbedded
+              ? 'Customer-facing card copy; does not change the saved answer value.'
+              : 'These fields shape the customer-facing card without changing the saved answer value.'}
           </p>
         </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -2392,10 +2408,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                     <p className="text-xs text-muted-foreground">
                       The active template is what customer-facing quiz flows will use whenever AI Diagnostic is off.
                     </p>
-                    <div className="rounded-2xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      Conditional visibility rules currently apply to the web quiz only. The native app will keep using
-                      the linear template flow until that rollout is implemented.
-                    </div>
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -2757,6 +2769,13 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                                         questionType === 'ranked-options'
                                                           ? 'multiple'
                                                           : candidateQuestion.selectionMode,
+                                                      options:
+                                                        questionType === 'ranked-options'
+                                                          ? candidateQuestion.options.map((candidateOption) => ({
+                                                              ...candidateOption,
+                                                              requestDetailNoteWhenSelected: false,
+                                                            }))
+                                                          : candidateQuestion.options,
                                                     }
                                                   : candidateQuestion,
                                               ),
@@ -2837,6 +2856,13 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                                   ? {
                                                       ...candidateQuestion,
                                                       selectionMode,
+                                                      options:
+                                                        selectionMode === 'single'
+                                                          ? candidateQuestion.options
+                                                          : candidateQuestion.options.map((candidateOption) => ({
+                                                              ...candidateOption,
+                                                              requestDetailNoteWhenSelected: false,
+                                                            })),
                                                     }
                                                   : candidateQuestion,
                                               ),
@@ -2890,33 +2916,8 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                 {question.options.map((option, optionIndex) => (
                                   <StaticOptionRow
                                     key={option.id}
-                                    option={option}
                                     optionIndex={optionIndex}
                                     optionsCount={question.options.length}
-                                    onChangeLabel={(nextLabel) =>
-                                      updateQuestionOption({
-                                        roundId: round.id,
-                                        questionId: question.id,
-                                        optionId: option.id,
-                                        shouldReindex: false,
-                                        updater: (candidateOption) => ({
-                                          ...candidateOption,
-                                          label: nextLabel,
-                                        }),
-                                      })
-                                    }
-                                    onChangeDescription={(nextDescription) =>
-                                      updateQuestionOption({
-                                        roundId: round.id,
-                                        questionId: question.id,
-                                        optionId: option.id,
-                                        shouldReindex: false,
-                                        updater: (candidateOption) => ({
-                                          ...candidateOption,
-                                          description: nextDescription,
-                                        }),
-                                      })
-                                    }
                                     onMoveUp={() =>
                                       updateSelectedTemplate((template) => ({
                                         ...template,
@@ -2988,38 +2989,158 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                       }))
                                     }
                                   >
-                                    {renderOptionVisibilityRuleEditor({
-                                      availableSources: buildAvailableOptionVisibilitySources({
-                                        template: selectedTemplate,
-                                        roundId: round.id,
-                                        question,
-                                        optionId: option.id,
-                                      }),
-                                      rule: option.showWhen,
-                                      onChange: (nextRule) =>
-                                        updateQuestionOption({
-                                          roundId: round.id,
-                                          questionId: question.id,
-                                          optionId: option.id,
-                                          updater: (candidateOption) => ({
-                                            ...candidateOption,
-                                            showWhen: nextRule,
+                                    <Tabs defaultValue="basics" className="w-full">
+                                      <TabsList
+                                        aria-label={`Option ${optionIndex + 1} settings`}
+                                        className="mb-0 flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg bg-muted/60 p-1"
+                                      >
+                                        <TabsTrigger value="basics">Basics</TabsTrigger>
+                                        <TabsTrigger value="visibility">Visibility</TabsTrigger>
+                                        <TabsTrigger value="card">Card</TabsTrigger>
+                                        {question.type === 'nested-options' ? (
+                                          <TabsTrigger value="followup">Follow-up</TabsTrigger>
+                                        ) : null}
+                                      </TabsList>
+                                      <TabsContent value="basics" className="mt-3 space-y-3">
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                          <div className="space-y-2">
+                                            <p className="text-xs font-medium text-muted-foreground">Label</p>
+                                            <Input
+                                              value={option.label}
+                                              onChange={(event) =>
+                                                updateQuestionOption({
+                                                  roundId: round.id,
+                                                  questionId: question.id,
+                                                  optionId: option.id,
+                                                  shouldReindex: false,
+                                                  updater: (candidateOption) => ({
+                                                    ...candidateOption,
+                                                    label: event.target.value,
+                                                  }),
+                                                })
+                                              }
+                                              placeholder="Short tap label"
+                                            />
+                                          </div>
+                                          <div className="space-y-2">
+                                            <p className="text-xs font-medium text-muted-foreground">Subtext</p>
+                                            <Textarea
+                                              value={option.description ?? ''}
+                                              onChange={(event) =>
+                                                updateQuestionOption({
+                                                  roundId: round.id,
+                                                  questionId: question.id,
+                                                  optionId: option.id,
+                                                  shouldReindex: false,
+                                                  updater: (candidateOption) => ({
+                                                    ...candidateOption,
+                                                    description: event.target.value,
+                                                  }),
+                                                })
+                                              }
+                                              placeholder="Optional supporting text below the label"
+                                              rows={2}
+                                              className="min-h-18 resize-y"
+                                            />
+                                          </div>
+                                        </div>
+                                        {question.selectionMode === 'single' ? (
+                                          <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-3">
+                                            <label className="flex cursor-pointer items-start gap-3 text-sm text-foreground">
+                                              <input
+                                                type="checkbox"
+                                                className="mt-1 size-4 shrink-0 rounded border-input"
+                                                checked={option.requestDetailNoteWhenSelected}
+                                                onChange={(event) => {
+                                                  const checked = event.target.checked;
+                                                  updateSelectedTemplate((template) => ({
+                                                    ...template,
+                                                    rounds: template.rounds.map((candidateRound) =>
+                                                      candidateRound.id !== round.id
+                                                        ? candidateRound
+                                                        : {
+                                                            ...candidateRound,
+                                                            questions: candidateRound.questions.map((candidateQuestion) =>
+                                                              candidateQuestion.id !== question.id
+                                                                ? candidateQuestion
+                                                                : {
+                                                                    ...candidateQuestion,
+                                                                    options: candidateQuestion.options.map((candidateOption) => {
+                                                                      if (candidateOption.id === option.id) {
+                                                                        return {
+                                                                          ...candidateOption,
+                                                                          requestDetailNoteWhenSelected: checked,
+                                                                        };
+                                                                      }
+                                                                      if (checked) {
+                                                                        return {
+                                                                          ...candidateOption,
+                                                                          requestDetailNoteWhenSelected: false,
+                                                                        };
+                                                                      }
+                                                                      return candidateOption;
+                                                                    }),
+                                                                  },
+                                                            ),
+                                                          },
+                                                    ),
+                                                  }));
+                                                }}
+                                              />
+                                              <span>
+                                                <span className="font-medium">Detail textbox when this option is selected</span>
+                                                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                                                  Single-select only. One option per question. When on, customers see
+                                                  &quot;Your exact answer&quot; only while this option is selected, and they must
+                                                  fill it before continuing.
+                                                </span>
+                                              </span>
+                                            </label>
+                                          </div>
+                                        ) : null}
+                                      </TabsContent>
+                                      <TabsContent value="visibility" className="mt-3">
+                                        {renderOptionVisibilityRuleEditor({
+                                          embedded: true,
+                                          availableSources: buildAvailableOptionVisibilitySources({
+                                            template: selectedTemplate,
+                                            roundId: round.id,
+                                            question,
+                                            optionId: option.id,
                                           }),
-                                        }),
-                                    })}
-                                    {renderOptionPresentationEditor({
-                                      roundId: round.id,
-                                      question,
-                                      questionId: question.id,
-                                      option,
-                                    })}
-                                    {question.type === 'nested-options'
-                                      ? renderChildQuestionEditor({
+                                          rule: option.showWhen,
+                                          onChange: (nextRule) =>
+                                            updateQuestionOption({
+                                              roundId: round.id,
+                                              questionId: question.id,
+                                              optionId: option.id,
+                                              updater: (candidateOption) => ({
+                                                ...candidateOption,
+                                                showWhen: nextRule,
+                                              }),
+                                            }),
+                                        })}
+                                      </TabsContent>
+                                      <TabsContent value="card" className="mt-3">
+                                        {renderOptionPresentationEditor({
+                                          embedded: true,
                                           roundId: round.id,
+                                          question,
                                           questionId: question.id,
                                           option,
-                                        })
-                                      : null}
+                                        })}
+                                      </TabsContent>
+                                      {question.type === 'nested-options' ? (
+                                        <TabsContent value="followup" className="mt-3">
+                                          {renderChildQuestionEditor({
+                                            embedded: true,
+                                            roundId: round.id,
+                                            questionId: question.id,
+                                            option,
+                                          })}
+                                        </TabsContent>
+                                      ) : null}
+                                    </Tabs>
                                   </StaticOptionRow>
                                 ))}
                               </div>

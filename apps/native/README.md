@@ -22,7 +22,7 @@ pnpm --filter native run android
 
 ## Current scope
 
-- Native public funnel screens: home, diagnostic, recommendation, service, booking, confirmation
+- Native public funnel screens: home, diagnostic, service (post-diagnostic recommendation), booking, confirmation
 - Anonymous device-backed quiz session persistence via `X-Device-Id`
 - Shared business logic reused from `@it-advisory/diagnostic-core`
 

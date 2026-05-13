@@ -1,6 +1,7 @@
 'use client';
 
 import { createColumnHelper } from '@tanstack/react-table';
+import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable } from '@/components/admin/data-table';
 import type { BookingRow } from '@/lib/data/bookings';
@@ -22,6 +23,22 @@ export function BookingsTable({ initialData }: BookingsTableProps) {
       }),
       columnHelper.accessor('status', { header: 'Status' }),
       columnHelper.accessor('visitorId', { header: 'Visitor' }),
+      columnHelper.display({
+        id: 'details',
+        header: 'Details',
+        cell: (info) => (
+          <Link
+            href={`/admin/bookings/${info.row.original.id}`}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            View
+          </Link>
+        ),
+      }),
+      columnHelper.accessor('hasDiagnosticSnapshot', {
+        header: 'Diagnostic',
+        cell: (info) => (info.getValue() ? 'Yes' : '—'),
+      }),
       columnHelper.accessor('meetingUrl', {
         header: 'Meeting',
         cell: (info) => info.getValue() ?? '—',

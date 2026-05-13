@@ -1,17 +1,20 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import {
+  PROJECT_RESCUE_BOOKING_FOOTNOTE,
+  PROJECT_RESCUE_PRICE_HEADLINE,
+  PROJECT_RESCUE_SERVICE_TITLE,
+  PROJECT_RESCUE_SESSION_DURATION,
+  PROJECT_RESCUE_WHATS_INCLUDED,
+  resolveProjectRescueBriefAssessment,
+  resolveProjectRescueGoodFitBullets,
+  resolveProjectRescueSessionTitle,
+} from '@it-advisory/diagnostic-core/project-rescue-service-context';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
+import { useDiagnosticFlow } from '../src/providers/diagnostic-flow-provider';
 import { useAppTheme } from '../src/theme/use-app-theme';
-
-const INCLUDED_ITEMS = [
-  'Review of the current situation, stakeholders, and constraints',
-  'Identification of delivery risks and likely root causes',
-  'Decision checkpoints and options ranked by impact versus effort',
-  'Vendor or systems-integrator dynamics to challenge or formalize',
-  'A 90-day stabilization roadmap outline',
-] as const;
 
 /**
  * Static service-detail screen for the first native release.
@@ -19,11 +22,16 @@ const INCLUDED_ITEMS = [
 export default function ServiceScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { guided } = useDiagnosticFlow();
+  const outcome = guided.outcome;
+  const advisorSummary = outcome?.advisorSummary?.trim() ?? '';
+  const mappedSituation = outcome?.mappedSituation?.trim() ?? '';
+  const goodFitBullets = resolveProjectRescueGoodFitBullets(outcome?.goodFitBullets ?? null);
 
   return (
     <AppScreen
-      title="Project Rescue Consultation"
-      subtitle="A focused working session for leaders who need independent judgment when timelines slip or scope churns."
+      title={resolveProjectRescueSessionTitle(outcome?.sessionTitle)}
+      subtitle={resolveProjectRescueBriefAssessment(outcome?.briefAssessment)}
       footer={
         <View style={styles.footerGroup}>
           <AppButton onPress={() => router.push('/booking')}>Book this session</AppButton>
@@ -33,9 +41,23 @@ export default function ServiceScreen() {
         </View>
       }
     >
+      {advisorSummary.length > 0 ? (
+        <AppCard>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Your advisor summary</Text>
+          <Text style={[styles.hintText, { color: theme.textMuted }]}>
+            From your guided diagnostic — useful context for your booking.
+          </Text>
+          {mappedSituation.length > 0 ? (
+            <View style={[styles.badge, { backgroundColor: theme.primarySoft }]}>
+              <Text style={[styles.badgeText, { color: theme.primary }]}>{mappedSituation}</Text>
+            </View>
+          ) : null}
+          <Text style={[styles.summaryText, { color: theme.textMuted }]}>{advisorSummary}</Text>
+        </AppCard>
+      ) : null}
       <AppCard>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>What is included</Text>
-        {INCLUDED_ITEMS.map((item) => (
+        {PROJECT_RESCUE_WHATS_INCLUDED.map((item) => (
           <View key={item} style={styles.row}>
             <View style={[styles.bullet, { backgroundColor: theme.primary }]} />
             <Text style={[styles.bodyText, { color: theme.text }]}>{item}</Text>
@@ -43,12 +65,21 @@ export default function ServiceScreen() {
         ))}
       </AppCard>
       <AppCard>
+        <Text style={[styles.goodFitHeading, { color: theme.textMuted }]}>Good fit if</Text>
+        {goodFitBullets.map((line, index) => (
+          <View key={`gf-${index}`} style={styles.row}>
+            <View style={[styles.bullet, { backgroundColor: theme.primary }]} />
+            <Text style={[styles.goodFitLine, { color: theme.textMuted }]}>{line}</Text>
+          </View>
+        ))}
+      </AppCard>
+      <AppCard>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Commercial snapshot</Text>
         <Text style={[styles.priceLabel, { color: theme.textMuted }]}>Investment</Text>
-        <Text style={[styles.priceValue, { color: theme.text }]}>From PHP 6,000</Text>
-        <Text style={[styles.bodyText, { color: theme.textMuted }]}>Per session, delivered remotely by default.</Text>
+        <Text style={[styles.priceValue, { color: theme.text }]}>{PROJECT_RESCUE_PRICE_HEADLINE}</Text>
+        <Text style={[styles.bodyText, { color: theme.textMuted }]}>{PROJECT_RESCUE_BOOKING_FOOTNOTE}</Text>
         <Text style={[styles.priceLabel, { color: theme.textMuted }]}>Duration</Text>
-        <Text style={[styles.bodyText, { color: theme.text }]}>60-90 minutes</Text>
+        <Text style={[styles.bodyText, { color: theme.text }]}>{PROJECT_RESCUE_SESSION_DURATION}</Text>
       </AppCard>
     </AppScreen>
   );
@@ -58,9 +89,43 @@ const styles = StyleSheet.create({
   footerGroup: {
     gap: 12,
   },
+  hintText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  badgeText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  summaryText: {
+    fontSize: 15,
+    lineHeight: 23,
+    marginTop: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
+  },
+  goodFitHeading: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  goodFitLine: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 10,
   },
   row: {
     flexDirection: 'row',

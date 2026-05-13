@@ -222,7 +222,7 @@ export function AdminShell(props: AdminShellProps) {
         />
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
           <div className="sticky top-0 z-20 border-b border-border/80 bg-background/90 shadow-[0_1px_0_0_rgb(0_0_0/0.03)] backdrop-blur-md dark:shadow-[0_1px_0_0_rgb(255_255_255/0.04)]">
-            <div className="mx-auto flex min-h-16 w-full max-w-[1600px] flex-col gap-4 px-4 py-3 sm:px-6 lg:px-8">
+            <div className="mx-auto flex min-h-16 w-full flex-col gap-4 px-4 py-3 sm:px-6 lg:px-8">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <Button
@@ -254,7 +254,7 @@ export function AdminShell(props: AdminShellProps) {
             </div>
           </div>
           <main className={cn('flex-1')}>
-            <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto w-full px-4 py-6 sm:px-6 lg:px-8">
               <div className="rounded-[28px] border border-border/70 bg-background/80 p-4 shadow-sm backdrop-blur-sm sm:p-6 lg:p-8 dark:bg-card/45 dark:shadow-[0_18px_50px_rgb(2_6_23/0.18)]">
                 {props.children}
               </div>

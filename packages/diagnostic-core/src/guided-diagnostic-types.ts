@@ -1,3 +1,9 @@
+import {
+  resolveProjectRescueBriefAssessment,
+  resolveProjectRescueGoodFitBullets,
+  resolveProjectRescueSessionTitle,
+} from './project-rescue-service-context';
+
 export type DiagnosticSelectionMode = 'single' | 'multiple';
 
 export type DiagnosticQuestionType = 'multiple-choice' | 'nested-options' | 'ranked-options';
@@ -38,6 +44,8 @@ export type DiagnosticQuestionOption = {
   readonly id: string;
   readonly label: string;
   readonly description: string | null;
+  /** When true, optional free-text for this question is shown only while this option is selected (at most one option per question). */
+  readonly requestDetailNoteWhenSelected: boolean;
   readonly showWhen: DiagnosticVisibilityRule;
   readonly presentation: DiagnosticOptionPresentation;
   readonly childQuestion: DiagnosticChildQuestionBlock | null;
@@ -84,6 +92,12 @@ export type CompletedRoundBundle = {
 export type GuidedDiagnosticOutcome = {
   readonly mappedSituation: string;
   readonly advisorSummary: string;
+  /** Primary headline for the recommended session (personalized or canonical). */
+  readonly sessionTitle: string;
+  /** User-facing hero line under the session title; empty means callers should fall back to the canonical tagline. */
+  readonly briefAssessment: string;
+  /** Three transcript-grounded "good fit if" bullets for this recommendation. */
+  readonly goodFitBullets: readonly string[];
 };
 
 export type ActiveGuidedRound = {
@@ -484,6 +498,7 @@ export function normalizeDiagnosticOptions(input: readonly unknown[]): Diagnosti
           id: `option-${index + 1}`,
           label,
           description: null,
+          requestDetailNoteWhenSelected: false,
           showWhen: null,
           presentation: createEmptyDiagnosticOptionPresentation(),
           childQuestion: null,
@@ -499,6 +514,7 @@ export function normalizeDiagnosticOptions(input: readonly unknown[]): Diagnosti
       readonly id?: unknown;
       readonly label?: unknown;
       readonly presentation?: unknown;
+      readonly requestDetailNoteWhenSelected?: unknown;
       readonly showWhen?: unknown;
     };
     if (!isNonEmptyString(option.label)) {
@@ -512,11 +528,13 @@ export function normalizeDiagnosticOptions(input: readonly unknown[]): Diagnosti
     seen.add(key);
     const normalizedOptionId = buildNormalizedId(option.id, 'option', index);
     const description = typeof option.description === 'string' ? normalizeText(option.description) : '';
+    const requestDetailNoteWhenSelected = option.requestDetailNoteWhenSelected === true;
     return [
       {
         id: normalizedOptionId,
         label,
         description: description.length > 0 ? description : null,
+        requestDetailNoteWhenSelected,
         showWhen: normalizeVisibilityRule(option.showWhen),
         presentation: normalizeOptionPresentation(option.presentation),
         childQuestion: normalizeChildQuestion(option.childQuestion, normalizedOptionId),
@@ -539,6 +557,16 @@ function normalizeQuestionOptions(input: unknown): DiagnosticQuestionOption[] {
   return normalizeDiagnosticOptions(input);
 }
 
+function normalizeDetailNoteTriggersOnQuestion(options: readonly DiagnosticQuestionOption[]): DiagnosticQuestionOption[] {
+  const triggerIndex = options.findIndex((option) => option.requestDetailNoteWhenSelected);
+  if (triggerIndex === -1) {
+    return options.map((option) => ({ ...option, requestDetailNoteWhenSelected: false }));
+  }
+  return options.map((option, index) =>
+    index === triggerIndex ? option : { ...option, requestDetailNoteWhenSelected: false },
+  );
+}
+
 function normalizeDiagnosticQuestionBlocks(input: unknown): DiagnosticQuestionBlock[] {
   if (!Array.isArray(input)) {
     return [];
@@ -559,7 +587,7 @@ function normalizeDiagnosticQuestionBlocks(input: unknown): DiagnosticQuestionBl
     if (!isNonEmptyString(question.prompt)) {
       return [];
     }
-    const options = normalizeQuestionOptions(question.options);
+    const options = normalizeDetailNoteTriggersOnQuestion(normalizeQuestionOptions(question.options));
     if (options.length === 0) {
       return [];
     }
@@ -867,6 +895,31 @@ export function getEffectiveSelectedOptionIds(params: {
   return lastSelectedOptionId === undefined ? [] : [lastSelectedOptionId];
 }
 
+/**
+ * The per-question detail textbox is opt-in: it appears only when at least one option sets
+ * {@link DiagnosticQuestionOption.requestDetailNoteWhenSelected}. If any do, it is shown only while
+ * a gated option is among the effective selection for this question.
+ */
+export function shouldShowQuestionDetailNoteInput(params: {
+  readonly baseAnswers?: Readonly<Record<string, DiagnosticQuestionSelection>>;
+  readonly question: DiagnosticQuestionBlock;
+  readonly selection: DiagnosticQuestionSelection | undefined;
+}): boolean {
+  const triggerIds = params.question.options
+    .filter((option) => option.requestDetailNoteWhenSelected)
+    .map((option) => option.id);
+  if (triggerIds.length === 0) {
+    return false;
+  }
+  const triggerIdSet = new Set(triggerIds);
+  const effectiveIds = getEffectiveSelectedOptionIds({
+    baseAnswers: params.baseAnswers,
+    question: params.question,
+    selection: params.selection,
+  });
+  return effectiveIds.some((optionId) => triggerIdSet.has(optionId));
+}
+
 function buildVisibilityAnswers(params: {
   readonly answers: Readonly<Record<string, DiagnosticQuestionSelection>>;
   readonly baseAnswers?: Readonly<Record<string, DiagnosticQuestionSelection>>;
@@ -880,6 +933,10 @@ function buildVisibilityAnswers(params: {
   };
 }
 
+/**
+ * Indexes of questions the participant can act on: visibility rules pass and at least one
+ * option is currently visible (so the step is not an empty shell).
+ */
 export function getVisibleQuestionIndexes(params: {
   readonly answers: Readonly<Record<string, DiagnosticQuestionSelection>>;
   readonly baseAnswers?: Readonly<Record<string, DiagnosticQuestionSelection>>;
@@ -889,14 +946,22 @@ export function getVisibleQuestionIndexes(params: {
     answers: params.answers,
     baseAnswers: params.baseAnswers,
   });
-  return params.questions.flatMap((question, questionIndex) =>
-    isQuestionVisible({
-      answers: visibilityAnswers,
+  return params.questions.flatMap((question, questionIndex) => {
+    if (
+      !isQuestionVisible({
+        answers: visibilityAnswers,
+        question,
+      })
+    ) {
+      return [];
+    }
+    const visibleOptions = getVisibleQuestionOptions({
+      baseAnswers: params.baseAnswers,
       question,
-    })
-      ? [questionIndex]
-      : [],
-  );
+      selection: params.answers[question.id],
+    });
+    return visibleOptions.length > 0 ? [questionIndex] : [];
+  });
 }
 
 export function findNextVisibleQuestionIndex(params: {
@@ -905,23 +970,9 @@ export function findNextVisibleQuestionIndex(params: {
   readonly currentIndex: number;
   readonly questions: readonly DiagnosticQuestionBlock[];
 }): number | null {
-  const visibilityAnswers = buildVisibilityAnswers({
-    answers: params.answers,
-    baseAnswers: params.baseAnswers,
-  });
-  for (let questionIndex = params.currentIndex + 1; questionIndex < params.questions.length; questionIndex += 1) {
-    const question = params.questions[questionIndex];
-    if (
-      question !== undefined &&
-      isQuestionVisible({
-        answers: visibilityAnswers,
-        question,
-      })
-    ) {
-      return questionIndex;
-    }
-  }
-  return null;
+  const indexed = getVisibleQuestionIndexes(params);
+  const next = indexed.find((questionIndex) => questionIndex > params.currentIndex);
+  return next ?? null;
 }
 
 export function findPreviousVisibleQuestionIndex(params: {
@@ -930,19 +981,10 @@ export function findPreviousVisibleQuestionIndex(params: {
   readonly currentIndex: number;
   readonly questions: readonly DiagnosticQuestionBlock[];
 }): number | null {
-  const visibilityAnswers = buildVisibilityAnswers({
-    answers: params.answers,
-    baseAnswers: params.baseAnswers,
-  });
-  for (let questionIndex = params.currentIndex - 1; questionIndex >= 0; questionIndex -= 1) {
-    const question = params.questions[questionIndex];
-    if (
-      question !== undefined &&
-      isQuestionVisible({
-        answers: visibilityAnswers,
-        question,
-      })
-    ) {
+  const indexed = getVisibleQuestionIndexes(params);
+  for (let index = indexed.length - 1; index >= 0; index -= 1) {
+    const questionIndex = indexed[index];
+    if (questionIndex !== undefined && questionIndex < params.currentIndex) {
       return questionIndex;
     }
   }
@@ -1158,6 +1200,19 @@ export function validateGuidedQuestionResponse(params: {
       message: 'Answer each follow-up option before continuing.',
     };
   }
+  if (
+    shouldShowQuestionDetailNoteInput({
+      baseAnswers: params.baseAnswers,
+      question: params.question,
+      selection,
+    }) &&
+    trimmedDetailNote.length === 0
+  ) {
+    return {
+      isValid: false,
+      message: 'Your exact answer is required for this selection — add a short detail before continuing.',
+    };
+  }
   return {
     isValid: true,
     message: null,
@@ -1252,6 +1307,21 @@ function normalizeGuidedDiagnostic(parsed: GuidedDiagnosticV1): GuidedDiagnostic
   let outcome: GuidedDiagnosticOutcome | null = parsed.outcome ?? null;
   if (outcome !== null && (typeof outcome.mappedSituation !== 'string' || typeof outcome.advisorSummary !== 'string')) {
     outcome = null;
+  }
+  if (outcome !== null) {
+    outcome = {
+      mappedSituation: outcome.mappedSituation,
+      advisorSummary: outcome.advisorSummary,
+      sessionTitle: resolveProjectRescueSessionTitle(
+        typeof outcome.sessionTitle === 'string' ? outcome.sessionTitle : null,
+      ),
+      briefAssessment: resolveProjectRescueBriefAssessment(
+        typeof outcome.briefAssessment === 'string' ? outcome.briefAssessment : null,
+      ),
+      goodFitBullets: resolveProjectRescueGoodFitBullets(
+        Array.isArray(outcome.goodFitBullets) ? outcome.goodFitBullets : null,
+      ),
+    };
   }
   return {
     version: 1,
@@ -1357,6 +1427,60 @@ export function applyGuidedGoBack(state: GuidedDiagnosticV1): GuidedDiagnosticV1
       stepIndex: lastStep,
       guidance: previous.guidance,
     },
+  };
+}
+
+/**
+ * Re-opens a completed round at its first visible question, preserving saved answers for that round.
+ */
+export function restoreActiveGuidedRoundFromCompletedBundle(params: {
+  readonly bundle: CompletedRoundBundle;
+  readonly priorBundles: readonly CompletedRoundBundle[];
+}): ActiveGuidedRound {
+  const baseAnswers = buildDiagnosticAnswerLookup({
+    completedBundles: params.priorBundles,
+  });
+  const firstStep =
+    findFirstVisibleQuestionIndex({
+      questions: params.bundle.questions,
+      baseAnswers,
+      answers: params.bundle.answers,
+    }) ?? 0;
+  return {
+    roundIndex: params.bundle.roundIndex,
+    roundTitle: params.bundle.roundTitle,
+    questions: params.bundle.questions,
+    answers: { ...params.bundle.answers },
+    answerNotes: { ...params.bundle.answerNotes },
+    stepIndex: firstStep,
+    guidance: params.bundle.guidance,
+  };
+}
+
+/**
+ * Jumps to a prior completed round by index in {@link GuidedDiagnosticV1.completedBundles}.
+ * Discards the active round (if any) and any bundles after the target. Clears a terminal outcome.
+ */
+export function applyGuidedJumpToCompletedBundleIndex(
+  state: GuidedDiagnosticV1,
+  bundleIndex: number,
+): GuidedDiagnosticV1 | null {
+  if (!Number.isInteger(bundleIndex) || bundleIndex < 0 || bundleIndex >= state.completedBundles.length) {
+    return null;
+  }
+  const bundle = state.completedBundles[bundleIndex];
+  if (bundle === undefined) {
+    return null;
+  }
+  const priorBundles = state.completedBundles.slice(0, bundleIndex);
+  return {
+    ...state,
+    outcome: null,
+    completedBundles: [...priorBundles],
+    activeRound: restoreActiveGuidedRoundFromCompletedBundle({
+      bundle,
+      priorBundles,
+    }),
   };
 }
 
@@ -1497,5 +1621,8 @@ export function buildDiagnosticThreadJson(state: GuidedDiagnosticV1): string {
     rounds,
     mappedSituation: state.outcome?.mappedSituation ?? null,
     advisorSummary: state.outcome?.advisorSummary ?? null,
+    sessionTitle: state.outcome?.sessionTitle ?? null,
+    briefAssessment: state.outcome?.briefAssessment ?? null,
+    goodFitBullets: state.outcome?.goodFitBullets ?? null,
   });
 }

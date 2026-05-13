@@ -3,13 +3,19 @@ import {
   createEmptyDiagnosticQuestionSelection,
   getVisibleQuestionIndexes,
   getVisibleQuestionOptions,
+  shouldShowQuestionDetailNoteInput,
   type DiagnosticQuestionBlock,
   type DiagnosticQuestionOption,
   type DiagnosticQuestionSelection,
 } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
+import {
+  resolveProjectRescueBriefAssessment,
+  resolveProjectRescueGoodFitBullets,
+  resolveProjectRescueSessionTitle,
+} from '@it-advisory/diagnostic-core/project-rescue-service-context';
 import { getSituationSeed } from '@it-advisory/diagnostic-core/situation-options';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
@@ -33,6 +39,23 @@ function hasSingleSelectCascade(question: DiagnosticQuestionBlock): boolean {
     question.selectionMode === 'single' &&
     question.options.some((option) => option.showWhen !== null && option.showWhen.sourceQuestionId === question.id)
   );
+}
+
+function resolveNestedGuidanceMessage(params: {
+  readonly hasParentSelected: boolean;
+  readonly question: DiagnosticQuestionBlock;
+  readonly supportsSingleSelectCascade: boolean;
+}): string | null {
+  if (!params.hasParentSelected) {
+    return 'Select this category above to enable the detailed choices below.';
+  }
+  if (params.supportsSingleSelectCascade) {
+    return 'Deeper selections keep the full path visible in this question.';
+  }
+  if (params.question.selectionMode === 'multiple') {
+    return 'Selections in other categories stay saved while you move between panels.';
+  }
+  return null;
 }
 
 function getTerminalSelectedOptionId(selection: DiagnosticQuestionSelection): string | null {
@@ -203,28 +226,26 @@ function NestedOptionsQuestionCard(props: {
   const supportsSingleSelectCascade = hasSingleSelectCascade(props.question);
   const terminalSelectedOptionId =
     props.question.selectionMode === 'single' ? getTerminalSelectedOptionId(props.selection) : null;
-  const [requestedActiveOptionId, setRequestedActiveOptionId] = useState<string | null>(
-    terminalSelectedOptionId ?? props.selection.selectedOptionIds[0] ?? props.options[0]?.id ?? null,
-  );
-
-  useEffect(() => {
-    setRequestedActiveOptionId(terminalSelectedOptionId ?? props.selection.selectedOptionIds[0] ?? props.options[0]?.id ?? null);
-  }, [props.options, props.selection.selectedOptionIds, terminalSelectedOptionId]);
-
+  const [requestedActiveOptionId, setRequestedActiveOptionId] = useState<string | null>(null);
   const activeOptionId =
     requestedActiveOptionId !== null && props.options.some((option) => option.id === requestedActiveOptionId)
       ? requestedActiveOptionId
-      : terminalSelectedOptionId ??
-        props.selection.selectedOptionIds.find((optionId) => props.options.some((option) => option.id === optionId)) ??
-        props.options[0]?.id ??
-        null;
-  const activeOption = props.options.find((option) => option.id === activeOptionId) ?? props.options[0] ?? null;
+      : null;
+  const activeOption =
+    activeOptionId === null ? null : props.options.find((option) => option.id === activeOptionId) ?? null;
   const activeChildSelections = activeOption === null ? [] : props.selection.childSelections[activeOption.id] ?? [];
-
+  const guidanceMessage =
+    activeOption === null
+      ? null
+      : resolveNestedGuidanceMessage({
+          hasParentSelected: props.selection.selectedOptionIds.includes(activeOption.id),
+          question: props.question,
+          supportsSingleSelectCascade,
+        });
   return (
     <View style={styles.optionGroup}>
       <Text style={[styles.variantHint, { color: theme.textMuted }]}>
-        Select a category, then answer the detailed choices below. Other category selections stay saved.
+        Tap a category first, then answer the detailed choices below. Other category selections stay saved.
       </Text>
       {props.options.map((option) => {
         const isInSelectedPath = props.selection.selectedOptionIds.includes(option.id);
@@ -267,70 +288,75 @@ function NestedOptionsQuestionCard(props: {
           </Pressable>
         );
       })}
-      {activeOption !== null ? (
-        <View style={[styles.detailPanel, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
-          <Text style={[styles.detailPanelTitle, { color: theme.text }]}>
-            {activeOption.presentation.panelTitle ?? getDisplayOptionTitle(activeOption)}
-          </Text>
-          {activeOption.childQuestion !== null ? (
-            <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>{activeOption.childQuestion.prompt}</Text>
-          ) : null}
-          {activeOption.childQuestion !== null ? (
-            <View style={styles.detailOptionGroup}>
-              {activeOption.childQuestion.options.map((childOption) => {
-                const isSelected = activeChildSelections.includes(childOption.id);
-                const isParentEnabled = props.selection.selectedOptionIds.includes(activeOption.id);
-                return (
-                  <Pressable
-                    key={childOption.id}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: !isParentEnabled, selected: isSelected }}
-                    disabled={!isParentEnabled}
-                    onPress={() => props.onToggleChildOption(activeOption.id, childOption.id)}
-                    style={({ pressed }) => [
-                      styles.childOptionButton,
-                      {
-                        backgroundColor: isSelected ? theme.primarySoft : theme.surface,
-                        borderColor: isSelected ? theme.primary : theme.border,
-                        opacity: !isParentEnabled ? 0.55 : pressed ? 0.95 : 1,
-                      },
-                    ]}
-                  >
-                    <View style={styles.optionContentWrap}>
-                      <Text style={[styles.childOptionLabel, { color: theme.text }]}>{childOption.label}</Text>
-                      {childOption.description !== null ? (
-                        <Text style={[styles.childOptionDescription, { color: theme.textMuted }]}>{childOption.description}</Text>
-                      ) : null}
-                    </View>
-                    <View
-                      style={[
-                        styles.childSelectionBox,
-                        {
-                          backgroundColor: isSelected ? theme.primary : theme.surface,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                      ]}
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
-              Add a follow-up question to this option in the template editor to show detailed choices here.
-            </Text>
-          )}
-          <View style={[styles.guidanceBanner, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.guidanceBannerText, { color: theme.textMuted }]}>
-              {props.selection.selectedOptionIds.includes(activeOption.id)
-                ? supportsSingleSelectCascade
-                  ? 'Deeper selections keep the full path visible in this question.'
-                  : 'Selections in other categories stay saved while you move between panels.'
-                : 'Select this category above to enable the detailed choices below.'}
+      <View style={[styles.detailPanel, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+        {activeOption === null ? (
+          <View style={styles.nestedDetailPlaceholder} accessibilityRole="text" accessibilityLabel="Choose a category first">
+            <Text style={[styles.nestedDetailPlaceholderTitle, { color: theme.text }]}>Choose a category first</Text>
+            <Text style={[styles.nestedDetailPlaceholderBody, { color: theme.textMuted }]}>
+              Select a category above. Follow-up choices for that category will appear here.
             </Text>
           </View>
-        </View>
-      ) : null}
+        ) : (
+          <>
+            <Text style={[styles.detailPanelTitle, { color: theme.text }]}>
+              {activeOption.presentation.panelTitle ?? getDisplayOptionTitle(activeOption)}
+            </Text>
+            {activeOption.childQuestion !== null ? (
+              <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>{activeOption.childQuestion.prompt}</Text>
+            ) : null}
+            {activeOption.childQuestion !== null ? (
+              <View style={styles.detailOptionGroup}>
+                {activeOption.childQuestion.options.map((childOption) => {
+                  const isSelected = activeChildSelections.includes(childOption.id);
+                  const isParentEnabled = props.selection.selectedOptionIds.includes(activeOption.id);
+                  return (
+                    <Pressable
+                      key={childOption.id}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: !isParentEnabled, selected: isSelected }}
+                      disabled={!isParentEnabled}
+                      onPress={() => props.onToggleChildOption(activeOption.id, childOption.id)}
+                      style={({ pressed }) => [
+                        styles.childOptionButton,
+                        {
+                          backgroundColor: isSelected ? theme.primarySoft : theme.surface,
+                          borderColor: isSelected ? theme.primary : theme.border,
+                          opacity: !isParentEnabled ? 0.55 : pressed ? 0.95 : 1,
+                        },
+                      ]}
+                    >
+                      <View style={styles.optionContentWrap}>
+                        <Text style={[styles.childOptionLabel, { color: theme.text }]}>{childOption.label}</Text>
+                        {childOption.description !== null ? (
+                          <Text style={[styles.childOptionDescription, { color: theme.textMuted }]}>{childOption.description}</Text>
+                        ) : null}
+                      </View>
+                      <View
+                        style={[
+                          styles.childSelectionBox,
+                          {
+                            backgroundColor: isSelected ? theme.primary : theme.surface,
+                            borderColor: isSelected ? theme.primary : theme.border,
+                          },
+                        ]}
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
+                Add a follow-up question to this option in the template editor to show detailed choices here.
+              </Text>
+            )}
+            {guidanceMessage !== null ? (
+              <View style={[styles.guidanceBanner, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Text style={[styles.guidanceBannerText, { color: theme.textMuted }]}>{guidanceMessage}</Text>
+              </View>
+            ) : null}
+          </>
+        )}
+      </View>
     </View>
   );
 }
@@ -564,6 +590,16 @@ export default function DiagnosticScreen() {
           question: currentQuestion,
           selection: questionSelection,
         });
+  const shouldShowDetailNoteTextbox = useMemo(() => {
+    if (currentQuestion === undefined) {
+      return false;
+    }
+    return shouldShowQuestionDetailNoteInput({
+      baseAnswers: optionBaseAnswers,
+      question: currentQuestion,
+      selection: questionSelection,
+    });
+  }, [currentQuestion, optionBaseAnswers, questionSelection]);
   const positionInRound = currentQuestion === undefined ? 0 : Math.max(visibleQuestionIndexes.indexOf(activeRound?.stepIndex ?? -1) + 1, 1);
   const roundSize = visibleQuestionIndexes.length > 0 ? visibleQuestionIndexes.length : activeRound?.questions.length ?? 0;
   const footer = (
@@ -572,10 +608,10 @@ export default function DiagnosticScreen() {
         <AppButton
           disabled={isBusy}
           onPress={() => {
-            void executeFinalizeDiagnostic().then(() => router.push('/recommendation')).catch(() => {});
+            void executeFinalizeDiagnostic().then(() => router.push('/service')).catch(() => {});
           }}
         >
-          See recommendation
+          Continue to service
         </AppButton>
       ) : activeRound !== null ? (
         <AppButton disabled={isBusy} onPress={() => void executeAdvance()}>
@@ -716,6 +752,7 @@ export default function DiagnosticScreen() {
           ) : null}
           {currentQuestion.type === 'nested-options' ? (
             <NestedOptionsQuestionCard
+              key={currentQuestion.id}
               options={currentOptions}
               question={currentQuestion}
               selection={questionSelection}
@@ -745,32 +782,56 @@ export default function DiagnosticScreen() {
               onToggleOption={(optionId: string): void => executeSelectOption(currentQuestion, optionId)}
             />
           )}
-          <TextInput
-            accessibilityLabel="Optional detail"
-            multiline
-            onChangeText={(value) => executeUpdateAnswerNote(currentQuestion.id, value)}
-            placeholder="Optional detail if the selected option needs more context"
-            placeholderTextColor={theme.textSoft}
-            style={[
-              styles.noteInput,
-              {
-                backgroundColor: theme.surfaceMuted,
-                borderColor: theme.border,
-                color: theme.text,
-              },
-            ]}
-            textAlignVertical="top"
-            value={activeRound.answerNotes[currentQuestion.id] ?? ''}
-          />
+          {shouldShowDetailNoteTextbox ? (
+            <View style={styles.noteFieldWrap}>
+              <Text style={[styles.noteFieldLabel, { color: theme.text }]}>
+                Your exact answer <Text style={{ color: theme.danger }}>(required)</Text>
+              </Text>
+              <Text style={[styles.noteFieldHint, { color: theme.textMuted }]}>
+                This path requires a short written detail before you can continue.
+              </Text>
+              <TextInput
+                accessibilityLabel="Your exact answer, required"
+                multiline
+                onChangeText={(value) => executeUpdateAnswerNote(currentQuestion.id, value)}
+                placeholder="Add specifics your advisor needs (versions, errors, timing…)"
+                placeholderTextColor={theme.textSoft}
+                style={[
+                  styles.noteInput,
+                  {
+                    backgroundColor: theme.surfaceMuted,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
+                ]}
+                textAlignVertical="top"
+                value={activeRound.answerNotes[currentQuestion.id] ?? ''}
+              />
+            </View>
+          ) : null}
         </AppCard>
       ) : null}
       {guided.outcome !== null ? (
         <AppCard>
           <Text style={[styles.sectionHeading, { color: theme.text }]}>We have enough signal to guide you.</Text>
+          <Text style={[styles.recommendationTitle, { color: theme.text }]}>
+            {resolveProjectRescueSessionTitle(guided.outcome.sessionTitle)}
+          </Text>
+          <Text style={[styles.briefAssessmentText, { color: theme.textMuted }]}>
+            {resolveProjectRescueBriefAssessment(guided.outcome.briefAssessment)}
+          </Text>
           <View style={[styles.summaryBadge, { backgroundColor: theme.primarySoft }]}>
             <Text style={[styles.summaryBadgeText, { color: theme.primary }]}>{guided.outcome.mappedSituation}</Text>
           </View>
+          <Text style={[styles.subsectionLabel, { color: theme.text }]}>Your advisor summary</Text>
           <Text style={[styles.summaryText, { color: theme.textMuted }]}>{guided.outcome.advisorSummary}</Text>
+          <Text style={[styles.goodFitHeading, { color: theme.textMuted }]}>Good fit if</Text>
+          {resolveProjectRescueGoodFitBullets(guided.outcome.goodFitBullets).map((line, index) => (
+            <View key={`gf-${index}`} style={styles.goodFitRow}>
+              <View style={[styles.goodFitBullet, { backgroundColor: theme.primary }]} />
+              <Text style={[styles.goodFitLine, { color: theme.textMuted }]}>{line}</Text>
+            </View>
+          ))}
         </AppCard>
       ) : null}
     </AppScreen>
@@ -807,6 +868,45 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     lineHeight: 28,
+  },
+  recommendationTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 30,
+    marginTop: 14,
+  },
+  briefAssessmentText: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 10,
+  },
+  subsectionLabel: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginTop: 20,
+  },
+  goodFitHeading: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginTop: 22,
+    textTransform: 'uppercase',
+  },
+  goodFitRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  goodFitBullet: {
+    borderRadius: 999,
+    height: 8,
+    marginTop: 8,
+    width: 8,
+  },
+  goodFitLine: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
   },
   textArea: {
     borderRadius: 18,
@@ -949,6 +1049,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
+  nestedDetailPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 160,
+    paddingVertical: 12,
+  },
+  nestedDetailPlaceholderTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  nestedDetailPlaceholderBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
+    textAlign: 'center',
+  },
   detailPanelTitle: {
     fontSize: 18,
     fontWeight: '800',
@@ -1065,12 +1183,25 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 14,
   },
+  noteFieldWrap: {
+    marginTop: 16,
+  },
+  noteFieldLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  noteFieldHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
   noteInput: {
     borderRadius: 18,
     borderWidth: 1,
     fontSize: 15,
     lineHeight: 22,
-    marginTop: 16,
+    marginTop: 10,
     minHeight: 110,
     paddingHorizontal: 16,
     paddingVertical: 14,

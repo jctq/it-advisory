@@ -55,7 +55,7 @@ export function BookingPicker() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
+    <div className="mx-auto max-w-6xl px-6 py-12">
       <h1 className="text-balance text-3xl font-semibold tracking-tight">Choose a date and time</h1>
       <p className="mt-2 max-w-2xl text-pretty text-muted-foreground">
         Select a slot in Philippine Time ({PRIMARY_TIMEZONE}). Calendar integration with your database can

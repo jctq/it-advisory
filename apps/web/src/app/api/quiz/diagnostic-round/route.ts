@@ -1,5 +1,11 @@
 import { openai } from '@ai-sdk/openai';
 import { normalizeDiagnosticOptionLabels } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
+import {
+  buildProjectRescueServicePromptBlock,
+  resolveProjectRescueBriefAssessment,
+  resolveProjectRescueGoodFitBullets,
+  resolveProjectRescueSessionTitle,
+} from '@it-advisory/diagnostic-core/project-rescue-service-context';
 import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -48,6 +54,9 @@ function buildResponseSchema(maxQuestionsPerRound: number, optionsPerQuestion: n
     complete: z.boolean(),
     mappedSituation: situationEnum.nullable(),
     summaryForAdvisor: z.string().max(2500).nullable(),
+    briefAssessment: z.string().max(420).nullable(),
+    sessionTitle: z.string().max(120).nullable(),
+    goodFitBullets: z.array(z.string().max(220)).length(3).nullable(),
     guidance: z.string().max(700).nullable(),
     questions: z.array(questionBlockSchema).max(maxQuestionsPerRound),
   });
@@ -143,117 +152,129 @@ export async function POST(request: Request): Promise<NextResponse> {
   const thread = formatDiagnosticThread(initialPrompt, rounds);
   const mustFinish = roundsCompleted >= maxRoundsBeforeForceComplete;
   const forceInstruction = mustFinish
-    ? `\n\nIMPORTANT: This was round ${roundsCompleted}. You MUST set complete=true. mappedSituation is REQUIRED. Leave questions empty. Write summaryForAdvisor capturing risk, impact, environment, and next-step advisory fit.`
+    ? `\n\nIMPORTANT: This was round ${roundsCompleted}. You MUST set complete=true. mappedSituation is REQUIRED. Leave questions empty. Write summaryForAdvisor (internal handoff), sessionTitle (personalized main headline), briefAssessment (customer-facing hero subtitle), AND goodFitBullets (exactly 3 short strings for a “Good fit if” bullet list—plain sentences without leading bullets/symbols; each reflects transcript-supported reasons this specialized rescue session fits them; max ~220 chars each): summaryForAdvisor captures risk, impact, environment, and advisory fit while explicitly tying findings to the Project Rescue Consultation scope in the system context (which inclusions matter most, what to validate live first). sessionTitle must briefly position the advisor's specialized rescue advisory service as it applies to this transcript (same engagement as the offering above—not generic IT help). Max ~90 characters; no quotation marks; transcript-grounded only. briefAssessment is 1–2 short sentences that tie their stated pains to this specialized session in calm, professional language — echo only transcript-supported signals; max ~320 characters; no bullets; not internal notes.`
     : `\n\nThis is round ${roundsCompleted + 1}. Unless you already have enough signal to finish now, emit **${maxQuestionsPerRound}** sharp multiple-choice questions so the user can tap through like a professional IT intake.`;
   const modelId = resolveDiagnosticModel();
   const responseSchema = buildResponseSchema(maxQuestionsPerRound, optionsPerQuestion);
+  const emptyFollowupRetryLimit = 3;
   try {
-    const { object } = await generateObject({
-      model: openai.chat(modelId),
-      schema: responseSchema,
-      temperature: 0.25,
-      system: `You are a senior IT advisor doing intake for independent consulting (Philippines SMB context when relevant). Speak plainly. Each question must have exactly ${optionsPerQuestion} mutually exclusive tap options (short phrases). Never ask open-ended questions—always supply options. Goal: enough detail to route advisory safely without pretending to diagnose production systems.
+    for (let attempt = 0; attempt <= emptyFollowupRetryLimit; attempt += 1) {
+      const { object } = await generateObject({
+        model: openai.chat(modelId),
+        schema: responseSchema,
+        temperature: 0.25,
+        system: `You are a senior IT advisor doing intake for independent consulting (Philippines SMB context when relevant). Speak plainly. Each question must have exactly ${optionsPerQuestion} mutually exclusive tap options (short phrases). Never ask open-ended questions—always supply options. Goal: enough detail to route advisory safely without pretending to diagnose production systems.
+
+Fixed offering for this funnel (use when complete=true to anchor summaryForAdvisor — internal handoff tone, not marketing):
+${buildProjectRescueServicePromptBlock()}
 
 Canonical situations (pick exactly ONE for mappedSituation when complete—verbatim):
 ${SITUATION_OPTIONS.map((s) => `- ${s}`).join('\n')}
 
-When complete=true: questions must be an empty array; mappedSituation and summaryForAdvisor must be non-null strings.
+When complete=true: questions must be an empty array; mappedSituation and summaryForAdvisor must be non-null strings; briefAssessment, sessionTitle, and goodFitBullets (exactly 3 strings) must be non-null (sessionTitle = brief headline for this specialized advisory session; briefAssessment = hero subtitle — both must align with "Advisor specialty" in the fixed offering block; distinct from summaryForAdvisor). summaryForAdvisor must synthesize the intake thread and relate it to the offering above: call out which session focus areas matter most, what remains ambiguous until validated live, and what a successful first session should clarify.
 
-When complete=false: set mappedSituation and summaryForAdvisor to null; fill questions with exactly ${maxQuestionsPerRound} items unless finishing early.`,
-      prompt: `${thread}${forceInstruction}`,
-    });
-    if (object.complete) {
-      const mappedSituation = normalizeSituation(object.mappedSituation);
-      const summaryForAdvisor =
-        object.summaryForAdvisor !== null && object.summaryForAdvisor.trim().length > 0
-          ? object.summaryForAdvisor.trim()
-          : 'Summary unavailable — follow up in session from thread above.';
-      const payload: DiagnosticRoundCachedPayload = {
-        complete: true,
-        mappedSituation,
-        summaryForAdvisor,
-        guidance: object.guidance ?? null,
-        questions: [],
-      };
-      await upsertDiagnosticRoundCache({
-        threadHash,
-        cacheVersion,
-        normalizedThread,
-        roundsCompleted,
-        model: modelId,
-        response: payload,
+When complete=false: set mappedSituation, summaryForAdvisor, briefAssessment, sessionTitle, and goodFitBullets to null; fill questions with exactly ${maxQuestionsPerRound} items unless finishing early.`,
+        prompt: `${thread}${forceInstruction}`,
       });
-      return respondDiagnosticSuccess(
-        payload,
-        {
-          source: 'ai',
-          matchTier: 'ai',
+      if (object.complete) {
+        const mappedSituation = normalizeSituation(object.mappedSituation);
+        const summaryForAdvisor =
+          object.summaryForAdvisor !== null && object.summaryForAdvisor.trim().length > 0
+            ? object.summaryForAdvisor.trim()
+            : 'Summary unavailable — follow up in session from thread above.';
+        const briefAssessment = resolveProjectRescueBriefAssessment(object.briefAssessment);
+        const sessionTitle = resolveProjectRescueSessionTitle(object.sessionTitle);
+        const goodFitBullets = resolveProjectRescueGoodFitBullets(object.goodFitBullets);
+        const payload: DiagnosticRoundCachedPayload = {
+          complete: true,
+          mappedSituation,
+          summaryForAdvisor,
+          briefAssessment,
+          sessionTitle,
+          goodFitBullets,
+          guidance: object.guidance ?? null,
+          questions: [],
+        };
+        await upsertDiagnosticRoundCache({
           threadHash,
-          queryThreadHash: threadHash,
           cacheVersion,
+          normalizedThread,
+          roundsCompleted,
           model: modelId,
-          semanticScore: null,
-        },
-        debugOptions,
-      );
-    }
-    if (mustFinish) {
-      return NextResponse.json(
-        {
-          error: 'Model returned incomplete after maximum rounds.',
-          code: 'max_rounds',
-        },
-        { status: 502 },
-      );
-    }
-    const questions = object.questions
-      .slice(0, maxQuestionsPerRound)
-      .flatMap((question) => {
-        const options = normalizeDiagnosticOptionLabels(question.options);
-        if (options.length === 0) {
-          return [];
-        }
-        return [
+          response: payload,
+        });
+        return respondDiagnosticSuccess(
+          payload,
           {
-            ...question,
-            options,
+            source: 'ai',
+            matchTier: 'ai',
+            threadHash,
+            queryThreadHash: threadHash,
+            cacheVersion,
+            model: modelId,
+            semanticScore: null,
           },
-        ];
-      });
-    if (questions.length === 0) {
-      return NextResponse.json(
-        {
-          error: 'Expected follow-up questions unless intake is complete.',
-          code: 'invalid_round',
-        },
-        { status: 502 },
-      );
+          debugOptions,
+        );
+      }
+      if (mustFinish) {
+        return NextResponse.json(
+          {
+            error: 'Model returned incomplete after maximum rounds.',
+            code: 'max_rounds',
+          },
+          { status: 502 },
+        );
+      }
+      const questions = object.questions
+        .slice(0, maxQuestionsPerRound)
+        .flatMap((question) => {
+          const options = normalizeDiagnosticOptionLabels(question.options);
+          if (options.length === 0) {
+            return [];
+          }
+          return [
+            {
+              ...question,
+              options,
+            },
+          ];
+        });
+      if (questions.length > 0) {
+        const payload: DiagnosticRoundCachedPayload = {
+          complete: false,
+          guidance: object.guidance ?? null,
+          questions,
+        };
+        await upsertDiagnosticRoundCache({
+          threadHash,
+          cacheVersion,
+          normalizedThread,
+          roundsCompleted,
+          model: modelId,
+          response: payload,
+        });
+        return respondDiagnosticSuccess(
+          payload,
+          {
+            source: 'ai',
+            matchTier: 'ai',
+            threadHash,
+            queryThreadHash: threadHash,
+            cacheVersion,
+            model: modelId,
+            semanticScore: null,
+          },
+          debugOptions,
+        );
+      }
     }
-    const payload: DiagnosticRoundCachedPayload = {
-      complete: false,
-      guidance: object.guidance ?? null,
-      questions,
-    };
-    await upsertDiagnosticRoundCache({
-      threadHash,
-      cacheVersion,
-      normalizedThread,
-      roundsCompleted,
-      model: modelId,
-      response: payload,
-    });
-    return respondDiagnosticSuccess(
-      payload,
+    return NextResponse.json(
       {
-        source: 'ai',
-        matchTier: 'ai',
-        threadHash,
-        queryThreadHash: threadHash,
-        cacheVersion,
-        model: modelId,
-        semanticScore: null,
+        error: 'Model returned no usable questions after several attempts.',
+        code: 'empty_followup_round',
       },
-      debugOptions,
+      { status: 502 },
     );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

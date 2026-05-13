@@ -10,7 +10,8 @@
     "./guided-diagnostic-types": "./src/guided-diagnostic-types.ts",
     "./quiz-steps": "./src/quiz-steps.ts",
     "./situation-options": "./src/situation-options.ts",
-    "./template-diagnostic-flow": "./src/template-diagnostic-flow.ts"
+    "./template-diagnostic-flow": "./src/template-diagnostic-flow.ts",
+    "./project-rescue-service-context": "./src/project-rescue-service-context.ts"
   },
   "dependencies": {
     "@it-advisory/domain": "workspace:*"

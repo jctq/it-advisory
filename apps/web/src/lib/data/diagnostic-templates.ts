@@ -185,29 +185,32 @@ function mapTemplateDocument(doc: DiagnosticTemplateStoredDocument): DiagnosticT
           type: questionType,
           rankedOptionLimit: normalizeRankedOptionLimit(question.rankedOptionLimit, questionType),
           selectionMode: questionType === 'ranked-options' ? 'multiple' : normalizeSelectionMode(question.selectionMode),
-          options: sortOptions(question.options).map((option) => ({
-            id: option.id,
-            label: option.label,
-            description: option.description ?? null,
-            order: option.order,
-            showWhen: mapVisibilityRuleValue(option.showWhen),
-            presentation: mapOptionPresentationValue(option.presentation),
-            childQuestion:
-              option.childQuestion === undefined || option.childQuestion === null
-                ? null
-                : {
-                    id: option.childQuestion.id,
-                    prompt: option.childQuestion.prompt,
-                    description: option.childQuestion.description ?? null,
-                    selectionMode: option.childQuestion.selectionMode,
-                    options: sortChildOptions(option.childQuestion.options).map((childOption) => ({
-                      id: childOption.id,
-                      label: childOption.label,
-                      description: childOption.description ?? null,
-                      order: childOption.order,
-                    })),
-                  },
-          })),
+          options: normalizeSingleRequestDetailNoteTrigger(
+            sortOptions(question.options).map((option) => ({
+              id: option.id,
+              label: option.label,
+              description: option.description ?? null,
+              order: option.order,
+              requestDetailNoteWhenSelected: option.requestDetailNoteWhenSelected === true,
+              showWhen: mapVisibilityRuleValue(option.showWhen),
+              presentation: mapOptionPresentationValue(option.presentation),
+              childQuestion:
+                option.childQuestion === undefined || option.childQuestion === null
+                  ? null
+                  : {
+                      id: option.childQuestion.id,
+                      prompt: option.childQuestion.prompt,
+                      description: option.childQuestion.description ?? null,
+                      selectionMode: option.childQuestion.selectionMode,
+                      options: sortChildOptions(option.childQuestion.options).map((childOption) => ({
+                        id: childOption.id,
+                        label: childOption.label,
+                        description: childOption.description ?? null,
+                        order: childOption.order,
+                      })),
+                    },
+            })),
+          ),
         };
       }),
     })),
@@ -218,6 +221,19 @@ function mapTemplateDocument(doc: DiagnosticTemplateStoredDocument): DiagnosticT
 
 function normalizeSelectionMode(value: string | undefined): DiagnosticTemplateSelectionMode {
   return value === 'multiple' ? 'multiple' : 'single';
+}
+
+function normalizeSingleRequestDetailNoteTrigger<T extends { requestDetailNoteWhenSelected?: boolean }>(
+  options: readonly T[],
+): T[] {
+  const firstIndex = options.findIndex((option) => option.requestDetailNoteWhenSelected === true);
+  if (firstIndex === -1) {
+    return options.map((option) => ({ ...option, requestDetailNoteWhenSelected: false }));
+  }
+  return options.map((option, index) => ({
+    ...option,
+    requestDetailNoteWhenSelected: index === firstIndex,
+  }));
 }
 
 function buildChildQuestionDocument(
@@ -267,6 +283,7 @@ function buildOptionDocument(
     label,
     description: description.length > 0 ? description : null,
     order,
+    requestDetailNoteWhenSelected: input.requestDetailNoteWhenSelected === true,
     showWhen: buildVisibilityRuleDocument(input.showWhen),
     presentation: buildOptionPresentationDocument(input.presentation),
     childQuestion,
@@ -279,6 +296,8 @@ function buildQuestionDocument(
 ): DiagnosticTemplateQuestionDocument {
   const description = input.description?.trim() ?? '';
   const questionType = normalizeQuestionType(input.type);
+  const optionsWithOrder = input.options.map((option, optionIndex) => buildOptionDocument(option, optionIndex));
+  const options = normalizeSingleRequestDetailNoteTrigger(optionsWithOrder);
   return {
     id: input.id.trim().length > 0 ? input.id.trim() : randomUUID(),
     prompt: input.prompt.trim(),
@@ -288,7 +307,7 @@ function buildQuestionDocument(
     type: questionType,
     rankedOptionLimit: normalizeRankedOptionLimit(input.rankedOptionLimit, questionType),
     selectionMode: questionType === 'ranked-options' ? 'multiple' : normalizeSelectionMode(input.selectionMode),
-    options: input.options.map((option, optionIndex) => buildOptionDocument(option, optionIndex)),
+    options,
   };
 }
 
@@ -373,38 +392,43 @@ function toPublicTemplate(template: DiagnosticTemplateValue): PublicDiagnosticTe
           type: question.type,
           rankedOptionLimit: normalizeRankedOptionLimit(question.rankedOptionLimit, question.type),
           selectionMode: question.type === 'ranked-options' ? 'multiple' : question.selectionMode,
-          options: question.options
-            .filter((option) => option.label.trim().length > 0)
-            .map((option) => ({
-              id: option.id,
-              label: option.label.trim(),
-              description: option.description?.trim() ? option.description.trim() : null,
-              showWhen: option.showWhen,
-              presentation: {
-                icon: normalizeOptionalString(option.presentation.icon),
-                badgeText: normalizeOptionalString(option.presentation.badgeText),
-                eyebrow: normalizeOptionalString(option.presentation.eyebrow),
-                title: normalizeOptionalString(option.presentation.title),
-                supportingText: normalizeOptionalString(option.presentation.supportingText),
-                exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
-                panelTitle: normalizeOptionalString(option.presentation.panelTitle),
-              },
-              childQuestion: isValidPublicChildQuestion(option.childQuestion)
-                ? {
-                    id: option.childQuestion.id,
-                    prompt: option.childQuestion.prompt.trim(),
-                    description: option.childQuestion.description?.trim() ? option.childQuestion.description.trim() : null,
-                    selectionMode: option.childQuestion.selectionMode,
-                    options: option.childQuestion.options
-                      .filter((childOption) => childOption.label.trim().length > 0)
-                      .map((childOption) => ({
-                        id: childOption.id,
-                        label: childOption.label.trim(),
-                        description: childOption.description?.trim() ? childOption.description.trim() : null,
-                      })),
-                  }
-                : null,
-            })),
+          options: normalizeSingleRequestDetailNoteTrigger(
+            question.options
+              .filter((option) => option.label.trim().length > 0)
+              .map((option) => ({
+                id: option.id,
+                label: option.label.trim(),
+                description: option.description?.trim() ? option.description.trim() : null,
+                requestDetailNoteWhenSelected: option.requestDetailNoteWhenSelected === true,
+                showWhen: option.showWhen,
+                presentation: {
+                  icon: normalizeOptionalString(option.presentation.icon),
+                  badgeText: normalizeOptionalString(option.presentation.badgeText),
+                  eyebrow: normalizeOptionalString(option.presentation.eyebrow),
+                  title: normalizeOptionalString(option.presentation.title),
+                  supportingText: normalizeOptionalString(option.presentation.supportingText),
+                  exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
+                  panelTitle: normalizeOptionalString(option.presentation.panelTitle),
+                },
+                childQuestion: isValidPublicChildQuestion(option.childQuestion)
+                  ? {
+                      id: option.childQuestion.id,
+                      prompt: option.childQuestion.prompt.trim(),
+                      description: option.childQuestion.description?.trim()
+                        ? option.childQuestion.description.trim()
+                        : null,
+                      selectionMode: option.childQuestion.selectionMode,
+                      options: option.childQuestion.options
+                        .filter((childOption) => childOption.label.trim().length > 0)
+                        .map((childOption) => ({
+                          id: childOption.id,
+                          label: childOption.label.trim(),
+                          description: childOption.description?.trim() ? childOption.description.trim() : null,
+                        })),
+                    }
+                  : null,
+              })),
+          ),
         })),
     }))
     .filter((round) => round.questions.length > 0);

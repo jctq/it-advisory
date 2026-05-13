@@ -28,6 +28,7 @@ type PublicDiagnosticTemplateValue = {
         readonly id: string;
         readonly label: string;
         readonly description: string | null;
+        readonly requestDetailNoteWhenSelected: boolean;
         readonly showWhen: PublicDiagnosticTemplateVisibilityRule;
         readonly presentation: {
           readonly icon: string | null;
@@ -91,6 +92,9 @@ type DiagnosticRoundPayload =
       readonly complete: true;
       readonly mappedSituation: string;
       readonly summaryForAdvisor: string;
+      readonly briefAssessment?: string;
+      readonly sessionTitle?: string;
+      readonly goodFitBullets?: readonly string[];
       readonly guidance: string | null;
       readonly questions: readonly [];
     }
@@ -125,7 +129,10 @@ type DiagnosticTemplateSummaryInput = {
 type DiagnosticTemplateSummaryPayload = {
   readonly mappedSituation: string;
   readonly summaryForAdvisor: string;
-  readonly source: 'ai' | 'fallback';
+  readonly briefAssessment: string;
+  readonly sessionTitle: string;
+  readonly goodFitBullets: readonly string[];
+  readonly source: 'ai' | 'cache' | 'fallback';
   readonly model: string | null;
 };
 

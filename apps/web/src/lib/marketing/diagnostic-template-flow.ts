@@ -5,6 +5,11 @@ import type {
   GuidedDiagnosticOutcome,
 } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
 import {
+  resolveProjectRescueBriefAssessment,
+  resolveProjectRescueGoodFitBullets,
+  resolveProjectRescueSessionTitle,
+} from '@it-advisory/diagnostic-core/project-rescue-service-context';
+import {
   buildDiagnosticAnswerLookup,
   findFirstVisibleQuestionIndex,
   formatGuidedQuestionAnswer,
@@ -62,34 +67,6 @@ export function buildTemplateMappedSituationFromRounds(
 ): string {
   const situationHint = buildSituationHintFromRounds(initialPrompt, rounds);
   return getSituationDisplayList(situationHint, 1)[0] ?? 'Not sure yet — need clarity first';
-}
-
-export function buildTemplateFallbackAdvisorSummary(
-  templateName: string,
-  initialPrompt: string,
-  rounds: readonly DiagnosticThreadRound[],
-): string {
-  const answeredSelections = rounds
-    .flatMap((round) =>
-      round.qa.map((row) => ({
-        roundIndex: round.roundIndex,
-        question: row.question.trim(),
-        answer: row.answer.trim(),
-      })),
-    )
-    .filter((item) => item.question.length > 0 || item.answer.length > 0);
-  const topSelections = answeredSelections
-    .slice(0, 5)
-    .map((item) => `Round ${item.roundIndex + 1}: ${item.question || 'Question'} -> ${item.answer || 'No answer captured'}`);
-  const contextLead =
-    initialPrompt.trim().length > 0
-      ? `Customer context: ${initialPrompt.trim()}`
-      : `Customer completed the "${templateName}" diagnostic template without an opening free-text prompt.`;
-  const selectionLead =
-    topSelections.length > 0
-      ? `Captured selections:\n- ${topSelections.join('\n- ')}`
-      : 'Captured selections were limited, so the advisor should review the transcript directly during the call.';
-  return `${contextLead}\n\n${selectionLead}\n\nUse the transcript below to confirm specifics, clarify timeline and impact, and identify the first practical next step.`;
 }
 
 export function buildActiveRoundFromTemplate(
@@ -188,11 +165,19 @@ export function buildTemplateDiagnosticOutcome(
   bundles: readonly CompletedRoundBundle[],
   template: PublicDiagnosticTemplateValue,
   advisorSummary: string,
+  briefAssessmentInput: string,
+  sessionTitleInput: string,
+  goodFitBulletsInput: readonly unknown[] | null,
 ): GuidedDiagnosticOutcome {
   return {
     mappedSituation: buildTemplateMappedSituation(initialPrompt, bundles),
     advisorSummary: advisorSummary.trim().length > 0
       ? advisorSummary.trim()
       : `Completed the "${template.name}" diagnostic template with ${bundles.length} rounds and ${countAnsweredQuestions(bundles)} questions.`,
+    sessionTitle: resolveProjectRescueSessionTitle(sessionTitleInput),
+    briefAssessment: resolveProjectRescueBriefAssessment(briefAssessmentInput),
+    goodFitBullets: resolveProjectRescueGoodFitBullets(goodFitBulletsInput),
   };
 }
+
+export { buildTemplateFallbackAdvisorSummary } from '@it-advisory/diagnostic-core/template-diagnostic-flow';

@@ -3,6 +3,11 @@ import { z } from 'zod';
 import { embedTextForDiagnosticCache } from '@/lib/ai/thread-embedding';
 import { COLLECTIONS } from '@/domain/collections';
 import type { DiagnosticRoundCacheDocument, DiagnosticRoundCachedPayload } from '@/domain/types';
+import {
+  PROJECT_RESCUE_SERVICE_TAGLINE,
+  PROJECT_RESCUE_SERVICE_TITLE,
+  resolveProjectRescueGoodFitBullets,
+} from '@it-advisory/diagnostic-core/project-rescue-service-context';
 import { getDb } from '@/lib/mongodb';
 import type { DiagnosticRoundForThread } from '@/lib/marketing/diagnostic-thread';
 import {
@@ -22,6 +27,9 @@ const cachedPayloadSchema = z.discriminatedUnion('complete', [
     complete: z.literal(true),
     mappedSituation: z.string(),
     summaryForAdvisor: z.string(),
+    briefAssessment: z.string().optional(),
+    sessionTitle: z.string().optional(),
+    goodFitBullets: z.array(z.string()).length(3).optional(),
     guidance: z.string().nullable(),
     questions: z.array(z.never()),
   }),
@@ -31,6 +39,20 @@ const cachedPayloadSchema = z.discriminatedUnion('complete', [
     questions: z.array(questionBlockCacheSchema).min(1),
   }),
 ]);
+
+function normalizeLegacyCompletePayload(payload: DiagnosticRoundCachedPayload): DiagnosticRoundCachedPayload {
+  if (!payload.complete) {
+    return payload;
+  }
+  const briefTrimmed = payload.briefAssessment?.trim() ?? '';
+  const titleTrimmed = payload.sessionTitle?.trim() ?? '';
+  return {
+    ...payload,
+    briefAssessment: briefTrimmed.length > 0 ? briefTrimmed : PROJECT_RESCUE_SERVICE_TAGLINE,
+    sessionTitle: titleTrimmed.length > 0 ? titleTrimmed : PROJECT_RESCUE_SERVICE_TITLE,
+    goodFitBullets: resolveProjectRescueGoodFitBullets(payload.goodFitBullets),
+  };
+}
 
 function hasMongoUri(): boolean {
   return Boolean(process.env.MONGODB_URI);
@@ -121,7 +143,7 @@ export async function findValidDiagnosticRoundCache(threadHash: string): Promise
     return null;
   }
   return {
-    payload: parsed.data as DiagnosticRoundCachedPayload,
+    payload: normalizeLegacyCompletePayload(parsed.data as DiagnosticRoundCachedPayload),
     model: doc.model,
     documentThreadHash: doc.threadHash,
   };
@@ -202,7 +224,7 @@ export async function findSemanticDiagnosticRoundCache(input: {
     const model =
       typeof top.model === 'string' && top.model.length > 0 ? top.model : 'unknown';
     return {
-      payload: parsed.data as DiagnosticRoundCachedPayload,
+      payload: normalizeLegacyCompletePayload(parsed.data as DiagnosticRoundCachedPayload),
       model,
       documentThreadHash: top.threadHash,
       similarityScore,

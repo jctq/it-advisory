@@ -10,6 +10,7 @@ import {
   type DiagnosticSelectionMode,
   type DiagnosticThreadRound,
 } from './guided-diagnostic-types';
+import { buildProjectRescueServicePromptBlock } from './project-rescue-service-context';
 import { getSituationDisplayList } from './situation-options';
 
 export type PublicDiagnosticTemplateQuestionType = 'multiple-choice' | 'nested-options' | 'ranked-options';
@@ -56,6 +57,7 @@ export type PublicDiagnosticTemplateValue = {
         readonly id: string;
         readonly label: string;
         readonly description: string | null;
+        readonly requestDetailNoteWhenSelected: boolean;
         readonly showWhen: DiagnosticVisibilityRule;
         readonly presentation: PublicDiagnosticTemplateOptionPresentationValue;
         readonly childQuestion: PublicDiagnosticTemplateChildQuestionValue | null;
@@ -226,5 +228,6 @@ export function buildTemplateFallbackAdvisorSummary(
     topSelections.length > 0
       ? `Captured selections:\n- ${topSelections.join('\n- ')}`
       : 'Captured selections were limited, so the advisor should review the transcript directly during the call.';
-  return `${contextLead}\n\n${selectionLead}\n\nUse the transcript below to confirm specifics, clarify timeline and impact, and identify the first practical next step.`;
+  const serviceBlock = buildProjectRescueServicePromptBlock();
+  return `${contextLead}\n\n${selectionLead}\n\n---\n${serviceBlock}\n\nUse the transcript below to confirm specifics, clarify timeline and impact, and identify the first practical next step within the session scope above.`;
 }

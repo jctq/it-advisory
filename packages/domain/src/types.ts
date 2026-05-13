@@ -58,6 +58,9 @@ export type BookingDocument = {
   timezone: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   meetingUrl?: string;
+  /** Raw guided diagnostic JSON (string or legacy object stringified) at booking time — full rounds, questions, options. */
+  guidedDiagnosticSnapshot?: string | null;
+  quizSessionId?: ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -112,6 +115,8 @@ export type DiagnosticTemplateOptionDocument = {
   label: string;
   description?: string | null;
   order: number;
+  /** When true, customers see the optional detail textbox only if this option is selected. At most one option per question should be true. */
+  requestDetailNoteWhenSelected?: boolean;
   showWhen?: DiagnosticTemplateVisibilityRuleDocument | null;
   presentation?: DiagnosticTemplateOptionPresentationDocument;
   childQuestion?: DiagnosticTemplateChildQuestionDocument | null;
@@ -181,6 +186,12 @@ export type DiagnosticRoundCachedPayload =
       readonly complete: true;
       readonly mappedSituation: string;
       readonly summaryForAdvisor: string;
+      /** Customer-facing hero line for the recommended session; omitted on legacy cache rows. */
+      readonly briefAssessment?: string;
+      /** Personalized headline; omitted on legacy cache rows. */
+      readonly sessionTitle?: string;
+      /** Three "good fit if" lines; omitted on legacy cache rows. */
+      readonly goodFitBullets?: readonly string[];
       readonly guidance: string | null;
       readonly questions: readonly [];
     }
@@ -193,6 +204,28 @@ export type DiagnosticRoundCachedPayload =
         readonly options: readonly string[];
       }>;
     };
+
+/** Cached AI output for template-based diagnostic completion (same inputs → same hash → no model call). */
+export type DiagnosticTemplateSummaryCachedPayload = {
+  readonly summaryForAdvisor: string;
+  readonly briefAssessment: string;
+  readonly sessionTitle: string;
+  readonly mappedSituation: string;
+  readonly goodFitBullets: readonly string[];
+};
+
+export type DiagnosticTemplateSummaryCacheDocument = {
+  _id?: ObjectId;
+  threadHash: string;
+  cacheVersion: string;
+  templateName: string;
+  normalizedThread: string;
+  model: string;
+  response: DiagnosticTemplateSummaryCachedPayload;
+  createdAt: Date;
+  updatedAt: Date;
+  hitCount: number;
+};
 
 /** Singleton document `_id: app` — persisted via admin `/admin/settings`. */
 export type AppSettingsDocument = {

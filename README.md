@@ -38,7 +38,7 @@ Suggested indexes (create in Atlas when you begin writing documents):
 - `quiz_audit`: `{ visitorId: 1, createdAt: -1 }`, `{ sessionId: 1, createdAt: 1 }`
 - `visitor_sessions`: `{ visitorId: 1 }` unique
 - `leads`: `{ createdAt: -1 }`, `{ phone: 1 }` (optional, search)
-- `bookings`: `{ startsAt: 1 }`, `{ leadId: 1 }`
+- `bookings`: `{ startsAt: 1 }`, `{ leadId: 1 }`, `{ visitorId: 1, serviceKey: 1, startsAt: 1 }` (idempotent re-confirmation / slot lookup)
 - `availability_slots`: `{ startsAt: 1, timezone: 1 }`
 - `email_sends`: `{ createdAt: -1 }`, `{ to: 1 }`
 - `diagnostic_round_cache`: `{ threadHash: 1 }` unique. For **semantic** reuse of similar prompts, add an Atlas **Vector Search** index on path `embedding` (1536 dimensions, cosine, matching `OPENAI_EMBEDDING_MODEL` / `OPENAI_EMBEDDING_DIMENSIONS`) and **filter** fields `cacheVersion`, `roundsCompleted`; set `DIAGNOSTIC_CACHE_VECTOR_INDEX_NAME` to that index name in `apps/web/.env.local`.

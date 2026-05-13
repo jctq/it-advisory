@@ -4,6 +4,7 @@ import {
   applyGuidedGoBack,
   buildDiagnosticAnswerLookup,
   computeGuidedLinearStep,
+  findNextVisibleQuestionIndex,
   getVisibleQuestionIndexes,
   normalizeDiagnosticOptions,
   parseGuidedDiagnosticJson,
@@ -17,7 +18,13 @@ import {
   type GuidedDiagnosticOutcome,
   type GuidedDiagnosticV1,
   validateGuidedQuestionResponse,
+  shouldShowQuestionDetailNoteInput,
 } from '@it-advisory/diagnostic-core/guided-diagnostic-types';
+import {
+  resolveProjectRescueBriefAssessment,
+  resolveProjectRescueGoodFitBullets,
+  resolveProjectRescueSessionTitle,
+} from '@it-advisory/diagnostic-core/project-rescue-service-context';
 import {
   buildActiveRoundFromTemplate,
   buildNextTemplateRoundFromState,
@@ -227,66 +234,75 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     if (client === null) {
       throw new Error('The app is still connecting to the diagnostic service.');
     }
-    const response = await client.createDiagnosticRound({
-      initialPrompt: guided.initialPrompt.trim(),
-      rounds: toApiRoundsFromBundles(completedBundles),
-    });
-    if (response.complete) {
-      const outcome: GuidedDiagnosticOutcome = {
-        mappedSituation: response.mappedSituation,
-        advisorSummary: response.summaryForAdvisor,
-      };
-      setGuided({
-        ...guided,
-        completedBundles: [...completedBundles],
-        activeRound: null,
-        outcome,
+    const clientEmptyRoundRetryLimit = 3;
+    for (let attempt = 0; attempt <= clientEmptyRoundRetryLimit; attempt += 1) {
+      const response = await client.createDiagnosticRound({
+        initialPrompt: guided.initialPrompt.trim(),
+        rounds: toApiRoundsFromBundles(completedBundles),
       });
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return;
-    }
-    const questions: DiagnosticQuestionBlock[] = response.questions.flatMap((question, index) => {
-      const hasQuestionId = typeof question.id === 'string' && question.id.trim().length > 0;
-      const hasPrompt = typeof question.prompt === 'string' && question.prompt.trim().length > 0;
-      const options = Array.isArray(question.options)
-        ? normalizeDiagnosticOptions(question.options)
-        : [];
-      if (!hasPrompt || options.length === 0) {
-        return [];
+      if (response.complete) {
+        const outcome: GuidedDiagnosticOutcome = {
+          mappedSituation: response.mappedSituation,
+          advisorSummary: response.summaryForAdvisor,
+          sessionTitle: resolveProjectRescueSessionTitle(response.sessionTitle),
+          briefAssessment: resolveProjectRescueBriefAssessment(response.briefAssessment),
+          goodFitBullets: resolveProjectRescueGoodFitBullets(response.goodFitBullets),
+        };
+        setGuided({
+          ...guided,
+          completedBundles: [...completedBundles],
+          activeRound: null,
+          outcome,
+        });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        return;
       }
-      return [
-        {
-          id: hasQuestionId ? question.id.trim() : `question-${index + 1}`,
-          prompt: question.prompt.trim(),
-          description: null,
-          showWhen: null,
-          type: 'multiple-choice',
-          rankedOptionLimit: null,
-          selectionMode: 'single',
-          options,
-        },
-      ];
-    });
-    if (questions.length === 0) {
-      throw new Error('No follow-up questions were returned. Please try again.');
+      const questions: DiagnosticQuestionBlock[] = response.questions.flatMap((question, index) => {
+        const hasQuestionId = typeof question.id === 'string' && question.id.trim().length > 0;
+        const hasPrompt = typeof question.prompt === 'string' && question.prompt.trim().length > 0;
+        const options = Array.isArray(question.options)
+          ? normalizeDiagnosticOptions(question.options)
+          : [];
+        if (!hasPrompt || options.length === 0) {
+          return [];
+        }
+        return [
+          {
+            id: hasQuestionId ? question.id.trim() : `question-${index + 1}`,
+            prompt: question.prompt.trim(),
+            description: null,
+            showWhen: null,
+            type: 'multiple-choice' as const,
+            rankedOptionLimit: null,
+            selectionMode: 'single' as const,
+            options,
+          },
+        ];
+      });
+      if (questions.length > 0) {
+        setGuided({
+          ...guided,
+          completedBundles: [...completedBundles],
+          activeRound: synchronizeActiveRound({
+            activeRound: {
+              roundIndex: completedBundles.length,
+              roundTitle: `Round ${completedBundles.length + 1}`,
+              questions,
+              answers: {},
+              answerNotes: {},
+              stepIndex: 0,
+              guidance: response.guidance,
+            },
+            completedBundles,
+          }),
+        });
+        void Haptics.selectionAsync();
+        return;
+      }
+      if (attempt === clientEmptyRoundRetryLimit) {
+        throw new Error('No follow-up questions were returned. Please try again.');
+      }
     }
-    setGuided({
-      ...guided,
-      completedBundles: [...completedBundles],
-      activeRound: synchronizeActiveRound({
-        activeRound: {
-          roundIndex: completedBundles.length,
-          roundTitle: `Round ${completedBundles.length + 1}`,
-          questions,
-          answers: {},
-          answerNotes: {},
-          stepIndex: 0,
-          guidance: response.guidance,
-        },
-        completedBundles,
-      }),
-    });
-    void Haptics.selectionAsync();
   }, [guided]);
 
   const executeFetchTemplateSummary = useCallback(
@@ -303,6 +319,9 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
       return {
         mappedSituation: response.mappedSituation,
         advisorSummary: response.summaryForAdvisor,
+        sessionTitle: resolveProjectRescueSessionTitle(response.sessionTitle),
+        briefAssessment: resolveProjectRescueBriefAssessment(response.briefAssessment),
+        goodFitBullets: resolveProjectRescueGoodFitBullets(response.goodFitBullets),
       };
     },
     [activeTemplate, guided.initialPrompt],
@@ -425,27 +444,46 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
       if (previous.activeRound === null) {
         return previous;
       }
+      const baseAnswers = buildDiagnosticAnswerLookup({
+        completedBundles: previous.completedBundles,
+        activeRound: previous.activeRound,
+      });
       const nextSelection = toggleQuestionOptionSelection({
-        baseAnswers: buildDiagnosticAnswerLookup({
-          completedBundles: previous.completedBundles,
-          activeRound: previous.activeRound,
-        }),
+        baseAnswers,
         question,
         selection: previous.activeRound.answers[question.id],
         optionId,
       });
+      let synchronized = synchronizeActiveRound({
+        activeRound: {
+          ...previous.activeRound,
+          answers: {
+            ...previous.activeRound.answers,
+            [question.id]: nextSelection,
+          },
+        },
+        completedBundles: previous.completedBundles,
+      });
+      if (synchronized === null) {
+        return previous;
+      }
+      if (
+        !shouldShowQuestionDetailNoteInput({
+          baseAnswers,
+          question,
+          selection: nextSelection,
+        })
+      ) {
+        const nextAnswerNotes = { ...synchronized.answerNotes };
+        delete nextAnswerNotes[question.id];
+        synchronized = {
+          ...synchronized,
+          answerNotes: nextAnswerNotes,
+        };
+      }
       return {
         ...previous,
-        activeRound: synchronizeActiveRound({
-          activeRound: {
-            ...previous.activeRound,
-            answers: {
-              ...previous.activeRound.answers,
-              [question.id]: nextSelection,
-            },
-          },
-          completedBundles: previous.completedBundles,
-        }),
+        activeRound: synchronized,
       };
     });
     void Haptics.selectionAsync();
@@ -493,18 +531,42 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
       if (previous.activeRound === null) {
         return previous;
       }
+      const questionBlock = previous.activeRound.questions.find((candidate) => candidate.id === questionId);
+      const baseAnswers = buildDiagnosticAnswerLookup({
+        completedBundles: previous.completedBundles,
+        activeRound: previous.activeRound,
+      });
+      let synchronized = synchronizeActiveRound({
+        activeRound: {
+          ...previous.activeRound,
+          answers: {
+            ...previous.activeRound.answers,
+            [questionId]: nextSelection,
+          },
+        },
+        completedBundles: previous.completedBundles,
+      });
+      if (synchronized === null) {
+        return previous;
+      }
+      if (
+        questionBlock !== undefined &&
+        !shouldShowQuestionDetailNoteInput({
+          baseAnswers,
+          question: questionBlock,
+          selection: nextSelection,
+        })
+      ) {
+        const nextAnswerNotes = { ...synchronized.answerNotes };
+        delete nextAnswerNotes[questionId];
+        synchronized = {
+          ...synchronized,
+          answerNotes: nextAnswerNotes,
+        };
+      }
       return {
         ...previous,
-        activeRound: synchronizeActiveRound({
-          activeRound: {
-            ...previous.activeRound,
-            answers: {
-              ...previous.activeRound.answers,
-              [questionId]: nextSelection,
-            },
-          },
-          completedBundles: previous.completedBundles,
-        }),
+        activeRound: synchronized,
       };
     });
     void Haptics.selectionAsync();
@@ -569,6 +631,63 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     if (activeRound === null) {
       return;
     }
+    const priorAnswersOnly = buildDiagnosticAnswerLookup({
+      completedBundles: guided.completedBundles,
+    });
+    const answerableQuestionIndexes = getVisibleQuestionIndexes({
+      questions: activeRound.questions,
+      baseAnswers: priorAnswersOnly,
+      answers: activeRound.answers,
+    });
+    if (answerableQuestionIndexes.length === 0) {
+      if (!diagnosticAiEnabled) {
+        if (activeTemplate === null) {
+          setErrorMessage('No active diagnostic template is available right now.');
+          return;
+        }
+        const nextRound = synchronizeActiveRound({
+          activeRound: buildNextTemplateRoundFromState({
+            template: activeTemplate,
+            completedBundles: guided.completedBundles,
+            startRoundIndex: activeRound.roundIndex + 1,
+          }),
+          completedBundles: guided.completedBundles,
+        });
+        if (nextRound !== null) {
+          setGuided({
+            ...guided,
+            activeRound: nextRound,
+            outcome: null,
+          });
+          void Haptics.selectionAsync();
+          return;
+        }
+        setIsBusy(true);
+        try {
+          const outcome = await executeFetchTemplateSummary(guided.completedBundles);
+          setGuided({
+            ...guided,
+            activeRound: null,
+            outcome,
+          });
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (error: unknown) {
+          setErrorMessage(readErrorMessage(error));
+        } finally {
+          setIsBusy(false);
+        }
+        return;
+      }
+      setIsBusy(true);
+      try {
+        await executeFetchRound(guided.completedBundles);
+      } catch (error: unknown) {
+        setErrorMessage(readErrorMessage(error));
+      } finally {
+        setIsBusy(false);
+      }
+      return;
+    }
     const currentQuestion = activeRound.questions[activeRound.stepIndex];
     if (currentQuestion === undefined) {
       return;
@@ -586,14 +705,14 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
       setErrorMessage(validation.message ?? 'Select an option or add a short note before continuing.');
       return;
     }
-    const visibleQuestionIndexes = getVisibleQuestionIndexes({
+    const nextQuestionIndex = findNextVisibleQuestionIndex({
       questions: activeRound.questions,
       baseAnswers: buildDiagnosticAnswerLookup({
         completedBundles: guided.completedBundles,
       }),
       answers: activeRound.answers,
+      currentIndex: activeRound.stepIndex,
     });
-    const nextQuestionIndex = visibleQuestionIndexes.find((questionIndex) => questionIndex > activeRound.stepIndex) ?? null;
     if (nextQuestionIndex !== null) {
       setGuided({
         ...guided,

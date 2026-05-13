@@ -6,8 +6,20 @@ import {
   buildTemplateFallbackAdvisorSummary,
   buildTemplateMappedSituationFromRounds,
 } from '@/lib/marketing/diagnostic-template-flow';
+import {
+  buildTemplateSummaryCacheKey,
+  findValidDiagnosticTemplateSummaryCache,
+  incrementDiagnosticTemplateSummaryCacheHit,
+  upsertDiagnosticTemplateSummaryCache,
+} from '@/lib/data/diagnostic-template-summary-cache';
 import { formatDiagnosticThread } from '@/lib/marketing/diagnostic-thread';
 import { SITUATION_OPTIONS } from '@/lib/marketing/situation-options';
+import {
+  buildProjectRescueServicePromptBlock,
+  resolveProjectRescueBriefAssessment,
+  resolveProjectRescueGoodFitBullets,
+  resolveProjectRescueSessionTitle,
+} from '@it-advisory/diagnostic-core/project-rescue-service-context';
 
 const qaSchema = z.object({
   questionId: z.string(),
@@ -28,6 +40,9 @@ const requestSchema = z.object({
 
 const responseSchema = z.object({
   summaryForAdvisor: z.string().max(2500),
+  briefAssessment: z.string().max(420),
+  sessionTitle: z.string().max(120),
+  goodFitBullets: z.array(z.string().max(220)).length(3),
 });
 
 function resolveDiagnosticModel(): string {
@@ -48,9 +63,26 @@ export async function POST(request: Request): Promise<NextResponse> {
   const { templateName, initialPrompt, rounds } = parsed.data;
   const fallbackSummary = buildTemplateFallbackAdvisorSummary(templateName, initialPrompt, rounds);
   const mappedSituation = buildTemplateMappedSituationFromRounds(initialPrompt, rounds);
+  const { threadHash, cacheVersion, normalizedThread } = buildTemplateSummaryCacheKey({
+    templateName,
+    initialPrompt,
+    rounds,
+  });
+  const cacheHit = await findValidDiagnosticTemplateSummaryCache(threadHash);
+  if (cacheHit !== null) {
+    await incrementDiagnosticTemplateSummaryCacheHit(cacheHit.documentThreadHash);
+    return NextResponse.json({
+      ...cacheHit.payload,
+      source: 'cache',
+      model: cacheHit.model,
+    });
+  }
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({
       summaryForAdvisor: fallbackSummary,
+      briefAssessment: resolveProjectRescueBriefAssessment(''),
+      sessionTitle: resolveProjectRescueSessionTitle(''),
+      goodFitBullets: resolveProjectRescueGoodFitBullets(null),
       mappedSituation,
       source: 'fallback',
       model: null,
@@ -67,10 +99,20 @@ export async function POST(request: Request): Promise<NextResponse> {
 
 Summarize only what the customer actually selected or typed in a fixed diagnostic template. Do not invent architecture, incidents, vendors, or business context that the transcript does not support.
 
+Booked offering for this funnel (anchor every summaryForAdvisor — internal tone, not sales copy):
+${buildProjectRescueServicePromptBlock()}
+
+Also output sessionTitle: concise headline (max ~90 characters; no quotation marks) that briefly positions the advisor's specialized rescue advisory service for this intake—aligned with "Advisor specialty" in the fixed offering block above; transcript-grounded only; same engagement as Project Rescue Consultation—not generic IT support.
+
+Also output briefAssessment: 1–2 short sentences under the title: connect their answers to this specialized session in plain language (calm, professional; only transcript-supported detail; max ~320 characters; no bullets; not the same as summaryForAdvisor).
+
+Also output goodFitBullets: exactly 3 strings for a customer-facing “Good fit if” list (plain sentences; no leading • or - in each string; transcript-grounded reasons this rescue advisory session fits them; max ~220 characters each).
+
 Write a concise summaryForAdvisor that:
 - synthesizes the most important selections, symptoms, constraints, and risks
 - mentions timeline/impact clues only if they appear in the answers
 - highlights what the advisor should validate first in the session
+- explicitly ties the thread to the offering above: which session inclusions matter most, what gaps the listed scope helps close, and what a strong first session should establish
 - sounds like an internal professional note, not customer-facing marketing copy
 
 Canonical situation labels for reference:
@@ -84,9 +126,26 @@ ${thread}`,
     });
     const summaryForAdvisor =
       object.summaryForAdvisor.trim().length > 0 ? object.summaryForAdvisor.trim() : fallbackSummary;
-    return NextResponse.json({
+    const briefAssessment = resolveProjectRescueBriefAssessment(object.briefAssessment);
+    const sessionTitle = resolveProjectRescueSessionTitle(object.sessionTitle);
+    const goodFitBullets = resolveProjectRescueGoodFitBullets(object.goodFitBullets);
+    const responseBody = {
       summaryForAdvisor,
+      briefAssessment,
+      sessionTitle,
       mappedSituation,
+      goodFitBullets,
+    };
+    await upsertDiagnosticTemplateSummaryCache({
+      threadHash,
+      cacheVersion,
+      templateName,
+      normalizedThread,
+      model: modelId,
+      response: responseBody,
+    });
+    return NextResponse.json({
+      ...responseBody,
       source: 'ai',
       model: modelId,
     });
@@ -95,6 +154,9 @@ ${thread}`,
     console.error('[api/quiz/diagnostic-template-summary]', message, error);
     return NextResponse.json({
       summaryForAdvisor: fallbackSummary,
+      briefAssessment: resolveProjectRescueBriefAssessment(''),
+      sessionTitle: resolveProjectRescueSessionTitle(''),
+      goodFitBullets: resolveProjectRescueGoodFitBullets(null),
       mappedSituation,
       source: 'fallback',
       model: null,

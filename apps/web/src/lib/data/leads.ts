@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { LeadDocument } from '@/domain/types';
 import { getDb } from '@/lib/mongodb';
@@ -34,4 +35,25 @@ export async function listLeads(limit = 500): Promise<LeadRow[]> {
     .limit(limit);
   const docs = await cursor.toArray();
   return docs.map((doc) => mapLead(doc as LeadDocument & { _id: { toString: () => string } }));
+}
+
+/**
+ * Inserts a minimal lead row for an anonymous marketing booking (ties booking to visitor).
+ */
+export async function insertMarketingBookingLead(visitorId: string): Promise<ObjectId | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const db = await getDb();
+  const now = new Date();
+  const doc: Omit<LeadDocument, '_id'> = {
+    visitorId,
+    name: 'Booking (funnel)',
+    company: '—',
+    phone: '—',
+    source: 'marketing-booking',
+    createdAt: now,
+  };
+  const result = await db.collection<LeadDocument>(COLLECTIONS.leads).insertOne(doc);
+  return result.insertedId;
 }

@@ -5,9 +5,11 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import {
   AlertTriangle,
+  ArrowRight,
   ArrowUpDown,
   BarChart3,
   Check,
+  CheckCircle2,
   CircleDollarSign,
   Clock3,
   FileWarning,
@@ -48,16 +50,26 @@ import {
   getVisibleQuestionIndexes,
   type GuidedDiagnosticOutcome,
   type GuidedDiagnosticV1,
-  buildDiagnosticTranscript,
   normalizeDiagnosticOptions,
   pruneHiddenAnswers,
   toggleChildQuestionOptionSelection,
   toggleQuestionOptionSelection,
   toApiRoundsFromBundles,
   validateGuidedQuestionResponse,
+  shouldShowQuestionDetailNoteInput,
 } from '@/lib/marketing/guided-diagnostic-types';
 import { getSituationSeed } from '@/lib/marketing/situation-options';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import {
+  PROJECT_RESCUE_BOOKING_FOOTNOTE,
+  PROJECT_RESCUE_PRICE_HEADLINE,
+  PROJECT_RESCUE_SESSION_DURATION,
+  PROJECT_RESCUE_WHATS_INCLUDED,
+  resolveProjectRescueBriefAssessment,
+  resolveProjectRescueGoodFitBullets,
+  resolveProjectRescueSessionTitle,
+} from '@it-advisory/diagnostic-core/project-rescue-service-context';
 
 const MIN_PROMPT_LENGTH = 8;
 const MAX_ANSWER_NOTE_LENGTH = 2000;
@@ -66,6 +78,12 @@ const DIAGNOSTIC_CONFIG_API_URL = '/api/quiz/diagnostic-config';
 const DIAGNOSTIC_ROUND_API_URL = '/api/quiz/diagnostic-round';
 const DIAGNOSTIC_TEMPLATE_API_URL = '/api/quiz/diagnostic-template';
 const DIAGNOSTIC_TEMPLATE_SUMMARY_API_URL = '/api/quiz/diagnostic-template-summary';
+
+function scheduleScrollQuizWizardToTop(): void {
+  requestAnimationFrame(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
 
 function togglePromptWithSeed(currentPrompt: string, phrase: string): string {
   const trimmedCurrent = currentPrompt.trim();
@@ -98,6 +116,9 @@ type DiagnosticRoundApiBody = {
   readonly guidance?: string | null;
   readonly mappedSituation?: string;
   readonly summaryForAdvisor?: string;
+  readonly briefAssessment?: string;
+  readonly sessionTitle?: string;
+  readonly goodFitBullets?: readonly string[];
   readonly error?: string;
   readonly code?: string;
   readonly details?: string;
@@ -235,6 +256,27 @@ function hasSingleSelectCascade(question: DiagnosticQuestionBlock): boolean {
     question.selectionMode === 'single' &&
     question.options.some((option) => option.showWhen !== null && option.showWhen.sourceQuestionId === question.id)
   );
+}
+
+function resolveNestedGuidanceMessage(params: {
+  readonly guidanceOverride: string | null;
+  readonly hasParentSelected: boolean;
+  readonly question: DiagnosticQuestionBlock;
+  readonly supportsSingleSelectCascade: boolean;
+}): string | null {
+  if (!params.hasParentSelected) {
+    return 'Select this category to enable the detailed choices on the right.';
+  }
+  if (params.guidanceOverride !== null) {
+    return params.guidanceOverride;
+  }
+  if (params.supportsSingleSelectCascade) {
+    return 'Choosing a deeper option keeps the earlier steps in your path visible.';
+  }
+  if (params.question.selectionMode === 'multiple') {
+    return 'Selections in other categories stay saved while you move between panels.';
+  }
+  return null;
 }
 
 function getTerminalSelectedOptionId(selection: DiagnosticQuestionSelection): string | null {
@@ -422,18 +464,23 @@ function NestedOptionsRoundRenderer(props: {
   const supportsSingleSelectCascade = hasSingleSelectCascade(props.question);
   const terminalSelectedOptionId =
     props.question.selectionMode === 'single' ? getTerminalSelectedOptionId(props.selection) : null;
-  const [requestedActiveOptionId, setRequestedActiveOptionId] = useState<string | null>(
-    terminalSelectedOptionId ?? props.selection.selectedOptionIds[0] ?? visibleOptions[0]?.id ?? null,
-  );
+  const [requestedActiveOptionId, setRequestedActiveOptionId] = useState<string | null>(null);
   const activeOptionId =
     requestedActiveOptionId !== null && visibleOptions.some((option) => option.id === requestedActiveOptionId)
       ? requestedActiveOptionId
-      : terminalSelectedOptionId ??
-        props.selection.selectedOptionIds.find((optionId) => visibleOptions.some((option) => option.id === optionId)) ??
-        visibleOptions[0]?.id ??
-        null;
-  const activeOption = visibleOptions.find((option) => option.id === activeOptionId) ?? visibleOptions[0] ?? null;
+      : null;
+  const activeOption =
+    activeOptionId === null ? null : visibleOptions.find((option) => option.id === activeOptionId) ?? null;
   const activeChildSelections = activeOption === null ? [] : props.selection.childSelections[activeOption.id] ?? [];
+  const guidanceMessage =
+    activeOption === null
+      ? null
+      : resolveNestedGuidanceMessage({
+          guidanceOverride: props.guidance,
+          hasParentSelected: props.selection.selectedOptionIds.includes(activeOption.id),
+          question: props.question,
+          supportsSingleSelectCascade,
+        });
   return (
     <section className="mt-8 space-y-5">
       <div>
@@ -495,7 +542,18 @@ function NestedOptionsRoundRenderer(props: {
           })}
         </div>
         <div className="rounded-3xl border border-border bg-card p-6 shadow-xs">
-          {activeOption !== null ? (
+          {activeOption === null ? (
+            <div
+              className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center"
+              role="status"
+              aria-live="polite"
+            >
+              <p className="text-base font-medium text-foreground">Choose a category first</p>
+              <p className="max-w-sm text-pretty text-sm text-muted-foreground">
+                Select a category. Follow-up choices for that category will appear here.
+              </p>
+            </div>
+          ) : (
             <>
               <div className="flex items-start gap-4">
                 <DiagnosticOptionIcon
@@ -555,16 +613,13 @@ function NestedOptionsRoundRenderer(props: {
                   Add a follow-up question to this option in the template editor to show detailed choices here.
                 </div>
               )}
-              <div className="mt-6 rounded-2xl border border-border/70 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-                {props.selection.selectedOptionIds.includes(activeOption.id)
-                  ? props.guidance ??
-                    (supportsSingleSelectCascade
-                      ? 'Choosing a deeper option keeps the earlier steps in your path visible.'
-                      : 'Selections in other categories stay saved while you move between panels.')
-                  : 'Select this category on the left to enable the detailed choices on the right.'}
-              </div>
+              {guidanceMessage !== null ? (
+                <div className="mt-6 rounded-2xl border border-border/70 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+                  {guidanceMessage}
+                </div>
+              ) : null}
             </>
-          ) : null}
+          )}
         </div>
       </div>
     </section>
@@ -607,12 +662,6 @@ function SortableRankedSelectionItem(props: {
         </span>
       </div>
       <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={props.onMoveUp} disabled={props.index === 0}>
-          Move up
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={props.onMoveDown}>
-          Move down
-        </Button>
         <Button type="button" variant="outline" size="sm" onClick={props.onRemove}>
           Remove
         </Button>
@@ -898,6 +947,9 @@ type DiagnosticTemplateApiBody = {
 
 type DiagnosticTemplateSummaryApiBody = {
   readonly summaryForAdvisor?: string;
+  readonly briefAssessment?: string;
+  readonly sessionTitle?: string;
+  readonly goodFitBullets?: readonly string[];
   readonly mappedSituation?: string;
   readonly error?: string;
   readonly details?: string;
@@ -905,6 +957,10 @@ type DiagnosticTemplateSummaryApiBody = {
 
 export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): ReactElement {
   const { backLabel, canGoBack, guided, onGoBack, onGuidedChange } = props;
+  const executeGoBackWithScroll = useCallback((): void => {
+    onGoBack();
+    scheduleScrollQuizWizardToTop();
+  }, [onGoBack]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAwaitingApi, setIsAwaitingApi] = useState<boolean>(false);
   const [diagnosticDebugLog, setDiagnosticDebugLog] = useState<DiagnosticDebugLogEntry[]>([]);
@@ -1000,16 +1056,17 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       if (guided.activeRound === null) {
         return;
       }
+      const baseAnswers = buildDiagnosticAnswerLookup({
+        completedBundles: guided.completedBundles,
+        activeRound: guided.activeRound,
+      });
       const nextSelection = toggleQuestionOptionSelection({
-        baseAnswers: buildDiagnosticAnswerLookup({
-          completedBundles: guided.completedBundles,
-          activeRound: guided.activeRound,
-        }),
+        baseAnswers,
         question,
         selection: guided.activeRound.answers[question.id],
         optionId,
       });
-      const nextActiveRound = synchronizeActiveRound({
+      let nextActiveRound = synchronizeActiveRound({
         completedBundles: guided.completedBundles,
         activeRound: {
           ...guided.activeRound,
@@ -1019,6 +1076,23 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           },
         },
       });
+      if (nextActiveRound === null) {
+        return;
+      }
+      if (
+        !shouldShowQuestionDetailNoteInput({
+          baseAnswers,
+          question,
+          selection: nextSelection,
+        })
+      ) {
+        const nextAnswerNotes = { ...nextActiveRound.answerNotes };
+        delete nextAnswerNotes[question.id];
+        nextActiveRound = {
+          ...nextActiveRound,
+          answerNotes: nextAnswerNotes,
+        };
+      }
       onGuidedChange({
         ...guided,
         activeRound: nextActiveRound,
@@ -1063,7 +1137,12 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       if (guided.activeRound === null) {
         return;
       }
-      const nextActiveRound = synchronizeActiveRound({
+      const questionBlock = guided.activeRound.questions.find((candidate) => candidate.id === questionId);
+      const baseAnswers = buildDiagnosticAnswerLookup({
+        completedBundles: guided.completedBundles,
+        activeRound: guided.activeRound,
+      });
+      let nextActiveRound = synchronizeActiveRound({
         completedBundles: guided.completedBundles,
         activeRound: {
           ...guided.activeRound,
@@ -1073,6 +1152,24 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           },
         },
       });
+      if (nextActiveRound === null) {
+        return;
+      }
+      if (
+        questionBlock !== undefined &&
+        !shouldShowQuestionDetailNoteInput({
+          baseAnswers,
+          question: questionBlock,
+          selection: nextSelection,
+        })
+      ) {
+        const nextAnswerNotes = { ...nextActiveRound.answerNotes };
+        delete nextAnswerNotes[questionId];
+        nextActiveRound = {
+          ...nextActiveRound,
+          answerNotes: nextAnswerNotes,
+        };
+      }
       onGuidedChange({
         ...guided,
         activeRound: nextActiveRound,
@@ -1101,83 +1198,100 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     [guided, onGuidedChange],
   );
   const executeFetchRound = useCallback(
-    async (completedBundles: CompletedRoundBundle[]): Promise<void> => {
+    async (completedBundles: CompletedRoundBundle[]): Promise<boolean> => {
       const trimmed = guided.initialPrompt.trim();
-      const response = await fetch(DIAGNOSTIC_ROUND_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          initialPrompt: trimmed,
-          rounds: toApiRoundsFromBundles(completedBundles),
-        }),
-      });
-      const data = (await response.json()) as DiagnosticRoundApiBody;
-      if (!response.ok) {
-        if (response.status === 503 && data.code === 'missing_key') {
-          setErrorMessage('Add OPENAI_API_KEY to enable guided intake.');
-        } else {
-          const hint = typeof data.details === 'string' ? ` ${data.details}` : '';
-          setErrorMessage(`${data.error ?? 'Something went wrong. Try again.'}${hint}`);
-        }
-        return;
-      }
-      const debugMeta = extractDiagnosticRoundDebugFromResponse(response, data);
-      if (debugMeta !== null && cacheDebugUiEnabled) {
-        const label =
-          data.complete === true
-            ? 'Completion & mapping'
-            : `Round ${completedBundles.length + 1} — question block`;
-        setDiagnosticDebugLog((previous) => [
-          ...previous,
-          { id: crypto.randomUUID(), label, meta: debugMeta },
-        ]);
-      }
-      if (data.complete === true) {
-        const mappedSituation = data.mappedSituation ?? 'Not sure yet — need clarity first';
-        const advisorSummary =
-          typeof data.summaryForAdvisor === 'string' && data.summaryForAdvisor.trim().length > 0
-            ? data.summaryForAdvisor.trim()
-            : '';
-        const outcome: GuidedDiagnosticOutcome = {
-          mappedSituation,
-          advisorSummary,
-        };
-        onGuidedChange({
-          ...guided,
-          completedBundles,
-          activeRound: null,
-          outcome,
+      const clientEmptyRoundRetryLimit = 3;
+      for (let attempt = 0; attempt <= clientEmptyRoundRetryLimit; attempt += 1) {
+        const response = await fetch(DIAGNOSTIC_ROUND_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            initialPrompt: trimmed,
+            rounds: toApiRoundsFromBundles(completedBundles),
+          }),
         });
-        return;
+        const data = (await response.json()) as DiagnosticRoundApiBody;
+        if (!response.ok) {
+          if (response.status === 503 && data.code === 'missing_key') {
+            setErrorMessage('Add OPENAI_API_KEY to enable guided intake.');
+          } else {
+            const hint = typeof data.details === 'string' ? ` ${data.details}` : '';
+            setErrorMessage(`${data.error ?? 'Something went wrong. Try again.'}${hint}`);
+          }
+          return false;
+        }
+        const debugMeta = extractDiagnosticRoundDebugFromResponse(response, data);
+        if (debugMeta !== null && cacheDebugUiEnabled) {
+          const label =
+            data.complete === true
+              ? 'Completion & mapping'
+              : `Round ${completedBundles.length + 1} — question block`;
+          setDiagnosticDebugLog((previous) => [
+            ...previous,
+            { id: crypto.randomUUID(), label, meta: debugMeta },
+          ]);
+        }
+        if (data.complete === true) {
+          const mappedSituation = data.mappedSituation ?? 'Not sure yet — need clarity first';
+          const advisorSummary =
+            typeof data.summaryForAdvisor === 'string' && data.summaryForAdvisor.trim().length > 0
+              ? data.summaryForAdvisor.trim()
+              : '';
+          const outcome: GuidedDiagnosticOutcome = {
+            mappedSituation,
+            advisorSummary,
+            sessionTitle: resolveProjectRescueSessionTitle(
+              typeof data.sessionTitle === 'string' ? data.sessionTitle : null,
+            ),
+            briefAssessment: resolveProjectRescueBriefAssessment(
+              typeof data.briefAssessment === 'string' ? data.briefAssessment : null,
+            ),
+            goodFitBullets: resolveProjectRescueGoodFitBullets(
+              Array.isArray(data.goodFitBullets) ? data.goodFitBullets : null,
+            ),
+          };
+          onGuidedChange({
+            ...guided,
+            completedBundles,
+            activeRound: null,
+            outcome,
+          });
+          return true;
+        }
+        const mappedQuestions: DiagnosticQuestionBlock[] = (Array.isArray(data.questions) ? data.questions : [])
+          .map((row) => ({
+            id: row.id,
+            prompt: row.prompt,
+            description: null,
+            showWhen: null,
+            type: 'multiple-choice' as const,
+            rankedOptionLimit: null,
+            selectionMode: 'single' as const,
+            options: normalizeDiagnosticOptions(row.options),
+          }))
+          .filter((block) => block.options.length > 0);
+        if (mappedQuestions.length > 0) {
+          onGuidedChange({
+            ...guided,
+            completedBundles,
+            activeRound: {
+              roundIndex: completedBundles.length,
+              roundTitle: `Round ${completedBundles.length + 1}`,
+              questions: mappedQuestions,
+              answers: {},
+              answerNotes: {},
+              stepIndex: 0,
+              guidance: typeof data.guidance === 'string' ? data.guidance : null,
+            },
+          });
+          return true;
+        }
+        if (attempt === clientEmptyRoundRetryLimit) {
+          setErrorMessage('No follow-up questions were returned. Try again.');
+          return false;
+        }
       }
-      const questions = Array.isArray(data.questions) ? data.questions : [];
-      if (questions.length === 0) {
-        setErrorMessage('No questions returned — try again.');
-        return;
-      }
-      const mappedQuestions: DiagnosticQuestionBlock[] = questions.map((row) => ({
-        id: row.id,
-        prompt: row.prompt,
-        description: null,
-        showWhen: null,
-        type: 'multiple-choice',
-        rankedOptionLimit: null,
-        selectionMode: 'single',
-        options: normalizeDiagnosticOptions(row.options),
-      }));
-      onGuidedChange({
-        ...guided,
-        completedBundles,
-        activeRound: {
-          roundIndex: completedBundles.length,
-          roundTitle: `Round ${completedBundles.length + 1}`,
-          questions: mappedQuestions,
-          answers: {},
-          answerNotes: {},
-          stepIndex: 0,
-          guidance: typeof data.guidance === 'string' ? data.guidance : null,
-        },
-      });
+      return false;
     },
     [cacheDebugUiEnabled, guided, onGuidedChange],
   );
@@ -1193,6 +1307,9 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             rounds: [],
           },
           '',
+          '',
+          '',
+          null,
         );
       }
       const response = await fetch(DIAGNOSTIC_TEMPLATE_SUMMARY_API_URL, {
@@ -1213,6 +1330,9 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         completedBundles,
         activeTemplate,
         data.summaryForAdvisor ?? '',
+        data.briefAssessment ?? '',
+        data.sessionTitle ?? '',
+        Array.isArray(data.goodFitBullets) ? data.goodFitBullets : null,
       );
     },
     [activeTemplate, guided.initialPrompt],
@@ -1241,6 +1361,61 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       completedBundles: guided.completedBundles,
     });
     if (activeRound === null) {
+      return;
+    }
+    const priorAnswersOnly = buildDiagnosticAnswerLookup({
+      completedBundles: guided.completedBundles,
+    });
+    const answerableQuestionIndexes = getVisibleQuestionIndexes({
+      questions: activeRound.questions,
+      baseAnswers: priorAnswersOnly,
+      answers: activeRound.answers,
+    });
+    if (answerableQuestionIndexes.length === 0) {
+      if (!diagnosticAiEnabled) {
+        if (activeTemplate === null) {
+          setErrorMessage('AI Diagnostic is off, but no active template is ready yet.');
+          return;
+        }
+        const nextRound = buildNextTemplateRoundFromState({
+          template: activeTemplate,
+          completedBundles: guided.completedBundles,
+          startRoundIndex: activeRound.roundIndex + 1,
+        });
+        if (nextRound !== null) {
+          onGuidedChange({
+            ...guided,
+            activeRound: nextRound,
+            outcome: null,
+          });
+          scheduleScrollQuizWizardToTop();
+          return;
+        }
+        setIsAwaitingApi(true);
+        try {
+          const outcome = await executeFetchTemplateSummary(guided.completedBundles);
+          onGuidedChange({
+            ...guided,
+            activeRound: null,
+            outcome,
+          });
+          scheduleScrollQuizWizardToTop();
+        } catch (error: unknown) {
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
+        } finally {
+          setIsAwaitingApi(false);
+        }
+        return;
+      }
+      setIsAwaitingApi(true);
+      try {
+        const didAdvance = await executeFetchRound(guided.completedBundles);
+        if (didAdvance) {
+          scheduleScrollQuizWizardToTop();
+        }
+      } finally {
+        setIsAwaitingApi(false);
+      }
       return;
     }
     const currentQuestion = activeRound.questions[activeRound.stepIndex];
@@ -1278,6 +1453,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           stepIndex: nextQuestionIndex,
         },
       });
+      scheduleScrollQuizWizardToTop();
       return;
     }
     const bundle = buildVisibleBundleFromActive({
@@ -1305,6 +1481,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           activeRound: nextRound,
           outcome: null,
         });
+        scheduleScrollQuizWizardToTop();
         return;
       }
       setIsAwaitingApi(true);
@@ -1316,6 +1493,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           activeRound: null,
           outcome,
         });
+        scheduleScrollQuizWizardToTop();
       } catch (error: unknown) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
       } finally {
@@ -1325,14 +1503,16 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     }
     setIsAwaitingApi(true);
     try {
-      await executeFetchRound(nextCompleted);
+      const didAdvance = await executeFetchRound(nextCompleted);
+      if (didAdvance) {
+        scheduleScrollQuizWizardToTop();
+      }
     } finally {
       setIsAwaitingApi(false);
     }
   }, [activeTemplate, diagnosticAiEnabled, executeFetchRound, executeFetchTemplateSummary, guided, onGuidedChange]);
   if (guided.outcome !== null) {
-    const { mappedSituation, advisorSummary } = guided.outcome;
-    const transcript = buildDiagnosticTranscript(guided);
+    const { advisorSummary, briefAssessment, sessionTitle, goodFitBullets } = guided.outcome;
     return (
       <div>
         <DiagnosticCacheDebugPanel
@@ -1341,55 +1521,59 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           onClear={() => setDiagnosticDebugLog([])}
         />
         <p className="mt-2 text-pretty text-muted-foreground">
-          Review everything you shared, how we mapped it, and the advisor summary. Use{' '}
-          <span className="font-medium text-foreground">Continue</span> below to see your recommendation.
+          Here is the session we recommend from your answers — the same details you will see on the service page. Use{' '}
+          <span className="font-medium text-foreground">Continue</span> below to book or open the full page.
         </p>
-        <div className="mt-10 rounded-2xl border border-border bg-card p-6 shadow-xs">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Intake complete</p>
-          <h2 className="mt-4 text-base font-semibold text-foreground">What you shared</h2>
-          {transcript.initialPrompt.trim().length > 0 ? (
-            <>
-              <p className="mt-1 text-sm font-medium text-muted-foreground">Your situation (in your words)</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{transcript.initialPrompt}</p>
-            </>
-          ) : null}
-          {transcript.rounds.map((round) => {
-            const label = `Round ${round.roundIndex + 1}`;
-            return (
-              <div key={round.roundIndex} className="mt-8 border-t border-border pt-8">
-                <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-                {round.guidance !== null && round.guidance.length > 0 ? (
-                  <p className="mt-2 text-sm text-muted-foreground">{round.guidance}</p>
-                ) : null}
-                <ul className="mt-4 space-y-5" role="list">
-                  {round.items.map((item, itemIndex) => {
-                    const ordinal = itemIndex + 1;
-                    return (
-                      <li key={`${round.roundIndex}-${ordinal}`}>
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          Question {ordinal}
-                        </p>
-                        <p className="mt-1 text-sm leading-snug text-foreground">{item.question}</p>
-                        {item.description !== null ? (
-                          <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
-                        ) : null}
-                        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Your answer</p>
-                        <p className="mt-1 text-sm font-medium text-foreground">{item.answer.length > 0 ? item.answer : '—'}</p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
-          <div className="mt-8 border-t border-border pt-8">
-            <p className="text-sm font-medium text-muted-foreground">Mapped situation</p>
-            <p className="mt-1 text-base font-semibold text-foreground">{mappedSituation}</p>
+        <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_minmax(0,280px)] lg:items-start">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Intake complete</p>
+            <h2 className="mt-2 text-balance text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+              {sessionTitle}
+            </h2>
+            <p className="mt-3 text-pretty text-base text-muted-foreground md:text-lg">{briefAssessment}</p>
+            <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-xs">
+              <h3 className="text-lg font-semibold text-foreground">Your advisor summary</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Pulled from your diagnostic — you will also see this when you open the full service page.
+              </p>
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{advisorSummary}</p>
+            </div>
+            <div className="mt-10 rounded-2xl border border-border bg-card p-6 shadow-xs">
+              <h3 className="text-lg font-semibold text-foreground">What&apos;s included</h3>
+              <ul className="mt-5 space-y-4">
+                {PROJECT_RESCUE_WHATS_INCLUDED.map((item) => (
+                  <li key={item} className="flex gap-3 text-sm text-foreground">
+                    <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-10 rounded-2xl border border-dashed border-border bg-muted/30 p-6">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Good fit if</h3>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                {goodFitBullets.map((line, index) => (
+                  <li key={`${index}-${line.slice(0, 24)}`}>{line}</li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <div className="mt-8 border-t border-border pt-8">
-            <p className="text-sm font-medium text-muted-foreground">Summary for your advisor</p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{advisorSummary}</p>
-          </div>
+          <aside className="rounded-3xl border border-border bg-card p-6 shadow-xs lg:sticky lg:top-48">
+            <p className="text-sm font-medium text-muted-foreground">Duration</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{PROJECT_RESCUE_SESSION_DURATION}</p>
+            <p className="mt-6 text-sm font-medium text-muted-foreground">Investment</p>
+            <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{PROJECT_RESCUE_PRICE_HEADLINE}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{PROJECT_RESCUE_BOOKING_FOOTNOTE}</p>
+            <Button asChild className="mt-8 w-full" size="lg">
+              <Link href="/book">
+                Book this session
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="mt-3 w-full">
+              <Link href="/service">Full service page</Link>
+            </Button>
+          </aside>
         </div>
       </div>
     );
@@ -1458,8 +1642,16 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         : !diagnosticAiEnabled
           ? trimmedNextTemplateRoundTitle !== null
             ? `Continue to ${trimmedNextTemplateRoundTitle}`
-            : 'Continue: Summary'
+            : 'Continue: Recommendation'
           : 'Submit round';
+    const isFirstVisibleQuestionInRound: boolean = positionInRound === 1;
+    const shouldShowDetailNoteTextbox =
+      question !== undefined &&
+      shouldShowQuestionDetailNoteInput({
+        baseAnswers: optionBaseAnswers,
+        question,
+        selection: questionSelection,
+      });
     return (
       <div>
         <DiagnosticCacheDebugPanel
@@ -1467,14 +1659,21 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           entries={diagnosticDebugLog}
           onClear={() => setDiagnosticDebugLog([])}
         />
-        <p className="mt-2 text-pretty text-muted-foreground">
-          {question?.type === 'ranked-options'
-            ? 'Rank the outcomes that matter most. Your progress is saved, so refresh or use Back and you will return to the same step.'
-            : question?.type === 'nested-options'
-              ? 'Choose one or more categories, then answer the detailed options in the right-hand panel. Your progress is saved automatically.'
-              : 'Answer one question at a time. Your progress is saved, so refresh or use Back and you will return to the same step.'}
-        </p>
-        <p className="mt-4 text-sm text-muted-foreground">
+        {isFirstVisibleQuestionInRound ? (
+          <p className="mt-2 text-pretty text-muted-foreground">
+            {question?.type === 'ranked-options'
+              ? 'Rank the outcomes that matter most. Your progress is saved, so refresh or use Back and you will return to the same step.'
+              : question?.type === 'nested-options'
+                ? 'Choose one or more categories first, then answer the detailed options that appear in the right-hand panel. Your progress is saved automatically.'
+                : 'Answer one question at a time. Your progress is saved, so refresh or use Back and you will return to the same step.'}
+          </p>
+        ) : null}
+        <p
+          className={cn(
+            'text-sm text-muted-foreground',
+            isFirstVisibleQuestionInRound ? 'mt-4' : 'mt-2',
+          )}
+        >
           Question {positionInRound} of {roundSize} · {activeRound.roundTitle}
         </p>
         {showGuidance ? (
@@ -1484,6 +1683,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           <>
             {question.type === 'nested-options' ? (
               <NestedOptionsRoundRenderer
+                key={question.id}
                 baseAnswers={optionBaseAnswers}
                 guidance={activeRound.guidance}
                 question={question}
@@ -1512,31 +1712,38 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
                 }
               />
             )}
-            <div className="mt-6">
-              <label
-                htmlFor={`diagnostic-exact-answer-${question.id}`}
-                className="text-sm font-medium text-foreground"
-              >
-                Your exact answer
-              </label>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Pick an option, answer any visible follow-up group, type here, or combine both. Use this for specifics
-                the buttons do not cover (versions, errors, timing).
-              </p>
-              <Textarea
-                id={`diagnostic-exact-answer-${question.id}`}
-                value={activeRound.answerNotes[question.id] ?? ''}
-                onChange={(event) => executeUpdateAnswerNote(question.id, event.target.value)}
-                disabled={isAwaitingApi}
-                rows={3}
-                maxLength={MAX_ANSWER_NOTE_LENGTH}
-                placeholder="Type the precise answer or extra detail for your advisor…"
-                className="mt-2 rounded-xl border-border bg-card shadow-xs"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {noteCharactersRemaining} characters left
-              </p>
-            </div>
+            {shouldShowDetailNoteTextbox ? (
+              <div className="mt-6">
+                <label
+                  htmlFor={`diagnostic-exact-answer-${question.id}`}
+                  className="text-sm font-medium text-foreground"
+                >
+                  Your exact answer
+                  <span className="ml-1.5 font-normal text-destructive" aria-hidden>
+                    (required)
+                  </span>
+                </label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  This question asks for specifics when you pick this path. Add versions, errors, timing, or anything
+                  your advisor must know before the call.
+                </p>
+                <Textarea
+                  id={`diagnostic-exact-answer-${question.id}`}
+                  value={activeRound.answerNotes[question.id] ?? ''}
+                  onChange={(event) => executeUpdateAnswerNote(question.id, event.target.value)}
+                  disabled={isAwaitingApi}
+                  rows={3}
+                  maxLength={MAX_ANSWER_NOTE_LENGTH}
+                  required
+                  aria-required={true}
+                  placeholder="Type the precise answer or extra detail for your advisor…"
+                  className="mt-2 rounded-xl border-border bg-card shadow-xs"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {noteCharactersRemaining} characters left
+                </p>
+              </div>
+            ) : null}
           </>
         ) : null}
         {errorMessage !== null ? (
@@ -1553,7 +1760,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
             <div>
               {canGoBack ? (
-                <Button type="button" variant="outline" onClick={onGoBack}>
+                <Button type="button" variant="outline" onClick={executeGoBackWithScroll}>
                   {backLabel}
                 </Button>
               ) : null}

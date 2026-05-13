@@ -44,6 +44,7 @@ const optionSchema = z.object({
   id: z.string().max(120),
   label: z.string().max(240),
   description: z.string().max(320).nullable().default(null),
+  requestDetailNoteWhenSelected: z.boolean().optional().default(false),
   showWhen: visibilityRuleSchema,
   presentation: optionPresentationSchema.default({
     icon: null,
@@ -228,6 +229,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
           id: option.id,
           label: option.label,
           description: option.description ?? null,
+          requestDetailNoteWhenSelected: option.requestDetailNoteWhenSelected,
           showWhen: option.showWhen,
           presentation: {
             icon: option.presentation.icon,
