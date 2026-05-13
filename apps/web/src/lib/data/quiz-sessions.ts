@@ -6,7 +6,165 @@ import type {
   QuizSessionDocument,
   VisitorSessionDocument,
 } from '@/domain/types';
+import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { getDb } from '@/lib/mongodb';
+
+const DEFAULT_QUIZ_SESSION_LIST_LIMIT = 500;
+const DEFAULT_QUIZ_AUDIT_LIST_LIMIT = 200;
+const SITUATION_PREVIEW_MAX_LENGTH = 120;
+
+export type QuizSessionListRow = {
+  readonly id: string;
+  readonly visitorId: string;
+  readonly currentStep: number;
+  readonly updatedAtIso: string;
+  readonly completedAtIso: string | null;
+  readonly hasGuidedDiagnostic: boolean;
+  readonly situationPreview: string | null;
+};
+
+export type QuizSessionDetail = {
+  readonly id: string;
+  readonly visitorId: string;
+  readonly currentStep: number;
+  readonly createdAtIso: string;
+  readonly updatedAtIso: string;
+  readonly completedAtIso: string | null;
+  readonly guidedDiagnosticRaw: string | null;
+  readonly situationDiagnosticThread: string | null;
+};
+
+export type QuizAuditAdminRow = {
+  readonly id: string;
+  readonly step: number;
+  readonly createdAtIso: string;
+  readonly answersJson: string;
+};
+
+function resolveSituationPreview(answers: QuizAnswers): string | null {
+  const raw = answers.situation;
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  return trimmed.length > SITUATION_PREVIEW_MAX_LENGTH
+    ? `${trimmed.slice(0, SITUATION_PREVIEW_MAX_LENGTH)}…`
+    : trimmed;
+}
+
+function resolveSituationDiagnosticThread(answers: QuizAnswers): string | null {
+  const raw = answers.situationDiagnosticThread;
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function mapQuizSessionListRow(
+  doc: QuizSessionDocument & { _id: ObjectId },
+): QuizSessionListRow {
+  const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
+  return {
+    id: doc._id.toString(),
+    visitorId: doc.visitorId,
+    currentStep: doc.currentStep,
+    updatedAtIso: doc.updatedAt.toISOString(),
+    completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
+    hasGuidedDiagnostic: guidedRaw !== null,
+    situationPreview: resolveSituationPreview(doc.answers),
+  };
+}
+
+/**
+ * Admin list: all persisted quiz session snapshots (latest row per visitor when upserts target the same document).
+ */
+export async function listQuizSessionsForAdmin(
+  limit: number = DEFAULT_QUIZ_SESSION_LIST_LIMIT,
+): Promise<QuizSessionListRow[]> {
+  if (!hasMongoUri()) {
+    return [];
+  }
+  const db = await getDb();
+  const cursor = db
+    .collection<QuizSessionDocument>(COLLECTIONS.quizSessions)
+    .find()
+    .sort({ updatedAt: -1 })
+    .limit(limit);
+  const docs = await cursor.toArray();
+  return docs
+    .filter((doc): doc is QuizSessionDocument & { _id: ObjectId } => doc._id !== undefined)
+    .map(mapQuizSessionListRow);
+}
+
+/**
+ * Admin detail: one quiz session by Mongo `_id`.
+ */
+export async function findQuizSessionById(sessionId: string): Promise<QuizSessionDetail | null> {
+  if (!hasMongoUri()) {
+    return null;
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(sessionId);
+  } catch {
+    return null;
+  }
+  const db = await getDb();
+  const doc = await db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).findOne({ _id: objectId });
+  if (doc === null || doc._id === undefined) {
+    return null;
+  }
+  const guidedDiagnosticRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
+  return {
+    id: doc._id.toString(),
+    visitorId: doc.visitorId,
+    currentStep: doc.currentStep,
+    createdAtIso: doc.createdAt.toISOString(),
+    updatedAtIso: doc.updatedAt.toISOString(),
+    completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
+    guidedDiagnosticRaw,
+    situationDiagnosticThread: resolveSituationDiagnosticThread(doc.answers),
+  };
+}
+
+/**
+ * Append-only save history for a session (`quiz_audit`).
+ */
+export async function listQuizAuditForSession(
+  sessionId: ObjectId,
+  limit: number = DEFAULT_QUIZ_AUDIT_LIST_LIMIT,
+): Promise<QuizAuditAdminRow[]> {
+  if (!hasMongoUri()) {
+    return [];
+  }
+  const db = await getDb();
+  const cursor = db
+    .collection<QuizAuditDocument>(COLLECTIONS.quizAudit)
+    .find({ sessionId })
+    .sort({ createdAt: 1 })
+    .limit(limit);
+  const docs = await cursor.toArray();
+  return docs
+    .filter((doc): doc is QuizAuditDocument & { _id: ObjectId } => doc._id !== undefined)
+    .map((doc) => ({
+      id: doc._id.toString(),
+      step: doc.step,
+      createdAtIso: doc.createdAt.toISOString(),
+      answersJson: safeStringifyAnswers(doc.answersSnapshot),
+    }));
+}
+
+function safeStringifyAnswers(answers: QuizAnswers): string {
+  try {
+    return JSON.stringify(answers, null, 2);
+  } catch {
+    return '{}';
+  }
+}
 
 function hasMongoUri(): boolean {
   return Boolean(process.env.MONGODB_URI);

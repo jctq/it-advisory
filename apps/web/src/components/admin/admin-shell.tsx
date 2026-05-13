@@ -114,6 +114,9 @@ function resolveAdminTitle(pathname: string): string {
   if (pathname.startsWith('/admin/diagnostic-templates')) {
     return 'Diagnostic templates';
   }
+  if (pathname.startsWith('/admin/quiz-sessions')) {
+    return 'Quiz sessions';
+  }
   if (pathname.startsWith('/admin/leads')) {
     return 'Leads';
   }
