@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   addMonths,
   eachDayOfInterval,
@@ -32,6 +32,9 @@ const TIME_SLOTS: readonly string[] = [
 
 export function BookingPicker() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const quizSessionIdFromUrl = searchParams.get('sessionId')?.trim() ?? '';
+  const hasValidQuizSessionParam = /^[a-f\d]{24}$/i.test(quizSessionIdFromUrl);
   const [visibleMonth, setVisibleMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>('11:00 AM');
@@ -51,7 +54,11 @@ export function BookingPicker() {
     }
     const dateParam = format(selectedDate, 'yyyy-MM-dd');
     const encodedTime = encodeURIComponent(selectedTime);
-    router.push(`/confirmation?date=${dateParam}&time=${encodedTime}`);
+    const sessionSuffix =
+      hasValidQuizSessionParam && quizSessionIdFromUrl.length > 0
+        ? `&sessionId=${encodeURIComponent(quizSessionIdFromUrl)}`
+        : '';
+    router.push(`/confirmation?date=${dateParam}&time=${encodedTime}${sessionSuffix}`);
   };
 
   return (

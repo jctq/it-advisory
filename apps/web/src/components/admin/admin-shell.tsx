@@ -112,13 +112,16 @@ function resolveClientSystemPrefersDark(): boolean {
 
 function resolveAdminTitle(pathname: string): string {
   if (pathname.startsWith('/admin/diagnostic-templates')) {
-    return 'Diagnostic templates';
+    return 'Templates';
   }
   if (pathname.startsWith('/admin/quiz-sessions')) {
     return 'Quiz sessions';
   }
   if (pathname.startsWith('/admin/leads')) {
     return 'Leads';
+  }
+  if (pathname.startsWith('/admin/users')) {
+    return 'Marketing users';
   }
   if (pathname.startsWith('/admin/bookings')) {
     return 'Bookings';

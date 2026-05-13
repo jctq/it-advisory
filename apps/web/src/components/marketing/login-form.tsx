@@ -1,0 +1,114 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useCallback, useState, type FormEvent, type ReactElement } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
+type LoginFormProps = {
+  readonly nextPath: string;
+};
+
+/**
+ * Client form for marketing-site sign-in.
+ */
+export function LoginForm(props: LoginFormProps): ReactElement {
+  const router = useRouter();
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [mergeGuestProgress, setMergeGuestProgress] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const executeSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+      event.preventDefault();
+      setErrorMessage(null);
+      setIsSubmitting(true);
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, mergeGuestProgress }),
+        });
+        const payload: unknown = await response.json();
+        if (!response.ok) {
+          const message =
+            typeof payload === 'object' && payload !== null && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
+              ? (payload as { error: string }).error
+              : 'Sign-in failed.';
+          setErrorMessage(message);
+          return;
+        }
+        router.push(props.nextPath);
+        router.refresh();
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [email, mergeGuestProgress, password, props.nextPath, router],
+  );
+  return (
+    <form className="mx-auto flex w-full max-w-md flex-col gap-5" onSubmit={executeSubmit} noValidate>
+      <div className="space-y-2">
+        <label htmlFor="login-email" className="text-sm font-medium text-foreground">
+          Email
+        </label>
+        <Input
+          id="login-email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          aria-invalid={errorMessage !== null}
+        />
+      </div>
+      <div className="space-y-2">
+        <label htmlFor="login-password" className="text-sm font-medium text-foreground">
+          Password
+        </label>
+        <Input
+          id="login-password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          minLength={8}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          aria-invalid={errorMessage !== null}
+        />
+      </div>
+      <label className="flex cursor-pointer items-start gap-3 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          className="mt-1 size-4 rounded border border-input"
+          checked={mergeGuestProgress}
+          onChange={(event) => setMergeGuestProgress(event.target.checked)}
+        />
+        <span>Move diagnostic and booking activity from this browser onto my signed-in profile.</span>
+      </label>
+      {errorMessage !== null ? (
+        <p className="text-sm text-destructive" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? 'Signing in…' : 'Sign in'}
+      </Button>
+      <p className="text-center text-sm text-muted-foreground">
+        No account?{' '}
+        <Link href="/register" className="font-medium text-primary underline-offset-4 hover:underline">
+          Create one
+        </Link>
+        {' · '}
+        <Link href="/quiz" className="font-medium text-primary underline-offset-4 hover:underline">
+          Continue as guest
+        </Link>
+      </p>
+    </form>
+  );
+}

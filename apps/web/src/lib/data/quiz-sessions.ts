@@ -8,11 +8,20 @@ import type {
   VisitorSessionDocument,
 } from '@/domain/types';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
+import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import { getDb } from '@/lib/mongodb';
 
 const DEFAULT_QUIZ_SESSION_LIST_LIMIT = 500;
 const DEFAULT_QUIZ_AUDIT_LIST_LIMIT = 200;
+const DEFAULT_VISITOR_SESSION_LIST_LIMIT = 50;
 const SITUATION_PREVIEW_MAX_LENGTH = 120;
+
+const BLANK_QUIZ_ANSWERS: QuizAnswers = {
+  guidedDiagnostic: serializeGuidedDiagnostic(GUIDED_DIAGNOSTIC_EMPTY),
+  situation: '',
+  situationAdvisorSummary: '',
+  situationDiagnosticThread: buildDiagnosticThreadJson(GUIDED_DIAGNOSTIC_EMPTY),
+};
 
 export type QuizSessionListRow = {
   readonly id: string;
@@ -250,6 +259,185 @@ export async function findLatestQuizSession(visitorId: string): Promise<QuizSess
     .findOne({ visitorId }, { sort: { updatedAt: -1 } });
 }
 
+/**
+ * Session to attach at booking time: prefers `visitor_sessions.latestSessionId` (matches `/quiz?sessionId=…` saves)
+ * over a raw `updatedAt` sort, which can pick a different row if multiple sessions exist.
+ */
+export async function findQuizSessionForBookingSnapshot(visitorId: string): Promise<QuizSessionDocument | null> {
+  if (!hasMongoUri()) {
+    return null;
+  }
+  const db = await getDb();
+  const pointer = await db
+    .collection<VisitorSessionDocument>(COLLECTIONS.visitorSessions)
+    .findOne({ visitorId });
+  if (pointer?.latestSessionId !== undefined && pointer.latestSessionId !== null) {
+    const preferred = await db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).findOne({
+      _id: pointer.latestSessionId,
+      visitorId,
+    });
+    if (preferred !== null) {
+      return preferred;
+    }
+  }
+  return findLatestQuizSession(visitorId);
+}
+
+export type VisitorQuizSessionSummary = {
+  readonly id: string;
+  readonly currentStep: number;
+  readonly updatedAtIso: string;
+  readonly completedAtIso: string | null;
+  readonly situationPreview: string | null;
+  readonly hasGuidedDiagnostic: boolean;
+  readonly isBooked: boolean;
+};
+
+function mapVisitorQuizSessionSummary(
+  doc: QuizSessionDocument & { _id: ObjectId },
+  isBooked: boolean,
+): VisitorQuizSessionSummary {
+  const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
+  return {
+    id: doc._id.toString(),
+    currentStep: doc.currentStep,
+    updatedAtIso: doc.updatedAt.toISOString(),
+    completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
+    situationPreview: resolveSituationPreview(doc.answers),
+    hasGuidedDiagnostic: guidedRaw !== null,
+    isBooked,
+  };
+}
+
+/**
+ * Lists persisted quiz rows for a visitor id (e.g. `acct:<userId>` or anonymous cookie id), newest first.
+ */
+export async function listQuizSessionsForVisitor(
+  visitorId: string,
+  limit: number = DEFAULT_VISITOR_SESSION_LIST_LIMIT,
+): Promise<VisitorQuizSessionSummary[]> {
+  if (!hasMongoUri()) {
+    return [];
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<QuizSessionDocument>(COLLECTIONS.quizSessions)
+    .find({ visitorId })
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .toArray();
+  const validDocs = docs.filter((doc): doc is QuizSessionDocument & { _id: ObjectId } => doc._id !== undefined);
+  const sessionIds = validDocs.map((doc) => doc._id);
+  const bookedIdSet = new Set<string>();
+  if (sessionIds.length > 0) {
+    const bookingDocs = await db
+      .collection<BookingDocument>(COLLECTIONS.bookings)
+      .find({ quizSessionId: { $in: sessionIds } }, { projection: { quizSessionId: 1 } })
+      .toArray();
+    for (const bookingDoc of bookingDocs) {
+      if (bookingDoc.quizSessionId !== undefined && bookingDoc.quizSessionId !== null) {
+        bookedIdSet.add(bookingDoc.quizSessionId.toString());
+      }
+    }
+  }
+  return validDocs.map((doc) => mapVisitorQuizSessionSummary(doc, bookedIdSet.has(doc._id.toString())));
+}
+
+/**
+ * Loads one quiz session when it belongs to the given visitor id.
+ */
+export async function findQuizSessionForVisitor(
+  visitorId: string,
+  sessionId: string,
+): Promise<QuizSessionDocument | null> {
+  if (!hasMongoUri()) {
+    return null;
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(sessionId);
+  } catch {
+    return null;
+  }
+  const db = await getDb();
+  return db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).findOne({
+    _id: objectId,
+    visitorId,
+  });
+}
+
+export type DeleteQuizSessionForVisitorResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly code: 'not_found' | 'has_booking' };
+
+/**
+ * Removes a quiz session and its audit rows when it belongs to the visitor and is not linked from a booking
+ * (in-progress or completed).
+ */
+export async function deleteQuizSessionForVisitor(visitorId: string, sessionId: string): Promise<DeleteQuizSessionForVisitorResult> {
+  if (!hasMongoUri()) {
+    return { ok: false, code: 'not_found' };
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(sessionId);
+  } catch {
+    return { ok: false, code: 'not_found' };
+  }
+  const db = await getDb();
+  const sessions = db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions);
+  const existing = await sessions.findOne({ _id: objectId, visitorId });
+  if (existing === null) {
+    return { ok: false, code: 'not_found' };
+  }
+  const bookingCount = await db
+    .collection(COLLECTIONS.bookings)
+    .countDocuments({ quizSessionId: objectId });
+  if (bookingCount > 0) {
+    return { ok: false, code: 'has_booking' };
+  }
+  await db.collection<QuizAuditDocument>(COLLECTIONS.quizAudit).deleteMany({ sessionId: objectId });
+  await sessions.deleteOne({ _id: objectId });
+  const pointer = await db.collection<VisitorSessionDocument>(COLLECTIONS.visitorSessions).findOne({ visitorId });
+  if (pointer?.latestSessionId?.equals(objectId) === true) {
+    const nextLatest = await sessions.findOne({ visitorId }, { sort: { updatedAt: -1 } });
+    if (nextLatest !== null && nextLatest._id !== undefined) {
+      await upsertVisitorSessionPointer(visitorId, nextLatest._id);
+    } else {
+      await db.collection<VisitorSessionDocument>(COLLECTIONS.visitorSessions).deleteOne({ visitorId });
+    }
+  }
+  return { ok: true };
+}
+
+/**
+ * Inserts a new empty quiz session for this visitor and points `visitor_sessions` at it.
+ */
+export async function insertBlankQuizSessionForVisitor(visitorId: string): Promise<string | null> {
+  if (!hasMongoUri()) {
+    return null;
+  }
+  const db = await getDb();
+  const sessions = db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions);
+  const now = new Date();
+  const insertDoc: Omit<QuizSessionDocument, '_id'> = {
+    visitorId,
+    answers: BLANK_QUIZ_ANSWERS,
+    currentStep: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const insertResult = await sessions.insertOne(insertDoc);
+  await insertQuizAudit({
+    visitorId,
+    sessionId: insertResult.insertedId,
+    step: 0,
+    answersSnapshot: BLANK_QUIZ_ANSWERS,
+  });
+  await upsertVisitorSessionPointer(visitorId, insertResult.insertedId);
+  return insertResult.insertedId.toString();
+}
+
 async function insertQuizAudit(input: {
   readonly visitorId: string;
   readonly sessionId: ObjectId;
@@ -286,6 +474,8 @@ export type UpsertQuizProgressInput = {
   readonly answers: QuizAnswers;
   readonly currentStep: number;
   readonly isComplete: boolean;
+  /** When set, updates this session row after verifying `visitorId` ownership. */
+  readonly targetSessionId?: string | null;
 };
 
 export type UpsertQuizProgressResult = {
@@ -303,7 +493,6 @@ export async function upsertQuizProgress(input: UpsertQuizProgressInput): Promis
   const db = await getDb();
   const sessions = db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions);
   const now = new Date();
-  const latest = await sessions.findOne({ visitorId: input.visitorId }, { sort: { updatedAt: -1 } });
   const setFields: Record<string, unknown> = {
     answers: input.answers,
     currentStep: input.currentStep,
@@ -312,12 +501,32 @@ export async function upsertQuizProgress(input: UpsertQuizProgressInput): Promis
   if (input.isComplete) {
     setFields.completedAt = now;
   }
-  if (latest?._id) {
+  let target: (QuizSessionDocument & { _id: ObjectId }) | null = null;
+  const rawTargetId = input.targetSessionId?.trim();
+  if (rawTargetId !== undefined && rawTargetId.length > 0) {
+    let objectId: ObjectId;
+    try {
+      objectId = new ObjectId(rawTargetId);
+    } catch {
+      return { persisted: false };
+    }
+    const found = await sessions.findOne({ _id: objectId, visitorId: input.visitorId });
+    if (found === null || found._id === undefined) {
+      return { persisted: false };
+    }
+    target = found as QuizSessionDocument & { _id: ObjectId };
+  } else {
+    const latest = await sessions.findOne({ visitorId: input.visitorId }, { sort: { updatedAt: -1 } });
+    if (latest !== null && latest._id !== undefined) {
+      target = latest as QuizSessionDocument & { _id: ObjectId };
+    }
+  }
+  if (target !== null) {
     if (input.isComplete) {
-      await sessions.updateOne({ _id: latest._id }, { $set: setFields });
+      await sessions.updateOne({ _id: target._id }, { $set: setFields });
     } else {
       await sessions.updateOne(
-        { _id: latest._id },
+        { _id: target._id },
         {
           $set: setFields,
           $unset: { completedAt: '' },
@@ -326,12 +535,12 @@ export async function upsertQuizProgress(input: UpsertQuizProgressInput): Promis
     }
     await insertQuizAudit({
       visitorId: input.visitorId,
-      sessionId: latest._id,
+      sessionId: target._id,
       step: input.currentStep,
       answersSnapshot: input.answers,
     });
-    await upsertVisitorSessionPointer(input.visitorId, latest._id);
-    return { persisted: true, sessionId: latest._id.toString() };
+    await upsertVisitorSessionPointer(input.visitorId, target._id);
+    return { persisted: true, sessionId: target._id.toString() };
   }
   const insertDoc: Omit<QuizSessionDocument, '_id'> = {
     visitorId: input.visitorId,

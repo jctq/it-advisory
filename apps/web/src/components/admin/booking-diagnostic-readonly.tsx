@@ -351,7 +351,7 @@ export function BookingDiagnosticReadonly(props: BookingDiagnosticReadonlyProps)
   if (props.guidedDiagnosticRaw === null || props.guidedDiagnosticRaw.trim().length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No guided diagnostic snapshot was stored (visitor may not have started the quiz, or MongoDB was unavailable when
+        No guided diagnostic snapshot was stored (visitor may not have started the quiz, or database was unavailable when
         saving).
       </p>
     );

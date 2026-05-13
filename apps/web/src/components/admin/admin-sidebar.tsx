@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  CircleUser,
   ClipboardList,
   FileStack,
   LifeBuoy,
@@ -31,7 +32,7 @@ type AdminSidebarItem = {
 const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
   {
     href: '/admin/diagnostic-templates',
-    label: 'Diagnostic templates',
+    label: 'Templates',
     icon: FileStack,
   },
   {
@@ -43,6 +44,11 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     href: '/admin/leads',
     label: 'Leads',
     icon: Users,
+  },
+  {
+    href: '/admin/users',
+    label: 'Marketing users',
+    icon: CircleUser,
   },
   {
     href: '/admin/bookings',
@@ -118,7 +124,7 @@ export function AdminSidebar(props: AdminSidebarProps) {
               <div className="rounded-2xl border border-sidebar-border/80 bg-sidebar-accent/70 px-3 py-3">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/60">Workspace</p>
                 <p className="mt-1 text-sm font-semibold text-sidebar-foreground">Customer operations</p>
-                <p className="mt-1 text-xs text-sidebar-foreground/68">Templates, quiz sessions, leads, bookings, advisor, and settings.</p>
+                <p className="mt-1 text-xs text-sidebar-foreground/68">Templates, quiz sessions, leads, marketing users, bookings, advisor, and settings.</p>
               </div>
             ) : null}
           </div>

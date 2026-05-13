@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
+import { useMarketingAuth } from '../src/providers/marketing-auth-provider';
 import { useAppTheme } from '../src/theme/use-app-theme';
 
 const PROBLEM_ITEMS = [
@@ -32,6 +33,7 @@ const STEP_ITEMS = [
 export default function HomeScreen() {
   const router = useRouter();
   const theme = useAppTheme();
+  const { user, executeLogout } = useMarketingAuth();
 
   return (
     <AppScreen
@@ -58,6 +60,34 @@ export default function HomeScreen() {
             </View>
           ))}
         </View>
+      </AppCard>
+      <AppCard>
+        <Text style={[styles.eyebrow, { color: theme.primary }]}>Account</Text>
+        <Text style={[styles.accountHint, { color: theme.textMuted }]}>
+          {`Signing in is optional. Use it to attach this device's diagnostic to your email.`}
+        </Text>
+        {user === null ? (
+          <View style={styles.accountActions}>
+            <AppButton onPress={() => router.push('/login')} variant="secondary">
+              Sign in
+            </AppButton>
+            <AppButton onPress={() => router.push('/register')} variant="ghost">
+              Create account
+            </AppButton>
+          </View>
+        ) : (
+          <View style={styles.accountActions}>
+            <Text style={[styles.signedInEmail, { color: theme.text }]}>{user.email}</Text>
+            <AppButton
+              onPress={() => {
+                void executeLogout().catch(() => {});
+              }}
+              variant="secondary"
+            >
+              Sign out
+            </AppButton>
+          </View>
+        )}
       </AppCard>
       <Text style={[styles.sectionTitle, { color: theme.text }]}>Common situations</Text>
       {PROBLEM_ITEMS.map((item) => (
@@ -127,5 +157,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     marginTop: 8,
+  },
+  accountHint: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 8,
+  },
+  accountActions: {
+    gap: 10,
+    marginTop: 16,
+  },
+  signedInEmail: {
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

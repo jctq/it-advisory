@@ -206,7 +206,11 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
-  packages/api-client: {}
+  packages/api-client:
+    dependencies:
+      '@it-advisory/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/diagnostic-core:
     dependencies:

@@ -152,9 +152,16 @@ export class DiagnosticApiClient {
 
   private readonly deviceId: string;
 
-  public constructor(input: { readonly apiOrigin: string; readonly deviceId: string }) {
+  private readonly marketingSessionToken: string | null;
+
+  public constructor(input: {
+    readonly apiOrigin: string;
+    readonly deviceId: string;
+    readonly marketingSessionToken?: string | null;
+  }) {
     this.apiOrigin = input.apiOrigin.replace(/\/$/, '');
     this.deviceId = input.deviceId;
+    this.marketingSessionToken = input.marketingSessionToken ?? null;
   }
 
   /**
@@ -244,6 +251,9 @@ export class DiagnosticApiClient {
   private buildHeaders(includeJsonContentType: boolean): Headers {
     const headers = new Headers();
     headers.set(MOBILE_DEVICE_ID_HEADER_NAME, this.deviceId);
+    if (this.marketingSessionToken !== null && this.marketingSessionToken.length > 0) {
+      headers.set('Authorization', `Bearer ${this.marketingSessionToken}`);
+    }
     if (includeJsonContentType) {
       headers.set('Content-Type', 'application/json');
     }

@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { MarketingAuthProvider } from '../src/providers/marketing-auth-provider';
 import { DiagnosticFlowProvider } from '../src/providers/diagnostic-flow-provider';
 
 /**
@@ -10,10 +11,12 @@ import { DiagnosticFlowProvider } from '../src/providers/diagnostic-flow-provide
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.container}>
-      <DiagnosticFlowProvider>
-        <StatusBar style="auto" />
-        <Stack screenOptions={{ headerShown: false }} />
-      </DiagnosticFlowProvider>
+      <MarketingAuthProvider>
+        <DiagnosticFlowProvider>
+          <StatusBar style="auto" />
+          <Stack screenOptions={{ headerShown: false }} />
+        </DiagnosticFlowProvider>
+      </MarketingAuthProvider>
     </GestureHandlerRootView>
   );
 }

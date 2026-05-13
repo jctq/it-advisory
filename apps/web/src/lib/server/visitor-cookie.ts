@@ -17,6 +17,15 @@ function readDeviceVisitorId(request: Request | undefined): string | null {
 /**
  * Returns the anonymous visitor id from a native device header or HTTP-only cookie.
  */
+/**
+ * Returns the existing anonymous visitor id from the cookie when set, without creating a new id.
+ */
+export async function readVisitorCookieIfPresent(): Promise<string | null> {
+  const jar = await cookies();
+  const existing = jar.get(VISITOR_ID_COOKIE_NAME)?.value;
+  return existing !== undefined && existing.length > 0 ? existing : null;
+}
+
 export async function readOrCreateVisitorId(request?: Request): Promise<string> {
   const deviceVisitorId = readDeviceVisitorId(request);
   if (deviceVisitorId !== null) {

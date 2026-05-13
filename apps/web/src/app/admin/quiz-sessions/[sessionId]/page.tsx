@@ -34,7 +34,7 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
       <AdminPageHeader
         eyebrow="Intake"
         title="Quiz session"
-        description="Visitor quiz snapshot from MongoDB. Booked = a booking row points at this session id. Table: diagnostic thread, guided diagnostic tabs, save history."
+        description="Visitor quiz snapshot from database. Booked = a booking row points at this session id. Table: diagnostic thread, guided diagnostic tabs, save history."
       />
       <div className="flex flex-wrap gap-3 text-sm">
         <Link href="/admin/quiz-sessions" className="font-medium text-primary underline-offset-4 hover:underline">

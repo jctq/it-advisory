@@ -42,7 +42,6 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { readOrCreateDeviceId } from '../lib/device-id';
 import {
   buildDiagnosticProgress,
   buildQuizAnswersPayload,
@@ -51,6 +50,7 @@ import {
   togglePromptWithSeed,
 } from '../lib/diagnostic-flow';
 import { readNativeAppConfig } from '../lib/native-app-config';
+import { useMarketingAuth } from './marketing-auth-provider';
 
 type DiagnosticFlowContextValue = {
   readonly canGoBack: boolean;
@@ -194,6 +194,7 @@ function buildVisibleBundleFromActive(params: {
  */
 export function DiagnosticFlowProvider(props: PropsWithChildren) {
   const config = useMemo(() => readNativeAppConfig(), []);
+  const { deviceId: authDeviceId, sessionToken, isReady: isMarketingAuthReady } = useMarketingAuth();
   const clientRef = useRef<DiagnosticApiClient | null>(null);
   const hasHydratedRef = useRef<boolean>(false);
   const [guided, setGuided] = useState<GuidedDiagnosticV1>(GUIDED_DIAGNOSTIC_EMPTY);
@@ -328,16 +329,26 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
   );
 
   useEffect(() => {
+    if (!isMarketingAuthReady || authDeviceId === null) {
+      return;
+    }
+    const deviceIdForClient = authDeviceId;
+    const marketingTokenForClient = sessionToken;
     let isMounted = true;
+    setIsConfigReady(false);
+    setIsHydrated(false);
+    hasHydratedRef.current = false;
+    setErrorMessage(null);
+    clientRef.current = null;
     async function hydrateSession(): Promise<void> {
       try {
-        const deviceId = await readOrCreateDeviceId();
         if (!isMounted) {
           return;
         }
         clientRef.current = new DiagnosticApiClient({
           apiOrigin: config.apiBaseUrl,
-          deviceId,
+          deviceId: deviceIdForClient,
+          marketingSessionToken: marketingTokenForClient,
         });
         const [sessionPayload, diagnosticConfig] = await Promise.all([
           clientRef.current.fetchQuizSession(),
@@ -373,7 +384,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     return () => {
       isMounted = false;
     };
-  }, [config.apiBaseUrl]);
+  }, [config.apiBaseUrl, authDeviceId, sessionToken, isMarketingAuthReady]);
 
   useEffect(() => {
     if (!isHydrated || !isConfigReady || diagnosticAiEnabled || initialTemplateRound === null) {

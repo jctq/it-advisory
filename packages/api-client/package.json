@@ -5,6 +5,10 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    "./diagnostic-api-client": "./src/diagnostic-api-client.ts"
+    "./diagnostic-api-client": "./src/diagnostic-api-client.ts",
+    "./marketing-auth-api-client": "./src/marketing-auth-api-client.ts"
+  },
+  "dependencies": {
+    "@it-advisory/domain": "workspace:*"
   }
 }

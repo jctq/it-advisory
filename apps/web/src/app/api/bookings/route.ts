@@ -3,16 +3,19 @@ import { z } from 'zod';
 import {
   createBookingWithLatestQuizSnapshot,
   findBookingByVisitorSlot,
+  linkQuizSessionToVisitorBooking,
+  syncBookingQuizSessionIfPointerChanged,
 } from '@/lib/data/bookings';
 import { insertMarketingBookingLead } from '@/lib/data/leads';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
-import { readOrCreateVisitorId } from '@/lib/server/visitor-cookie';
+import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
 
 const postBodySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().min(1).max(48),
   serviceKey: z.string().min(1).max(120).default('project-rescue'),
+  quizSessionId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
 });
 
 /**
@@ -29,7 +32,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
-  const visitorId = await readOrCreateVisitorId(request);
+  const visitorId = await resolveMarketingVisitorId(request);
   let startsAt: Date;
   try {
     startsAt = parseBookingSlotToUtc(parsed.data.date, parsed.data.time);
@@ -39,6 +42,26 @@ export async function POST(request: Request): Promise<NextResponse> {
   const serviceKey = parsed.data.serviceKey;
   const existingId = await findBookingByVisitorSlot({ visitorId, serviceKey, startsAt });
   if (existingId !== null) {
+    if (parsed.data.quizSessionId !== undefined) {
+      const linked = await linkQuizSessionToVisitorBooking({
+        bookingId: existingId,
+        visitorId,
+        quizSessionIdHex: parsed.data.quizSessionId,
+      });
+      if (!linked) {
+        return NextResponse.json(
+          { error: 'Could not link this diagnostic to the existing reservation.', code: 'quiz_link_failed' },
+          { status: 400 },
+        );
+      }
+      return NextResponse.json({
+        ok: true as const,
+        bookingId: existingId.toString(),
+        deduped: true as const,
+        quizSessionLinked: true as const,
+      });
+    }
+    await syncBookingQuizSessionIfPointerChanged({ bookingId: existingId, visitorId });
     return NextResponse.json({
       ok: true as const,
       bookingId: existingId.toString(),
@@ -55,6 +78,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     startsAt,
     timezone: PRIMARY_TIMEZONE,
     leadId,
+    preferredQuizSessionId: parsed.data.quizSessionId,
   });
   if (created === null) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });

@@ -9,6 +9,8 @@ export const COLLECTIONS = {
   availabilitySlots: 'availability_slots',
   emailSends: 'email_sends',
   users: 'users',
+  /** Opaque bearer sessions for marketing-site accounts (`it_auth_session` cookie). */
+  userAuthSessions: 'user_auth_sessions',
   /** Diagnostic cache for `/api/quiz/diagnostic-round`: unique `{ threadHash: 1 }`; Vector Search on `embedding` optional. */
   diagnosticRoundCache: 'diagnostic_round_cache',
   /** Exact-match cache for `/api/quiz/diagnostic-template-summary`: unique `{ threadHash: 1 }`. */

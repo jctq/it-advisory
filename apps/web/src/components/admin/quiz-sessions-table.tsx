@@ -25,7 +25,24 @@ export function QuizSessionsTable(props: QuizSessionsTableProps): ReactElement {
         header: 'Updated (PH)',
         cell: (info) => DATE_TIME_FORMATTER.format(new Date(info.getValue())),
       }),
-      columnHelper.accessor('visitorId', { header: 'Visitor' }),
+      columnHelper.accessor('visitorId', {
+        header: 'Visitor',
+        cell: (info) => {
+          const value = info.getValue();
+          const match = /^acct:([a-f\d]{24})$/i.exec(value);
+          if (match !== null && match[1] !== undefined) {
+            return (
+              <Link
+                href={`/admin/users/${match[1]}`}
+                className="font-mono text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {value}
+              </Link>
+            );
+          }
+          return <span className="font-mono text-xs">{value}</span>;
+        },
+      }),
       columnHelper.accessor('currentStep', { header: 'Step' }),
       columnHelper.accessor('completedAtIso', {
         header: 'Completed',

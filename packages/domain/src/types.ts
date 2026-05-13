@@ -83,6 +83,26 @@ export type EmailSendDocument = {
   createdAt: Date;
 };
 
+/** Marketing-site account (optional sign-in; diagnostics still work anonymously). */
+export type UserAccountDocument = {
+  _id?: ObjectId;
+  emailNormalized: string;
+  /** scrypt-derived key, hex-encoded salt + hash segments (see web app password helper). */
+  passwordHash: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Server-side session row backing the `it_auth_session` HTTP-only cookie. */
+export type UserAuthSessionDocument = {
+  _id?: ObjectId;
+  userId: ObjectId;
+  /** SHA-256 (hex) of the raw secret token bytes issued to the browser. */
+  tokenHash: string;
+  createdAt: Date;
+  expiresAt: Date;
+};
+
 export type DiagnosticTemplateChildQuestionOptionDocument = {
   id: string;
   label: string;

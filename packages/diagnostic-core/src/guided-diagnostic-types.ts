@@ -1338,10 +1338,14 @@ export function parseGuidedDiagnosticJson(raw: string | undefined): GuidedDiagno
   }
   try {
     const parsed = JSON.parse(raw) as GuidedDiagnosticV1;
-    if ((parsed as { readonly version?: unknown }).version !== 1 || typeof parsed.initialPrompt !== 'string') {
+    if ((parsed as { readonly version?: unknown }).version !== 1) {
       return null;
     }
-    return normalizeGuidedDiagnostic(parsed);
+    const withPrompt: GuidedDiagnosticV1 = {
+      ...parsed,
+      initialPrompt: typeof parsed.initialPrompt === 'string' ? parsed.initialPrompt : '',
+    };
+    return normalizeGuidedDiagnostic(withPrompt);
   } catch {
     return null;
   }
@@ -1481,6 +1485,122 @@ export function applyGuidedJumpToCompletedBundleIndex(
       bundle,
       priorBundles,
     }),
+  };
+}
+
+/**
+ * Opens a completed round for review without removing later bundles or clearing a saved outcome.
+ * Use for read-only / browse navigation so later answers stay intact.
+ */
+export function applyGuidedPeekCompletedBundleIndex(
+  state: GuidedDiagnosticV1,
+  bundleIndex: number,
+): GuidedDiagnosticV1 | null {
+  if (!Number.isInteger(bundleIndex) || bundleIndex < 0 || bundleIndex >= state.completedBundles.length) {
+    return null;
+  }
+  const bundle = state.completedBundles[bundleIndex];
+  if (bundle === undefined) {
+    return null;
+  }
+  const priorBundles = state.completedBundles.slice(0, bundleIndex);
+  return {
+    ...state,
+    activeRound: restoreActiveGuidedRoundFromCompletedBundle({
+      bundle,
+      priorBundles,
+    }),
+  };
+}
+
+/**
+ * Back navigation that never drops completed bundles or mutates stored outcome data.
+ * Intended for booking-linked (read-only) review sessions.
+ */
+export function applyGuidedGoBackReadOnly(state: GuidedDiagnosticV1): GuidedDiagnosticV1 {
+  if (state.outcome !== null && state.activeRound === null) {
+    const bundles = state.completedBundles;
+    if (bundles.length === 0) {
+      return state;
+    }
+    const lastBundle = bundles[bundles.length - 1];
+    if (lastBundle === undefined) {
+      return state;
+    }
+    const priorBundles = bundles.slice(0, -1);
+    const lastStep = resolveVisibleStepIndex({
+      questions: lastBundle.questions,
+      baseAnswers: buildBundleAnswerLookup(priorBundles),
+      answers: lastBundle.answers,
+      requestedStepIndex: lastBundle.questions.length - 1,
+    });
+    return {
+      ...state,
+      activeRound: {
+        roundIndex: lastBundle.roundIndex,
+        roundTitle: lastBundle.roundTitle,
+        questions: lastBundle.questions,
+        answers: { ...lastBundle.answers },
+        answerNotes: { ...lastBundle.answerNotes },
+        stepIndex: lastStep,
+        guidance: lastBundle.guidance,
+      },
+    };
+  }
+  if (state.activeRound === null) {
+    return state;
+  }
+  const activeRound = state.activeRound;
+  const previousVisibleQuestionIndex = findPreviousVisibleQuestionIndex({
+    questions: activeRound.questions,
+    baseAnswers: buildBundleAnswerLookup(state.completedBundles),
+    answers: activeRound.answers,
+    currentIndex: activeRound.stepIndex,
+  });
+  if (previousVisibleQuestionIndex !== null) {
+    return {
+      ...state,
+      activeRound: {
+        ...activeRound,
+        stepIndex: previousVisibleQuestionIndex,
+      },
+    };
+  }
+  if (activeRound.roundIndex === 0) {
+    return {
+      ...state,
+      activeRound: null,
+    };
+  }
+  const bundleIndex = state.completedBundles.findIndex((bundle) => bundle.roundIndex === activeRound.roundIndex);
+  if (bundleIndex <= 0) {
+    return {
+      ...state,
+      activeRound: null,
+    };
+  }
+  const previousBundle = state.completedBundles[bundleIndex - 1];
+  if (previousBundle === undefined) {
+    return state;
+  }
+  const priorBundles = state.completedBundles.slice(0, bundleIndex - 1);
+  const lastStep = resolveVisibleStepIndex({
+    questions: previousBundle.questions,
+    baseAnswers: buildBundleAnswerLookup(priorBundles),
+    answers: previousBundle.answers,
+    requestedStepIndex: previousBundle.questions.length - 1,
+  });
+  return {
+    ...state,
+    activeRound: {
+      roundIndex: previousBundle.roundIndex,
+      roundTitle: previousBundle.roundTitle,
+      questions: previousBundle.questions,
+      answers: { ...previousBundle.answers },
+      answerNotes: { ...previousBundle.answerNotes },
+      stepIndex: lastStep,
+      guidance: previousBundle.guidance,
+    },
   };
 }
 

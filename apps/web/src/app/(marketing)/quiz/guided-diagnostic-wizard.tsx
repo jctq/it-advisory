@@ -39,6 +39,7 @@ import {
 import type { DiagnosticRoundDebugMeta } from '@/domain/types';
 import { extractDiagnosticRoundDebugFromResponse } from '@/lib/marketing/diagnostic-cache-debug';
 import {
+  applyGuidedPeekCompletedBundleIndex,
   type CompletedRoundBundle,
   type DiagnosticQuestionBlock,
   type DiagnosticQuestionOption,
@@ -143,7 +144,7 @@ function DiagnosticCacheDebugPanel(props: {
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           Each row is one response from <span className="font-medium text-foreground">/api/quiz/diagnostic-round</span>.
           <span className="font-medium text-emerald-700 dark:text-emerald-400"> Cache</span> means the response came from
-          MongoDB (exact hash match or semantic vector neighbor);{' '}
+          database (exact hash match or semantic vector neighbor);{' '}
           <span className="font-medium text-sky-700 dark:text-sky-400">AI</span> means OpenAI generated it (then stored
           when applicable).
         </p>
@@ -173,7 +174,7 @@ function DiagnosticCacheDebugPanel(props: {
                         : 'font-medium text-sky-700 dark:text-sky-400'
                     }
                   >
-                    {entry.meta.source === 'cache' ? 'MongoDB cache' : 'AI (OpenAI)'}
+                    {entry.meta.source === 'cache' ? 'Database cache' : 'AI (OpenAI)'}
                   </span>
                 </span>
                 {entry.meta.model !== null ? (
@@ -281,6 +282,32 @@ function resolveNestedGuidanceMessage(params: {
 
 function getTerminalSelectedOptionId(selection: DiagnosticQuestionSelection): string | null {
   return selection.selectedOptionIds[selection.selectedOptionIds.length - 1] ?? null;
+}
+
+function resolveNestedPanelOptionIdFromSelection(params: {
+  readonly question: DiagnosticQuestionBlock;
+  readonly selection: DiagnosticQuestionSelection;
+  readonly visibleOptions: readonly DiagnosticQuestionOption[];
+}): string | null {
+  const { question, selection, visibleOptions } = params;
+  if (visibleOptions.length === 0) {
+    return null;
+  }
+  const selectedInOrder = visibleOptions.filter((option) => selection.selectedOptionIds.includes(option.id));
+  for (let index = selectedInOrder.length - 1; index >= 0; index -= 1) {
+    const candidate = selectedInOrder[index];
+    if (candidate !== undefined && candidate.childQuestion !== null) {
+      return candidate.id;
+    }
+  }
+  if (question.selectionMode === 'single') {
+    const terminalId = getTerminalSelectedOptionId(selection);
+    if (terminalId !== null && visibleOptions.some((option) => option.id === terminalId)) {
+      return terminalId;
+    }
+  }
+  const firstVisibleSelected = selection.selectedOptionIds.find((id) => visibleOptions.some((option) => option.id === id));
+  return firstVisibleSelected ?? null;
 }
 
 function getAccentClassName(optionIndex: number): string {
@@ -465,10 +492,22 @@ function NestedOptionsRoundRenderer(props: {
   const terminalSelectedOptionId =
     props.question.selectionMode === 'single' ? getTerminalSelectedOptionId(props.selection) : null;
   const [requestedActiveOptionId, setRequestedActiveOptionId] = useState<string | null>(null);
+  useEffect(() => {
+    setRequestedActiveOptionId(null);
+  }, [props.question.id]);
+  const selectionDefaultPanelId = useMemo(
+    () =>
+      resolveNestedPanelOptionIdFromSelection({
+        question: props.question,
+        selection: props.selection,
+        visibleOptions,
+      }),
+    [props.question, props.selection, visibleOptions],
+  );
   const activeOptionId =
     requestedActiveOptionId !== null && visibleOptions.some((option) => option.id === requestedActiveOptionId)
       ? requestedActiveOptionId
-      : null;
+      : selectionDefaultPanelId;
   const activeOption =
     activeOptionId === null ? null : visibleOptions.find((option) => option.id === activeOptionId) ?? null;
   const activeChildSelections = activeOption === null ? [] : props.selection.childSelections[activeOption.id] ?? [];
@@ -842,6 +881,15 @@ export type GuidedDiagnosticWizardProps = {
   readonly backLabel: string;
   readonly canGoBack: boolean;
   readonly guided: GuidedDiagnosticV1;
+  /**
+   * When true, do not inject the first template round into an empty guided state. Use for `/quiz?sessionId=…` so a
+   * brief empty render (or Strict Mode fetch abort) is never overwritten before session hydration applies.
+   */
+  readonly suppressEmptyTemplateBootstrap?: boolean;
+  /** Booking-linked session: review only, no API writes or starting a new run from this screen. */
+  readonly sessionReadOnly?: boolean;
+  /** Destination for “Book this session” from the outcome panel (include `?sessionId=` when the quiz URL targets a row). */
+  readonly marketingBookHref?: string;
   readonly onGoBack: () => void;
   readonly onGuidedChange: (next: GuidedDiagnosticV1) => void;
 };
@@ -956,7 +1004,16 @@ type DiagnosticTemplateSummaryApiBody = {
 };
 
 export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): ReactElement {
-  const { backLabel, canGoBack, guided, onGoBack, onGuidedChange } = props;
+  const {
+    backLabel,
+    canGoBack,
+    guided,
+    onGoBack,
+    onGuidedChange,
+    suppressEmptyTemplateBootstrap = false,
+    sessionReadOnly = false,
+    marketingBookHref = '/book',
+  } = props;
   const executeGoBackWithScroll = useCallback((): void => {
     onGoBack();
     scheduleScrollQuizWizardToTop();
@@ -1017,6 +1074,9 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     };
   }, []);
   useEffect(() => {
+    if (suppressEmptyTemplateBootstrap) {
+      return;
+    }
     if (diagnosticAiEnabled || isLoadingConfig || initialTemplateRound === null) {
       return;
     }
@@ -1030,18 +1090,36 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       activeRound: initialTemplateRound,
       outcome: null,
     });
-  }, [diagnosticAiEnabled, guided, initialTemplateRound, isLoadingConfig, onGuidedChange]);
+  }, [diagnosticAiEnabled, guided, initialTemplateRound, isLoadingConfig, onGuidedChange, suppressEmptyTemplateBootstrap]);
+  useEffect(() => {
+    if (!sessionReadOnly) {
+      return;
+    }
+    if (guided.activeRound !== null || guided.outcome !== null || guided.completedBundles.length === 0) {
+      return;
+    }
+    const nextGuided = applyGuidedPeekCompletedBundleIndex(guided, 0);
+    if (nextGuided !== null) {
+      onGuidedChange(nextGuided);
+    }
+  }, [guided, onGuidedChange, sessionReadOnly]);
   const executeUpdatePrompt = useCallback(
     (value: string): void => {
+      if (sessionReadOnly) {
+        return;
+      }
       onGuidedChange({
         ...guided,
         initialPrompt: value,
       });
     },
-    [guided, onGuidedChange],
+    [guided, onGuidedChange, sessionReadOnly],
   );
   const executeToggleSeedChip = useCallback(
     (phrase: string): void => {
+      if (sessionReadOnly) {
+        return;
+      }
       setErrorMessage(null);
       const next = togglePromptWithSeed(guided.initialPrompt, phrase);
       onGuidedChange({
@@ -1049,10 +1127,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         initialPrompt: next,
       });
     },
-    [guided, onGuidedChange],
+    [guided, onGuidedChange, sessionReadOnly],
   );
   const executeSelectOption = useCallback(
     (question: DiagnosticQuestionBlock, optionId: string): void => {
+      if (sessionReadOnly) {
+        return;
+      }
       if (guided.activeRound === null) {
         return;
       }
@@ -1098,10 +1179,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         activeRound: nextActiveRound,
       });
     },
-    [guided, onGuidedChange],
+    [guided, onGuidedChange, sessionReadOnly],
   );
   const executeSelectChildOption = useCallback(
     (question: DiagnosticQuestionBlock, parentOptionId: string, childOptionId: string): void => {
+      if (sessionReadOnly) {
+        return;
+      }
       if (guided.activeRound === null) {
         return;
       }
@@ -1130,10 +1214,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         activeRound: nextActiveRound,
       });
     },
-    [guided, onGuidedChange],
+    [guided, onGuidedChange, sessionReadOnly],
   );
   const executeSetQuestionSelection = useCallback(
     (questionId: string, nextSelection: DiagnosticQuestionSelection): void => {
+      if (sessionReadOnly) {
+        return;
+      }
       if (guided.activeRound === null) {
         return;
       }
@@ -1175,10 +1262,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         activeRound: nextActiveRound,
       });
     },
-    [guided, onGuidedChange],
+    [guided, onGuidedChange, sessionReadOnly],
   );
   const executeUpdateAnswerNote = useCallback(
     (questionId: string, value: string): void => {
+      if (sessionReadOnly) {
+        return;
+      }
       if (guided.activeRound === null) {
         return;
       }
@@ -1195,10 +1285,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         },
       });
     },
-    [guided, onGuidedChange],
+    [guided, onGuidedChange, sessionReadOnly],
   );
   const executeFetchRound = useCallback(
     async (completedBundles: CompletedRoundBundle[]): Promise<boolean> => {
+      if (sessionReadOnly) {
+        return false;
+      }
       const trimmed = guided.initialPrompt.trim();
       const clientEmptyRoundRetryLimit = 3;
       for (let attempt = 0; attempt <= clientEmptyRoundRetryLimit; attempt += 1) {
@@ -1293,10 +1386,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       }
       return false;
     },
-    [cacheDebugUiEnabled, guided, onGuidedChange],
+    [cacheDebugUiEnabled, guided, onGuidedChange, sessionReadOnly],
   );
   const executeFetchTemplateSummary = useCallback(
     async (completedBundles: CompletedRoundBundle[]): Promise<GuidedDiagnosticOutcome> => {
+      if (sessionReadOnly) {
+        throw new Error('This diagnostic is view-only.');
+      }
       if (activeTemplate === null) {
         return buildTemplateDiagnosticOutcome(
           guided.initialPrompt,
@@ -1335,9 +1431,12 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         Array.isArray(data.goodFitBullets) ? data.goodFitBullets : null,
       );
     },
-    [activeTemplate, guided.initialPrompt],
+    [activeTemplate, guided.initialPrompt, sessionReadOnly],
   );
   const executeStartFromPrompt = useCallback(async (): Promise<void> => {
+    if (sessionReadOnly) {
+      return;
+    }
     setErrorMessage(null);
     const trimmed = guided.initialPrompt.trim();
     if (trimmed.length < MIN_PROMPT_LENGTH) {
@@ -1350,10 +1449,76 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     } finally {
       setIsAwaitingApi(false);
     }
-  }, [executeFetchRound, guided.initialPrompt]);
+  }, [executeFetchRound, guided.initialPrompt, sessionReadOnly]);
   const executeAdvanceOrSubmitRound = useCallback(async (): Promise<void> => {
     setErrorMessage(null);
     if (guided.activeRound === null) {
+      return;
+    }
+    if (sessionReadOnly) {
+      const activeRound = synchronizeActiveRound({
+        activeRound: guided.activeRound,
+        completedBundles: guided.completedBundles,
+      });
+      if (activeRound === null) {
+        return;
+      }
+      const priorAnswersOnly = buildDiagnosticAnswerLookup({
+        completedBundles: guided.completedBundles,
+      });
+      const currentQuestion = activeRound.questions[activeRound.stepIndex];
+      if (currentQuestion === undefined) {
+        return;
+      }
+      const selection = activeRound.answers[currentQuestion.id];
+      const detailNote = activeRound.answerNotes[currentQuestion.id] ?? '';
+      const validation = validateGuidedQuestionResponse({
+        baseAnswers: buildDiagnosticAnswerLookup({
+          completedBundles: guided.completedBundles,
+          activeRound,
+        }),
+        question: currentQuestion,
+        selection,
+        detailNote,
+      });
+      if (!validation.isValid) {
+        setErrorMessage(validation.message ?? 'Pick an option above or type your exact answer below.');
+        return;
+      }
+      const nextQuestionIndex = findNextVisibleQuestionIndex({
+        questions: activeRound.questions,
+        baseAnswers: priorAnswersOnly,
+        answers: activeRound.answers,
+        currentIndex: activeRound.stepIndex,
+      });
+      if (nextQuestionIndex !== null) {
+        onGuidedChange({
+          ...guided,
+          activeRound: {
+            ...activeRound,
+            stepIndex: nextQuestionIndex,
+          },
+        });
+        scheduleScrollQuizWizardToTop();
+        return;
+      }
+      const bundleIndex = guided.completedBundles.findIndex((bundle) => bundle.roundIndex === activeRound.roundIndex);
+      const nextBundleIndex = bundleIndex >= 0 ? bundleIndex + 1 : guided.completedBundles.length;
+      if (nextBundleIndex < guided.completedBundles.length) {
+        const peeked = applyGuidedPeekCompletedBundleIndex(guided, nextBundleIndex);
+        if (peeked !== null) {
+          onGuidedChange(peeked);
+        }
+        scheduleScrollQuizWizardToTop();
+        return;
+      }
+      if (guided.outcome !== null) {
+        onGuidedChange({
+          ...guided,
+          activeRound: null,
+        });
+        scheduleScrollQuizWizardToTop();
+      }
       return;
     }
     const activeRound = synchronizeActiveRound({
@@ -1510,8 +1675,8 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     } finally {
       setIsAwaitingApi(false);
     }
-  }, [activeTemplate, diagnosticAiEnabled, executeFetchRound, executeFetchTemplateSummary, guided, onGuidedChange]);
-  if (guided.outcome !== null) {
+  }, [activeTemplate, diagnosticAiEnabled, executeFetchRound, executeFetchTemplateSummary, guided, onGuidedChange, sessionReadOnly]);
+  if (guided.outcome !== null && !(sessionReadOnly && guided.activeRound !== null)) {
     const { advisorSummary, briefAssessment, sessionTitle, goodFitBullets } = guided.outcome;
     return (
       <div>
@@ -1521,8 +1686,17 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           onClear={() => setDiagnosticDebugLog([])}
         />
         <p className="mt-2 text-pretty text-muted-foreground">
-          Here is the session we recommend from your answers — the same details you will see on the service page. Use{' '}
-          <span className="font-medium text-foreground">Continue</span> below to book or open the full page.
+          {sessionReadOnly ? (
+            <>
+              Review the recommendation from your saved diagnostic. This copy is linked to a booking and cannot be
+              changed here.
+            </>
+          ) : (
+            <>
+              Here is the session we recommend from your answers — the same details you will see on the service page. Use{' '}
+              <span className="font-medium text-foreground">Continue</span> below to book or open the full page.
+            </>
+          )}
         </p>
         <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_minmax(0,280px)] lg:items-start">
           <div>
@@ -1564,12 +1738,16 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             <p className="mt-6 text-sm font-medium text-muted-foreground">Investment</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{PROJECT_RESCUE_PRICE_HEADLINE}</p>
             <p className="mt-2 text-sm text-muted-foreground">{PROJECT_RESCUE_BOOKING_FOOTNOTE}</p>
-            <Button asChild className="mt-8 w-full" size="lg">
-              <Link href="/book">
-                Book this session
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            </Button>
+            {sessionReadOnly ? (
+              <p className="mt-8 text-sm text-muted-foreground">This intake is already linked to a booking.</p>
+            ) : (
+              <Button asChild className="mt-8 w-full" size="lg">
+                <Link href={marketingBookHref}>
+                  Book this session
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </Button>
+            )}
             <Button asChild variant="outline" className="mt-3 w-full">
               <Link href="/service">Full service page</Link>
             </Button>
@@ -1577,6 +1755,26 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         </div>
       </div>
     );
+  }
+  if (sessionReadOnly) {
+    const hasGuidedSnapshot =
+      guided.activeRound !== null ||
+      guided.completedBundles.length > 0 ||
+      guided.outcome !== null ||
+      guided.initialPrompt.trim().length > 0;
+    if (!hasGuidedSnapshot) {
+      return (
+        <div className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-sm text-foreground">
+          <p className="font-medium">Saved answers could not be loaded</p>
+          <p className="mt-2 text-muted-foreground">
+            Try opening the diagnostic again from My diagnostics. If this keeps happening, contact support.
+          </p>
+          <Button type="button" className="mt-4" variant="outline" asChild>
+            <Link href="/account/diagnostics">My diagnostics</Link>
+          </Button>
+        </div>
+      );
+    }
   }
   if (guided.activeRound !== null) {
     const activeRound = synchronizeActiveRound({
@@ -1774,7 +1972,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     );
   }
   if (!diagnosticAiEnabled) {
-    if (isLoadingConfig || initialTemplateRound !== null) {
+    const isAwaitingFirstTemplateRoundBootstrap =
+      !suppressEmptyTemplateBootstrap &&
+      initialTemplateRound !== null &&
+      guided.activeRound === null &&
+      guided.completedBundles.length === 0 &&
+      guided.outcome === null;
+    if (isLoadingConfig || isAwaitingFirstTemplateRoundBootstrap) {
       return (
         <div>
           <p className="mt-2 text-pretty text-muted-foreground">
@@ -1787,16 +1991,18 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         </div>
       );
     }
-    return (
-      <div>
-        <p className="mt-2 text-pretty text-muted-foreground">
-          Template mode is active, but there is no usable active template yet.
-        </p>
-        <div className="mt-4 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          Ask an admin to create and activate a diagnostic template before customers start this flow.
+    if (activeTemplate === null || initialTemplateRound === null) {
+      return (
+        <div>
+          <p className="mt-2 text-pretty text-muted-foreground">
+            Template mode is active, but there is no usable active template yet.
+          </p>
+          <div className="mt-4 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            Ask an admin to create and activate a diagnostic template before customers start this flow.
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
   return (
     <div>
@@ -1806,15 +2012,23 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         onClear={() => setDiagnosticDebugLog([])}
       />
       <p className="mt-2 text-pretty text-muted-foreground">
-        {diagnosticAiEnabled
-          ? 'Describe the problem in your own words. We will ask short guided questions until we have enough context to map your case.'
-          : 'Describe the problem in your own words. We will guide you through the active diagnostic template your advisor configured for customer-facing intake.'}
+        {sessionReadOnly ? (
+          <>
+            Review how you described your situation and the answers you chose. This is not an AI chat — template mode
+            uses the fixed questionnaire your advisor published.
+          </>
+        ) : diagnosticAiEnabled ? (
+          'Describe the problem in your own words. We will ask short guided questions until we have enough context to map your case.'
+        ) : (
+          'Describe the problem in your own words. Next, you will step through the fixed questionnaire from your advisor’s diagnostic template (not a free-form AI chat).'
+        )}
       </p>
       {!diagnosticAiEnabled ? (
         <div className="mt-4 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           {activeTemplate !== null ? (
             <span>
-              Template mode is active: <span className="font-medium text-foreground">{activeTemplate.name}</span>.
+              Template mode: <span className="font-medium text-foreground">{activeTemplate.name}</span>
+              {sessionReadOnly ? ' — answers below are read-only.' : '.'}
             </span>
           ) : (
             'Template mode is active, but no usable diagnostic template is available yet.'
@@ -1827,14 +2041,14 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       <textarea
         id="diagnostic-prompt"
         value={guided.initialPrompt}
-        disabled={isAwaitingApi}
+        disabled={isAwaitingApi || sessionReadOnly}
         onChange={(event) => executeUpdatePrompt(event.target.value)}
         rows={4}
-        placeholder='Example: "Our MongoDB cluster is slow during payroll runs."'
+        placeholder='Example: "Our team keeps missing release dates and stakeholders are losing trust."'
         className={cn(
           'mt-2 w-full resize-y rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-xs outline-none transition-colors',
           'placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25',
-          isAwaitingApi ? 'opacity-80' : '',
+          isAwaitingApi || sessionReadOnly ? 'opacity-80' : '',
         )}
       />
       <div className="mt-4">
@@ -1849,7 +2063,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
                 key={phrase}
                 type="button"
                 onClick={() => executeToggleSeedChip(phrase)}
-                disabled={isAwaitingApi}
+                disabled={isAwaitingApi || sessionReadOnly}
                 aria-pressed={isActive}
                 className={cn(
                   'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
@@ -1876,6 +2090,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
           {diagnosticAiEnabled ? 'Preparing your first questions…' : 'Preparing your first template round…'}
         </div>
+      ) : sessionReadOnly ? (
+        <p className="mt-6 text-sm text-muted-foreground">
+          Use the step indicators above to open saved rounds. You cannot start a new run from this booked copy.
+        </p>
       ) : (
         <div className="mt-6">
           <Button

@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import {
   GUIDED_DIAGNOSTIC_EMPTY,
   applyGuidedGoBack,
+  applyGuidedGoBackReadOnly,
   applyGuidedJumpToCompletedBundleIndex,
+  applyGuidedPeekCompletedBundleIndex,
   buildDiagnosticAnswerLookup,
   buildDiagnosticThreadJson,
   computeGuidedLinearStep,
@@ -48,26 +50,35 @@ function normalizeRoundLabel(rawLabel: string, index: number): string {
 }
 
 function buildPreviousRoundLabel(guided: GuidedDiagnosticV1): string | null {
-  if (guided.outcome !== null) {
-    const lastCompletedBundle = guided.completedBundles[guided.completedBundles.length - 1];
-    return lastCompletedBundle?.roundTitle ?? null;
-  }
   if (guided.activeRound === null) {
+    if (guided.outcome !== null) {
+      const lastCompletedBundle = guided.completedBundles[guided.completedBundles.length - 1];
+      return lastCompletedBundle?.roundTitle ?? null;
+    }
     return null;
   }
+  const activeRound = guided.activeRound;
   const previousVisibleQuestionIndex = findPreviousVisibleQuestionIndex({
-    questions: guided.activeRound.questions,
+    questions: activeRound.questions,
     baseAnswers: buildDiagnosticAnswerLookup({
       completedBundles: guided.completedBundles,
     }),
-    answers: guided.activeRound.answers,
-    currentIndex: guided.activeRound.stepIndex,
+    answers: activeRound.answers,
+    currentIndex: activeRound.stepIndex,
   });
   if (previousVisibleQuestionIndex !== null) {
     return null;
   }
-  const previousCompletedBundle = guided.completedBundles[guided.completedBundles.length - 1];
-  return previousCompletedBundle?.roundTitle ?? null;
+  const bundleIndex = guided.completedBundles.findIndex((bundle) => bundle.roundIndex === activeRound.roundIndex);
+  if (bundleIndex > 0) {
+    const previousBundle = guided.completedBundles[bundleIndex - 1];
+    return previousBundle?.roundTitle ?? null;
+  }
+  if (bundleIndex === 0) {
+    return null;
+  }
+  const lastCompletedBundle = guided.completedBundles[guided.completedBundles.length - 1];
+  return lastCompletedBundle?.roundTitle ?? null;
 }
 
 type CurrentRoundProgressSummary = {
@@ -107,14 +118,14 @@ function computeRoundProgressCurrentIndex(params: {
   if (params.roundSummaries.length === 0) {
     return 0;
   }
-  if (params.guided.outcome !== null) {
-    return params.roundSummaries.length;
-  }
   if (params.guided.activeRound !== null) {
     return Math.max(
       0,
       params.roundSummaries.findIndex((round) => round.authoredRoundIndex === params.guided.activeRound?.roundIndex),
     );
+  }
+  if (params.guided.outcome !== null) {
+    return params.roundSummaries.length;
   }
   return 0;
 }
@@ -171,29 +182,49 @@ function normalizeGuidedDiagnosticRaw(raw: unknown): string | undefined {
 export function QuizFlow() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sessionTargetId = useMemo((): string | null => {
+    const raw = searchParams.get('sessionId')?.trim() ?? '';
+    return /^[a-f\d]{24}$/i.test(raw) ? raw : null;
+  }, [searchParams]);
   const [guided, setGuided] = useState<GuidedDiagnosticV1>(GUIDED_DIAGNOSTIC_EMPTY);
   const [isSessionReady, setIsSessionReady] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(true);
+  const [targetSessionError, setTargetSessionError] = useState<string | null>(null);
+  const [sessionReadOnly, setSessionReadOnly] = useState<boolean>(false);
+  const sessionReadOnlyRef = useRef<boolean>(false);
+  const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
   const [isWizardProgressPinned, setIsWizardProgressPinned] = useState<boolean>(false);
   const wizardProgressStickySentinelRef = useRef<HTMLDivElement | null>(null);
   const hasHydratedRef = useRef<boolean>(false);
-  const persistGuided = useCallback(async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
-    const linearStep = computeGuidedLinearStep(next);
-    await fetch(QUIZ_SESSION_API_URL, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+  const persistGuided = useCallback(
+    async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
+      if (sessionReadOnlyRef.current) {
+        return;
+      }
+      const linearStep = computeGuidedLinearStep(next);
+      const body: Record<string, unknown> = {
         answers: buildAnswersPayload(next),
         currentStep: linearStep,
         completed,
-      }),
-    });
-  }, []);
+      };
+      if (sessionTargetId !== null) {
+        body.sessionId = sessionTargetId;
+      }
+      await fetch(QUIZ_SESSION_API_URL, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    },
+    [sessionTargetId],
+  );
   useEffect(() => {
     let cancelled = false;
     async function initializeSession(): Promise<void> {
+      setTargetSessionError(null);
+      sessionReadOnlyRef.current = false;
+      setSessionReadOnly(false);
       if (searchParams.get('retake') === '1') {
         await persistGuided(GUIDED_DIAGNOSTIC_EMPTY, false);
         if (cancelled) {
@@ -202,20 +233,45 @@ export function QuizFlow() {
         setGuided(GUIDED_DIAGNOSTIC_EMPTY);
         hasHydratedRef.current = true;
         setIsSessionReady(true);
-        router.replace('/quiz');
+        const nextPath =
+          sessionTargetId !== null ? `/quiz?sessionId=${encodeURIComponent(sessionTargetId)}` : '/quiz';
+        router.replace(nextPath);
         return;
       }
       try {
-        const response = await fetch(QUIZ_SESSION_API_URL);
-        if (!response.ok || cancelled) {
+        const sessionUrl =
+          sessionTargetId !== null
+            ? `${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(sessionTargetId)}`
+            : QUIZ_SESSION_API_URL;
+        const response = await fetch(sessionUrl);
+        if (cancelled) {
+          return;
+        }
+        if (!response.ok) {
+          if (response.status === 404) {
+            setTargetSessionError('This diagnostic was not found or you no longer have access to it.');
+            setGuided(GUIDED_DIAGNOSTIC_EMPTY);
+          }
+          sessionReadOnlyRef.current = false;
+          setSessionReadOnly(false);
+          hasHydratedRef.current = true;
+          setIsSessionReady(true);
           return;
         }
         const data = (await response.json()) as {
           session: { answers: Record<string, string | string[] | number | boolean>; currentStep: number } | null;
+          readOnly?: boolean;
         };
         if (cancelled || !data.session) {
+          sessionReadOnlyRef.current = false;
+          setSessionReadOnly(false);
+          hasHydratedRef.current = true;
+          setIsSessionReady(true);
           return;
         }
+        const readOnly = Boolean(data.readOnly);
+        sessionReadOnlyRef.current = readOnly;
+        setSessionReadOnly(readOnly);
         const rawGuided = data.session.answers['guidedDiagnostic'];
         const normalized = normalizeGuidedDiagnosticRaw(rawGuided);
         const parsed =
@@ -232,7 +288,7 @@ export function QuizFlow() {
     return () => {
       cancelled = true;
     };
-  }, [persistGuided, router, searchParams]);
+  }, [persistGuided, router, searchParams, sessionTargetId]);
   useEffect(() => {
     let cancelled = false;
     async function loadProgressMetadata(): Promise<void> {
@@ -243,7 +299,7 @@ export function QuizFlow() {
           return;
         }
         const nextDiagnosticAiEnabled =
-          typeof configData.diagnosticAiEnabled === 'boolean' ? configData.diagnosticAiEnabled : true;
+          typeof configData.diagnosticAiEnabled === 'boolean' ? configData.diagnosticAiEnabled : false;
         setDiagnosticAiEnabled(nextDiagnosticAiEnabled);
         if (nextDiagnosticAiEnabled) {
           setActiveTemplate(null);
@@ -257,7 +313,7 @@ export function QuizFlow() {
         setActiveTemplate(templateData.template);
       } catch {
         if (!cancelled) {
-          setDiagnosticAiEnabled(true);
+          setDiagnosticAiEnabled(false);
           setActiveTemplate(null);
         }
       }
@@ -295,7 +351,7 @@ export function QuizFlow() {
     };
   }, [isSessionReady]);
   useEffect(() => {
-    if (!isSessionReady || !hasHydratedRef.current) {
+    if (!isSessionReady || !hasHydratedRef.current || sessionReadOnlyRef.current) {
       return;
     }
     const handle = setTimeout(() => {
@@ -304,7 +360,7 @@ export function QuizFlow() {
     return () => clearTimeout(handle);
   }, [guided, isSessionReady, persistGuided]);
   useEffect(() => {
-    if (!isSessionReady || typeof document === 'undefined') {
+    if (!isSessionReady || typeof document === 'undefined' || sessionReadOnlyRef.current) {
       return;
     }
     function flushBeforeLeave(): void {
@@ -365,11 +421,46 @@ export function QuizFlow() {
     guided.activeRound !== null ||
     guided.initialPrompt.trim().length > 0;
   const executeGoBack = (): void => {
-    setGuided((previous) => applyGuidedGoBack(previous));
+    setGuided((previous) =>
+      sessionReadOnlyRef.current ? applyGuidedGoBackReadOnly(previous) : applyGuidedGoBack(previous),
+    );
   };
   const executeJumpToRoundProgressStep = useCallback(
     (targetRoundStepIndex: number) => {
       if (diagnosticAiEnabled || visibleTemplateRounds.length === 0) {
+        return;
+      }
+      if (sessionReadOnlyRef.current) {
+        if (targetRoundStepIndex === visibleTemplateRounds.length) {
+          setGuided((previous) =>
+            previous.outcome === null
+              ? previous
+              : {
+                  ...previous,
+                  activeRound: null,
+                },
+          );
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        if (targetRoundStepIndex < 0 || targetRoundStepIndex >= visibleTemplateRounds.length) {
+          return;
+        }
+        const roundSummary = visibleTemplateRounds[targetRoundStepIndex];
+        if (roundSummary === undefined) {
+          return;
+        }
+        setGuided((previous) => {
+          const bundleIndex = previous.completedBundles.findIndex(
+            (bundle) => bundle.roundIndex === roundSummary.authoredRoundIndex,
+          );
+          if (bundleIndex < 0) {
+            return previous;
+          }
+          const peeked = applyGuidedPeekCompletedBundleIndex(previous, bundleIndex);
+          return peeked ?? previous;
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
       const currentProgressIndex = computeRoundProgressCurrentIndex({
@@ -397,6 +488,9 @@ export function QuizFlow() {
     [diagnosticAiEnabled, guided, visibleTemplateRounds],
   );
   const executeContinueToService = async (): Promise<void> => {
+    if (sessionReadOnlyRef.current) {
+      return;
+    }
     setIsSaving(true);
     try {
       await persistGuided(guided, true);
@@ -417,6 +511,34 @@ export function QuizFlow() {
   }
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
+      {targetSessionError !== null ? (
+        <div
+          className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          role="alert"
+        >
+          <p>{targetSessionError}</p>
+          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            <Link href="/account/diagnostics" className="font-medium underline underline-offset-2">
+              My diagnostics
+            </Link>
+            <Link href="/quiz" className="font-medium underline underline-offset-2">
+              Open latest quiz
+            </Link>
+          </p>
+        </div>
+      ) : null}
+      {sessionReadOnly ? (
+        <div
+          className="mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground"
+          role="status"
+        >
+          <p className="font-medium">View only</p>
+          <p className="mt-1 text-muted-foreground">
+            This diagnostic is linked to a booking. You can review answers here; changes are not saved and you cannot
+            retake this copy.
+          </p>
+        </div>
+      ) : null}
       <div ref={wizardProgressStickySentinelRef} className="hidden h-px w-full shrink-0 lg:block" aria-hidden />
       <div
         className={cn(
@@ -452,8 +574,19 @@ export function QuizFlow() {
                           ? 'bg-primary/60'
                           : 'bg-muted',
                     );
-                    const isJumpTarget =
-                      stepIndex < visibleTemplateRounds.length && step.status === 'complete';
+                    const isRecommendationIndex = stepIndex === visibleTemplateRounds.length;
+                    const summaryAtStep = visibleTemplateRounds[stepIndex];
+                    const hasSavedRoundBundle =
+                      !isRecommendationIndex &&
+                      summaryAtStep !== undefined &&
+                      guided.completedBundles.some(
+                        (bundle) => bundle.roundIndex === summaryAtStep.authoredRoundIndex,
+                      );
+                    const isJumpTarget = sessionReadOnly
+                      ? isRecommendationIndex
+                        ? guided.outcome !== null
+                        : hasSavedRoundBundle
+                      : stepIndex < visibleTemplateRounds.length && step.status === 'complete';
                     if (!isJumpTarget) {
                       return (
                         <div key={step.id} className="flex min-h-11 min-w-0 flex-1 items-center px-0.5">
@@ -479,7 +612,19 @@ export function QuizFlow() {
             <div className="hidden rounded-2xl border border-border bg-card px-4 py-4 shadow-xs lg:block">
               <div className="grid gap-4 lg:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
                 {roundProgressSteps.map((step, index) => {
-                  const isJumpTarget = index < visibleTemplateRounds.length && step.status === 'complete';
+                  const isRecommendationIndex = index === visibleTemplateRounds.length;
+                  const summaryAtStep = visibleTemplateRounds[index];
+                  const hasSavedRoundBundle =
+                    !isRecommendationIndex &&
+                    summaryAtStep !== undefined &&
+                    guided.completedBundles.some(
+                      (bundle) => bundle.roundIndex === summaryAtStep.authoredRoundIndex,
+                    );
+                  const isJumpTarget = sessionReadOnly
+                    ? isRecommendationIndex
+                      ? guided.outcome !== null
+                      : hasSavedRoundBundle
+                    : index < visibleTemplateRounds.length && step.status === 'complete';
                   const rowInner = (
                     <>
                       <div className="flex flex-1 items-center gap-3">
@@ -574,6 +719,11 @@ export function QuizFlow() {
         backLabel={backLabel}
         canGoBack={canGoBack}
         guided={guided}
+        suppressEmptyTemplateBootstrap={sessionTargetId !== null && !isSessionReady}
+        sessionReadOnly={sessionReadOnly}
+        marketingBookHref={
+          sessionTargetId !== null ? `/book?sessionId=${encodeURIComponent(sessionTargetId)}` : '/book'
+        }
         onGoBack={executeGoBack}
         onGuidedChange={setGuided}
       />
@@ -585,9 +735,17 @@ export function QuizFlow() {
           </Link>
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {showRetakeLink ? (
+          {showRetakeLink && !sessionReadOnly ? (
             <Button type="button" variant="outline" asChild>
-              <Link href="/quiz?retake=1">Retake diagnostic</Link>
+              <Link
+                href={
+                  sessionTargetId !== null
+                    ? `/quiz?retake=1&sessionId=${encodeURIComponent(sessionTargetId)}`
+                    : '/quiz?retake=1'
+                }
+              >
+                Retake diagnostic
+              </Link>
             </Button>
           ) : null}
           {canGoBack && guided.activeRound === null ? (

@@ -29,7 +29,7 @@ export function LeadsTable({ initialData }: LeadsTableProps) {
     <DataTable
       columns={columns}
       data={initialData}
-      emptyMessage="No leads yet. Configure MONGODB_URI to load data."
+      emptyMessage="No leads yet."
     />
   );
 }

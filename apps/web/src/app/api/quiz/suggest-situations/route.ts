@@ -103,7 +103,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       schema: phraseResponseSchema,
       temperature: 0.35,
       system:
-        'You write tap-friendly chip labels for an IT advisory intake (Philippines market). Each chip maps to exactly one canonical situation from the allowed list. Labels must be plain language and may echo the user\'s words (e.g. "MongoDB feels slow", "scope keeps shifting"). Never invent new situation categories — only use `situation` strings from the allowed list verbatim.',
+        'You write tap-friendly chip labels for an IT advisory intake (Philippines market). Each chip maps to exactly one canonical situation from the allowed list. Labels must be plain language and may echo the user\'s words (e.g. "Database feels slow", "scope keeps shifting"). Never invent new situation categories — only use `situation` strings from the allowed list verbatim.',
       prompt: `User wrote:\n"${trimmed}"\n\nCanonical situations (best → worst fit for this text):\n${priorityLine}\n\nAllowed situation strings (copy exactly into situation):\n${optionLines}\n\nReturn up to 6 items in choices[]. Label = short phrase the user would tap (max ~120 chars). Situation = one allowed string per row. Order best match first. Prefer diverse situations when several apply (do not repeat the same situation twice).`,
     });
     const merged = normalizeAiChoices(object.choices, trimmed, orderedCanonical);

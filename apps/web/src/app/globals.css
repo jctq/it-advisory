@@ -211,4 +211,9 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    html.marketing-smooth-scroll {
+      scroll-behavior: smooth;
+    }
+  }
 }
