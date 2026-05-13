@@ -82,6 +82,7 @@ const TEMPLATE_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
 });
 const ROUND_SECTION_ID_PREFIX = 'diagnostic-template-round';
 const QUESTION_SECTION_ID_PREFIX = 'diagnostic-template-question';
+const OPTION_SECTION_ID_PREFIX = 'diagnostic-template-option';
 const SAME_QUESTION_PATH_SOURCE_LABEL = 'This question path';
 const ROW_INTERACTIVE_ELEMENT_SELECTOR =
   'button, a, input, textarea, select, [role="button"], [data-row-interactive="true"]';
@@ -97,14 +98,19 @@ const QUESTION_TYPE_OPTIONS = [
   { value: 'ranked-options', label: 'Ranked options' },
 ] as const satisfies readonly { value: DiagnosticTemplateQuestionType; label: string }[];
 
-type TemplateSectionKind = 'round' | 'question';
+type TemplateSectionKind = 'round' | 'question' | 'option';
 
 type UpdateSelectedTemplateOptions = {
   readonly shouldReindex?: boolean;
 };
 
 function buildTemplateSectionId(params: { readonly entityId: string; readonly kind: TemplateSectionKind }): string {
-  const prefix = params.kind === 'round' ? ROUND_SECTION_ID_PREFIX : QUESTION_SECTION_ID_PREFIX;
+  const prefix =
+    params.kind === 'round'
+      ? ROUND_SECTION_ID_PREFIX
+      : params.kind === 'question'
+        ? QUESTION_SECTION_ID_PREFIX
+        : OPTION_SECTION_ID_PREFIX;
   return `${prefix}-${params.entityId}`;
 }
 
@@ -683,6 +689,7 @@ type SortableOptionRowProps = {
   readonly children?: ReactNode;
   readonly optionIndex: number;
   readonly optionsCount: number;
+  readonly sectionId?: string;
   readonly onMoveUp: () => void;
   readonly onMoveDown: () => void;
   readonly onRemove: () => void;
@@ -698,13 +705,17 @@ type OptionRowContentProps = {
   readonly onMoveUp: () => void;
   readonly onRemove: () => void;
   readonly optionIndex: number;
+  readonly sectionId?: string;
 };
 
 function OptionRowContent(props: OptionRowContentProps): ReactElement {
   return (
     <div
+      id={props.sectionId}
+      tabIndex={props.sectionId === undefined ? undefined : -1}
       className={cn(
         'flex flex-col gap-3 rounded-xl border border-border bg-background px-3 py-3',
+        props.sectionId !== undefined && 'scroll-mt-28 outline-none',
         props.isDragging && 'border-primary/40 bg-primary/5 shadow-sm',
       )}
     >
@@ -733,6 +744,7 @@ function OptionRowContent(props: OptionRowContentProps): ReactElement {
 function StaticOptionRow(props: SortableOptionRowProps): ReactElement {
   return (
     <OptionRowContent
+      sectionId={props.sectionId}
       dragHandle={
         <span
           aria-hidden="true"
@@ -914,8 +926,8 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
     }));
     executeScrollToTemplateSectionSoon(
       buildTemplateSectionId({
-        kind: 'question',
-        entityId: params.questionId,
+        kind: 'option',
+        entityId: nextOption.id,
       }),
     );
   }
@@ -2916,6 +2928,10 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                 {question.options.map((option, optionIndex) => (
                                   <StaticOptionRow
                                     key={option.id}
+                                    sectionId={buildTemplateSectionId({
+                                      kind: 'option',
+                                      entityId: option.id,
+                                    })}
                                     optionIndex={optionIndex}
                                     optionsCount={question.options.length}
                                     onMoveUp={() =>
