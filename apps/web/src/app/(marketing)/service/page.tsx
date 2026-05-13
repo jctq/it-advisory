@@ -11,7 +11,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { ServiceAdvisorSummary } from './service-advisor-summary';
+import { ServiceReviewDiagnosticButton } from './service-review-diagnostic-button';
 
 export const metadata: Metadata = {
   title: `${PROJECT_RESCUE_SERVICE_TITLE} · IT Advisory`,
@@ -19,7 +21,9 @@ export const metadata: Metadata = {
     'Structured consultation to stabilize timelines, clarify ownership, and reduce delivery risk.',
 };
 
-export default function ServiceDetailPage() {
+export default async function ServiceDetailPage() {
+  const user = await getAuthenticatedMarketingUser();
+  const isAuthenticated = user !== null;
   return (
     <main className="mx-auto max-w-6xl px-6 py-16 md:py-24">
       <div className="grid gap-12 lg:grid-cols-[1fr_320px] lg:items-start">
@@ -44,9 +48,7 @@ export default function ServiceDetailPage() {
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           </Button>
-          <Button asChild variant="outline" className="mt-3 w-full">
-            <Link href="/quiz">Review diagnostic</Link>
-          </Button>
+          <ServiceReviewDiagnosticButton isAuthenticated={isAuthenticated} />
         </aside>
       </div>
     </main>

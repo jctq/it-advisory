@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { useCallback, type ReactElement } from 'react';
+import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { Button } from '@/components/ui/button';
 import type { AuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,8 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
     await router.refresh();
   }, [router]);
   const user = props.marketingUser;
+  const isAuthenticated = user !== null;
+  const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(isAuthenticated);
   const shortEmail =
     user !== null && user.email.length > 28 ? `${user.email.slice(0, 25)}…` : user?.email ?? '';
   return (
@@ -78,9 +81,15 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
               </Button>
             </div>
           )}
-          <Button asChild className="hidden sm:inline-flex">
-            <Link href="/quiz">Get Started</Link>
-          </Button>
+          {isAuthenticated ? (
+            <Button type="button" className="hidden sm:inline-flex" disabled={isNavigating} onClick={() => void navigateToNewQuiz()}>
+              {isNavigating ? 'Starting…' : 'Get Started'}
+            </Button>
+          ) : (
+            <Button asChild className="hidden sm:inline-flex">
+              <Link href="/quiz">Get Started</Link>
+            </Button>
+          )}
           <details className="relative md:hidden">
             <summary
               className="flex cursor-pointer list-none items-center justify-center rounded-md border border-border bg-background p-2 shadow-xs [&::-webkit-details-marker]:hidden"
@@ -138,12 +147,23 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                   )}
                 </li>
                 <li className="pt-2">
-                  <Link
-                    href="/quiz"
-                    className="block rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground"
-                  >
-                    Get Started
-                  </Link>
+                  {isAuthenticated ? (
+                    <button
+                      type="button"
+                      disabled={isNavigating}
+                      className="block w-full rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground disabled:opacity-60"
+                      onClick={() => void navigateToNewQuiz()}
+                    >
+                      {isNavigating ? 'Starting…' : 'Get Started'}
+                    </button>
+                  ) : (
+                    <Link
+                      href="/quiz"
+                      className="block rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground"
+                    >
+                      Get Started
+                    </Link>
+                  )}
                 </li>
               </ul>
             </div>

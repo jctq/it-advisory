@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
+import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-sessions';
 
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
-const MY_SESSIONS_API_URL = '/api/quiz/my-sessions';
 
 type AccountDiagnosticsPanelProps = {
   readonly initialSessions: readonly VisitorQuizSessionSummary[];
@@ -25,35 +25,11 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
 export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps): ReactElement {
   const router = useRouter();
   const [actionError, setActionError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const executeCreateNew = useCallback(async (): Promise<void> => {
-    setActionError(null);
-    setIsCreating(true);
-    try {
-      const response = await fetch(MY_SESSIONS_API_URL, { method: 'POST', credentials: 'include' });
-      const payload: unknown = await response.json();
-      if (!response.ok) {
-        const message =
-          typeof payload === 'object' && payload !== null && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
-            ? (payload as { error: string }).error
-            : 'Could not start a new diagnostic.';
-        setActionError(message);
-        return;
-      }
-      const sessionId =
-        typeof payload === 'object' && payload !== null && 'sessionId' in payload && typeof (payload as { sessionId?: unknown }).sessionId === 'string'
-          ? (payload as { sessionId: string }).sessionId
-          : null;
-      if (sessionId === null) {
-        setActionError('Invalid response from server.');
-        return;
-      }
-      router.push(`/quiz?sessionId=${encodeURIComponent(sessionId)}`);
-    } finally {
-      setIsCreating(false);
-    }
-  }, [router]);
+  const onNavigateError = useCallback((message: string): void => {
+    setActionError(message);
+  }, []);
+  const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(true, onNavigateError);
   const executeDelete = useCallback(
     async (sessionId: string): Promise<void> => {
       if (!window.confirm('Delete this diagnostic permanently? This cannot be undone.')) {
@@ -92,8 +68,15 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps): Re
           <strong className="text-foreground">New diagnostic</strong> starts a separate session. Scheduled bookings stay
           on file and are not deleted here.
         </p>
-        <Button type="button" onClick={() => void executeCreateNew()} disabled={isCreating}>
-          {isCreating ? 'Starting…' : 'New diagnostic'}
+        <Button
+          type="button"
+          onClick={() => {
+            setActionError(null);
+            void navigateToNewQuiz();
+          }}
+          disabled={isNavigating}
+        >
+          {isNavigating ? 'Starting…' : 'New diagnostic'}
         </Button>
       </div>
       {actionError !== null ? (
@@ -104,8 +87,16 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps): Re
       {props.initialSessions.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-12 text-center text-sm text-muted-foreground">
           <p>No saved diagnostics yet.</p>
-          <Button type="button" className="mt-4" asChild>
-            <Link href="/quiz">Start your first diagnostic</Link>
+          <Button
+            type="button"
+            className="mt-4"
+            disabled={isNavigating}
+            onClick={() => {
+              setActionError(null);
+              void navigateToNewQuiz();
+            }}
+          >
+            {isNavigating ? 'Starting…' : 'Start your first diagnostic'}
           </Button>
         </div>
       ) : (
