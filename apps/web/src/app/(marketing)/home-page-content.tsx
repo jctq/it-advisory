@@ -114,19 +114,10 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             independent advice, actionable recommendations, and booking when you are ready.
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
-            {props.isAuthenticated ? (
-              <Button size="lg" disabled={isNavigating} onClick={() => void navigateToNewQuiz()}>
-                {isNavigating ? 'Starting…' : 'Find my solution'}
-                <ArrowRight className="size-4" aria-hidden />
-              </Button>
-            ) : (
-              <Button asChild size="lg">
-                <Link href="/quiz">
-                  Find my solution
-                  <ArrowRight className="size-4" aria-hidden />
-                </Link>
-              </Button>
-            )}
+            <Button size="lg" disabled={isNavigating} onClick={() => void navigateToNewQuiz()}>
+              {isNavigating ? 'Starting…' : 'Find my solution'}
+              <ArrowRight className="size-4" aria-hidden />
+            </Button>
             <Button asChild variant="outline" size="lg">
               <Link href="#services">Explore services</Link>
             </Button>
@@ -173,36 +164,22 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 const Icon = item.icon;
                 return (
                   <li key={item.title}>
-                    {props.isAuthenticated ? (
-                      <button
-                        type="button"
-                        className={problemCardClassName}
-                        disabled={isNavigating}
-                        onClick={() => void navigateToNewQuiz()}
-                      >
-                        <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                          <Icon className="size-5" aria-hidden />
-                        </span>
-                        <span className="mt-4 font-semibold text-foreground">{item.title}</span>
-                        <span className="mt-2 text-sm text-muted-foreground">{item.description}</span>
-                        <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                          Start diagnostic
-                          <ArrowRight className="size-4" aria-hidden />
-                        </span>
-                      </button>
-                    ) : (
-                      <Link href="/quiz" className={problemCardClassName}>
-                        <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                          <Icon className="size-5" aria-hidden />
-                        </span>
-                        <span className="mt-4 font-semibold text-foreground">{item.title}</span>
-                        <span className="mt-2 text-sm text-muted-foreground">{item.description}</span>
-                        <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                          Start diagnostic
-                          <ArrowRight className="size-4" aria-hidden />
-                        </span>
-                      </Link>
-                    )}
+                    <button
+                      type="button"
+                      className={problemCardClassName}
+                      disabled={isNavigating}
+                      onClick={() => void navigateToNewQuiz()}
+                    >
+                      <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Icon className="size-5" aria-hidden />
+                      </span>
+                      <span className="mt-4 font-semibold text-foreground">{item.title}</span>
+                      <span className="mt-2 text-sm text-muted-foreground">{item.description}</span>
+                      <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                        Start diagnostic
+                        <ArrowRight className="size-4" aria-hidden />
+                      </span>
+                    </button>
                   </li>
                 );
               })}
@@ -224,25 +201,15 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               <div key={service.title} className="rounded-2xl border border-border bg-card p-6 shadow-xs">
                 <h3 className="text-lg font-semibold text-foreground">{service.title}</h3>
                 <p className="mt-3 text-sm text-muted-foreground">{service.blurb}</p>
-                {props.isAuthenticated ? (
-                  <button
-                    type="button"
-                    className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline disabled:opacity-60"
-                    disabled={isNavigating}
-                    onClick={() => void navigateToNewQuiz()}
-                  >
-                    Match me to a session
-                    <ArrowRight className="size-4" aria-hidden />
-                  </button>
-                ) : (
-                  <Link
-                    href="/quiz"
-                    className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline"
-                  >
-                    Match me to a session
-                    <ArrowRight className="size-4" aria-hidden />
-                  </Link>
-                )}
+                <button
+                  type="button"
+                  className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline disabled:opacity-60"
+                  disabled={isNavigating}
+                  onClick={() => void navigateToNewQuiz()}
+                >
+                  Match me to a session
+                  <ArrowRight className="size-4" aria-hidden />
+                </button>
               </div>
             ))}
           </div>
@@ -299,15 +266,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 References you can share internally — more articles ship after launch.
               </p>
             </div>
-            {props.isAuthenticated ? (
-              <Button variant="outline" disabled={isNavigating} onClick={() => void navigateToNewQuiz()}>
-                {isNavigating ? 'Starting…' : 'Start with the diagnostic'}
-              </Button>
-            ) : (
-              <Button asChild variant="outline">
-                <Link href="/quiz">Start with the diagnostic</Link>
-              </Button>
-            )}
+            <Button variant="outline" disabled={isNavigating} onClick={() => void navigateToNewQuiz()}>
+              {isNavigating ? 'Starting…' : 'Start with the diagnostic'}
+            </Button>
           </div>
           <ul className="grid gap-4 md:grid-cols-3">
             {[

@@ -3206,8 +3206,8 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
         </section>
       </div>
       {selectedTemplate !== null ? (
-        <div className="sticky bottom-4 z-10">
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 rounded-2xl border border-border bg-background/95 p-3 shadow-lg backdrop-blur supports-backdrop-filter:bg-background/80">
+        <div className="sticky bottom-0 z-10">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 p-3 shadow-lg backdrop-blur supports-backdrop-filter:bg-background/80">
             <Button
               type="button"
               variant="outline"

@@ -28,6 +28,7 @@ import {
   buildMarketingQuizSessionPath,
   isPlausibleMarketingQuizSessionRef,
 } from '@/lib/marketing/quiz-session-marketing-ref';
+import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import { GuidedDiagnosticWizard } from './guided-diagnostic-wizard';
 
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
@@ -337,12 +338,16 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           setActiveTemplate(null);
           return;
         }
-        const templateResponse = await fetch(DIAGNOSTIC_TEMPLATE_API_URL);
+        const templateUrl =
+          sessionTargetId !== null
+            ? `${DIAGNOSTIC_TEMPLATE_API_URL}?sessionId=${encodeURIComponent(sessionTargetId)}`
+            : DIAGNOSTIC_TEMPLATE_API_URL;
+        const templateResponse = await fetch(templateUrl);
         const templateData = (await templateResponse.json()) as DiagnosticTemplateApiBody;
         if (cancelled) {
           return;
         }
-        setActiveTemplate(templateData.template);
+        setActiveTemplate(templateData.template ?? null);
       } catch {
         if (!cancelled) {
           setDiagnosticAiEnabled(false);
@@ -354,7 +359,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sessionTargetId]);
   useEffect(() => {
     if (!isSessionReady) {
       return;
@@ -530,7 +535,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     );
   }
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="mx-auto px-6 py-12">
       {targetSessionError !== null ? (
         <div
           className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -571,11 +576,12 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
         {roundProgressSteps.length > 0 && !diagnosticAiEnabled ? (
           <>
             {currentRoundProgressSummary !== null ? (
-              <div
-                className="flex flex-col gap-2 lg:hidden"
-                role="group"
-                aria-label={`Template progress: step ${currentRoundProgressSummary.currentStepNumber} of ${currentRoundProgressSummary.totalStepCount}, ${currentRoundProgressSummary.currentStepLabel}`}
-              >
+              <>
+                <div
+                  className="flex flex-col gap-2 lg:hidden"
+                  role="group"
+                  aria-label={`Template progress: step ${currentRoundProgressSummary.currentStepNumber} of ${currentRoundProgressSummary.totalStepCount}, ${currentRoundProgressSummary.currentStepLabel}`}
+                >
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Step {currentRoundProgressSummary.currentStepNumber} of {currentRoundProgressSummary.totalStepCount}
@@ -628,80 +634,29 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
                   })}
                 </div>
               </div>
+                <HorizontalProgressStepper
+                  className="rounded-2xl border border-border bg-card px-4 py-6 shadow-xs"
+                  ariaLabel={`Template progress: step ${currentRoundProgressSummary.currentStepNumber} of ${currentRoundProgressSummary.totalStepCount}, ${currentRoundProgressSummary.currentStepLabel}`}
+                  steps={roundProgressSteps}
+                  isStepInteractive={({ step, stepIndex }) => {
+                    const isRecommendationIndex = stepIndex === visibleTemplateRounds.length;
+                    const summaryAtStep = visibleTemplateRounds[stepIndex];
+                    const hasSavedRoundBundle =
+                      !isRecommendationIndex &&
+                      summaryAtStep !== undefined &&
+                      guided.completedBundles.some(
+                        (bundle) => bundle.roundIndex === summaryAtStep.authoredRoundIndex,
+                      );
+                    return sessionReadOnly
+                      ? isRecommendationIndex
+                        ? guided.outcome !== null
+                        : hasSavedRoundBundle
+                      : stepIndex < visibleTemplateRounds.length && step.status === 'complete';
+                  }}
+                  onStepClick={executeJumpToRoundProgressStep}
+                />
+              </>
             ) : null}
-            <div className="hidden rounded-2xl border border-border bg-card px-4 py-4 shadow-xs lg:block">
-              <div className="grid gap-4 lg:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
-                {roundProgressSteps.map((step, index) => {
-                  const isRecommendationIndex = index === visibleTemplateRounds.length;
-                  const summaryAtStep = visibleTemplateRounds[index];
-                  const hasSavedRoundBundle =
-                    !isRecommendationIndex &&
-                    summaryAtStep !== undefined &&
-                    guided.completedBundles.some(
-                      (bundle) => bundle.roundIndex === summaryAtStep.authoredRoundIndex,
-                    );
-                  const isJumpTarget = sessionReadOnly
-                    ? isRecommendationIndex
-                      ? guided.outcome !== null
-                      : hasSavedRoundBundle
-                    : index < visibleTemplateRounds.length && step.status === 'complete';
-                  const rowInner = (
-                    <>
-                      <div className="flex flex-1 items-center gap-3">
-                        <span
-                          className={cn(
-                            'flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
-                            step.status === 'complete'
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : step.status === 'current'
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border bg-background text-muted-foreground',
-                          )}
-                        >
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <p
-                            className={cn(
-                              'truncate text-xs font-semibold uppercase tracking-wide',
-                              step.status === 'current' ? 'text-primary' : 'text-muted-foreground',
-                            )}
-                          >
-                            {step.label}
-                          </p>
-                        </div>
-                      </div>
-                      {index < roundProgressSteps.length - 1 ? (
-                        <div className="mt-3 hidden h-px flex-1 bg-border lg:block" aria-hidden />
-                      ) : null}
-                    </>
-                  );
-                  const rowClassName = 'flex min-h-11 w-full min-w-0 items-center gap-3';
-                  if (isJumpTarget) {
-                    return (
-                      <button
-                        key={step.id}
-                        type="button"
-                        className={cn(
-                          rowClassName,
-                          'rounded-xl px-1 py-0.5 text-left transition-colors',
-                          'hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35',
-                        )}
-                        onClick={() => executeJumpToRoundProgressStep(index)}
-                        aria-label={`Go to ${step.label}`}
-                      >
-                        {rowInner}
-                      </button>
-                    );
-                  }
-                  return (
-                    <div key={step.id} className={rowClassName}>
-                      {rowInner}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </>
         ) : (
           <>
@@ -724,54 +679,57 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           </>
         )}
       </div>
-      {guided.outcome === null && guided.activeRound?.roundIndex === 0 ? (
-        <>
-          <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-            Guided diagnostic
-          </h1>
-          <p className="mt-2 text-pretty text-muted-foreground">
-            Tell us what is going on in plain language, then move through short multiple-choice screens until we can map
-            your situation and brief your advisor.
-          </p>
-        </>
-      ) : null}
-      <GuidedDiagnosticWizard
-        backLabel={backLabel}
-        canGoBack={canGoBack}
-        guided={guided}
-        suppressEmptyTemplateBootstrap={sessionTargetId !== null && !isSessionReady}
-        sessionReadOnly={sessionReadOnly}
-        marketingBookHref={
-          sessionTargetId !== null ? buildMarketingBookSessionPath(sessionTargetId) : '/book'
-        }
-        reviewDiagnosticHref={
-          sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/quiz'
-        }
-        onGoBack={executeGoBack}
-        onGuidedChange={setGuided}
-      />
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
-        <Button type="button" variant="ghost" asChild>
-          <Link href="/" className="gap-1">
-            <ChevronLeft className="size-4" aria-hidden />
-            Home
-          </Link>
-        </Button>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {showRetakeLink && !sessionReadOnly ? (
-            <Button type="button" variant="outline" asChild>
-              <Link
-                href={buildMarketingQuizRetakePath(sessionTargetId)}
-              >
-                Retake diagnostic
-              </Link>
-            </Button>
-          ) : null}
-          {canGoBack && guided.activeRound === null ? (
-            <Button type="button" variant="outline" onClick={executeGoBack}>
-              {backLabel}
-            </Button>
-          ) : null}
+      <div className="max-w-6xl mx-auto">
+        {guided.outcome === null && guided.activeRound?.roundIndex === 0 ? (
+          <>
+            <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+              Guided diagnostic
+            </h1>
+            <p className="mt-2 text-pretty text-muted-foreground">
+              Tell us what is going on in plain language, then move through short multiple-choice screens until we can map
+              your situation and brief your advisor.
+            </p>
+          </>
+        ) : null}
+        <GuidedDiagnosticWizard
+          backLabel={backLabel}
+          canGoBack={canGoBack}
+          guided={guided}
+          templateSessionMarketingRef={sessionTargetId}
+          suppressEmptyTemplateBootstrap={sessionTargetId !== null && !isSessionReady}
+          sessionReadOnly={sessionReadOnly}
+          marketingBookHref={
+            sessionTargetId !== null ? buildMarketingBookSessionPath(sessionTargetId) : '/book'
+          }
+          reviewDiagnosticHref={
+            sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/quiz'
+          }
+          onGoBack={executeGoBack}
+          onGuidedChange={setGuided}
+        />
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
+          <Button type="button" variant="ghost" asChild>
+            <Link href="/" className="gap-1">
+              <ChevronLeft className="size-4" aria-hidden />
+              Home
+            </Link>
+          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {showRetakeLink && !sessionReadOnly ? (
+              <Button type="button" variant="outline" asChild>
+                <Link
+                  href={buildMarketingQuizRetakePath(sessionTargetId)}
+                >
+                  Retake diagnostic
+                </Link>
+              </Button>
+            ) : null}
+            {canGoBack && guided.activeRound === null ? (
+              <Button type="button" variant="outline" onClick={executeGoBack}>
+                {backLabel}
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

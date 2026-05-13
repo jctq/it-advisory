@@ -69,6 +69,9 @@ type QuizSessionPayload = {
     readonly answers: QuizAnswers;
     readonly currentStep: number;
   } | null;
+  /** Encoded ref for `/quiz/[sessionRef]` and scoped template loads; omitted when no row or legacy response. */
+  readonly sessionId?: string | null;
+  readonly readOnly?: boolean;
 };
 
 type SaveQuizSessionInput = {
@@ -209,11 +212,14 @@ export class DiagnosticApiClient {
   }
 
   /**
-   * Loads the current active diagnostic template for customer-facing template mode.
+   * Loads the diagnostic template for template mode: pinned to `marketingSessionRef` when provided,
+   * otherwise the visitor’s latest session pin (if any), otherwise the globally active template.
    */
-  public async fetchActiveDiagnosticTemplate(): Promise<DiagnosticTemplatePayload> {
+  public async fetchActiveDiagnosticTemplate(marketingSessionRef?: string | null): Promise<DiagnosticTemplatePayload> {
+    const trimmed = marketingSessionRef?.trim() ?? '';
+    const query = trimmed.length > 0 ? `?sessionId=${encodeURIComponent(trimmed)}` : '';
     return this.executeJsonRequest<DiagnosticTemplatePayload>({
-      pathname: '/api/quiz/diagnostic-template',
+      pathname: `/api/quiz/diagnostic-template${query}`,
     });
   }
 

@@ -9,6 +9,7 @@ import type {
 } from '@/domain/types';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
+import { getActiveDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
 import { getDb } from '@/lib/mongodb';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
@@ -236,6 +237,17 @@ function hasMongoUri(): boolean {
   return Boolean(process.env.MONGODB_URI);
 }
 
+async function resolveActiveDiagnosticTemplateObjectId(): Promise<ObjectId | null> {
+  const template = await getActiveDiagnosticTemplate();
+  if (template === null) {
+    return null;
+  }
+  if (!ObjectId.isValid(template.id)) {
+    return null;
+  }
+  return new ObjectId(template.id);
+}
+
 export async function findIncompleteQuizSession(visitorId: string): Promise<QuizSessionDocument | null> {
   if (!hasMongoUri()) {
     return null;
@@ -425,12 +437,14 @@ export async function insertBlankQuizSessionForVisitor(visitorId: string): Promi
   const db = await getDb();
   const sessions = db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions);
   const now = new Date();
+  const templateObjectId = await resolveActiveDiagnosticTemplateObjectId();
   const insertDoc: Omit<QuizSessionDocument, '_id'> = {
     visitorId,
     answers: BLANK_QUIZ_ANSWERS,
     currentStep: 0,
     createdAt: now,
     updatedAt: now,
+    ...(templateObjectId !== null ? { diagnosticTemplateId: templateObjectId } : {}),
   };
   const insertResult = await sessions.insertOne(insertDoc);
   await insertQuizAudit({
@@ -527,13 +541,21 @@ export async function upsertQuizProgress(input: UpsertQuizProgressInput): Promis
     }
   }
   if (target !== null) {
+    const templatePinToSet =
+      target.diagnosticTemplateId !== undefined && target.diagnosticTemplateId !== null
+        ? null
+        : await resolveActiveDiagnosticTemplateObjectId();
+    const setWithTemplatePin: Record<string, unknown> = {
+      ...setFields,
+      ...(templatePinToSet !== null ? { diagnosticTemplateId: templatePinToSet } : {}),
+    };
     if (input.isComplete) {
-      await sessions.updateOne({ _id: target._id }, { $set: setFields });
+      await sessions.updateOne({ _id: target._id }, { $set: setWithTemplatePin });
     } else {
       await sessions.updateOne(
         { _id: target._id },
         {
-          $set: setFields,
+          $set: setWithTemplatePin,
           $unset: { completedAt: '' },
         },
       );
@@ -547,6 +569,7 @@ export async function upsertQuizProgress(input: UpsertQuizProgressInput): Promis
     await upsertVisitorSessionPointer(input.visitorId, target._id);
     return { persisted: true, sessionId: target._id.toString() };
   }
+  const insertTemplateId = await resolveActiveDiagnosticTemplateObjectId();
   const insertDoc: Omit<QuizSessionDocument, '_id'> = {
     visitorId: input.visitorId,
     answers: input.answers,
@@ -554,6 +577,7 @@ export async function upsertQuizProgress(input: UpsertQuizProgressInput): Promis
     createdAt: now,
     updatedAt: now,
     ...(input.isComplete ? { completedAt: now } : {}),
+    ...(insertTemplateId !== null ? { diagnosticTemplateId: insertTemplateId } : {}),
   };
   const insertResult = await sessions.insertOne(insertDoc);
   await insertQuizAudit({

@@ -892,6 +892,11 @@ export type GuidedDiagnosticWizardProps = {
   readonly marketingBookHref?: string;
   /** Destination for “Review diagnostic” (use `/quiz/[sessionRef]` when the quiz URL targets a persisted row). */
   readonly reviewDiagnosticHref?: string;
+  /**
+   * When set, `/api/quiz/diagnostic-template` is scoped to this session so the pinned template is used on revisit
+   * even if the admin activated a different template later.
+   */
+  readonly templateSessionMarketingRef?: string | null;
   readonly onGoBack: () => void;
   readonly onGuidedChange: (next: GuidedDiagnosticV1) => void;
 };
@@ -1016,6 +1021,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     sessionReadOnly = false,
     marketingBookHref = '/book',
     reviewDiagnosticHref = '/quiz',
+    templateSessionMarketingRef = null,
   } = props;
   const executeGoBackWithScroll = useCallback((): void => {
     onGoBack();
@@ -1055,12 +1061,17 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           setActiveTemplate(null);
           return;
         }
-        const templateResponse = await fetch(DIAGNOSTIC_TEMPLATE_API_URL);
+        const trimmedRef = templateSessionMarketingRef?.trim() ?? '';
+        const templateUrl =
+          trimmedRef.length > 0
+            ? `${DIAGNOSTIC_TEMPLATE_API_URL}?sessionId=${encodeURIComponent(trimmedRef)}`
+            : DIAGNOSTIC_TEMPLATE_API_URL;
+        const templateResponse = await fetch(templateUrl);
         const templateData = (await templateResponse.json()) as DiagnosticTemplateApiBody;
         if (cancelled) {
           return;
         }
-        setActiveTemplate(templateData.template);
+        setActiveTemplate(templateData.template ?? null);
       } catch {
         if (!cancelled) {
           setActiveTemplate(null);
@@ -1075,7 +1086,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [templateSessionMarketingRef]);
   useEffect(() => {
     if (suppressEmptyTemplateBootstrap) {
       return;
@@ -1696,7 +1707,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             </>
           ) : (
             <>
-              Here is the session we recommend from your answers. Use{' '}
+              Here is the session we recommend from your answers. Click{' '}
               <span className="font-medium text-foreground">Book this session</span> below to reserve your consultation, or{' '}
               <span className="font-medium text-foreground">Review diagnostic</span> to revisit your answers in this session.
             </>

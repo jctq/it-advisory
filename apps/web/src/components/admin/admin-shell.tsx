@@ -260,10 +260,8 @@ export function AdminShell(props: AdminShellProps) {
             </div>
           </div>
           <main className={cn('flex-1')}>
-            <div className="mx-auto w-full px-4 py-6 sm:px-6 lg:px-8">
-              <div className="rounded-[28px] border border-border/70 bg-background/80 p-4 shadow-sm backdrop-blur-sm sm:p-6 lg:p-8 dark:bg-card/45 dark:shadow-[0_18px_50px_rgb(2_6_23/0.18)]">
-                {props.children}
-              </div>
+            <div className="bg-background/80 px-3 py-4">
+              {props.children}
             </div>
           </main>
         </div>

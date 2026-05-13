@@ -565,3 +565,14 @@ export async function getPublicActiveDiagnosticTemplate(): Promise<PublicDiagnos
   }
   return toPublicTemplate(activeTemplate);
 }
+
+/**
+ * Customer-safe projection for any stored template id (active or not), for session-pinned loads.
+ */
+export async function getPublicDiagnosticTemplateById(templateId: string): Promise<PublicDiagnosticTemplateValue | null> {
+  const template = await getDiagnosticTemplateById(templateId);
+  if (template === null) {
+    return null;
+  }
+  return toPublicTemplate(template);
+}

@@ -359,7 +359,10 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
         }
         setDiagnosticAiEnabled(diagnosticConfig.diagnosticAiEnabled);
         if (!diagnosticConfig.diagnosticAiEnabled) {
-          const templatePayload = await clientRef.current.fetchActiveDiagnosticTemplate();
+          const ref = sessionPayload.sessionId?.trim() ?? '';
+          const templatePayload = await clientRef.current.fetchActiveDiagnosticTemplate(
+            ref.length > 0 ? ref : null,
+          );
           if (!isMounted) {
             return;
           }

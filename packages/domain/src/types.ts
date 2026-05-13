@@ -7,6 +7,11 @@ export type QuizSessionDocument = {
   visitorId: string;
   answers: QuizAnswers;
   currentStep: number;
+  /**
+   * Diagnostic template row pinned to this session (first save / blank insert).
+   * Public template loads use this id so admin “activate another template” does not break in-flight sessions.
+   */
+  diagnosticTemplateId?: ObjectId;
   completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;

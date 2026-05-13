@@ -6,6 +6,7 @@ import {
   deleteQuizSessionForVisitor,
   findLatestQuizSession,
   findQuizSessionForVisitor,
+  insertBlankQuizSessionForVisitor,
   upsertQuizProgress,
 } from '@/lib/data/quiz-sessions';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
@@ -179,14 +180,18 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     const bookedCount = await countBookingsByQuizSessionId(latestSession._id);
     if (bookedCount > 0) {
       /**
-       * Latest snapshot is already linked to a booking — do not reset it and do not insert a replacement row.
-       * (Previously we created a blank session here so the visitor had a fresh row; product prefers no new diagnostic
-       * until the user explicitly starts one from My diagnostics or /quiz.)
+       * Latest row is the diagnostic captured at checkout — it must stay in Mongo for CRM. Point the visitor at a
+       * new blank session so guests (and signed-in users) can start another diagnostic from home or `/quiz` after
+       * booking without reusing the read-only snapshot.
        */
+      const newSessionHex = await insertBlankQuizSessionForVisitor(visitorId);
+      if (newSessionHex === null) {
+        return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
+      }
       return NextResponse.json({
-        persisted: false,
-        reset: false,
-        sessionId: encodeQuizSessionRefForMarketingUrl(latestSession._id.toString()),
+        persisted: true,
+        reset: true,
+        sessionId: encodeQuizSessionRefForMarketingUrl(newSessionHex),
       });
     }
   }

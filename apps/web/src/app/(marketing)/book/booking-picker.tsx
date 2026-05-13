@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -28,6 +28,7 @@ import {
   Video,
 } from 'lucide-react';
 import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SESSION_DURATION } from '@it-advisory/diagnostic-core/project-rescue-service-context';
+import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
@@ -40,6 +41,8 @@ import {
 
 const BOOKINGS_API_URL = '/api/bookings';
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
+/** Matches `SiteHeader` (`h-16`) so booking progress sticks below the marketing nav. */
+const MARKETING_SITE_HEADER_HEIGHT_PX = 64;
 
 const TIME_SLOTS: readonly string[] = [
   '09:00 AM',
@@ -130,38 +133,15 @@ function BookingStepper(props: { readonly activePhase: BookingSlotPhase }): Reac
           })}
         </div>
       </div>
-      <div className="hidden rounded-2xl border border-border bg-card px-4 py-4 shadow-xs lg:block">
-        <ol className="grid gap-4 lg:grid-cols-3">
-          {BOOKING_STEPS.map((step, index) => {
-            const status = resolveStepStatus({ stepIndex: index, activeStepIndex: resolvedIndex });
-            return (
-              <li key={step.id} className="flex min-h-11 w-full min-w-0 items-center gap-3">
-                <span
-                  className={cn(
-                    'flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors',
-                    status === 'complete' && 'border-primary bg-primary text-primary-foreground',
-                    status === 'current' && 'border-primary bg-primary/10 text-primary',
-                    status === 'upcoming' && 'border-border bg-background text-muted-foreground',
-                  )}
-                  aria-current={status === 'current' ? 'step' : undefined}
-                >
-                  {index + 1}
-                </span>
-                <div className="min-w-0 pt-0.5">
-                  <p
-                    className={cn(
-                      'truncate text-xs font-semibold uppercase tracking-wide',
-                      status === 'current' ? 'text-primary' : 'text-muted-foreground',
-                    )}
-                  >
-                    {step.barLabel}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+      <HorizontalProgressStepper
+        className="rounded-2xl border border-border bg-card px-4 py-6 shadow-xs"
+        ariaLabel={`Booking checkout: step ${resolvedIndex + 1} of ${BOOKING_STEPS.length}, ${currentHeadline}`}
+        steps={BOOKING_STEPS.map((step, index) => ({
+          id: step.id,
+          label: step.headline,
+          status: resolveStepStatus({ stepIndex: index, activeStepIndex: resolvedIndex }),
+        }))}
+      />
     </>
   );
 }
@@ -214,6 +194,36 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId | null>('card');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successPaymentLabel, setSuccessPaymentLabel] = useState<string>('');
+  const bookingProgressStickySentinelRef = useRef<HTMLDivElement | null>(null);
+  const [isBookingProgressPinned, setIsBookingProgressPinned] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (phase !== 'date' && phase !== 'details' && phase !== 'payment') {
+      return;
+    }
+    const sentinel = bookingProgressStickySentinelRef.current;
+    if (sentinel === null) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry === undefined) {
+          return;
+        }
+        setIsBookingProgressPinned(!entry.isIntersecting);
+      },
+      {
+        root: null,
+        rootMargin: `-${MARKETING_SITE_HEADER_HEIGHT_PX}px 0px 0px 0px`,
+        threshold: 0,
+      },
+    );
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+    };
+  }, [phase]);
 
   useEffect(() => {
     const keys = Object.keys(fieldErrors);
@@ -469,322 +479,338 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const activeSlotPhase: BookingSlotPhase =
     phase === 'date' || phase === 'details' || phase === 'payment' ? phase : 'date';
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10 md:py-14">
-      <BookingStepper activePhase={activeSlotPhase} />
-      <p className="text-xs font-semibold uppercase tracking-wide text-primary mt-8">Booking</p>
-      <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-        {phase === 'date' && 'Choose Date & Time'}
-        {phase === 'details' && 'Your Details'}
-        {phase === 'payment' && 'Payment'}
-      </h1>
-      <p className="mt-2 text-pretty text-muted-foreground">
-        {phase === 'date' &&
-          `Select a slot in Philippine Time (${PRIMARY_TIMEZONE}). You can add calendar sync later — this flow captures your preference now.`}
-        {phase === 'details' &&
-          'We use this information only to confirm your reservation and to send your calendar invite and meeting link.'}
-        {phase === 'payment' && 'Choose a payment method to secure your booking.'}
-      </p>
-      {phase === 'date' ? (
-        <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_300px] lg:items-start">
-          <section className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
-            <div className="flex items-center justify-between gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="shrink-0"
-                aria-label="Previous month"
-                onClick={() => setVisibleMonth((previous) => subMonths(previous, 1))}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <p className="text-sm font-semibold text-foreground">{monthLabel}</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="shrink-0"
-                aria-label="Next month"
-                onClick={() => setVisibleMonth((previous) => addMonths(previous, 1))}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
-            <div className="mt-6 grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
-              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((label) => (
-                <div key={label} className="py-2">
-                  {label}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((day) => {
-                const inMonth = isSameMonth(day, visibleMonth);
-                const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
-                const isToday = isSameDay(day, new Date());
-                return (
-                  <button
-                    key={day.toISOString()}
-                    type="button"
-                    disabled={!inMonth}
-                    onClick={() => setSelectedDate(day)}
-                    className={cn(
-                      'aspect-square min-h-10 rounded-lg text-sm font-medium transition-colors',
-                      !inMonth && 'cursor-default opacity-0',
-                      inMonth && !isSelected && 'hover:bg-muted',
-                      inMonth && isToday && !isSelected && 'border border-primary/40',
-                      isSelected && 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
-                    )}
-                  >
-                    {format(day, 'd')}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-          <aside className="space-y-4">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-              <h2 className="text-sm font-semibold text-foreground">Available times</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Philippine Time · {PRIMARY_TIMEZONE}</p>
-              <ul className="mt-4 grid gap-2">
-                {TIME_SLOTS.map((slot) => {
-                  const isSelected = selectedTime === slot;
-                  return (
-                    <li key={slot}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTime(slot)}
-                        className={cn(
-                          'min-h-11 w-full rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors',
-                          isSelected
-                            ? 'border-primary bg-primary text-primary-foreground shadow-xs hover:bg-primary/90'
-                            : 'border-border hover:border-primary/40 hover:bg-muted/50',
-                        )}
-                      >
-                        {slot}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-            <Button
-              type="button"
-              className="w-full"
-              size="lg"
-              disabled={!selectedDate || !selectedTime}
-              onClick={executeContinueFromDate}
-            >
-              Next
-            </Button>
-            <Button type="button" variant="outline" className="w-full" asChild>
-              <Link href={activeDiagnosticHref}>Back to diagnostic</Link>
-            </Button>
-          </aside>
-        </div>
-      ) : null}
-      {phase === 'details' ? (
-        <div className="mt-10 mx-auto w-full max-w-lg lg:max-w-3xl">
-          <section
-            aria-labelledby="booking-contact-heading"
-            className="rounded-2xl border border-border bg-card shadow-xs ring-1 ring-border/40"
-          >
-            <div className="border-b border-border/80 px-6 py-6 sm:px-8 sm:py-7">
-              <h2
-                id="booking-contact-heading"
-                className="text-base font-semibold tracking-tight text-foreground sm:text-lg"
-              >
-                Contact information
-              </h2>
-              <p className="mt-2 max-w-prose text-pretty text-sm leading-relaxed text-muted-foreground">
-                Use the same email you check regularly — that is where we will send confirmations and updates.
-              </p>
-            </div>
-            <div className="px-6 py-8 sm:px-8">
-              <div className="grid grid-cols-1 gap-7 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-7">
-                <div className="min-w-0 space-y-2.5">
-                  <label htmlFor="booking-full-name" className="block text-sm font-semibold leading-none text-foreground">
-                    Full name <span className="font-normal text-destructive">*</span>
-                  </label>
-                  <Input
-                    id="booking-full-name"
-                    autoComplete="name"
-                    className="h-12 touch-manipulation rounded-xl border-border/90 text-base shadow-none sm:text-sm"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Juan Dela Cruz"
-                    aria-invalid={fieldErrors.fullName !== undefined}
-                    aria-describedby={fieldErrors.fullName !== undefined ? 'booking-full-name-error' : undefined}
-                  />
-                  {fieldErrors.fullName ? (
-                    <p id="booking-full-name-error" className="flex gap-2 text-sm text-destructive" role="alert">
-                      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                      <span>{fieldErrors.fullName}</span>
-                    </p>
-                  ) : null}
-                </div>
-                <div className="min-w-0 space-y-2.5">
-                  <label htmlFor="booking-email" className="block text-sm font-semibold leading-none text-foreground">
-                    Email address <span className="font-normal text-destructive">*</span>
-                  </label>
-                  <Input
-                    id="booking-email"
-                    type="email"
-                    autoComplete="email"
-                    inputMode="email"
-                    className="h-12 touch-manipulation rounded-xl border-border/90 text-base shadow-none sm:text-sm"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="juan.delacruz@email.com"
-                    aria-invalid={fieldErrors.email !== undefined}
-                    aria-describedby={fieldErrors.email !== undefined ? 'booking-email-error' : undefined}
-                  />
-                  {fieldErrors.email ? (
-                    <p id="booking-email-error" className="flex gap-2 text-sm text-destructive" role="alert">
-                      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                      <span>{fieldErrors.email}</span>
-                    </p>
-                  ) : null}
-                </div>
-                <div className="min-w-0 space-y-2.5">
-                  <label htmlFor="booking-company" className="block text-sm font-semibold leading-none text-foreground">
-                    Company / business name{' '}
-                    <span className="font-normal text-muted-foreground">(optional)</span>
-                  </label>
-                  <Input
-                    id="booking-company"
-                    autoComplete="organization"
-                    className="h-12 touch-manipulation rounded-xl border-border/90 text-base shadow-none sm:text-sm"
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                    placeholder="ABC Trading"
-                  />
-                </div>
-                <div className="min-w-0 space-y-2.5">
-                  <label htmlFor="booking-phone" className="block text-sm font-semibold leading-none text-foreground">
-                    Phone number <span className="font-normal text-destructive">*</span>
-                  </label>
-                  <Input
-                    id="booking-phone"
-                    type="tel"
-                    autoComplete="tel"
-                    inputMode="tel"
-                    className="h-12 touch-manipulation rounded-xl border-border/90 text-base shadow-none sm:text-sm"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="0912 345 6789"
-                    aria-invalid={fieldErrors.phone !== undefined}
-                    aria-describedby={fieldErrors.phone !== undefined ? 'booking-phone-error' : undefined}
-                  />
-                  {fieldErrors.phone ? (
-                    <p id="booking-phone-error" className="flex gap-2 text-sm text-destructive" role="alert">
-                      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                      <span>{fieldErrors.phone}</span>
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-              <div className="mt-10 flex flex-col gap-3 border-t border-border/80 pt-8 sm:flex-row sm:items-stretch sm:gap-4">
+    <div className="mx-auto px-6 py-12">
+      <div
+        ref={bookingProgressStickySentinelRef}
+        className="hidden h-px w-full shrink-0 lg:block"
+        aria-hidden
+      />
+      <div
+        className={cn(
+          'mb-8 space-y-3 transition-[box-shadow,background-color,border-color] duration-200 lg:sticky lg:top-16 lg:z-40 lg:-mx-6 lg:border-b lg:px-6 lg:py-4 lg:backdrop-blur',
+          isBookingProgressPinned
+            ? 'lg:border-border lg:bg-background lg:shadow-md lg:supports-backdrop-filter:bg-background/92'
+            : 'lg:border-transparent lg:bg-background/85 lg:supports-backdrop-filter:bg-background/70',
+        )}
+      >
+        <BookingStepper activePhase={activeSlotPhase} />
+      </div>
+      <div className="max-w-6xl mx-auto">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary mt-8">Booking</p>
+        <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+          {phase === 'date' && 'Choose Date & Time'}
+          {phase === 'details' && 'Your Details'}
+          {phase === 'payment' && 'Payment'}
+        </h1>
+        <p className="mt-2 text-pretty text-muted-foreground">
+          {phase === 'date' &&
+            `Select a slot in Philippine Time (${PRIMARY_TIMEZONE}). You can add calendar sync later — this flow captures your preference now.`}
+          {phase === 'details' &&
+            'We use this information only to confirm your reservation and to send your calendar invite and meeting link.'}
+          {phase === 'payment' && 'Choose a payment method to secure your booking.'}
+        </p>
+        {phase === 'date' ? (
+          <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_300px] lg:items-start">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
+              <div className="flex items-center justify-between gap-4">
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-12 min-h-12 shrink-0 gap-2 sm:w-auto sm:px-6"
-                  onClick={executeBackToDate}
+                  size="icon"
+                  className="shrink-0"
+                  aria-label="Previous month"
+                  onClick={() => setVisibleMonth((previous) => subMonths(previous, 1))}
                 >
-                  <ChevronLeft className="size-4" aria-hidden />
-                  Back
+                  <ChevronLeft className="size-4" />
                 </Button>
+                <p className="text-sm font-semibold text-foreground">{monthLabel}</p>
                 <Button
                   type="button"
-                  className="h-12 min-h-12 flex-1 text-base font-semibold sm:min-w-0"
-                  size="lg"
-                  onClick={executeContinueFromDetails}
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  aria-label="Next month"
+                  onClick={() => setVisibleMonth((previous) => addMonths(previous, 1))}
                 >
-                  Next
+                  <ChevronRight className="size-4" />
                 </Button>
               </div>
-            </div>
-          </section>
-        </div>
-      ) : null}
-      {phase === 'payment' ? (
-        <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_340px] lg:items-start">
-          <div className="space-y-6">
-            <fieldset>
-              <legend className="text-sm font-semibold text-foreground">Payment method</legend>
-              <div className="mt-4 space-y-3">
-                {PAYMENT_METHOD_OPTIONS.map((option) => {
-                  const isSelected = paymentMethod === option.id;
+              <div className="mt-6 grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
+                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((label) => (
+                  <div key={label} className="py-2">
+                    {label}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map((day) => {
+                  const inMonth = isSameMonth(day, visibleMonth);
+                  const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+                  const isToday = isSameDay(day, new Date());
                   return (
-                    <label
-                      key={option.id}
+                    <button
+                      key={day.toISOString()}
+                      type="button"
+                      disabled={!inMonth}
+                      onClick={() => setSelectedDate(day)}
                       className={cn(
-                        'flex cursor-pointer items-center gap-4 rounded-2xl border bg-card p-4 shadow-xs transition-colors',
-                        isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-border hover:border-primary/30',
+                        'aspect-square min-h-10 rounded-lg text-sm font-medium transition-colors',
+                        !inMonth && 'cursor-default opacity-0',
+                        inMonth && !isSelected && 'hover:bg-muted',
+                        inMonth && isToday && !isSelected && 'border border-primary/40',
+                        isSelected && 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="payment-method"
-                        value={option.id}
-                        checked={isSelected}
-                        onChange={() => setPaymentMethod(option.id)}
-                        className="size-4 accent-primary"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                        <p className="text-xs text-muted-foreground">{option.hint}</p>
-                      </div>
-                      {option.id === 'card' ? <CreditCard className="size-6 shrink-0 text-muted-foreground" aria-hidden /> : null}
-                    </label>
+                      {format(day, 'd')}
+                    </button>
                   );
                 })}
               </div>
-            </fieldset>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button type="button" variant="outline" onClick={executeBackToDetails} className="gap-2">
-                <ChevronLeft className="size-4" aria-hidden />
-                Back
+            </section>
+            <aside className="space-y-4">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+                <h2 className="text-sm font-semibold text-foreground">Available times</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Philippine Time · {PRIMARY_TIMEZONE}</p>
+                <ul className="mt-4 grid gap-2">
+                  {TIME_SLOTS.map((slot) => {
+                    const isSelected = selectedTime === slot;
+                    return (
+                      <li key={slot}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTime(slot)}
+                          className={cn(
+                            'min-h-11 w-full rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors',
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground shadow-xs hover:bg-primary/90'
+                              : 'border-border hover:border-primary/40 hover:bg-muted/50',
+                          )}
+                        >
+                          {slot}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <Button
+                type="button"
+                className="w-full"
+                size="lg"
+                disabled={!selectedDate || !selectedTime}
+                onClick={executeContinueFromDate}
+              >
+                Next
               </Button>
-            </div>
+              <Button type="button" variant="outline" className="w-full" asChild>
+                <Link href={activeDiagnosticHref}>Back to diagnostic</Link>
+              </Button>
+            </aside>
           </div>
-          <aside className="space-y-4 lg:sticky lg:top-28">
-            <div className="rounded-2xl border border-border bg-muted/30 p-5">
-              <p className="text-sm font-semibold text-foreground">{PROJECT_RESCUE_SERVICE_TITLE}</p>
-              <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <dt className="text-xs text-muted-foreground">Duration</dt>
-                  <dd className="mt-1 font-semibold text-foreground">{PROJECT_RESCUE_SESSION_DURATION}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-muted-foreground">Amount</dt>
-                  <dd className="mt-1 font-semibold text-foreground">{CHECKOUT_AMOUNT_LABEL}</dd>
-                </div>
-              </dl>
-              <p className="mt-2 text-xs text-muted-foreground">Inclusive of VAT</p>
-            </div>
-            <div className="flex gap-3 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
-              <Lock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-              <div>
-                <p className="text-sm font-semibold text-foreground">Secure checkout</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Your payment is safe and encrypted. We never store your card details on this site.
+        ) : null}
+        {phase === 'details' ? (
+          <div className="mt-10 mx-auto w-full max-w-lg lg:max-w-3xl">
+            <section
+              aria-labelledby="booking-contact-heading"
+              className="rounded-2xl border border-border bg-card shadow-xs ring-1 ring-border/40"
+            >
+              <div className="border-b border-border/80 px-6 py-6 sm:px-8 sm:py-7">
+                <h2
+                  id="booking-contact-heading"
+                  className="text-base font-semibold tracking-tight text-foreground sm:text-lg"
+                >
+                  Contact information
+                </h2>
+                <p className="mt-2 max-w-prose text-pretty text-sm leading-relaxed text-muted-foreground">
+                  Use the same email you check regularly — that is where we will send confirmations and updates.
                 </p>
               </div>
+              <div className="px-6 py-8 sm:px-8">
+                <div className="grid grid-cols-1 gap-7 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-7">
+                  <div className="min-w-0 space-y-2.5">
+                    <label htmlFor="booking-full-name" className="block text-sm font-semibold leading-none text-foreground">
+                      Full name <span className="font-normal text-destructive">*</span>
+                    </label>
+                    <Input
+                      id="booking-full-name"
+                      autoComplete="name"
+                      className="h-12 touch-manipulation rounded-xl border-border/90 text-base shadow-none sm:text-sm"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Juan Dela Cruz"
+                      aria-invalid={fieldErrors.fullName !== undefined}
+                      aria-describedby={fieldErrors.fullName !== undefined ? 'booking-full-name-error' : undefined}
+                    />
+                    {fieldErrors.fullName ? (
+                      <p id="booking-full-name-error" className="flex gap-2 text-sm text-destructive" role="alert">
+                        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                        <span>{fieldErrors.fullName}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 space-y-2.5">
+                    <label htmlFor="booking-email" className="block text-sm font-semibold leading-none text-foreground">
+                      Email address <span className="font-normal text-destructive">*</span>
+                    </label>
+                    <Input
+                      id="booking-email"
+                      type="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      className="h-12 touch-manipulation rounded-xl border-border/90 text-base shadow-none sm:text-sm"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="juan.delacruz@email.com"
+                      aria-invalid={fieldErrors.email !== undefined}
+                      aria-describedby={fieldErrors.email !== undefined ? 'booking-email-error' : undefined}
+                    />
+                    {fieldErrors.email ? (
+                      <p id="booking-email-error" className="flex gap-2 text-sm text-destructive" role="alert">
+                        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                        <span>{fieldErrors.email}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 space-y-2.5">
+                    <label htmlFor="booking-company" className="block text-sm font-semibold leading-none text-foreground">
+                      Company / business name{' '}
+                      <span className="font-normal text-muted-foreground">(optional)</span>
+                    </label>
+                    <Input
+                      id="booking-company"
+                      autoComplete="organization"
+                      className="h-12 touch-manipulation rounded-xl border-border/90 text-base shadow-none sm:text-sm"
+                      value={company}
+                      onChange={(e) => setCompany(e.target.value)}
+                      placeholder="ABC Trading"
+                    />
+                  </div>
+                  <div className="min-w-0 space-y-2.5">
+                    <label htmlFor="booking-phone" className="block text-sm font-semibold leading-none text-foreground">
+                      Phone number <span className="font-normal text-destructive">*</span>
+                    </label>
+                    <Input
+                      id="booking-phone"
+                      type="tel"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      className="h-12 touch-manipulation rounded-xl border-border/90 text-base shadow-none sm:text-sm"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="0912 345 6789"
+                      aria-invalid={fieldErrors.phone !== undefined}
+                      aria-describedby={fieldErrors.phone !== undefined ? 'booking-phone-error' : undefined}
+                    />
+                    {fieldErrors.phone ? (
+                      <p id="booking-phone-error" className="flex gap-2 text-sm text-destructive" role="alert">
+                        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                        <span>{fieldErrors.phone}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-10 flex flex-col gap-3 border-t border-border/80 pt-8 sm:flex-row sm:items-stretch sm:gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 min-h-12 shrink-0 gap-2 sm:w-auto sm:px-6"
+                    onClick={executeBackToDate}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden />
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-12 min-h-12 flex-1 text-base font-semibold sm:min-w-0"
+                    size="lg"
+                    onClick={executeContinueFromDetails}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </section>
+          </div>
+        ) : null}
+        {phase === 'payment' ? (
+          <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_340px] lg:items-start">
+            <div className="space-y-6">
+              <fieldset>
+                <legend className="text-sm font-semibold text-foreground">Payment method</legend>
+                <div className="mt-4 space-y-3">
+                  {PAYMENT_METHOD_OPTIONS.map((option) => {
+                    const isSelected = paymentMethod === option.id;
+                    return (
+                      <label
+                        key={option.id}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-4 rounded-2xl border bg-card p-4 shadow-xs transition-colors',
+                          isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-border hover:border-primary/30',
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="payment-method"
+                          value={option.id}
+                          checked={isSelected}
+                          onChange={() => setPaymentMethod(option.id)}
+                          className="size-4 accent-primary"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-foreground">{option.label}</p>
+                          <p className="text-xs text-muted-foreground">{option.hint}</p>
+                        </div>
+                        {option.id === 'card' ? <CreditCard className="size-6 shrink-0 text-muted-foreground" aria-hidden /> : null}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button type="button" variant="outline" onClick={executeBackToDetails} className="gap-2">
+                  <ChevronLeft className="size-4" aria-hidden />
+                  Back
+                </Button>
+              </div>
             </div>
-            <Button
-              type="button"
-              className="w-full gap-2"
-              size="lg"
-              disabled={paymentMethod === null}
-              onClick={() => void executePay()}
-            >
-              <Lock className="size-4" aria-hidden />
-              Pay {CHECKOUT_AMOUNT_LABEL}
-            </Button>
-          </aside>
-        </div>
-      ) : null}
+            <aside className="space-y-4 lg:sticky lg:top-60">
+              <div className="rounded-2xl border border-border bg-muted/30 p-5">
+                <p className="text-sm font-semibold text-foreground">{PROJECT_RESCUE_SERVICE_TITLE}</p>
+                <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Duration</dt>
+                    <dd className="mt-1 font-semibold text-foreground">{PROJECT_RESCUE_SESSION_DURATION}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Amount</dt>
+                    <dd className="mt-1 font-semibold text-foreground">{CHECKOUT_AMOUNT_LABEL}</dd>
+                  </div>
+                </dl>
+                <p className="mt-2 text-xs text-muted-foreground">Inclusive of VAT</p>
+              </div>
+              <div className="flex gap-3 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+                <Lock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Secure checkout</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Your payment is safe and encrypted. We never store your card details on this site.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                className="w-full gap-2"
+                size="lg"
+                disabled={paymentMethod === null}
+                onClick={() => void executePay()}
+              >
+                <Lock className="size-4" aria-hidden />
+                Pay {CHECKOUT_AMOUNT_LABEL}
+              </Button>
+            </aside>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
