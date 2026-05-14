@@ -493,7 +493,9 @@ function NestedOptionsRoundRenderer(props: {
     props.question.selectionMode === 'single' ? getTerminalSelectedOptionId(props.selection) : null;
   const [requestedActiveOptionId, setRequestedActiveOptionId] = useState<string | null>(null);
   useEffect(() => {
-    setRequestedActiveOptionId(null);
+    queueMicrotask(() => {
+      setRequestedActiveOptionId(null);
+    });
   }, [props.question.id]);
   const selectionDefaultPanelId = useMemo(
     () =>

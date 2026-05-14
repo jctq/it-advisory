@@ -69,18 +69,20 @@ export function HorizontalProgressStepper(props: HorizontalProgressStepperProps)
                 : 'bg-border',
           );
           const circleClassName = cn(
-            'relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums transition-colors duration-200 motion-reduce:transition-none',
+            'relative z-10 flex shrink-0 items-center justify-center rounded-full font-semibold tabular-nums transition-[color,background-color,transform,box-shadow,width,height] duration-200 motion-reduce:transition-none',
+            'size-8 text-xs',
             step.status === 'complete' && 'bg-green-800 text-white shadow-sm dark:bg-green-900',
             step.status === 'current' && 'bg-primary text-primary-foreground shadow-sm',
             step.status === 'upcoming' && 'bg-muted text-muted-foreground',
           );
           const labelClassName = cn(
-            'mt-3 block w-full max-w-[10rem] text-pretty text-center text-sm font-medium leading-snug sm:max-w-none',
+            'mx-auto block w-full text-pretty text-center font-medium leading-snug transition-[margin,font-size] duration-200 motion-reduce:transition-none',
+            'mt-1.5 max-w-[6.5rem] text-xs sm:max-w-[8rem]',
             step.status === 'current' ? 'text-foreground' : 'text-muted-foreground',
           );
           const stepBody = (
             <>
-              <div className="flex h-10 w-full min-w-0 shrink-0 items-center">
+              <div className="flex h-8 w-full min-w-0 shrink-0 items-center transition-[height] duration-200 motion-reduce:transition-none">
                 <span className={leftLineClassName} aria-hidden />
                 <span className={circleClassName}>{stepNumber}</span>
                 <span className={rightLineClassName} aria-hidden />
@@ -96,7 +98,7 @@ export function HorizontalProgressStepper(props: HorizontalProgressStepperProps)
                 <button
                   type="button"
                   className={cn(
-                    'group flex w-full flex-col rounded-xl py-1 transition-colors',
+                    'group flex w-full flex-col rounded-xl py-0.5 transition-colors duration-200 motion-reduce:transition-none',
                     'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35',
                   )}
                   onClick={() => onStepClick?.(stepIndex)}
@@ -109,7 +111,7 @@ export function HorizontalProgressStepper(props: HorizontalProgressStepperProps)
           }
           return (
             <li key={step.id} className={itemClassName} aria-current={liAriaCurrent}>
-              <div className="py-1">{stepBody}</div>
+              <div className="py-0.5">{stepBody}</div>
             </li>
           );
         })}

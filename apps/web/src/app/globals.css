@@ -217,3 +217,48 @@
     }
   }
 }
+
+/**
+ * Admin schedule week preview (FullCalendar): align toolbar and grid with app tokens.
+ */
+@layer components {
+  .fc-advisor-preview .fc {
+    --fc-border-color: var(--border);
+    --fc-page-bg-color: var(--background);
+    --fc-neutral-bg-color: var(--muted);
+    --fc-today-bg-color: color-mix(in oklch, var(--primary) 10%, transparent);
+    --fc-now-indicator-color: var(--primary);
+    --fc-button-text-color: var(--foreground);
+    --fc-button-bg-color: var(--background);
+    --fc-button-border-color: var(--border);
+    --fc-button-hover-bg-color: var(--muted);
+    --fc-button-active-bg-color: color-mix(in oklch, var(--muted) 85%, var(--foreground));
+    font-size: 0.8125rem;
+  }
+  .fc-advisor-preview .fc-toolbar {
+    @apply mx-0 flex flex-nowrap items-center gap-2 px-2 py-2 sm:gap-3 sm:px-3;
+    flex-wrap: nowrap;
+  }
+  .fc-advisor-preview .fc-toolbar-chunk {
+    @apply flex min-w-0 shrink items-center gap-1;
+  }
+  .fc-advisor-preview .fc-toolbar-title {
+    @apply truncate text-center text-sm font-semibold tracking-tight text-foreground;
+    max-width: 100%;
+  }
+  .fc-advisor-preview .fc-button {
+    @apply rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium shadow-xs;
+  }
+  .fc-advisor-preview .fc-button-primary:not(:disabled) {
+    @apply bg-primary text-primary-foreground hover:opacity-90;
+  }
+  .fc-advisor-preview .fc-col-header-cell {
+    @apply py-2 text-xs font-medium text-muted-foreground;
+  }
+  .fc-advisor-preview .fc-timegrid-slot-label {
+    @apply text-[0.6875rem] text-muted-foreground;
+  }
+  .fc-advisor-preview .fc-timegrid-axis-cushion {
+    @apply px-1;
+  }
+}

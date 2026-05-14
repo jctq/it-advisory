@@ -3,18 +3,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import {
-  addMonths,
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  format,
-  isSameDay,
-  isSameMonth,
-  startOfMonth,
-  startOfWeek,
-  subMonths,
-} from 'date-fns';
+import { addMonths, parse } from 'date-fns';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import {
   AlertCircle,
   CalendarClock,
@@ -27,10 +17,22 @@ import {
   Shield,
   Video,
 } from 'lucide-react';
+import { fetchMarketingServerClockOffsetMs } from '@it-advisory/api-client/marketing-booking-api-client';
 import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SESSION_DURATION } from '@it-advisory/diagnostic-core/project-rescue-service-context';
+import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { buildApiUrl } from '@/lib/config/build-api-url';
+import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
+import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-slot-times-for-manila-date';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import {
@@ -40,23 +42,19 @@ import {
 } from '@/lib/marketing/quiz-session-marketing-ref';
 
 const BOOKINGS_API_URL = '/api/bookings';
-const QUIZ_SESSION_API_URL = '/api/quiz/session';
-/** Matches `SiteHeader` (`h-16`) so booking progress sticks below the marketing nav. */
-const MARKETING_SITE_HEADER_HEIGHT_PX = 64;
+const AVAILABILITY_API_URL = buildApiUrl('/api/booking/availability');
 
-const TIME_SLOTS: readonly string[] = [
-  '09:00 AM',
-  '10:00 AM',
-  '11:00 AM',
-  '01:00 PM',
-  '02:00 PM',
-  '03:00 PM',
-  '04:00 PM',
-  '07:00 PM',
-];
+function resolveMarketingClientApiBaseUrl(): string {
+  if (AVAILABILITY_API_URL.startsWith('http://') || AVAILABILITY_API_URL.startsWith('https://')) {
+    return new URL(AVAILABILITY_API_URL).origin;
+  }
+  return '';
+}
+
+const MARKETING_CLIENT_API_BASE_URL = resolveMarketingClientApiBaseUrl();
+const DEFAULT_SERVICE_KEY = 'project-rescue' as const;
 
 const CHECKOUT_AMOUNT_LABEL = '₱6,000.00';
-
 type BookingSlotPhase = 'date' | 'details' | 'payment';
 
 type BookingPhase = BookingSlotPhase | 'processing' | 'success' | 'error';
@@ -87,6 +85,14 @@ const BOOKING_STEPS: readonly {
   { id: 'payment', barLabel: 'PAYMENT', headline: 'Payment' },
 ];
 
+function addManilaYearMonth(manilaYearMonth: string, deltaMonths: number): string {
+  const pivot = fromZonedTime(
+    parse(`${manilaYearMonth}-15 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)),
+    PRIMARY_TIMEZONE,
+  );
+  return formatInTimeZone(addMonths(pivot, deltaMonths), PRIMARY_TIMEZONE, 'yyyy-MM');
+}
+
 function resolveStepStatus(params: {
   readonly stepIndex: number;
   readonly activeStepIndex: number;
@@ -101,32 +107,33 @@ function resolveStepStatus(params: {
 }
 
 function BookingStepper(props: { readonly activePhase: BookingSlotPhase }): ReactElement {
-  const activeStepIndex = BOOKING_STEPS.findIndex((s) => s.id === props.activePhase);
+  const { activePhase } = props;
+  const activeStepIndex = BOOKING_STEPS.findIndex((s) => s.id === activePhase);
   const resolvedIndex = activeStepIndex >= 0 ? activeStepIndex : 0;
   const currentStep = BOOKING_STEPS[resolvedIndex] ?? BOOKING_STEPS[0];
   const currentHeadline = currentStep?.headline ?? '';
   return (
     <>
       <div
-        className="flex flex-col gap-2 lg:hidden"
+        className="flex flex-col gap-1 lg:hidden"
         role="group"
         aria-label={`Booking checkout: step ${resolvedIndex + 1} of ${BOOKING_STEPS.length}, ${currentHeadline}`}
       >
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Step {resolvedIndex + 1} of {BOOKING_STEPS.length}
           </p>
-          <p className="min-w-0 truncate text-right text-sm font-semibold text-foreground">{currentHeadline}</p>
+          <p className="min-w-0 truncate text-right text-xs font-semibold text-foreground">{currentHeadline}</p>
         </div>
         <div className="flex items-center gap-1">
           {BOOKING_STEPS.map((step, stepIndex) => {
             const status = resolveStepStatus({ stepIndex, activeStepIndex: resolvedIndex });
             const barClassName = cn(
-              'h-1.5 w-full rounded-full transition-colors',
+              'h-1 w-full rounded-full',
               status === 'complete' ? 'bg-primary' : status === 'current' ? 'bg-primary/60' : 'bg-muted',
             );
             return (
-              <div key={step.id} className="flex min-h-11 min-w-0 flex-1 items-center px-0.5">
+              <div key={step.id} className="flex min-h-9 min-w-0 flex-1 items-center px-0.5">
                 <span className={barClassName} aria-hidden />
               </div>
             );
@@ -134,7 +141,7 @@ function BookingStepper(props: { readonly activePhase: BookingSlotPhase }): Reac
         </div>
       </div>
       <HorizontalProgressStepper
-        className="rounded-2xl border border-border bg-card px-4 py-6 shadow-xs"
+        className="rounded-2xl border border-border bg-card px-3 py-2.5 shadow-xs lg:rounded-xl"
         ariaLabel={`Booking checkout: step ${resolvedIndex + 1} of ${BOOKING_STEPS.length}, ${currentHeadline}`}
         steps={BOOKING_STEPS.map((step, index) => ({
           id: step.id,
@@ -182,48 +189,51 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return searchParams.get('sessionId')?.trim() ?? '';
   }, [pathSessionRef, searchParams]);
   const hasValidQuizSessionParam = isPlausibleMarketingQuizSessionRef(quizSessionRef);
+  const hasUserNavigatedVisibleMonthRef = useRef<boolean>(false);
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null);
   const [phase, setPhase] = useState<BookingPhase>('date');
-  const [visibleMonth, setVisibleMonth] = useState<Date>(() => startOfMonth(new Date()));
-  const [selectedDate, setSelectedDate] = useState<Date | null>(() => new Date());
-  const [selectedTime, setSelectedTime] = useState<string | null>('11:00 AM');
+  const [visibleManilaYearMonth, setVisibleManilaYearMonth] = useState<string>(() =>
+    formatInTimeZone(new Date(), PRIMARY_TIMEZONE, 'yyyy-MM'),
+  );
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [slotDialogOpen, setSlotDialogOpen] = useState<boolean>(false);
+  const [slotDialogManilaYmd, setSlotDialogManilaYmd] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [company, setCompany] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId | null>('card');
+  const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, readonly string[]>>({});
+  const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle');
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successPaymentLabel, setSuccessPaymentLabel] = useState<string>('');
-  const bookingProgressStickySentinelRef = useRef<HTMLDivElement | null>(null);
-  const [isBookingProgressPinned, setIsBookingProgressPinned] = useState<boolean>(false);
 
   useEffect(() => {
-    if (phase !== 'date' && phase !== 'details' && phase !== 'payment') {
-      return;
-    }
-    const sentinel = bookingProgressStickySentinelRef.current;
-    if (sentinel === null) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry === undefined) {
-          return;
-        }
-        setIsBookingProgressPinned(!entry.isIntersecting);
-      },
-      {
-        root: null,
-        rootMargin: `-${MARKETING_SITE_HEADER_HEIGHT_PX}px 0px 0px 0px`,
-        threshold: 0,
-      },
-    );
-    observer.observe(sentinel);
+    const controller = new AbortController();
+    void fetchMarketingServerClockOffsetMs({ apiBaseUrl: MARKETING_CLIENT_API_BASE_URL, signal: controller.signal }).then((offset) => {
+      if (controller.signal.aborted || offset === null) {
+        return;
+      }
+      setServerClockOffsetMs(offset);
+    });
     return () => {
-      observer.disconnect();
+      controller.abort();
     };
-  }, [phase]);
+  }, []);
+
+  useEffect(() => {
+    if (serverClockOffsetMs === null) {
+      return;
+    }
+    if (hasUserNavigatedVisibleMonthRef.current) {
+      return;
+    }
+    const serverSyncedNow = new Date(Date.now() + serverClockOffsetMs);
+    setVisibleManilaYearMonth(formatInTimeZone(serverSyncedNow, PRIMARY_TIMEZONE, 'yyyy-MM'));
+  }, [serverClockOffsetMs]);
 
   useEffect(() => {
     const keys = Object.keys(fieldErrors);
@@ -248,18 +258,109 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     });
   }, [fieldErrors]);
 
-  const monthLabel = format(visibleMonth, 'MMMM yyyy');
-  const calendarDays = useMemo(() => {
-    const monthStart = startOfMonth(visibleMonth);
-    const monthEnd = endOfMonth(visibleMonth);
-    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-    return eachDayOfInterval({ start: gridStart, end: gridEnd });
-  }, [visibleMonth]);
+  const monthLabel = formatInTimeZone(
+    fromZonedTime(
+      parse(`${visibleManilaYearMonth}-01 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)),
+      PRIMARY_TIMEZONE,
+    ),
+    PRIMARY_TIMEZONE,
+    'MMMM yyyy',
+  );
+  const manilaFetchBounds = useMemo(
+    () => resolveManilaMonthGridYmdBounds(visibleManilaYearMonth),
+    [visibleManilaYearMonth],
+  );
+  const selectedManilaYmd =
+    selectedDate !== null ? formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd') : null;
+  const pendingManilaYmd = slotDialogOpen && slotDialogManilaYmd !== null ? slotDialogManilaYmd : null;
+
+  type AvailabilityApiSlot = {
+    readonly date: string;
+    readonly time: string;
+    readonly startsAtIso: string;
+  };
+
+  useEffect(() => {
+    if (phase !== 'date') {
+      return;
+    }
+    const from = manilaFetchBounds.from;
+    const to = manilaFetchBounds.to;
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      setAvailabilityStatus('loading');
+      setAvailabilityError(null);
+    });
+    const url = `${AVAILABILITY_API_URL}?serviceKey=${encodeURIComponent(DEFAULT_SERVICE_KEY)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+    void fetch(url, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = (await response.json()) as { slots?: AvailabilityApiSlot[]; error?: string };
+        if (!response.ok) {
+          throw new Error(typeof payload.error === 'string' ? payload.error : 'Failed to load times');
+        }
+        return payload.slots ?? [];
+      })
+      .then((slots) => {
+        const map: Record<string, string[]> = {};
+        for (const row of slots) {
+          const existing = map[row.date];
+          if (existing === undefined) {
+            map[row.date] = [row.time];
+          } else {
+            existing.push(row.time);
+          }
+        }
+        for (const key of Object.keys(map)) {
+          const list = map[key];
+          if (list !== undefined) {
+            sortBookingSlotTimesForManilaDate(key, list);
+          }
+        }
+        setAvailabilityByDate(map);
+        setAvailabilityStatus('ready');
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        setAvailabilityByDate({});
+        setAvailabilityStatus('error');
+        setAvailabilityError(error instanceof Error ? error.message : 'Failed to load times');
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [phase, manilaFetchBounds]);
+
+  useEffect(() => {
+    if (phase !== 'date' || selectedDate === null) {
+      return;
+    }
+    const ymd = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
+    const times = availabilityByDate[ymd] ?? [];
+    queueMicrotask(() => {
+      setSelectedTime((previous) => {
+        if (times.length === 0) {
+          return null;
+        }
+        if (previous !== null && times.includes(previous)) {
+          return previous;
+        }
+        return times[0] ?? null;
+      });
+    });
+  }, [availabilityByDate, selectedDate, phase]);
+
+  const slotsForSelectedDay = useMemo((): readonly string[] => {
+    if (selectedDate === null) {
+      return [];
+    }
+    return availabilityByDate[formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd')] ?? [];
+  }, [selectedDate, availabilityByDate]);
 
   const displayDateLong =
     selectedDate !== null
-      ? format(selectedDate, 'EEEE, MMMM d, yyyy')
+      ? formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'EEEE, MMMM d, yyyy')
       : '';
   const displayTimeLabel = selectedTime ?? '';
   const activeDiagnosticHref = hasValidQuizSessionParam
@@ -307,11 +408,11 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 900);
     });
-    const dateParam = format(selectedDate, 'yyyy-MM-dd');
+    const dateParam = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
     const body: Record<string, string> = {
       date: dateParam,
       time: selectedTime,
-      serviceKey: 'project-rescue',
+      serviceKey: DEFAULT_SERVICE_KEY,
       customerName: fullName.trim(),
       customerEmail: email.trim(),
       customerPhone: phone.trim(),
@@ -344,7 +445,6 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         setPhase('error');
         return;
       }
-      await fetch(QUIZ_SESSION_API_URL, { method: 'DELETE', credentials: 'include' });
       void router.refresh();
       setSuccessPaymentLabel(resolvedPaymentLabel);
       setPhase('success');
@@ -480,19 +580,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     phase === 'date' || phase === 'details' || phase === 'payment' ? phase : 'date';
   return (
     <div className="mx-auto px-6 py-12">
-      <div
-        ref={bookingProgressStickySentinelRef}
-        className="hidden h-px w-full shrink-0 lg:block"
-        aria-hidden
-      />
-      <div
-        className={cn(
-          'mb-8 space-y-3 transition-[box-shadow,background-color,border-color] duration-200 lg:sticky lg:top-16 lg:z-40 lg:-mx-6 lg:border-b lg:px-6 lg:py-4 lg:backdrop-blur',
-          isBookingProgressPinned
-            ? 'lg:border-border lg:bg-background lg:shadow-md lg:supports-backdrop-filter:bg-background/92'
-            : 'lg:border-transparent lg:bg-background/85 lg:supports-backdrop-filter:bg-background/70',
-        )}
-      >
+      <div className="mb-8 space-y-3 lg:sticky lg:top-16 lg:z-40 lg:-mx-6 lg:border-b lg:border-border lg:bg-background lg:px-6 lg:py-2 lg:shadow-md lg:backdrop-blur lg:supports-backdrop-filter:bg-background/92">
         <BookingStepper activePhase={activeSlotPhase} />
       </div>
       <div className="max-w-6xl mx-auto">
@@ -510,101 +598,179 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           {phase === 'payment' && 'Choose a payment method to secure your booking.'}
         </p>
         {phase === 'date' ? (
-          <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_300px] lg:items-start">
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
-              <div className="flex items-center justify-between gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                  aria-label="Previous month"
-                  onClick={() => setVisibleMonth((previous) => subMonths(previous, 1))}
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <p className="text-sm font-semibold text-foreground">{monthLabel}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                  aria-label="Next month"
-                  onClick={() => setVisibleMonth((previous) => addMonths(previous, 1))}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
-              <div className="mt-6 grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
-                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((label) => (
-                  <div key={label} className="py-2">
-                    {label}
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((day) => {
-                  const inMonth = isSameMonth(day, visibleMonth);
-                  const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
-                  const isToday = isSameDay(day, new Date());
-                  return (
-                    <button
-                      key={day.toISOString()}
-                      type="button"
-                      disabled={!inMonth}
-                      onClick={() => setSelectedDate(day)}
-                      className={cn(
-                        'aspect-square min-h-10 rounded-lg text-sm font-medium transition-colors',
-                        !inMonth && 'cursor-default opacity-0',
-                        inMonth && !isSelected && 'hover:bg-muted',
-                        inMonth && isToday && !isSelected && 'border border-primary/40',
-                        isSelected && 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
-                      )}
-                    >
-                      {format(day, 'd')}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-            <aside className="space-y-4">
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
-                <h2 className="text-sm font-semibold text-foreground">Available times</h2>
-                <p className="mt-1 text-xs text-muted-foreground">Philippine Time · {PRIMARY_TIMEZONE}</p>
-                <ul className="mt-4 grid gap-2">
-                  {TIME_SLOTS.map((slot) => {
-                    const isSelected = selectedTime === slot;
-                    return (
-                      <li key={slot}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedTime(slot)}
-                          className={cn(
-                            'min-h-11 w-full rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors',
-                            isSelected
-                              ? 'border-primary bg-primary text-primary-foreground shadow-xs hover:bg-primary/90'
-                              : 'border-border hover:border-primary/40 hover:bg-muted/50',
-                          )}
-                        >
-                          {slot}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-              <Button
-                type="button"
-                className="w-full"
-                size="lg"
-                disabled={!selectedDate || !selectedTime}
-                onClick={executeContinueFromDate}
+          <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_min(100%,22rem)] lg:items-start lg:gap-x-8 xl:gap-x-10">
+            <div className="min-w-0 space-y-8 lg:space-y-0">
+              <section className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label="Previous month"
+                    onClick={() => {
+                      hasUserNavigatedVisibleMonthRef.current = true;
+                      setVisibleManilaYearMonth((previous) => addManilaYearMonth(previous, -1));
+                    }}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                  <p className="text-sm font-semibold text-foreground">{monthLabel}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label="Next month"
+                    onClick={() => {
+                      hasUserNavigatedVisibleMonthRef.current = true;
+                      setVisibleManilaYearMonth((previous) => addManilaYearMonth(previous, 1));
+                    }}
+                  >
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </div>
+                <div className="mt-6">
+                  <BookingMonthFullCalendar
+                    visibleManilaYearMonth={visibleManilaYearMonth}
+                    availabilityByDate={availabilityByDate}
+                    availabilityReady={availabilityStatus === 'ready'}
+                    selectedManilaYmd={selectedManilaYmd}
+                    pendingManilaYmd={pendingManilaYmd}
+                    onSelectDateWithSlots={(manilaYmd) => {
+                      setSlotDialogManilaYmd(manilaYmd);
+                      setSlotDialogOpen(true);
+                    }}
+                  />
+                </div>
+              </section>
+              <Dialog
+                open={slotDialogOpen}
+                onOpenChange={(open) => {
+                  setSlotDialogOpen(open);
+                  if (!open) {
+                    setSlotDialogManilaYmd(null);
+                  }
+                }}
               >
-                Next
-              </Button>
-              <Button type="button" variant="outline" className="w-full" asChild>
-                <Link href={activeDiagnosticHref}>Back to diagnostic</Link>
-              </Button>
+                <DialogContent className="gap-0 sm:max-w-md" showCloseButton>
+                  <DialogHeader className="space-y-2 pb-2">
+                    <DialogTitle>Choose a time</DialogTitle>
+                    <DialogDescription>
+                      {slotDialogManilaYmd !== null
+                        ? formatInTimeZone(
+                            fromZonedTime(
+                              parse(`${slotDialogManilaYmd} 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)),
+                              PRIMARY_TIMEZONE,
+                            ),
+                            PRIMARY_TIMEZONE,
+                            'EEEE, MMMM d, yyyy',
+                          )
+                        : 'Philippine Time'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <p className="pb-4 text-xs text-muted-foreground">{PRIMARY_TIMEZONE}</p>
+                  {availabilityStatus === 'loading' ? (
+                    <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
+                      Loading open times…
+                    </p>
+                  ) : null}
+                  {availabilityStatus === 'error' ? (
+                    <p className="py-4 text-sm text-destructive">{availabilityError ?? 'Could not load times.'}</p>
+                  ) : null}
+                  {slotDialogManilaYmd !== null &&
+                  availabilityStatus === 'ready' &&
+                  (availabilityByDate[slotDialogManilaYmd]?.length ?? 0) === 0 ? (
+                    <p className="py-4 text-sm text-muted-foreground">No times on this date. Pick another day.</p>
+                  ) : null}
+                  {slotDialogManilaYmd !== null && availabilityStatus === 'ready' ? (
+                    <ul className="max-h-[min(50vh,22rem)] space-y-2 overflow-y-auto py-1 pr-1">
+                      {(availabilityByDate[slotDialogManilaYmd] ?? []).map((slot) => (
+                        <li key={slot}>
+                          <button
+                            type="button"
+                            className="min-h-11 w-full rounded-xl border border-border px-3 py-2.5 text-left text-sm font-medium transition-colors hover:border-primary/40 hover:bg-muted/50"
+                            onClick={() => {
+                              const picked = fromZonedTime(
+                                parse(`${slotDialogManilaYmd} 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)),
+                                PRIMARY_TIMEZONE,
+                              );
+                              setSelectedDate(picked);
+                              setSelectedTime(slot);
+                              setSlotDialogOpen(false);
+                              setSlotDialogManilaYmd(null);
+                            }}
+                          >
+                            {slot}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </DialogContent>
+              </Dialog>
+            </div>
+            <aside
+              aria-label="Booking selection"
+              className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:mx-0 lg:max-w-none lg:sticky lg:top-44 lg:z-45 lg:self-start lg:min-h-0 lg:rounded-2xl lg:border lg:border-border lg:bg-card lg:p-5 lg:shadow-xs xl:p-6"
+            >
+              {availabilityStatus === 'loading' ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
+                  Loading open times…
+                </p>
+              ) : null}
+              {availabilityStatus === 'error' ? (
+                <p className="text-sm text-destructive">{availabilityError ?? 'Could not load times.'}</p>
+              ) : null}
+              {availabilityStatus === 'ready' && (selectedDate === null || selectedTime === null) ? (
+                <div className="rounded-2xl border border-dashed border-border/90 bg-muted/20 px-4 py-6 text-sm lg:min-h-44 lg:py-8">
+                  <p className="font-semibold text-foreground">Pick a date and time</p>
+                  <p className="mt-2 text-pretty leading-relaxed text-muted-foreground">
+                    Tap any day in the calendar that has open slots. When the time list opens, choose a slot — your
+                    selection will appear here, and the day stays highlighted on the calendar.
+                  </p>
+                </div>
+              ) : null}
+              {availabilityStatus === 'ready' && selectedDate !== null && selectedTime !== null ? (
+                <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm">
+                  <p className="font-semibold text-foreground">Your selection</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {displayDateLong} · {selectedTime} · {PRIMARY_TIMEZONE}
+                  </p>
+                </div>
+              ) : null}
+              <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                  asChild
+                >
+                  <Link
+                    href={activeDiagnosticHref}
+                    className="inline-flex items-center justify-center gap-2"
+                  >
+                    <ChevronLeft className="size-4 shrink-0" aria-hidden />
+                    Back
+                  </Link>
+                </Button>
+                <Button
+                  type="button"
+                  className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                  size="lg"
+                  disabled={
+                    !selectedDate ||
+                    !selectedTime ||
+                    availabilityStatus === 'loading' ||
+                    (availabilityStatus === 'ready' && slotsForSelectedDay.length === 0)
+                  }
+                  onClick={executeContinueFromDate}
+                >
+                  Next
+                </Button>
+              </div>
             </aside>
           </div>
         ) : null}
@@ -766,14 +932,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   })}
                 </div>
               </fieldset>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button type="button" variant="outline" onClick={executeBackToDetails} className="gap-2">
-                  <ChevronLeft className="size-4" aria-hidden />
-                  Back
-                </Button>
-              </div>
             </div>
-            <aside className="space-y-4 lg:sticky lg:top-60">
+            <aside className="space-y-4 lg:sticky lg:top-44 lg:z-45">
               <div className="rounded-2xl border border-border bg-muted/30 p-5">
                 <p className="text-sm font-semibold text-foreground">{PROJECT_RESCUE_SERVICE_TITLE}</p>
                 <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
@@ -797,16 +957,27 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   </p>
                 </div>
               </div>
-              <Button
-                type="button"
-                className="w-full gap-2"
-                size="lg"
-                disabled={paymentMethod === null}
-                onClick={() => void executePay()}
-              >
-                <Lock className="size-4" aria-hidden />
-                Pay {CHECKOUT_AMOUNT_LABEL}
-              </Button>
+              <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                  onClick={executeBackToDetails}
+                >
+                  <ChevronLeft className="size-4 shrink-0" aria-hidden />
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                  size="lg"
+                  disabled={paymentMethod === null}
+                  onClick={() => void executePay()}
+                >
+                  <Lock className="size-4 shrink-0" aria-hidden />
+                  Pay {CHECKOUT_AMOUNT_LABEL}
+                </Button>
+              </div>
             </aside>
           </div>
         ) : null}

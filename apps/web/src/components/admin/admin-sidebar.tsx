@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  CalendarClock,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -51,6 +52,11 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     icon: CircleUser,
   },
   {
+    href: '/admin/schedule',
+    label: 'Schedule',
+    icon: CalendarClock,
+  },
+  {
     href: '/admin/bookings',
     label: 'Bookings',
     icon: CalendarDays,
@@ -85,7 +91,7 @@ export function AdminSidebar(props: AdminSidebarProps) {
       />
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex border-r border-sidebar-border/90 bg-sidebar/95 text-sidebar-foreground backdrop-blur md:sticky md:top-0 md:z-30 md:h-dvh',
+          'fixed inset-y-0 left-0 z-50 flex border-r border-sidebar-border/90 bg-sidebar/95 text-sidebar-foreground backdrop-blur md:sticky md:top-0 md:z-35 md:h-dvh',
           'transition-[width,transform] duration-200 ease-out',
           props.collapsed ? 'w-20' : 'w-72',
           props.mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',

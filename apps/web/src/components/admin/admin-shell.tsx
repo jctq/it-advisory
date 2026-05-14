@@ -123,6 +123,9 @@ function resolveAdminTitle(pathname: string): string {
   if (pathname.startsWith('/admin/users')) {
     return 'Marketing users';
   }
+  if (pathname.startsWith('/admin/schedule')) {
+    return 'Schedule';
+  }
   if (pathname.startsWith('/admin/bookings')) {
     return 'Bookings';
   }
@@ -219,7 +222,7 @@ export function AdminShell(props: AdminShellProps) {
       suppressHydrationWarning
       className={cn('min-h-dvh bg-muted/30 scheme-light dark:bg-background dark:scheme-dark')}
     >
-      <div className="flex min-h-dvh">
+      <div className="flex min-h-dvh [--admin-sticky-top:7rem]">
         <AdminSidebar
           collapsed={collapsed}
           mobileOpen={mobileOpen}

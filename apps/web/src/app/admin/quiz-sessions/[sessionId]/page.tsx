@@ -30,7 +30,7 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
   }
   const auditRows = await listQuizAuditForSession(new ObjectId(session.id));
   return (
-    <section className="mx-auto max-w-6xl space-y-8">
+    <section className="mx-auto space-y-8">
       <AdminPageHeader
         eyebrow="Intake"
         title="Quiz session"

@@ -6,6 +6,8 @@ export const COLLECTIONS = {
   recommendations: 'recommendations',
   leads: 'leads',
   bookings: 'bookings',
+  /** Singleton advisor booking rules + caps (`_id: 'default'`). */
+  advisorBookingSettings: 'advisor_booking_settings',
   availabilitySlots: 'availability_slots',
   emailSends: 'email_sends',
   users: 'users',

@@ -6,6 +6,7 @@ import {
   linkQuizSessionToVisitorBooking,
   syncBookingQuizSessionIfPointerChanged,
 } from '@/lib/data/bookings';
+import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
@@ -138,6 +139,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       deduped: true as const,
     });
   }
+  const slotOk = await isMarketingSlotInPublishedAvailability({
+    serviceKey,
+    startsAtUtc: startsAt,
+  });
+  if (!slotOk) {
+    return NextResponse.json(
+      { error: 'This time is no longer available.', code: 'booking_slot_unavailable' },
+      { status: 409 },
+    );
+  }
   const leadId = await insertMarketingBookingLead(visitorId, checkoutContact);
   if (leadId === null) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
@@ -151,6 +162,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     preferredQuizSessionId: quizSessionIdHex,
     paymentMethodLabel,
   });
+  if (created === 'duplicate_key') {
+    return NextResponse.json(
+      { error: 'This time is no longer available.', code: 'booking_slot_unavailable' },
+      { status: 409 },
+    );
+  }
   if (created === null) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
   }

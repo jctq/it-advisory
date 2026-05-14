@@ -34,8 +34,6 @@ import { GuidedDiagnosticWizard } from './guided-diagnostic-wizard';
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const DIAGNOSTIC_CONFIG_API_URL = '/api/quiz/diagnostic-config';
 const DIAGNOSTIC_TEMPLATE_API_URL = '/api/quiz/diagnostic-template';
-/** Matches `SiteHeader` (`h-16`) so quiz progress sticks below the marketing nav instead of under it. */
-const MARKETING_SITE_HEADER_HEIGHT_PX = 64;
 
 type DiagnosticPublicConfig = {
   readonly diagnosticAiEnabled: boolean;
@@ -227,8 +225,6 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   const sessionReadOnlyRef = useRef<boolean>(false);
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
-  const [isWizardProgressPinned, setIsWizardProgressPinned] = useState<boolean>(false);
-  const wizardProgressStickySentinelRef = useRef<HTMLDivElement | null>(null);
   const hasHydratedRef = useRef<boolean>(false);
   const persistGuided = useCallback(
     async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
@@ -360,33 +356,6 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       cancelled = true;
     };
   }, [sessionTargetId]);
-  useEffect(() => {
-    if (!isSessionReady) {
-      return;
-    }
-    const sentinel = wizardProgressStickySentinelRef.current;
-    if (sentinel === null) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry === undefined) {
-          return;
-        }
-        setIsWizardProgressPinned(!entry.isIntersecting);
-      },
-      {
-        root: null,
-        rootMargin: `-${MARKETING_SITE_HEADER_HEIGHT_PX}px 0px 0px 0px`,
-        threshold: 0,
-      },
-    );
-    observer.observe(sentinel);
-    return () => {
-      observer.disconnect();
-    };
-  }, [isSessionReady]);
   useEffect(() => {
     if (!isSessionReady || !hasHydratedRef.current || sessionReadOnlyRef.current) {
       return;
@@ -564,36 +533,28 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           </p>
         </div>
       ) : null}
-      <div ref={wizardProgressStickySentinelRef} className="hidden h-px w-full shrink-0 lg:block" aria-hidden />
-      <div
-        className={cn(
-          'mb-8 space-y-3 transition-[box-shadow,background-color,border-color] duration-200 lg:sticky lg:top-16 lg:z-40 lg:-mx-6 lg:border-b lg:px-6 lg:py-4 lg:backdrop-blur',
-          isWizardProgressPinned
-            ? 'lg:border-border lg:bg-background lg:shadow-md lg:supports-backdrop-filter:bg-background/92'
-            : 'lg:border-transparent lg:bg-background/85 lg:supports-backdrop-filter:bg-background/70',
-        )}
-      >
+      <div className="mb-8 space-y-3 lg:sticky lg:top-16 lg:z-40 lg:-mx-6 lg:border-b lg:border-border lg:bg-background lg:px-6 lg:py-2 lg:shadow-md lg:backdrop-blur lg:supports-backdrop-filter:bg-background/92">
         {roundProgressSteps.length > 0 && !diagnosticAiEnabled ? (
           <>
             {currentRoundProgressSummary !== null ? (
               <>
                 <div
-                  className="flex flex-col gap-2 lg:hidden"
+                  className="flex flex-col gap-1 lg:hidden"
                   role="group"
                   aria-label={`Template progress: step ${currentRoundProgressSummary.currentStepNumber} of ${currentRoundProgressSummary.totalStepCount}, ${currentRoundProgressSummary.currentStepLabel}`}
                 >
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Step {currentRoundProgressSummary.currentStepNumber} of {currentRoundProgressSummary.totalStepCount}
                   </p>
-                  <p className="min-w-0 truncate text-right text-sm font-semibold text-foreground">
+                  <p className="min-w-0 truncate text-right text-xs font-semibold text-foreground">
                     {currentRoundProgressSummary.currentStepLabel}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
                   {roundProgressSteps.map((step, stepIndex) => {
                     const barClassName = cn(
-                      'h-1.5 w-full rounded-full transition-colors',
+                      'h-1 w-full rounded-full',
                       step.status === 'complete'
                         ? 'bg-primary'
                         : step.status === 'current'
@@ -615,7 +576,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
                       : stepIndex < visibleTemplateRounds.length && step.status === 'complete';
                     if (!isJumpTarget) {
                       return (
-                        <div key={step.id} className="flex min-h-11 min-w-0 flex-1 items-center px-0.5">
+                        <div key={step.id} className="flex min-h-9 min-w-0 flex-1 items-center px-0.5">
                           <span className={barClassName} aria-hidden />
                         </div>
                       );
@@ -624,7 +585,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
                       <button
                         key={step.id}
                         type="button"
-                        className="flex min-h-11 min-w-0 flex-1 items-center rounded-md px-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                        className="flex min-h-9 min-w-0 flex-1 items-center rounded-md px-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
                         onClick={() => executeJumpToRoundProgressStep(stepIndex)}
                         aria-label={`Go to ${step.label}`}
                       >
@@ -635,7 +596,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
                 </div>
               </div>
                 <HorizontalProgressStepper
-                  className="rounded-2xl border border-border bg-card px-4 py-6 shadow-xs"
+                  className="rounded-2xl border border-border bg-card px-3 py-2.5 shadow-xs lg:rounded-xl"
                   ariaLabel={`Template progress: step ${currentRoundProgressSummary.currentStepNumber} of ${currentRoundProgressSummary.totalStepCount}, ${currentRoundProgressSummary.currentStepLabel}`}
                   steps={roundProgressSteps}
                   isStepInteractive={({ step, stepIndex }) => {
@@ -660,17 +621,11 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           </>
         ) : (
           <>
-            <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>{progressHint}</span>
               <span>{progressPercent}%</span>
             </div>
-            <div
-              className="h-2 overflow-hidden rounded-full bg-muted"
-              role="progressbar"
-              aria-valuenow={progressPercent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
               <div
                 className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
                 style={{ width: `${progressPercent}%` }}

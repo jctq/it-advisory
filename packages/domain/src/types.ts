@@ -74,6 +74,10 @@ export type BookingDocument = {
   updatedAt: Date;
 };
 
+/**
+ * Legacy discrete slot inventory shape — not used by the rule-based advisor schedule.
+ * Prefer {@link AdvisorBookingSettingsDocument} and `COLLECTIONS.advisorBookingSettings`.
+ */
 export type AvailabilitySlotDocument = {
   _id?: ObjectId;
   startsAt: Date;
@@ -81,6 +85,41 @@ export type AvailabilitySlotDocument = {
   timezone: string;
   capacity: number;
   bookedCount: number;
+};
+
+/** `HH:mm` 24-hour strings, inclusive start, exclusive end semantics for generated slot starts. */
+export type AdvisorDayTimeWindow = {
+  readonly start: string;
+  readonly end: string;
+};
+
+export type AdvisorWeekdayOverride =
+  | { readonly kind: 'closed' }
+  | { readonly kind: 'window'; readonly start: string; readonly end: string };
+
+/**
+ * Singleton persisted advisor availability for marketing booking (`_id` is the string `default`).
+ */
+export type AdvisorBookingSettingsDocument = {
+  readonly _id: 'default';
+  readonly timezone: string;
+  /** JavaScript convention: 0 = Sunday … 6 = Saturday. Treated as non-working unless overridden. */
+  readonly weekendDayIndices: readonly number[];
+  readonly defaultWeekdayWindow: AdvisorDayTimeWindow;
+  /** Sparse overrides by JS day-of-week (`'0'` … `'6'`). */
+  readonly weekdayOverrides?: Readonly<Partial<Record<string, AdvisorWeekdayOverride>>>;
+  /**
+   * Calendar-date overrides in `timezone` (`yyyy-MM-dd` → closed or custom window).
+   * Takes precedence over weekend and weekday rules for that date.
+   */
+  readonly dateWindowOverrides?: Readonly<Partial<Record<string, AdvisorWeekdayOverride>>>;
+  readonly slotIntervalMinutes: 30 | 45 | 60 | 90;
+  /** `yyyy-MM-dd` (calendar date in `timezone`) → max bookings that day; omitted keys = unlimited. */
+  readonly dailyBookingCapOverrides?: Readonly<Record<string, number>>;
+  /** ISO week key `RRRR-'W'II` in `timezone` → max bookings that week; omitted = unlimited. */
+  readonly weeklyBookingCapOverrides?: Readonly<Record<string, number>>;
+  readonly bookingHorizonDays: number;
+  readonly updatedAt: Date;
 };
 
 export type EmailSendDocument = {

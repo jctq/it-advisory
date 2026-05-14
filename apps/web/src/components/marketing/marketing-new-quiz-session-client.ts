@@ -9,8 +9,8 @@ const QUIZ_SESSION_API_URL = '/api/quiz/session';
 
 /**
  * When the visitor's latest quiz row is read-only (linked to a booking), `DELETE /api/quiz/session` forks a new
- * blank row. Call this before navigating to `/quiz` so guests do not reopen a completed, booked snapshot after
- * checkout if the client missed the booking success `DELETE`.
+ * blank row. Call this before navigating to `/quiz` for an explicit “new diagnostic” so guests do not reopen the
+ * booked snapshot as an editable session.
  */
 export async function ensureGuestQuizFreshStart(): Promise<void> {
   const response = await fetch(QUIZ_SESSION_API_URL, { credentials: 'include' });

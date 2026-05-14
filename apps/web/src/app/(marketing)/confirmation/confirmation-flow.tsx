@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { isPlausibleMarketingQuizSessionRef } from '@/lib/marketing/quiz-session-marketing-ref';
 
-const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const BOOKINGS_API_URL = '/api/bookings';
 
 type ConfirmationStatus = 'pending' | 'success' | 'error' | 'invalid';
@@ -23,7 +22,7 @@ type ConfirmationFlowProps = {
 };
 
 /**
- * Creates the booking from the URL slot, optionally clears quiz draft state, then drives the UI from the result.
+ * Creates the booking from the URL slot, then drives the UI from the result.
  * The server page must not claim success until this flow completes — otherwise users see a false positive.
  */
 export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
@@ -38,7 +37,9 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
     const trimmedDate = props.dateRaw.trim();
     const trimmedTime = props.timeRaw.trim();
     if (trimmedDate.length === 0 || trimmedTime.length === 0) {
-      setStatus('invalid');
+      queueMicrotask(() => {
+        setStatus('invalid');
+      });
       return;
     }
     hasRunRef.current = true;
@@ -72,7 +73,6 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
           setStatus('error');
           return;
         }
-        await fetch(QUIZ_SESSION_API_URL, { method: 'DELETE', credentials: 'include' });
         void router.refresh();
         setStatus('success');
       } catch {

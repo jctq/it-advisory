@@ -5,12 +5,24 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./booking-schedule": "./src/booking-schedule.ts",
     "./collections": "./src/collections.ts",
     "./diagnostic-settings-bounds": "./src/diagnostic-settings-bounds.ts",
     "./types": "./src/types.ts",
     "./visitor-session": "./src/visitor-session.ts"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
   "dependencies": {
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "mongodb": "^6.16.0"
+  },
+  "devDependencies": {
+    "@it-advisory/typescript-config": "workspace:*",
+    "typescript": "~5.8.3",
+    "vitest": "^3.2.4"
   }
 }

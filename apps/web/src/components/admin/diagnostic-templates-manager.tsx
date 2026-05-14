@@ -773,7 +773,13 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
   const listHref = props.listHref ?? '/admin/diagnostic-templates';
   const [templates, setTemplates] = useState<readonly DiagnosticTemplateValue[]>(props.initialTemplates);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(props.initialTemplates[0]?.id ?? null);
-  const [dirtyTemplateIds, setDirtyTemplateIds] = useState<readonly string[]>([]);
+  const [savedTemplatePatchById, setSavedTemplatePatchById] = useState<Readonly<Record<string, string>>>(() => {
+    const initial: Record<string, string> = {};
+    for (const template of props.initialTemplates) {
+      initial[template.id] = buildTemplatePatchBody(template);
+    }
+    return initial;
+  });
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isCreateFormOpen, setIsCreateFormOpen] = useState<boolean>(props.initialTemplates.length === 0);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -795,34 +801,37 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
     () => templates.find((template) => template.id === selectedTemplateId) ?? null,
     [selectedTemplateId, templates],
   );
-  const hasDirtySelectedTemplate =
-    selectedTemplate !== null && dirtyTemplateIds.includes(selectedTemplate.id);
+  const selectedTemplatePatchBody = useMemo((): string | null => {
+    if (selectedTemplate === null) {
+      return null;
+    }
+    return buildTemplatePatchBody(selectedTemplate);
+  }, [selectedTemplate]);
+  const hasUnsavedPatchChangesForSelectedTemplate = useMemo((): boolean => {
+    if (selectedTemplate === null || selectedTemplatePatchBody === null) {
+      return false;
+    }
+    const baseline = savedTemplatePatchById[selectedTemplate.id];
+    return baseline === undefined || selectedTemplatePatchBody !== baseline;
+  }, [savedTemplatePatchById, selectedTemplate, selectedTemplatePatchBody]);
   const templateTableRows = useMemo<readonly DiagnosticTemplateTableRow[]>(
     () =>
       templates.map((template) => ({
         id: template.id,
         name: template.name,
         isActive: template.isActive,
-        hasUnsavedChanges: dirtyTemplateIds.includes(template.id),
+        hasUnsavedChanges: buildTemplatePatchBody(template) !== savedTemplatePatchById[template.id],
         roundCount: template.rounds.length,
         questionCount: countTemplateQuestions(template),
         createdAtIso: template.createdAtIso,
         updatedAtIso: template.updatedAtIso,
       })),
-    [dirtyTemplateIds, templates],
+    [savedTemplatePatchById, templates],
   );
   const templateTableData = useMemo<DiagnosticTemplateTableRow[]>(() => templateTableRows.slice(), [templateTableRows]);
 
   function replaceTemplateInState(nextTemplate: DiagnosticTemplateValue): void {
     setTemplates((previous) => previous.map((template) => (template.id === nextTemplate.id ? nextTemplate : template)));
-  }
-
-  function markTemplateDirty(templateId: string): void {
-    setDirtyTemplateIds((previous) => (previous.includes(templateId) ? previous : [...previous, templateId]));
-  }
-
-  function clearDirtyTemplate(templateId: string): void {
-    setDirtyTemplateIds((previous) => previous.filter((id) => id !== templateId));
   }
 
   const executeSelectTemplate = useCallback((templateId: string): void => {
@@ -949,7 +958,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
     const updatedTemplate = updater(selectedTemplate);
     const nextTemplate = options.shouldReindex === false ? updatedTemplate : reindexTemplate(updatedTemplate);
     replaceTemplateInState(nextTemplate);
-    markTemplateDirty(nextTemplate.id);
     setStatusMessage(null);
     setErrorMessage(null);
   }
@@ -971,6 +979,10 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       }
       setTemplates((previous) => [data.template!, ...previous]);
       setSelectedTemplateId(data.template.id);
+      setSavedTemplatePatchById((previous) => ({
+        ...previous,
+        [data.template!.id]: buildTemplatePatchBody(data.template!),
+      }));
       setTemplateSearchValue('');
       setNewTemplateName('');
       setIsCreateFormOpen(false);
@@ -999,8 +1011,12 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       if (!response.ok || data.template === undefined) {
         throw new Error(data.details ?? data.error ?? 'Failed to save diagnostic template.');
       }
-      replaceTemplateInState(data.template);
-      clearDirtyTemplate(data.template.id);
+      const savedTemplate = data.template;
+      replaceTemplateInState(savedTemplate);
+      setSavedTemplatePatchById((previous) => ({
+        ...previous,
+        [savedTemplate.id]: buildTemplatePatchBody(savedTemplate),
+      }));
       setStatusMessage('Template saved.');
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to save diagnostic template.');
@@ -1061,7 +1077,10 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       }
       const remainingTemplates = templates.filter((template) => template.id !== templateId);
       setTemplates(remainingTemplates);
-      setDirtyTemplateIds((previous) => previous.filter((id) => id !== templateId));
+      setSavedTemplatePatchById((previous) => {
+        const { [templateId]: _removed, ...rest } = previous;
+        return rest;
+      });
       setSelectedTemplateId((previous) => {
         if (previous !== templateId) {
           return previous;
@@ -3207,7 +3226,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       </div>
       {selectedTemplate !== null ? (
         <div className="sticky bottom-0 z-10">
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 p-3 shadow-lg backdrop-blur supports-backdrop-filter:bg-background/80">
+          <div className="flex w-full flex-wrap items-center justify-center gap-2 p-3 shadow-lg backdrop-blur supports-backdrop-filter:bg-background/80">
             <Button
               type="button"
               variant="outline"
@@ -3228,7 +3247,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
             <Button
               type="button"
               onClick={() => void executeSaveSelectedTemplate()}
-              disabled={!hasDirtySelectedTemplate || isSaving}
+              disabled={!hasUnsavedPatchChangesForSelectedTemplate || isSaving}
             >
               <Save className="size-4" aria-hidden />
               {isSaving ? 'Saving…' : 'Save template'}

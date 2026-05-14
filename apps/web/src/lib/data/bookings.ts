@@ -2,7 +2,7 @@
  * Marketing booking persistence. Booking documents are append-only in this application:
  * there is no delete path (API or data layer) so CRM history and slot confirmations stay auditable.
  */
-import { ObjectId } from 'mongodb';
+import { MongoServerError, ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { BookingDocument } from '@/domain/types';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
@@ -116,7 +116,12 @@ export type CreateMarketingBookingInput = {
   readonly paymentMethodLabel?: string | null;
 };
 
-export async function insertMarketingBooking(input: CreateMarketingBookingInput): Promise<ObjectId | null> {
+export type InsertMarketingBookingResult =
+  | { readonly kind: 'inserted'; readonly id: ObjectId }
+  | { readonly kind: 'duplicate_key' }
+  | null;
+
+export async function insertMarketingBooking(input: CreateMarketingBookingInput): Promise<InsertMarketingBookingResult> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
@@ -135,8 +140,15 @@ export async function insertMarketingBooking(input: CreateMarketingBookingInput)
     createdAt: now,
     updatedAt: now,
   };
-  const result = await db.collection<BookingDocument>(COLLECTIONS.bookings).insertOne(doc);
-  return result.insertedId;
+  try {
+    const result = await db.collection<BookingDocument>(COLLECTIONS.bookings).insertOne(doc);
+    return { kind: 'inserted', id: result.insertedId };
+  } catch (error: unknown) {
+    if (error instanceof MongoServerError && error.code === 11000) {
+      return { kind: 'duplicate_key' };
+    }
+    throw error;
+  }
 }
 
 /**
@@ -152,7 +164,7 @@ export async function createBookingWithLatestQuizSnapshot(input: {
   readonly leadId: ObjectId;
   readonly preferredQuizSessionId?: string | null;
   readonly paymentMethodLabel?: string | null;
-}): Promise<{ readonly bookingId: ObjectId; readonly quizSessionId: ObjectId | null } | null> {
+}): Promise<{ readonly bookingId: ObjectId; readonly quizSessionId: ObjectId | null } | 'duplicate_key' | null> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
@@ -169,7 +181,7 @@ export async function createBookingWithLatestQuizSnapshot(input: {
     session !== null && session.answers !== undefined
       ? extractGuidedDiagnosticRawFromQuizAnswers(session.answers)
       : null;
-  const bookingId = await insertMarketingBooking({
+  const inserted = await insertMarketingBooking({
     visitorId: input.visitorId,
     serviceKey: input.serviceKey,
     startsAt: input.startsAt,
@@ -179,10 +191,13 @@ export async function createBookingWithLatestQuizSnapshot(input: {
     guidedDiagnosticSnapshot: snapshot,
     paymentMethodLabel: input.paymentMethodLabel ?? null,
   });
-  if (bookingId === null) {
+  if (inserted === null) {
     return null;
   }
-  return { bookingId, quizSessionId };
+  if (inserted.kind === 'duplicate_key') {
+    return 'duplicate_key';
+  }
+  return { bookingId: inserted.id, quizSessionId };
 }
 
 /**
