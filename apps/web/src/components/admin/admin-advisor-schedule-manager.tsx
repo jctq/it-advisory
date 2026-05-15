@@ -15,6 +15,7 @@ import {
   Gauge,
   Loader2,
   Plus,
+  RotateCcw,
   Save,
   SlidersHorizontal,
   Trash2,
@@ -22,7 +23,9 @@ import {
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import {
   buildFullCalendarBusinessHourSegments,
+  listSunToSatYmdsForWeekContaining,
   normalizeAdvisorBookingSettings,
+  resolveAdvisorSchedulePreviewAnchorYmd,
 } from '@it-advisory/domain/booking-schedule';
 import type { AdvisorBookingSettingsDocument, AdvisorWeekdayOverride } from '@/domain/types';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
@@ -64,6 +67,22 @@ function resolveAdvisorWeeklyCapKeyFromSelection(selected: Date, timeZone: strin
   const ymd: string = formatInTimeZone(selected, timeZone, 'yyyy-MM-dd');
   const noonUtc: Date = fromZonedTime(parse(`${ymd} 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)), timeZone);
   return formatInTimeZone(noonUtc, timeZone, "RRRR-'W'II");
+}
+
+function formatPreviewWeekYmdLabel(ymd: string, timeZone: string): string {
+  const noonUtc: Date = fromZonedTime(parse(`${ymd} 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)), timeZone);
+  return formatInTimeZone(noonUtc, timeZone, 'EEE, MMM d');
+}
+
+function formatPreviewWeekRangeLabel(sunToSatYmds: readonly string[], timeZone: string): string | null {
+  if (sunToSatYmds.length !== 7) {
+    return null;
+  }
+  const sundayYmd: string = sunToSatYmds[0]!;
+  const saturdayYmd: string = sunToSatYmds[6]!;
+  const sundayNoon: Date = fromZonedTime(parse(`${sundayYmd} 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)), timeZone);
+  const yearLabel: string = formatInTimeZone(sundayNoon, timeZone, 'yyyy');
+  return `${formatPreviewWeekYmdLabel(sundayYmd, timeZone)} – ${formatPreviewWeekYmdLabel(saturdayYmd, timeZone)}, ${yearLabel}`;
 }
 
 const CalendarInner = dynamic(
@@ -258,7 +277,7 @@ function resolveOverrideRow(dow: number, doc: AdvisorBookingSettingsDocument): {
 
 export function AdminAdvisorScheduleManager(): ReactElement {
   const [settings, setSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
-  const [savedScheduleFingerprint, setSavedScheduleFingerprint] = useState<string | null>(null);
+  const [lastSavedSettings, setLastSavedSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -286,7 +305,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
         if (!cancelled) {
           const cloned = cloneSettings(doc);
           setSettings(cloned);
-          setSavedScheduleFingerprint(serializeAdvisorBookingSettingsForComparison(cloned));
+          setLastSavedSettings(cloneSettings(doc));
         }
       })
       .catch((error: unknown) => {
@@ -309,12 +328,28 @@ export function AdminAdvisorScheduleManager(): ReactElement {
     }
     return normalizeAdvisorBookingSettings(settings);
   }, [settings]);
+  const [previewAnchorYmd] = useState<string>(() =>
+    resolveAdvisorSchedulePreviewAnchorYmd(new Date(), PRIMARY_TIMEZONE),
+  );
+  const [previewWeekYmds, setPreviewWeekYmds] = useState<readonly string[]>(() =>
+    listSunToSatYmdsForWeekContaining(
+      resolveAdvisorSchedulePreviewAnchorYmd(new Date(), PRIMARY_TIMEZONE),
+      PRIMARY_TIMEZONE,
+    ),
+  );
+  const previewWeekRangeLabel: string | null = useMemo(
+    () => formatPreviewWeekRangeLabel(previewWeekYmds, PRIMARY_TIMEZONE),
+    [previewWeekYmds],
+  );
+  const executePreviewWeekChange = useCallback((sunToSatYmds: readonly string[]): void => {
+    setPreviewWeekYmds(sunToSatYmds);
+  }, []);
   const businessHours = useMemo(() => {
     if (normalized === null) {
       return [];
     }
-    return buildFullCalendarBusinessHourSegments(normalized);
-  }, [normalized]);
+    return buildFullCalendarBusinessHourSegments(normalized, previewWeekYmds);
+  }, [normalized, previewWeekYmds]);
   const executeToggleWeekendDay = useCallback((dow: number): void => {
     setSettings((previous) => {
       if (previous === null) {
@@ -391,7 +426,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
       }
       const cloned = cloneSettings(data.settings);
       setSettings(cloned);
-      setSavedScheduleFingerprint(serializeAdvisorBookingSettingsForComparison(cloned));
+      setLastSavedSettings(cloneSettings(data.settings));
       setStatusMessage('Saved.');
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Save failed.');
@@ -399,12 +434,23 @@ export function AdminAdvisorScheduleManager(): ReactElement {
       setIsSaving(false);
     }
   }, [settings]);
+  const executeResetToSaved = useCallback((): void => {
+    if (lastSavedSettings === null) {
+      return;
+    }
+    setSettings(cloneSettings(lastSavedSettings));
+    setStatusMessage(null);
+    setErrorMessage(null);
+  }, [lastSavedSettings]);
   const hasScheduleChanges: boolean = useMemo(() => {
-    if (settings === null || savedScheduleFingerprint === null) {
+    if (settings === null || lastSavedSettings === null) {
       return false;
     }
-    return serializeAdvisorBookingSettingsForComparison(settings) !== savedScheduleFingerprint;
-  }, [savedScheduleFingerprint, settings]);
+    return (
+      serializeAdvisorBookingSettingsForComparison(settings) !==
+      serializeAdvisorBookingSettingsForComparison(lastSavedSettings)
+    );
+  }, [lastSavedSettings, settings]);
   const isScheduleReady: boolean = !isLoading && settings !== null;
   return (
     <div className="mx-auto space-y-8">
@@ -418,7 +464,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
         <ScheduleLoadFailurePanel errorMessage={errorMessage} onRetry={executeRetryLoad} />
       ) : null}
       {!isLoading && settings !== null ? (
-        <div className="space-y-6 pb-32">
+        <div className="space-y-6">
           {errorMessage !== null ? (
             <Alert variant="destructive">
               <AlertCircle />
@@ -466,8 +512,8 @@ export function AdminAdvisorScheduleManager(): ReactElement {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="hours-grid" className="mt-6 outline-none">
-              <Card className="overflow-hidden border-border/90 shadow-sm">
-              <CardHeader className="border-b border-border/80 bg-muted/25 pb-6">
+              <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+              <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="flex min-w-0 gap-3">
                     <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
@@ -782,10 +828,21 @@ export function AdminAdvisorScheduleManager(): ReactElement {
               </CardHeader>
               <CardContent className="space-y-3 px-4 pb-5 pt-4 sm:px-6">
                 <p className="rounded-lg border border-dashed border-border/80 bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                  Reference week: Mon Jun 8–Sun Jun 14, 2026 ({PRIMARY_TIMEZONE}). Use prev / next in the grid to inspect
-                  nearby weeks.
+                  {previewWeekRangeLabel !== null ? (
+                    <>
+                      Showing {previewWeekRangeLabel} ({PRIMARY_TIMEZONE}). Opens on the current week; use prev / next
+                      to inspect nearby weeks.
+                    </>
+                  ) : (
+                    <>Use prev / next in the grid to inspect weeks ({PRIMARY_TIMEZONE}).</>
+                  )}
                 </p>
-                <CalendarInner businessHours={businessHours} timeZone={PRIMARY_TIMEZONE} />
+                <CalendarInner
+                  businessHours={businessHours}
+                  timeZone={PRIMARY_TIMEZONE}
+                  initialAnchorYmd={previewAnchorYmd}
+                  onVisibleWeekChange={executePreviewWeekChange}
+                />
               </CardContent>
             </Card>
             </TabsContent>
@@ -797,28 +854,41 @@ export function AdminAdvisorScheduleManager(): ReactElement {
           <div className="mx-auto flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
             <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
               {hasScheduleChanges
-                ? 'You have unsaved edits. Save to update what clients see from the availability API.'
+                ? 'You have unsaved edits. Reset to saved discards them, or save to update what clients see from the availability API.'
                 : 'All changes are saved. Switch tabs above to review or edit the schedule.'}
             </p>
-            <Button
-              type="button"
-              size="lg"
-              className="min-h-11 min-w-40 shrink-0 gap-2"
-              onClick={() => void executeSave()}
-              disabled={isSaving || !hasScheduleChanges}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                  Saving…
-                </>
-              ) : (
-                <>
-                  <Save className="size-4 shrink-0" aria-hidden />
-                  Save schedule
-                </>
-              )}
-            </Button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="min-h-11 gap-2"
+                onClick={executeResetToSaved}
+                disabled={isSaving || !hasScheduleChanges}
+              >
+                <RotateCcw className="size-4 shrink-0" aria-hidden />
+                Reset to saved
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                className="min-h-11 min-w-40 gap-2"
+                onClick={() => void executeSave()}
+                disabled={isSaving || !hasScheduleChanges}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <Save className="size-4 shrink-0" aria-hidden />
+                    Save schedule
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1018,7 +1088,7 @@ function DateWindowOverrideEditor(props: DateWindowOverrideEditorProps): ReactEl
               const row = resolveDateOverrideRow(ymd, props.value);
               return (
                 <li key={ymd}>
-                  <Card className="overflow-hidden border-border/80 shadow-sm ring-1 ring-border/40">
+                  <Card className="overflow-hidden border-border/80 shadow-sm ring-1 ring-border/40 p-0">
                     <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 border-b border-border/70 bg-muted/25 px-4 py-4 sm:px-5">
                       <div className="min-w-0 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">

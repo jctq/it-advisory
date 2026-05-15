@@ -466,16 +466,10 @@ export function hasActiveBookingAtInstant(
   return activeBookingStartsUtc.some((d) => d.getTime() === t);
 }
 
-/** One ISO week anchored Sun–Sat in June 2025 for FullCalendar `businessHours` preview (dow 0–6). */
-const PREVIEW_SUN_TO_SAT_YMD: readonly string[] = [
-  '2025-06-08',
-  '2025-06-09',
-  '2025-06-10',
-  '2025-06-11',
-  '2025-06-12',
-  '2025-06-13',
-  '2025-06-14',
-] as const;
+/** Calendar `yyyy-MM-dd` for the admin week preview — today in `timeZone`. */
+export function resolveAdvisorSchedulePreviewAnchorYmd(nowUtc: Date, timeZone: string): string {
+  return formatInTimeZone(nowUtc, timeZone, 'yyyy-MM-dd');
+}
 
 export type FullCalendarBusinessHourSegment = {
   readonly daysOfWeek: readonly number[];
@@ -484,14 +478,43 @@ export type FullCalendarBusinessHourSegment = {
 };
 
 /**
- * Builds FullCalendar `businessHours` segments from normalized settings (template week preview).
+ * Sun–Sat `yyyy-MM-dd` labels for the calendar week containing `ymd` in `timeZone` (dow 0 = Sunday).
+ */
+export function listSunToSatYmdsForWeekContaining(ymd: string, timeZone: string): readonly string[] {
+  const dow = jsDayOfWeekFromYmd(ymd, timeZone);
+  const anchorNoon = fromZonedTime(parse(`${ymd} 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)), timeZone);
+  const sundayNoon = addDays(anchorNoon, -dow);
+  const sundayYmd = formatInTimeZone(sundayNoon, timeZone, 'yyyy-MM-dd');
+  const saturdayYmd = formatInTimeZone(addDays(sundayNoon, 6), timeZone, 'yyyy-MM-dd');
+  return enumerateYmdInclusive(sundayYmd, saturdayYmd, timeZone);
+}
+
+/**
+ * `yyyy-MM-dd` labels for each day in a FullCalendar visible range (`end` is exclusive).
+ */
+export function listYmdsForVisibleRange(
+  rangeStart: Date,
+  rangeEndExclusive: Date,
+  timeZone: string,
+): readonly string[] {
+  const fromYmd = formatInTimeZone(rangeStart, timeZone, 'yyyy-MM-dd');
+  const toYmd = formatInTimeZone(addDays(rangeEndExclusive, -1), timeZone, 'yyyy-MM-dd');
+  return enumerateYmdInclusive(fromYmd, toYmd, timeZone);
+}
+
+/**
+ * Builds FullCalendar `businessHours` for one visible week (index 0 = Sunday … 6 = Saturday).
  */
 export function buildFullCalendarBusinessHourSegments(
   settings: NormalizedAdvisorBookingSettings,
+  sunToSatYmds: readonly string[],
 ): readonly FullCalendarBusinessHourSegment[] {
+  if (sunToSatYmds.length !== 7) {
+    return [];
+  }
   const segments: FullCalendarBusinessHourSegment[] = [];
   for (let dow = 0; dow <= 6; dow += 1) {
-    const ymd = PREVIEW_SUN_TO_SAT_YMD[dow]!;
+    const ymd = sunToSatYmds[dow]!;
     const window = resolveAdvisorDayWindowForManilaYmd(ymd, settings);
     if (window === null) {
       continue;

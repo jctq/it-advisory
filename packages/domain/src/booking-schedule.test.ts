@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { AdvisorBookingSettingsDocument } from './types.js';
 import {
+  buildFullCalendarBusinessHourSegments,
   createDefaultAdvisorBookingSettingsDocument,
   expandAdvisorAvailabilityUtc,
   expandPublicAvailabilitySlots,
   isUtcInstantBookable,
   LEGACY_MARKETING_TIME_LABELS,
+  listSunToSatYmdsForWeekContaining,
   normalizeAdvisorBookingSettings,
 } from './booking-schedule.js';
 
@@ -140,6 +142,43 @@ describe('expandPublicAvailabilitySlots', () => {
     });
     expect(slots[0]?.time.length).toBeGreaterThan(4);
     expect(slots[0]?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('listSunToSatYmdsForWeekContaining', () => {
+  it('returns Sun–Sat for the week containing the preview anchor Monday', () => {
+    const week = listSunToSatYmdsForWeekContaining('2026-06-08', 'Asia/Manila');
+    expect(week).toEqual([
+      '2026-06-07',
+      '2026-06-08',
+      '2026-06-09',
+      '2026-06-10',
+      '2026-06-11',
+      '2026-06-12',
+      '2026-06-13',
+    ]);
+  });
+});
+
+describe('buildFullCalendarBusinessHourSegments', () => {
+  it('applies a date override for the visible Monday', () => {
+    const week = listSunToSatYmdsForWeekContaining('2026-06-08', 'Asia/Manila');
+    const settings = normalizeAdvisorBookingSettings(
+      baseDoc({
+        dateWindowOverrides: { '2026-06-08': { kind: 'window', start: '07:00', end: '22:00' } },
+      }),
+    );
+    const segments = buildFullCalendarBusinessHourSegments(settings, week);
+    const monday = segments.find((s) => s.daysOfWeek[0] === 1);
+    expect(monday).toEqual({ daysOfWeek: [1], startTime: '07:00', endTime: '22:00' });
+  });
+
+  it('uses default weekday hours when no override applies', () => {
+    const week = listSunToSatYmdsForWeekContaining('2026-06-08', 'Asia/Manila');
+    const settings = normalizeAdvisorBookingSettings(baseDoc());
+    const segments = buildFullCalendarBusinessHourSegments(settings, week);
+    const tuesday = segments.find((s) => s.daysOfWeek[0] === 2);
+    expect(tuesday).toEqual({ daysOfWeek: [2], startTime: '08:00', endTime: '22:00' });
   });
 });
 
