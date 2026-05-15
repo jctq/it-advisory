@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { DM_Sans, JetBrains_Mono } from 'next/font/google';
+import { Roboto, Roboto_Mono } from 'next/font/google';
 import { QueryProvider } from '@/components/providers/query-provider';
 import {
   ADMIN_COLOR_MODES,
@@ -16,12 +16,14 @@ import {
 import { resolveConfiguredAppOrigin } from '@/lib/config/app-origin';
 import './globals.css';
 
-const sans = DM_Sans({
+const sans = Roboto({
+  weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
   display: 'swap',
 });
 
-const mono = JetBrains_Mono({
+const mono = Roboto_Mono({
+  weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
   variable: '--font-mono',
   display: 'swap',
