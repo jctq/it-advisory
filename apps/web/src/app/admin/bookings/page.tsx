@@ -1,5 +1,5 @@
+import { AdminBookingsCalendar } from '@/components/admin/admin-bookings-calendar';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
-import { BookingsTable } from '@/components/admin/bookings-table';
 import { listBookings } from '@/lib/data/bookings';
 
 export default async function AdminBookingsPage() {
@@ -9,9 +9,9 @@ export default async function AdminBookingsPage() {
       <AdminPageHeader
         eyebrow="Scheduling"
         title="Bookings"
-        description="All stored bookings (up to 10,000, newest slot first). Table is paginated client-side (10 per page). Quiz session links when the booking captured a session id at checkout. Booking rows cannot be deleted from this app."
+        description="Calendar of stored bookings (up to 10,000). Use Month, Week, Day, or List in the toolbar; times are Asia/Manila. Click an event for details. Rows cannot be deleted from this app."
       />
-      <BookingsTable initialData={bookings} />
+      <AdminBookingsCalendar bookings={bookings} />
     </section>
   );
 }

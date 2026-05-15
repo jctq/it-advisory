@@ -111,6 +111,9 @@ function resolveClientSystemPrefersDark(): boolean {
 }
 
 function resolveAdminTitle(pathname: string): string {
+  if (pathname === '/admin') {
+    return 'Dashboard';
+  }
   if (pathname.startsWith('/admin/diagnostic-templates')) {
     return 'Templates';
   }

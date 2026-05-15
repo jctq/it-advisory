@@ -261,4 +261,122 @@
   .fc-advisor-preview .fc-timegrid-axis-cushion {
     @apply px-1;
   }
+
+  /**
+   * Admin bookings calendar (FullCalendar): month / week / day / list with status-colored events.
+   */
+  .fc-admin-bookings {
+    --booking-pending-bg: var(--warning-soft);
+    --booking-pending-fg: var(--warning-foreground);
+    --booking-pending-border: color-mix(in oklch, var(--warning) 32%, transparent);
+    --booking-pending-hover-bg: color-mix(in oklch, var(--warning) 18%, var(--warning-soft));
+  }
+  .dark .fc-admin-bookings {
+    --booking-pending-bg: color-mix(in oklch, var(--warning) 16%, var(--card));
+    --booking-pending-fg: oklch(0.93 0.04 85);
+    --booking-pending-border: color-mix(in oklch, var(--warning) 38%, var(--border));
+    --booking-pending-hover-bg: color-mix(in oklch, var(--warning) 28%, var(--card));
+  }
+  .fc-admin-bookings .fc {
+    --fc-list-event-hover-bg-color: color-mix(in oklch, var(--foreground) 5%, var(--muted));
+    --fc-border-color: var(--border);
+    --fc-page-bg-color: var(--card);
+    --fc-neutral-bg-color: var(--muted);
+    --fc-today-bg-color: color-mix(in oklch, var(--primary) 12%, transparent);
+    --fc-now-indicator-color: var(--primary);
+    --fc-button-text-color: var(--foreground);
+    --fc-button-bg-color: var(--background);
+    --fc-button-border-color: var(--border);
+    --fc-button-hover-bg-color: var(--muted);
+    --fc-button-active-bg-color: color-mix(in oklch, var(--muted) 85%, var(--foreground));
+    --fc-event-border-color: transparent;
+    font-size: 0.8125rem;
+  }
+  .dark .fc-admin-bookings .fc {
+    --fc-list-event-hover-bg-color: color-mix(in oklch, var(--foreground) 10%, var(--card));
+  }
+  .fc-admin-bookings .fc-toolbar {
+    @apply flex flex-wrap items-center gap-2 px-3 py-3 sm:gap-3;
+  }
+  .fc-admin-bookings .fc-toolbar-chunk {
+    @apply flex min-w-0 shrink items-center gap-1;
+  }
+  .fc-admin-bookings .fc-toolbar-title {
+    @apply text-base font-semibold tracking-tight text-foreground sm:text-lg;
+  }
+  .fc-admin-bookings .fc-button {
+    @apply rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium shadow-xs;
+  }
+  .fc-admin-bookings .fc-button-primary:not(:disabled).fc-button-active,
+  .fc-admin-bookings .fc-button-primary:not(:disabled):active {
+    @apply bg-primary text-primary-foreground;
+  }
+  .fc-admin-bookings .fc-button-primary:not(:disabled) {
+    @apply bg-primary/90 text-primary-foreground hover:bg-primary;
+  }
+  .fc-admin-bookings .fc-col-header-cell {
+    @apply py-2 text-xs font-medium text-muted-foreground;
+  }
+  .fc-admin-bookings .fc-timegrid-slot-label {
+    @apply text-[0.6875rem] text-muted-foreground;
+  }
+  .fc-admin-bookings .fc-daygrid-week-number {
+    @apply text-[0.625rem] font-medium text-muted-foreground/70;
+  }
+  .fc-admin-bookings .fc-event {
+    @apply cursor-pointer rounded px-1 py-0.5 text-xs font-medium;
+  }
+  .fc-admin-bookings .fc-booking-status-confirmed {
+    @apply border-primary/30 bg-primary text-primary-foreground;
+  }
+  .fc-admin-bookings .fc-booking-status-pending {
+    --fc-event-bg-color: var(--booking-pending-bg);
+    --fc-event-border-color: var(--booking-pending-border);
+    --fc-event-text-color: var(--booking-pending-fg);
+    background-color: var(--booking-pending-bg);
+    border-color: var(--booking-pending-border);
+    color: var(--booking-pending-fg);
+  }
+  .fc-admin-bookings .fc-booking-status-pending .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-pending .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-pending .fc-event-time,
+  .fc-admin-bookings .fc-booking-status-pending .fc-list-event-title a,
+  .fc-admin-bookings .fc-booking-status-pending .fc-list-event-time {
+    color: var(--booking-pending-fg);
+  }
+  .fc-admin-bookings tr.fc-list-event:has(.fc-booking-status-pending) td {
+    background-color: var(--booking-pending-bg);
+    color: var(--booking-pending-fg);
+  }
+  .fc-admin-bookings tr.fc-list-event:has(.fc-booking-status-pending) .fc-list-event-title a {
+    color: var(--booking-pending-fg);
+  }
+  .fc-admin-bookings .fc-booking-status-cancelled {
+    @apply border-border bg-muted text-muted-foreground line-through opacity-80;
+  }
+  /* Beat FullCalendar’s default list hover (#f5f5f5) which washes out dark-mode text. */
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-confirmed):hover td {
+    background-color: color-mix(in oklch, var(--primary) 72%, var(--card)) !important;
+    color: var(--primary-foreground) !important;
+  }
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-confirmed):hover .fc-list-event-title a,
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-confirmed):hover .fc-list-event-time {
+    color: var(--primary-foreground) !important;
+  }
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-pending):hover td {
+    background-color: var(--booking-pending-hover-bg) !important;
+    color: var(--booking-pending-fg) !important;
+  }
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-pending):hover .fc-list-event-title a,
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-pending):hover .fc-list-event-time {
+    color: var(--booking-pending-fg) !important;
+  }
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-cancelled):hover td {
+    background-color: color-mix(in oklch, var(--foreground) 8%, var(--muted)) !important;
+    color: var(--muted-foreground) !important;
+  }
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-cancelled):hover .fc-list-event-title a,
+  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-cancelled):hover .fc-list-event-time {
+    color: var(--muted-foreground) !important;
+  }
 }

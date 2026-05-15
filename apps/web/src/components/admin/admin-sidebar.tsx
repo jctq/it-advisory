@@ -10,6 +10,7 @@ import {
   CircleUser,
   ClipboardList,
   FileStack,
+  LayoutDashboard,
   LifeBuoy,
   Settings,
   Users,
@@ -31,6 +32,11 @@ type AdminSidebarItem = {
 };
 
 const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
+  {
+    href: '/admin',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+  },
   {
     href: '/admin/diagnostic-templates',
     label: 'Templates',
@@ -74,6 +80,9 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
 ] as const;
 
 function isItemActive(pathname: string, href: string): boolean {
+  if (href === '/admin') {
+    return pathname === '/admin';
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
