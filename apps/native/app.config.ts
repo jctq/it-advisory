@@ -44,7 +44,7 @@ export default (): ExpoConfig => ({
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: true,
   },
-  plugins: ['expo-router', 'expo-secure-store'],
+  plugins: ['expo-router', 'expo-secure-store', 'expo-font'],
   experiments: {
     typedRoutes: false,
   },

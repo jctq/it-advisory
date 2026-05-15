@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
+import { ThemedText } from '../src/components/themed-text';
 import { useMarketingAuth } from '../src/providers/marketing-auth-provider';
 import { useAppTheme } from '../src/theme/use-app-theme';
 
@@ -22,11 +23,13 @@ export default function LoginScreen() {
   return (
     <AppScreen
       title="Sign in"
-      subtitle="Optional — continue anonymously from the home screen if you prefer."
+      subtitle="Optional — attach guided diagnostics to your email from the Profile tab if you want."
       footer={
         <View style={styles.footerGroup}>
           <AppButton
-            disabled={isSubmitting || email.trim().length === 0 || password.length === 0}
+            busy={isSubmitting}
+            disabled={email.trim().length === 0 || password.length === 0}
+            iconName="log-in-outline"
             onPress={() => {
               setErrorMessage(null);
               setIsSubmitting(true);
@@ -42,9 +45,9 @@ export default function LoginScreen() {
                 });
             }}
           >
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
+            Sign in
           </AppButton>
-          <AppButton onPress={() => router.push('/register')} variant="secondary">
+          <AppButton iconName="person-add-outline" onPress={() => router.push('/register')} variant="secondary">
             Create an account
           </AppButton>
           <AppButton onPress={() => router.back()} variant="ghost">
@@ -54,7 +57,7 @@ export default function LoginScreen() {
       }
     >
       <AppCard>
-        <Text style={[styles.label, { color: theme.text }]}>Email</Text>
+        <ThemedText style={[styles.label, { color: theme.text }]}>Email</ThemedText>
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
@@ -72,7 +75,7 @@ export default function LoginScreen() {
           ]}
           value={email}
         />
-        <Text style={[styles.label, { color: theme.text, marginTop: 14 }]}>Password</Text>
+        <ThemedText style={[styles.label, { color: theme.text, marginTop: 14 }]}>Password</ThemedText>
         <TextInput
           autoCapitalize="none"
           onChangeText={setPassword}
@@ -90,7 +93,7 @@ export default function LoginScreen() {
           value={password}
         />
         {errorMessage !== null ? (
-          <Text style={[styles.error, { color: theme.primary }]}>{errorMessage}</Text>
+          <ThemedText style={[styles.error, { color: theme.danger }]}>{errorMessage}</ThemedText>
         ) : null}
       </AppCard>
     </AppScreen>
@@ -106,13 +109,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   input: {
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     fontSize: 16,
     marginTop: 8,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    minHeight: 50,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   error: {
     fontSize: 14,

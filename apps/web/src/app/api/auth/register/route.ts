@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { authEmailPasswordBodySchema } from '@/lib/marketing/auth-api-schema';
 import { mergeVisitorIdentityIntoAccount } from '@/lib/data/merge-visitor-identity';
 import { createUserAuthSession } from '@/lib/data/user-auth-sessions';
+import { buildMarketingUserPublicFromNewAccount } from '@/lib/marketing/marketing-user-public';
 import { insertUserAccount, normalizeAccountEmail } from '@/lib/data/users';
 import { appendMarketingAuthSessionCookie } from '@/lib/server/marketing-auth-cookie';
 import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
@@ -48,12 +49,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const jsonBody: {
     ok: true;
-    user: { id: string; email: string };
+    user: ReturnType<typeof buildMarketingUserPublicFromNewAccount>;
     sessionToken?: string;
     sessionExpiresAt?: string;
   } = {
     ok: true as const,
-    user: { id: userId.toHexString(), email: emailNormalized },
+    user: buildMarketingUserPublicFromNewAccount({ idHex: userId.toHexString(), emailNormalized }),
   };
   if (parsed.data.returnSessionToken) {
     jsonBody.sessionToken = session.cookieValue;

@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
+import { ThemedText } from '../src/components/themed-text';
 import { useMarketingAuth } from '../src/providers/marketing-auth-provider';
 import { useAppTheme } from '../src/theme/use-app-theme';
 
@@ -22,11 +23,13 @@ export default function RegisterScreen() {
   return (
     <AppScreen
       title="Create account"
-      subtitle="Optional — your on-device diagnostic can be merged into this account."
+      subtitle="Optional — merge on-device progress into this account from Profile when you sign in."
       footer={
         <View style={styles.footerGroup}>
           <AppButton
-            disabled={isSubmitting || email.trim().length === 0 || password.length < 8}
+            busy={isSubmitting}
+            disabled={email.trim().length === 0 || password.length < 8}
+            iconName="person-add-outline"
             onPress={() => {
               setErrorMessage(null);
               setIsSubmitting(true);
@@ -42,9 +45,9 @@ export default function RegisterScreen() {
                 });
             }}
           >
-            {isSubmitting ? 'Creating account…' : 'Create account'}
+            Create account
           </AppButton>
-          <AppButton onPress={() => router.push('/login')} variant="secondary">
+          <AppButton iconName="log-in-outline" onPress={() => router.push('/login')} variant="secondary">
             Already have an account
           </AppButton>
           <AppButton onPress={() => router.back()} variant="ghost">
@@ -54,7 +57,7 @@ export default function RegisterScreen() {
       }
     >
       <AppCard>
-        <Text style={[styles.label, { color: theme.text }]}>Email</Text>
+        <ThemedText style={[styles.label, { color: theme.text }]}>Email</ThemedText>
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
@@ -72,7 +75,7 @@ export default function RegisterScreen() {
           ]}
           value={email}
         />
-        <Text style={[styles.label, { color: theme.text, marginTop: 14 }]}>Password</Text>
+        <ThemedText style={[styles.label, { color: theme.text, marginTop: 14 }]}>Password</ThemedText>
         <TextInput
           autoCapitalize="none"
           onChangeText={setPassword}
@@ -90,7 +93,7 @@ export default function RegisterScreen() {
           value={password}
         />
         {errorMessage !== null ? (
-          <Text style={[styles.error, { color: theme.primary }]}>{errorMessage}</Text>
+          <ThemedText style={[styles.error, { color: theme.danger }]}>{errorMessage}</ThemedText>
         ) : null}
       </AppCard>
     </AppScreen>
@@ -106,13 +109,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   input: {
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     fontSize: 16,
     marginTop: 8,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    minHeight: 50,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   error: {
     fontSize: 14,

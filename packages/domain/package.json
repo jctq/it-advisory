@@ -9,6 +9,7 @@
     "./collections": "./src/collections.ts",
     "./diagnostic-settings-bounds": "./src/diagnostic-settings-bounds.ts",
     "./payment-types": "./src/payment-types.ts",
+    "./philippine-mobile-phone": "./src/philippine-mobile-phone.ts",
     "./types": "./src/types.ts",
     "./visitor-session": "./src/visitor-session.ts"
   },

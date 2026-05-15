@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { addDays, format } from 'date-fns';
 import { getBookingAvailabilitySlots, fetchMarketingServerClockOffsetMs } from '@techmd/api-client/marketing-booking-api-client';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
+import { ThemedText } from '../src/components/themed-text';
 import { useAppTheme } from '../src/theme/use-app-theme';
 
 const PRIMARY_TIMEZONE = 'Asia/Manila';
@@ -133,6 +134,7 @@ export default function BookingScreen() {
               loadStatus === 'loading' ||
               (loadStatus === 'ready' && slotsForSelected.length === 0)
             }
+            iconName="checkmark-circle-outline"
             onPress={() => {
               if (selectedDate === null || selectedTime === null) {
                 return;
@@ -145,27 +147,32 @@ export default function BookingScreen() {
                 },
               });
             }}
+            showTrailingIcon
           >
             Confirm booking
           </AppButton>
-          <AppButton onPress={() => router.back()} variant="secondary">
+          <AppButton iconName="arrow-back-outline" onPress={() => router.back()} variant="secondary">
             Back
           </AppButton>
         </View>
       }
     >
       <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Select a date</Text>
+        <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>Select a date</ThemedText>
         {loadStatus === 'loading' ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator color={theme.primary} />
-            <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading open days…</Text>
+            <ThemedText style={[styles.loadingText, { color: theme.textMuted }]}>Loading open days…</ThemedText>
           </View>
         ) : null}
         {loadStatus === 'error' && loadError !== null ? (
-          <Text style={[styles.errorText, { color: theme.danger }]}>{loadError}</Text>
+          <ThemedText style={[styles.errorText, { color: theme.danger }]}>{loadError}</ThemedText>
         ) : null}
-        <View style={styles.grid}>
+        <ScrollView
+          contentContainerStyle={styles.dateStrip}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
           {dateOptionDates.map((date) => {
             const isoDate = format(date, 'yyyy-MM-dd');
             const slotCount = availabilityByDate[isoDate]?.length ?? 0;
@@ -182,25 +189,30 @@ export default function BookingScreen() {
                   }
                 }}
                 style={({ pressed }) => [
-                  styles.choiceButton,
+                  styles.dateChip,
                   {
-                    backgroundColor: isSelected ? theme.primarySoft : theme.surfaceMuted,
-                    borderColor: isSelected ? theme.primary : theme.border,
-                    opacity: isEmpty ? 0.45 : pressed ? 0.94 : 1,
+                    backgroundColor: isSelected ? theme.primary : theme.surfaceMuted,
+                    borderColor: isSelected ? 'transparent' : theme.border,
+                    borderWidth: isSelected ? 0 : StyleSheet.hairlineWidth,
+                    opacity: isEmpty ? 0.4 : pressed ? 0.92 : 1,
                   },
                 ]}
               >
-                <Text style={[styles.choiceTitle, { color: theme.text }]}>{format(date, 'EEE')}</Text>
-                <Text style={[styles.choiceBody, { color: theme.textMuted }]}>{format(date, 'MMM d')}</Text>
+                <ThemedText style={[styles.choiceTitle, { color: isSelected ? theme.onPrimary : theme.text }]}>
+                  {format(date, 'EEE')}
+                </ThemedText>
+                <ThemedText style={[styles.choiceBody, { color: isSelected ? theme.onPrimaryMuted : theme.textMuted }]}>
+                  {format(date, 'MMM d')}
+                </ThemedText>
               </Pressable>
             );
           })}
-        </View>
+        </ScrollView>
       </AppCard>
       <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Select a time</Text>
+        <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>Select a time</ThemedText>
         {loadStatus === 'ready' && slotsForSelected.length === 0 ? (
-          <Text style={[styles.emptyText, { color: theme.textMuted }]}>No times for this day.</Text>
+          <ThemedText style={[styles.emptyText, { color: theme.textMuted }]}>No times for this day.</ThemedText>
         ) : null}
         <View style={styles.grid}>
           {slotsForSelected.map((slot) => {
@@ -215,12 +227,13 @@ export default function BookingScreen() {
                   {
                     backgroundColor: isSelected ? theme.primarySoft : theme.surfaceMuted,
                     borderColor: isSelected ? theme.primary : theme.border,
+                    borderWidth: isSelected ? 1.5 : StyleSheet.hairlineWidth,
                     opacity: pressed ? 0.94 : 1,
                   },
                 ]}
               >
-                <Text style={[styles.choiceTitle, { color: theme.text }]}>{slot}</Text>
-                <Text style={[styles.choiceBody, { color: theme.textMuted }]}>{PRIMARY_TIMEZONE}</Text>
+                <ThemedText style={[styles.choiceTitle, { color: theme.text }]}>{slot}</ThemedText>
+                <ThemedText style={[styles.choiceBody, { color: theme.textMuted }]}>{PRIMARY_TIMEZONE}</ThemedText>
               </Pressable>
             );
           })}
@@ -235,8 +248,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '600',
   },
   loadingRow: {
     flexDirection: 'row',
@@ -246,7 +259,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   errorText: {
     marginTop: 12,
@@ -256,7 +269,23 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 12,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  dateStrip: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+    paddingBottom: 4,
+    paddingRight: 4,
+  },
+  dateChip: {
+    alignItems: 'center',
+    borderRadius: 20,
+    justifyContent: 'center',
+    minHeight: 76,
+    minWidth: 78,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   grid: {
     flexDirection: 'row',
@@ -265,8 +294,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   choiceButton: {
-    borderRadius: 18,
-    borderWidth: 1,
+    borderRadius: 20,
     minHeight: 76,
     minWidth: '47%',
     paddingHorizontal: 14,
@@ -274,11 +302,11 @@ const styles = StyleSheet.create({
   },
   choiceTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   choiceBody: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     marginTop: 6,
   },
 });

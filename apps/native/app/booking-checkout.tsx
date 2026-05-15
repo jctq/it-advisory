@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import {
   createPaymentCheckoutSession,
@@ -12,9 +12,45 @@ import type { PaymentGatewayId } from '@techmd/domain/payment-types';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
+import { ThemedText } from '../src/components/themed-text';
+import { readNativeAppConfig } from '../src/lib/native-app-config';
+import { useMarketingAuth } from '../src/providers/marketing-auth-provider';
 import { useAppTheme } from '../src/theme/use-app-theme';
 
 const DEFAULT_SERVICE_KEY = 'project-rescue' as const;
+const POLL_INTERVAL_MS = 2000;
+const MAX_PAID_POLLS = 30;
+const CANCEL_POLL_CAP = 10;
+
+async function waitUntilTransactionPaidOrTerminal(params: {
+  readonly apiBaseUrl: string;
+  readonly transactionId: string;
+  readonly deviceId?: string | null;
+  readonly marketingSessionToken?: string | null;
+  readonly maxPolls?: number;
+}): Promise<'paid' | 'failed' | 'pending'> {
+  const maxPolls = params.maxPolls ?? MAX_PAID_POLLS;
+  for (let polls = 0; polls < maxPolls; polls += 1) {
+    if (polls > 0) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, POLL_INTERVAL_MS);
+      });
+    }
+    const result = await fetchPaymentTransactionStatus({
+      apiBaseUrl: params.apiBaseUrl,
+      transactionId: params.transactionId,
+      deviceId: params.deviceId,
+      marketingSessionToken: params.marketingSessionToken,
+    });
+    if (result.status === 'paid') {
+      return 'paid';
+    }
+    if (result.status === 'failed' || result.status === 'expired') {
+      return 'failed';
+    }
+  }
+  return 'pending';
+}
 
 export default function BookingCheckoutScreen() {
   const router = useRouter();
@@ -27,7 +63,8 @@ export default function BookingCheckoutScreen() {
     company?: string;
     phone?: string;
   }>();
-  const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ?? '';
+  const { apiBaseUrl } = useMemo(() => readNativeAppConfig(), []);
+  const { deviceId, sessionToken } = useMarketingAuth();
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfigPublic | null>(null);
   const [gatewayId, setGatewayId] = useState<PaymentGatewayId | null>(null);
   const [paymentMethodId, setPaymentMethodId] = useState<string | null>(null);
@@ -88,6 +125,10 @@ export default function BookingCheckoutScreen() {
     try {
       const session = await createPaymentCheckoutSession({
         apiBaseUrl,
+        appBaseUrl: apiBaseUrl,
+        nativeInAppPaymentReturn: true,
+        deviceId,
+        marketingSessionToken: sessionToken,
         gatewayId,
         paymentMethodId,
         date,
@@ -106,12 +147,32 @@ export default function BookingCheckoutScreen() {
         });
         return;
       }
-      const browserResult = await WebBrowser.openAuthSessionAsync(session.redirectUrl, `${apiBaseUrl}/book/payment/return`);
+      const paymentReturnUrlPrefix = `${apiBaseUrl.replace(/\/$/, '')}/book/payment/native-close`;
+      const browserResult = await WebBrowser.openAuthSessionAsync(session.redirectUrl, paymentReturnUrlPrefix);
+      let transactionId = session.transactionId;
       if (browserResult.type === 'success' && browserResult.url !== undefined) {
-        const returnUrl = new URL(browserResult.url);
-        const transactionId = returnUrl.searchParams.get('transactionId') ?? session.transactionId;
-        const status = await fetchPaymentTransactionStatus({ apiBaseUrl, transactionId });
-        if (status.status === 'paid') {
+        try {
+          const parsedReturn = new URL(browserResult.url);
+          const fromQuery = parsedReturn.searchParams.get('transactionId')?.trim() ?? '';
+          if (fromQuery.length > 0) {
+            transactionId = fromQuery;
+          }
+        } catch {
+          /* ignore malformed return URL */
+        }
+      }
+      const shouldPollForPaid =
+        browserResult.type === 'success' || browserResult.type === 'dismiss' || browserResult.type === 'cancel';
+      if (shouldPollForPaid) {
+        const maxPolls = browserResult.type === 'cancel' ? CANCEL_POLL_CAP : MAX_PAID_POLLS;
+        const outcome = await waitUntilTransactionPaidOrTerminal({
+          apiBaseUrl,
+          transactionId,
+          deviceId,
+          marketingSessionToken: sessionToken,
+          maxPolls,
+        });
+        if (outcome === 'paid') {
           router.replace({ pathname: '/confirmation', params: { date, time } });
           return;
         }
@@ -134,12 +195,15 @@ export default function BookingCheckoutScreen() {
       footer={
         <View style={styles.footerGroup}>
           <AppButton
-            disabled={gatewayId === null || paymentMethodId === null || isPaying || loadStatus !== 'ready'}
+            busy={isPaying}
+            disabled={gatewayId === null || paymentMethodId === null || loadStatus !== 'ready'}
+            iconName="card-outline"
             onPress={() => void executePay()}
+            showTrailingIcon
           >
-            {isPaying ? 'Opening payment…' : 'Continue to payment'}
+            Continue to payment
           </AppButton>
-          <AppButton variant="secondary" onPress={() => router.back()}>
+          <AppButton iconName="arrow-back-outline" onPress={() => router.back()} variant="secondary">
             Back
           </AppButton>
         </View>
@@ -148,12 +212,12 @@ export default function BookingCheckoutScreen() {
       {loadStatus === 'loading' ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator color={theme.primary} />
-          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading payment options…</Text>
+          <ThemedText style={[styles.loadingText, { color: theme.textMuted }]}>Loading payment options…</ThemedText>
         </View>
       ) : null}
-      {loadError !== null ? <Text style={[styles.errorText, { color: theme.danger }]}>{loadError}</Text> : null}
+      {loadError !== null ? <ThemedText style={[styles.errorText, { color: theme.danger }]}>{loadError}</ThemedText> : null}
       <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Payment gateway</Text>
+        <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>Payment gateway</ThemedText>
         {paymentConfig?.gateways.map((gateway) => {
           const isSelected = gatewayId === gateway.id;
           return (
@@ -168,19 +232,20 @@ export default function BookingCheckoutScreen() {
                 {
                   backgroundColor: isSelected ? theme.primarySoft : theme.surfaceMuted,
                   borderColor: isSelected ? theme.primary : theme.border,
+                  borderWidth: isSelected ? 1.5 : StyleSheet.hairlineWidth,
                   opacity: pressed ? 0.94 : 1,
                 },
               ]}
             >
-              <Text style={[styles.choiceTitle, { color: theme.text }]}>{gateway.label}</Text>
-              <Text style={[styles.choiceBody, { color: theme.textMuted }]}>{gateway.description}</Text>
+              <ThemedText style={[styles.choiceTitle, { color: theme.text }]}>{gateway.label}</ThemedText>
+              <ThemedText style={[styles.choiceBody, { color: theme.textMuted }]}>{gateway.description}</ThemedText>
             </Pressable>
           );
         })}
       </AppCard>
       {availableMethods.length > 0 ? (
         <AppCard>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Payment method</Text>
+          <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>Payment method</ThemedText>
           {availableMethods.map((method) => {
             const isSelected = paymentMethodId === method.id;
             return (
@@ -192,12 +257,13 @@ export default function BookingCheckoutScreen() {
                   {
                     backgroundColor: isSelected ? theme.primarySoft : theme.surfaceMuted,
                     borderColor: isSelected ? theme.primary : theme.border,
+                    borderWidth: isSelected ? 1.5 : StyleSheet.hairlineWidth,
                     opacity: pressed ? 0.94 : 1,
                   },
                 ]}
               >
-                <Text style={[styles.choiceTitle, { color: theme.text }]}>{method.label}</Text>
-                <Text style={[styles.choiceBody, { color: theme.textMuted }]}>{method.hint}</Text>
+                <ThemedText style={[styles.choiceTitle, { color: theme.text }]}>{method.label}</ThemedText>
+                <ThemedText style={[styles.choiceBody, { color: theme.textMuted }]}>{method.hint}</ThemedText>
               </Pressable>
             );
           })}
@@ -212,8 +278,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '600',
     marginBottom: 12,
   },
   loadingRow: {
@@ -224,7 +290,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   errorText: {
     marginBottom: 12,
@@ -232,19 +298,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   choiceButton: {
-    borderRadius: 18,
-    borderWidth: 1,
+    borderRadius: 20,
     marginBottom: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
   },
   choiceTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   choiceBody: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     marginTop: 6,
   },
 });

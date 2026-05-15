@@ -41,6 +41,14 @@ export type InsertUserAccountInput = {
   readonly plainPassword: string;
 };
 
+export type UpdateUserProfileInput = {
+  readonly fullName: string;
+  readonly company: string;
+  readonly phone: string;
+  /** When set, replaces `emailNormalized` (caller must ensure uniqueness). */
+  readonly emailNormalized?: string;
+};
+
 /**
  * Registers a new account. Returns null when MongoDB is unavailable or the email is taken.
  */
@@ -66,4 +74,29 @@ export async function insertUserAccount(input: InsertUserAccountInput): Promise<
     }
     throw err;
   }
+}
+
+/**
+ * Updates optional profile fields on a marketing user account.
+ */
+export async function updateUserProfileFields(
+  userId: ObjectId,
+  input: UpdateUserProfileInput,
+): Promise<boolean> {
+  if (!hasMongoUri()) {
+    return false;
+  }
+  const db = await getDb();
+  const now = new Date();
+  const setFields: Record<string, unknown> = {
+    fullName: input.fullName,
+    company: input.company,
+    phone: input.phone,
+    updatedAt: now,
+  };
+  if (input.emailNormalized !== undefined) {
+    setFields.emailNormalized = input.emailNormalized;
+  }
+  const result = await db.collection<UserAccountDocument>(COLLECTIONS.users).updateOne({ _id: userId }, { $set: setFields });
+  return result.matchedCount > 0;
 }

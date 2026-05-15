@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronDown, LogOut, LayoutList } from 'lucide-react';
+import { ChevronDown, LogOut, LayoutList, User } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import type { AuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -98,6 +98,15 @@ export function MarketingHeaderAccountMenu(props: MarketingHeaderAccountMenuProp
             <p className="text-xs font-medium text-muted-foreground">Signed in</p>
             <p className="break-all text-sm font-medium text-foreground">{props.user.email}</p>
           </div>
+          <Link
+            href="/account/profile"
+            role="menuitem"
+            className="flex items-center gap-2 px-3 py-2.5 text-sm text-popover-foreground hover:bg-accent"
+            onClick={() => setOpen(false)}
+          >
+            <User className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            Profile
+          </Link>
           <Link
             href="/account/diagnostics"
             role="menuitem"

@@ -3,6 +3,7 @@ import { authEmailPasswordBodySchema } from '@/lib/marketing/auth-api-schema';
 import { mergeVisitorIdentityIntoAccount } from '@/lib/data/merge-visitor-identity';
 import { createUserAuthSession } from '@/lib/data/user-auth-sessions';
 import { findUserByEmailNormalized, normalizeAccountEmail } from '@/lib/data/users';
+import { buildMarketingUserPublicFromDocument } from '@/lib/marketing/marketing-user-public';
 import { appendMarketingAuthSessionCookie } from '@/lib/server/marketing-auth-cookie';
 import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 import { verifyPasswordPlain } from '@/lib/server/password-credentials';
@@ -43,12 +44,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const jsonBody: {
     ok: true;
-    user: { id: string; email: string };
+    user: ReturnType<typeof buildMarketingUserPublicFromDocument>;
     sessionToken?: string;
     sessionExpiresAt?: string;
   } = {
     ok: true as const,
-    user: { id: user._id.toHexString(), email: user.emailNormalized },
+    user: buildMarketingUserPublicFromDocument(user),
   };
   if (parsed.data.returnSessionToken) {
     jsonBody.sessionToken = session.cookieValue;

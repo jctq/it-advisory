@@ -16,7 +16,8 @@ import {
 import { getSituationSeed } from '@techmd/diagnostic-core/situation-options';
 import { useRouter } from 'expo-router';
 import { useMemo, useState, type ReactElement } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ThemedText } from '../src/components/themed-text';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
@@ -88,13 +89,13 @@ function MultipleChoiceQuestionCard(props: {
     props.question.selectionMode === 'single' ? getTerminalSelectedOptionId(props.selection) : null;
   return (
     <View style={styles.optionGroup}>
-      <Text style={[styles.variantHint, { color: theme.textMuted }]}>
+      <ThemedText style={[styles.variantHint, { color: theme.textMuted }]}>
         {props.question.selectionMode === 'multiple'
           ? 'Select one or more options.'
           : supportsSingleSelectCascade
             ? 'Choose one path. More choices may appear after your first selection.'
             : 'Select the option that fits best.'}
-      </Text>
+      </ThemedText>
       {props.options.length > 0 ? (
         props.options.map((option) => {
           const isInSelectedPath = props.selection.selectedOptionIds.includes(option.id);
@@ -127,40 +128,40 @@ function MultipleChoiceQuestionCard(props: {
                   />
                   <View style={styles.optionHeaderTextWrap}>
                     {option.presentation.eyebrow !== null ? (
-                      <Text style={[styles.optionEyebrow, { color: theme.primary }]}>{option.presentation.eyebrow}</Text>
+                      <ThemedText style={[styles.optionEyebrow, { color: theme.primary }]}>{option.presentation.eyebrow}</ThemedText>
                     ) : null}
                     <View style={styles.optionHeaderRow}>
-                      <Text style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(option)}</Text>
+                      <ThemedText style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(option)}</ThemedText>
                       {option.presentation.badgeText !== null ? (
                         <View style={[styles.optionBadge, { backgroundColor: theme.primarySoft }]}>
-                          <Text style={[styles.optionBadgeText, { color: theme.primary }]}>{option.presentation.badgeText}</Text>
+                          <ThemedText style={[styles.optionBadgeText, { color: theme.primary }]}>{option.presentation.badgeText}</ThemedText>
                         </View>
                       ) : null}
                     </View>
                     {getDisplayOptionSupportingText(option) !== null ? (
-                      <Text style={[styles.optionDescription, { color: isSelected ? theme.text : theme.textMuted }]}>
+                      <ThemedText style={[styles.optionDescription, { color: isSelected ? theme.text : theme.textMuted }]}>
                         {getDisplayOptionSupportingText(option)}
-                      </Text>
+                      </ThemedText>
                     ) : null}
                   </View>
                 </View>
                 {option.presentation.exampleBullets.length > 0 ? (
                   <View style={styles.exampleList}>
                     {option.presentation.exampleBullets.map((bullet) => (
-                      <Text key={`${option.id}-${bullet}`} style={[styles.exampleBullet, { color: theme.textMuted }]}>
+                      <ThemedText key={`${option.id}-${bullet}`} style={[styles.exampleBullet, { color: theme.textMuted }]}>
                         - {bullet}
-                      </Text>
+                      </ThemedText>
                     ))}
                   </View>
                 ) : null}
               </Pressable>
               {isSelected && option.childQuestion !== null ? (
                 <View style={[styles.detailPanel, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
-                  <Text style={[styles.detailPanelTitle, { color: theme.text }]}>{option.childQuestion.prompt}</Text>
+                  <ThemedText style={[styles.detailPanelTitle, { color: theme.text }]}>{option.childQuestion.prompt}</ThemedText>
                   {option.childQuestion.description !== null ? (
-                    <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
+                    <ThemedText style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
                       {option.childQuestion.description}
-                    </Text>
+                    </ThemedText>
                   ) : null}
                   <View style={styles.detailOptionGroup}>
                     {option.childQuestion.options.map((childOption) => {
@@ -181,11 +182,11 @@ function MultipleChoiceQuestionCard(props: {
                           ]}
                         >
                           <View style={styles.optionContentWrap}>
-                            <Text style={[styles.childOptionLabel, { color: theme.text }]}>{childOption.label}</Text>
+                            <ThemedText style={[styles.childOptionLabel, { color: theme.text }]}>{childOption.label}</ThemedText>
                             {childOption.description !== null ? (
-                              <Text style={[styles.childOptionDescription, { color: theme.textMuted }]}>
+                              <ThemedText style={[styles.childOptionDescription, { color: theme.textMuted }]}>
                                 {childOption.description}
-                              </Text>
+                              </ThemedText>
                             ) : null}
                           </View>
                           <View
@@ -207,9 +208,9 @@ function MultipleChoiceQuestionCard(props: {
           );
         })
       ) : (
-        <Text style={[styles.helperText, { color: theme.textMuted }]}>
+        <ThemedText style={[styles.helperText, { color: theme.textMuted }]}>
           We could not load the answer options for this step. Tap Start over to request a fresh round.
-        </Text>
+        </ThemedText>
       )}
     </View>
   );
@@ -244,9 +245,9 @@ function NestedOptionsQuestionCard(props: {
         });
   return (
     <View style={styles.optionGroup}>
-      <Text style={[styles.variantHint, { color: theme.textMuted }]}>
+      <ThemedText style={[styles.variantHint, { color: theme.textMuted }]}>
         Tap a category first, then answer the detailed choices below. Other category selections stay saved.
-      </Text>
+      </ThemedText>
       {props.options.map((option) => {
         const isInSelectedPath = props.selection.selectedOptionIds.includes(option.id);
         const isSelected = terminalSelectedOptionId !== null ? terminalSelectedOptionId === option.id : isInSelectedPath;
@@ -280,9 +281,9 @@ function NestedOptionsQuestionCard(props: {
               ]}
             />
             <View style={styles.optionContentWrap}>
-              <Text style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(option)}</Text>
+              <ThemedText style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(option)}</ThemedText>
               {getDisplayOptionSupportingText(option) !== null ? (
-                <Text style={[styles.optionDescription, { color: theme.textMuted }]}>{getDisplayOptionSupportingText(option)}</Text>
+                <ThemedText style={[styles.optionDescription, { color: theme.textMuted }]}>{getDisplayOptionSupportingText(option)}</ThemedText>
               ) : null}
             </View>
           </Pressable>
@@ -291,18 +292,18 @@ function NestedOptionsQuestionCard(props: {
       <View style={[styles.detailPanel, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
         {activeOption === null ? (
           <View style={styles.nestedDetailPlaceholder} accessibilityRole="text" accessibilityLabel="Choose a category first">
-            <Text style={[styles.nestedDetailPlaceholderTitle, { color: theme.text }]}>Choose a category first</Text>
-            <Text style={[styles.nestedDetailPlaceholderBody, { color: theme.textMuted }]}>
+            <ThemedText style={[styles.nestedDetailPlaceholderTitle, { color: theme.text }]}>Choose a category first</ThemedText>
+            <ThemedText style={[styles.nestedDetailPlaceholderBody, { color: theme.textMuted }]}>
               Select a category above. Follow-up choices for that category will appear here.
-            </Text>
+            </ThemedText>
           </View>
         ) : (
           <>
-            <Text style={[styles.detailPanelTitle, { color: theme.text }]}>
+            <ThemedText style={[styles.detailPanelTitle, { color: theme.text }]}>
               {activeOption.presentation.panelTitle ?? getDisplayOptionTitle(activeOption)}
-            </Text>
+            </ThemedText>
             {activeOption.childQuestion !== null ? (
-              <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>{activeOption.childQuestion.prompt}</Text>
+              <ThemedText style={[styles.detailPanelDescription, { color: theme.textMuted }]}>{activeOption.childQuestion.prompt}</ThemedText>
             ) : null}
             {activeOption.childQuestion !== null ? (
               <View style={styles.detailOptionGroup}>
@@ -326,9 +327,9 @@ function NestedOptionsQuestionCard(props: {
                       ]}
                     >
                       <View style={styles.optionContentWrap}>
-                        <Text style={[styles.childOptionLabel, { color: theme.text }]}>{childOption.label}</Text>
+                        <ThemedText style={[styles.childOptionLabel, { color: theme.text }]}>{childOption.label}</ThemedText>
                         {childOption.description !== null ? (
-                          <Text style={[styles.childOptionDescription, { color: theme.textMuted }]}>{childOption.description}</Text>
+                          <ThemedText style={[styles.childOptionDescription, { color: theme.textMuted }]}>{childOption.description}</ThemedText>
                         ) : null}
                       </View>
                       <View
@@ -345,13 +346,13 @@ function NestedOptionsQuestionCard(props: {
                 })}
               </View>
             ) : (
-              <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
+              <ThemedText style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
                 Add a follow-up question to this option in the template editor to show detailed choices here.
-              </Text>
+              </ThemedText>
             )}
             {guidanceMessage !== null ? (
               <View style={[styles.guidanceBanner, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <Text style={[styles.guidanceBannerText, { color: theme.textMuted }]}>{guidanceMessage}</Text>
+                <ThemedText style={[styles.guidanceBannerText, { color: theme.textMuted }]}>{guidanceMessage}</ThemedText>
               </View>
             ) : null}
           </>
@@ -415,9 +416,9 @@ function RankedOptionsQuestionCard(props: {
 
   return (
     <View style={styles.optionGroup}>
-      <Text style={[styles.variantHint, { color: theme.textMuted }]}>
+      <ThemedText style={[styles.variantHint, { color: theme.textMuted }]}>
         Pick your top {props.rankedOptionLimit} outcomes, then use the move buttons below to adjust their order.
-      </Text>
+      </ThemedText>
       {props.options.map((option) => {
         const selectedRankIndex = selectedRankLookup.get(option.id);
         const isSelected = selectedRankIndex !== undefined;
@@ -441,16 +442,16 @@ function RankedOptionsQuestionCard(props: {
           >
             {isSelected ? (
               <View style={[styles.rankBadge, { backgroundColor: theme.primarySoft, borderColor: theme.primary }]}>
-                <Text style={[styles.rankBadgeText, { color: theme.primary }]}>RANK {selectedRankIndex + 1}</Text>
+                <ThemedText style={[styles.rankBadgeText, { color: theme.primary }]}>RANK {selectedRankIndex + 1}</ThemedText>
               </View>
             ) : null}
             <View style={styles.optionContentWrap}>
               {option.presentation.eyebrow !== null ? (
-                <Text style={[styles.optionEyebrow, { color: theme.primary }]}>{option.presentation.eyebrow}</Text>
+                <ThemedText style={[styles.optionEyebrow, { color: theme.primary }]}>{option.presentation.eyebrow}</ThemedText>
               ) : null}
-              <Text style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(option)}</Text>
+              <ThemedText style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(option)}</ThemedText>
               {getDisplayOptionSupportingText(option) !== null ? (
-                <Text style={[styles.optionDescription, { color: theme.textMuted }]}>{getDisplayOptionSupportingText(option)}</Text>
+                <ThemedText style={[styles.optionDescription, { color: theme.textMuted }]}>{getDisplayOptionSupportingText(option)}</ThemedText>
               ) : null}
             </View>
           </Pressable>
@@ -458,10 +459,10 @@ function RankedOptionsQuestionCard(props: {
       })}
       <View style={[styles.detailPanel, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
         <View style={styles.rankHeaderRow}>
-          <Text style={[styles.detailPanelTitle, { color: theme.text }]}>Your ranked outcomes</Text>
-          <Text style={[styles.rankCount, { color: theme.primary }]}>
+          <ThemedText style={[styles.detailPanelTitle, { color: theme.text }]}>Your ranked outcomes</ThemedText>
+          <ThemedText style={[styles.rankCount, { color: theme.primary }]}>
             {selectedOptionIds.length} / {props.rankedOptionLimit}
-          </Text>
+          </ThemedText>
         </View>
         {selectedOptions.length > 0 ? (
           <View style={styles.detailOptionGroup}>
@@ -478,16 +479,16 @@ function RankedOptionsQuestionCard(props: {
               >
                 <View style={styles.rankSelectionHeader}>
                   <View style={[styles.rankIndexPill, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.rankIndexText}>{index + 1}</Text>
+                    <ThemedText style={[styles.rankIndexText, { color: theme.onPrimary }]}>{index + 1}</ThemedText>
                   </View>
                   <View style={styles.optionContentWrap}>
-                    <Text style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(item)}</Text>
+                    <ThemedText style={[styles.optionLabel, { color: theme.text }]}>{getDisplayOptionTitle(item)}</ThemedText>
                     {getDisplayOptionSupportingText(item) !== null ? (
-                      <Text style={[styles.optionDescription, { color: theme.textMuted }]}>{getDisplayOptionSupportingText(item)}</Text>
+                      <ThemedText style={[styles.optionDescription, { color: theme.textMuted }]}>{getDisplayOptionSupportingText(item)}</ThemedText>
                     ) : null}
                   </View>
                   <View style={[styles.rankStatusBadge, { backgroundColor: theme.primarySoft, borderColor: theme.border }]}>
-                    <Text style={[styles.rankStatusText, { color: theme.primary }]}>SELECTED</Text>
+                    <ThemedText style={[styles.rankStatusText, { color: theme.primary }]}>SELECTED</ThemedText>
                   </View>
                 </View>
                 <View style={styles.rankActionsRow}>
@@ -509,9 +510,9 @@ function RankedOptionsQuestionCard(props: {
             ))}
           </View>
         ) : (
-          <Text style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
+          <ThemedText style={[styles.detailPanelDescription, { color: theme.textMuted }]}>
             No outcomes ranked yet. Select options above to build your top list.
-          </Text>
+          </ThemedText>
         )}
       </View>
     </View>
@@ -606,15 +607,17 @@ export default function DiagnosticScreen() {
     <View style={styles.footerGroup}>
       {guided.outcome !== null ? (
         <AppButton
-          disabled={isBusy}
+          busy={isBusy}
+          iconName="calendar-outline"
           onPress={() => {
             void executeFinalizeDiagnostic().then(() => router.push('/booking')).catch(() => {});
           }}
+          showTrailingIcon
         >
           Book this session
         </AppButton>
       ) : activeRound !== null ? (
-        <AppButton disabled={isBusy} onPress={() => void executeAdvance()}>
+        <AppButton busy={isBusy} iconName="arrow-forward-circle-outline" onPress={() => void executeAdvance()} showTrailingIcon>
           {positionInRound >= roundSize
             ? diagnosticAiEnabled
               ? 'Submit round'
@@ -622,17 +625,23 @@ export default function DiagnosticScreen() {
             : 'Next question'}
         </AppButton>
       ) : diagnosticAiEnabled ? (
-        <AppButton disabled={isBusy || !isHydrated} onPress={() => void executeStartDiagnostic()}>
+        <AppButton
+          busy={isBusy}
+          disabled={!isHydrated}
+          iconName="play-circle-outline"
+          onPress={() => void executeStartDiagnostic()}
+          showTrailingIcon
+        >
           Start diagnostic
         </AppButton>
       ) : null}
       {canGoBack ? (
-        <AppButton disabled={isBusy} onPress={executeGoBack} variant="secondary">
+        <AppButton disabled={isBusy} iconName="arrow-back-outline" onPress={executeGoBack} variant="secondary">
           Back
         </AppButton>
       ) : null}
       {hasProgress ? (
-        <AppButton disabled={isBusy} onPress={() => void executeReset()} variant="ghost">
+        <AppButton disabled={isBusy} iconName="refresh-outline" onPress={() => void executeReset()} variant="ghost">
           Start over
         </AppButton>
       ) : null}
@@ -651,8 +660,8 @@ export default function DiagnosticScreen() {
     >
       <AppCard>
         <View style={styles.progressRow}>
-          <Text style={[styles.progressLabel, { color: theme.textMuted }]}>{progressHint}</Text>
-          <Text style={[styles.progressLabel, { color: theme.textMuted }]}>{progressPercent}%</Text>
+          <ThemedText style={[styles.progressLabel, { color: theme.textMuted }]}>{progressHint}</ThemedText>
+          <ThemedText style={[styles.progressLabel, { color: theme.textMuted }]}>{progressPercent}%</ThemedText>
         </View>
         <View style={styles.progressBarWrap}>
           <ProgressBar value={progressPercent} />
@@ -660,20 +669,20 @@ export default function DiagnosticScreen() {
       </AppCard>
       {!isHydrated ? (
         <AppCard>
-          <Text style={[styles.helperText, { color: theme.textMuted }]}>Loading your saved diagnostic progress...</Text>
+          <ThemedText style={[styles.helperText, { color: theme.textMuted }]}>Loading your saved diagnostic progress...</ThemedText>
         </AppCard>
       ) : null}
       {errorMessage !== null ? (
         <AppCard>
-          <Text style={[styles.errorText, { color: theme.danger }]}>{errorMessage}</Text>
+          <ThemedText style={[styles.errorText, { color: theme.danger }]}>{errorMessage}</ThemedText>
         </AppCard>
       ) : null}
       {guided.outcome === null && activeRound === null && diagnosticAiEnabled ? (
         <AppCard>
-          <Text style={[styles.sectionHeading, { color: theme.text }]}>What is going on right now?</Text>
-          <Text style={[styles.helperText, { color: theme.textMuted }]}>
+          <ThemedText style={[styles.sectionHeading, { color: theme.text }]}>What is going on right now?</ThemedText>
+          <ThemedText style={[styles.helperText, { color: theme.textMuted }]}>
             Describe the business or delivery problem in a few lines. You can tap suggested phrases below.
-          </Text>
+          </ThemedText>
           <TextInput
             accessibilityLabel="Diagnostic prompt"
             multiline
@@ -708,7 +717,7 @@ export default function DiagnosticScreen() {
                     },
                   ]}
                 >
-                  <Text style={[styles.seedChipText, { color: isActive ? theme.primary : theme.text }]}>{phrase}</Text>
+                  <ThemedText style={[styles.seedChipText, { color: isActive ? theme.primary : theme.text }]}>{phrase}</ThemedText>
                 </Pressable>
               );
             })}
@@ -719,19 +728,19 @@ export default function DiagnosticScreen() {
         <AppCard>
           {!isConfigReady || hasUsableActiveTemplate ? (
             <>
-              <Text style={[styles.sectionHeading, { color: theme.text }]}>Preparing your diagnostic</Text>
-              <Text style={[styles.helperText, { color: theme.textMuted }]}>
+              <ThemedText style={[styles.sectionHeading, { color: theme.text }]}>Preparing your diagnostic</ThemedText>
+              <ThemedText style={[styles.helperText, { color: theme.textMuted }]}>
                 {activeTemplateName !== null
                   ? `Loading the active template: ${activeTemplateName}.`
                   : 'Loading the active diagnostic template.'}
-              </Text>
+              </ThemedText>
             </>
           ) : (
             <>
-              <Text style={[styles.sectionHeading, { color: theme.text }]}>Template unavailable</Text>
-              <Text style={[styles.helperText, { color: theme.textMuted }]}>
+              <ThemedText style={[styles.sectionHeading, { color: theme.text }]}>Template unavailable</ThemedText>
+              <ThemedText style={[styles.helperText, { color: theme.textMuted }]}>
                 No active diagnostic template is ready yet. Ask an admin to create and activate one first.
-              </Text>
+              </ThemedText>
             </>
           )}
         </AppCard>
@@ -739,16 +748,16 @@ export default function DiagnosticScreen() {
       {activeRound !== null && currentQuestion !== undefined ? (
         <AppCard>
           {positionInRound === 1 && activeRound.guidance !== null ? (
-            <Text style={[styles.guidanceText, { color: theme.primary }]}>{activeRound.guidance}</Text>
+            <ThemedText style={[styles.guidanceText, { color: theme.primary }]}>{activeRound.guidance}</ThemedText>
           ) : null}
-          <Text style={[styles.questionCounter, { color: theme.textMuted }]}>
+          <ThemedText style={[styles.questionCounter, { color: theme.textMuted }]}>
             Question {positionInRound} of {roundSize}
-          </Text>
-          <Text style={[styles.questionTitle, { color: theme.text }]}>{currentQuestion.prompt}</Text>
+          </ThemedText>
+          <ThemedText style={[styles.questionTitle, { color: theme.text }]}>{currentQuestion.prompt}</ThemedText>
           {currentQuestion.description !== null ? (
-            <Text style={[styles.helperText, styles.questionDescription, { color: theme.textMuted }]}>
+            <ThemedText style={[styles.helperText, styles.questionDescription, { color: theme.textMuted }]}>
               {currentQuestion.description}
-            </Text>
+            </ThemedText>
           ) : null}
           {currentQuestion.type === 'nested-options' ? (
             <NestedOptionsQuestionCard
@@ -784,12 +793,12 @@ export default function DiagnosticScreen() {
           )}
           {shouldShowDetailNoteTextbox ? (
             <View style={styles.noteFieldWrap}>
-              <Text style={[styles.noteFieldLabel, { color: theme.text }]}>
-                Your exact answer <Text style={{ color: theme.danger }}>(required)</Text>
-              </Text>
-              <Text style={[styles.noteFieldHint, { color: theme.textMuted }]}>
+              <ThemedText style={[styles.noteFieldLabel, { color: theme.text }]}>
+                Your exact answer <ThemedText style={{ color: theme.danger }}>(required)</ThemedText>
+              </ThemedText>
+              <ThemedText style={[styles.noteFieldHint, { color: theme.textMuted }]}>
                 This path requires a short written detail before you can continue.
-              </Text>
+              </ThemedText>
               <TextInput
                 accessibilityLabel="Your exact answer, required"
                 multiline
@@ -813,23 +822,23 @@ export default function DiagnosticScreen() {
       ) : null}
       {guided.outcome !== null ? (
         <AppCard>
-          <Text style={[styles.sectionHeading, { color: theme.text }]}>We have enough signal to guide you.</Text>
-          <Text style={[styles.recommendationTitle, { color: theme.text }]}>
+          <ThemedText style={[styles.sectionHeading, { color: theme.text }]}>We have enough signal to guide you.</ThemedText>
+          <ThemedText style={[styles.recommendationTitle, { color: theme.text }]}>
             {resolveProjectRescueSessionTitle(guided.outcome.sessionTitle)}
-          </Text>
-          <Text style={[styles.briefAssessmentText, { color: theme.textMuted }]}>
+          </ThemedText>
+          <ThemedText style={[styles.briefAssessmentText, { color: theme.textMuted }]}>
             {resolveProjectRescueBriefAssessment(guided.outcome.briefAssessment)}
-          </Text>
+          </ThemedText>
           <View style={[styles.summaryBadge, { backgroundColor: theme.primarySoft }]}>
-            <Text style={[styles.summaryBadgeText, { color: theme.primary }]}>{guided.outcome.mappedSituation}</Text>
+            <ThemedText style={[styles.summaryBadgeText, { color: theme.primary }]}>{guided.outcome.mappedSituation}</ThemedText>
           </View>
-          <Text style={[styles.subsectionLabel, { color: theme.text }]}>Your advisor summary</Text>
-          <Text style={[styles.summaryText, { color: theme.textMuted }]}>{guided.outcome.advisorSummary}</Text>
-          <Text style={[styles.goodFitHeading, { color: theme.textMuted }]}>Good fit if</Text>
+          <ThemedText style={[styles.subsectionLabel, { color: theme.text }]}>Your advisor summary</ThemedText>
+          <ThemedText style={[styles.summaryText, { color: theme.textMuted }]}>{guided.outcome.advisorSummary}</ThemedText>
+          <ThemedText style={[styles.goodFitHeading, { color: theme.textMuted }]}>Good fit if</ThemedText>
           {resolveProjectRescueGoodFitBullets(guided.outcome.goodFitBullets).map((line, index) => (
             <View key={`gf-${index}`} style={styles.goodFitRow}>
               <View style={[styles.goodFitBullet, { backgroundColor: theme.primary }]} />
-              <Text style={[styles.goodFitLine, { color: theme.textMuted }]}>{line}</Text>
+              <ThemedText style={[styles.goodFitLine, { color: theme.textMuted }]}>{line}</ThemedText>
             </View>
           ))}
         </AppCard>
@@ -1163,7 +1172,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   rankIndexText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
   },

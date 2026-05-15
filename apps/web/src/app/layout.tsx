@@ -39,7 +39,7 @@ function resolveMetadataBase(): URL | undefined {
 
 export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
-  title: 'TechMD — IT Advisory',
+  title: 'TechMD — Technology Consultation',
   description:
     'Technology consultation. Better decisions. Stronger business. Guided diagnostics and expert sessions.',
   icons: {

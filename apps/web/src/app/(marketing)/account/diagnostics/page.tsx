@@ -25,9 +25,6 @@ export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
             Track guided diagnostics, find bookings by reference, and pick up where you left off.
           </p>
         </div>
-        <Link href="/quiz" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
-          Open quiz (latest)
-        </Link>
       </div>
       <AccountDiagnosticsPanel />
     </main>

@@ -9,6 +9,9 @@ type AuthEmailPasswordInput = {
 export type MarketingAuthUser = {
   readonly id: string;
   readonly email: string;
+  readonly fullName: string | null;
+  readonly company: string | null;
+  readonly phone: string | null;
 };
 
 type AuthSuccessJson = {
@@ -25,6 +28,32 @@ type MeJson = {
 type ErrorJson = {
   readonly error?: string;
   readonly details?: unknown;
+};
+
+function normalizeMarketingUser(raw: unknown): MarketingAuthUser | null {
+  if (raw === null || typeof raw !== 'object') {
+    return null;
+  }
+  const row = raw as Record<string, unknown>;
+  const id = typeof row.id === 'string' ? row.id : '';
+  const email = typeof row.email === 'string' ? row.email : '';
+  if (id.length === 0 || email.length === 0) {
+    return null;
+  }
+  return {
+    id,
+    email,
+    fullName: typeof row.fullName === 'string' ? row.fullName : null,
+    company: typeof row.company === 'string' ? row.company : null,
+    phone: typeof row.phone === 'string' ? row.phone : null,
+  };
+}
+
+export type MarketingPatchProfileInput = {
+  readonly email: string;
+  readonly fullName: string;
+  readonly company: string;
+  readonly phone: string;
 };
 
 /**
@@ -74,7 +103,30 @@ export class MarketingAuthApiClient {
       const message = payload.error ?? 'Request failed.';
       throw new Error(message);
     }
-    return { user: payload.user };
+    return { user: normalizeMarketingUser(payload.user) };
+  }
+
+  public async patchProfile(sessionToken: string, input: MarketingPatchProfileInput): Promise<MarketingAuthUser> {
+    const response = await fetch(this.buildUrl('/api/auth/profile'), {
+      method: 'PATCH',
+      headers: this.buildHeaders(sessionToken, true),
+      body: JSON.stringify({
+        email: input.email,
+        fullName: input.fullName,
+        company: input.company,
+        phone: input.phone,
+      }),
+    });
+    const payload = (await response.json()) as { readonly user?: unknown } & ErrorJson;
+    if (!response.ok) {
+      const message = payload.error ?? 'Request failed.';
+      throw new Error(message);
+    }
+    const user = normalizeMarketingUser(payload.user);
+    if (user === null) {
+      throw new Error('Invalid profile response.');
+    }
+    return user;
   }
 
   public async logout(sessionToken: string): Promise<void> {
@@ -106,7 +158,11 @@ export class MarketingAuthApiClient {
     if (payload.sessionToken === undefined || payload.sessionToken.length === 0) {
       throw new Error('The server did not return a session token.');
     }
-    return { user: payload.user, sessionToken: payload.sessionToken };
+    const user = normalizeMarketingUser(payload.user);
+    if (user === null) {
+      throw new Error('Invalid user payload.');
+    }
+    return { user, sessionToken: payload.sessionToken };
   }
 
   private buildHeaders(sessionToken: string | undefined, includeJson: boolean): Headers {

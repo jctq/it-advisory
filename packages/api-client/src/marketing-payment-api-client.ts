@@ -1,4 +1,5 @@
 import type { PaymentGatewayId } from '@techmd/domain/payment-types';
+import { VISITOR_SESSION_CONFIG } from '@techmd/domain/visitor-session';
 
 export type PaymentConfigPublic = {
   readonly paymentsEnabled: boolean;
@@ -34,6 +35,17 @@ export type CreatePaymentCheckoutSessionParams = {
   readonly quizSessionId?: string;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
+  /**
+   * Public site origin for PSP return URLs. Send the same value you pass as apiBaseUrl from native
+   * so success redirects match openAuthSessionAsync’s return URL prefix.
+   */
+  readonly appBaseUrl?: string;
+  /** Minimal HTML return route for in-app PSP browsers (Expo / ASWebAuthenticationSession). */
+  readonly nativeInAppPaymentReturn?: boolean;
+  /** Native anonymous visitor; must match checkout so GET /status can load the transaction. */
+  readonly deviceId?: string | null;
+  /** When set, visitor resolves to the signed-in account (must match checkout). */
+  readonly marketingSessionToken?: string | null;
   readonly signal?: AbortSignal;
 };
 
@@ -49,6 +61,23 @@ export type CreatePaymentCheckoutSessionResult = {
 function buildApiUrl(apiBaseUrl: string, path: string): string {
   const base = apiBaseUrl.replace(/\/$/, '');
   return base.length === 0 ? path : `${base}${path}`;
+}
+
+function buildDeviceIdHeaders(deviceId: string | null | undefined): Record<string, string> {
+  const trimmed = typeof deviceId === 'string' ? deviceId.trim() : '';
+  if (trimmed.length === 0) {
+    return {};
+  }
+  const value = trimmed.slice(0, VISITOR_SESSION_CONFIG.maxVisitorIdLength);
+  return { [VISITOR_SESSION_CONFIG.mobileDeviceIdHeaderName]: value };
+}
+
+function buildMarketingAuthHeaders(marketingSessionToken: string | null | undefined): Record<string, string> {
+  const token = marketingSessionToken?.trim() ?? '';
+  if (token.length === 0) {
+    return {};
+  }
+  return { Authorization: `Bearer ${token}` };
 }
 
 export async function fetchPaymentConfigPublic(params: {
@@ -68,7 +97,7 @@ export async function createPaymentCheckoutSession(
   params: CreatePaymentCheckoutSessionParams,
 ): Promise<CreatePaymentCheckoutSessionResult> {
   const url = buildApiUrl(params.apiBaseUrl, '/api/payments/checkout-session');
-  const body: Record<string, string> = {
+  const body: Record<string, string | boolean> = {
     gatewayId: params.gatewayId,
     date: params.date,
     time: params.time,
@@ -87,10 +116,21 @@ export async function createPaymentCheckoutSession(
   if (params.paymentMethodLabel !== undefined) {
     body.paymentMethodLabel = params.paymentMethodLabel;
   }
+  const trimmedAppBase = params.appBaseUrl?.trim() ?? '';
+  if (trimmedAppBase.length > 0) {
+    body.appBaseUrl = trimmedAppBase;
+  }
+  if (params.nativeInAppPaymentReturn === true) {
+    body.nativeInAppPaymentReturn = true;
+  }
   const response = await fetch(url, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildDeviceIdHeaders(params.deviceId),
+      ...buildMarketingAuthHeaders(params.marketingSessionToken),
+    },
     body: JSON.stringify(body),
     signal: params.signal,
   });
@@ -109,6 +149,8 @@ export async function fetchPaymentTransactionStatus(params: {
   readonly apiBaseUrl: string;
   readonly transactionId: string;
   readonly mock?: boolean;
+  readonly deviceId?: string | null;
+  readonly marketingSessionToken?: string | null;
   readonly signal?: AbortSignal;
 }): Promise<{
   readonly transactionId: string;
@@ -124,7 +166,15 @@ export async function fetchPaymentTransactionStatus(params: {
     params.apiBaseUrl,
     `/api/payments/${encodeURIComponent(params.transactionId)}/status${mockSuffix}`,
   );
-  const response = await fetch(url, { credentials: 'include', signal: params.signal, cache: 'no-store' });
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers: {
+      ...buildDeviceIdHeaders(params.deviceId),
+      ...buildMarketingAuthHeaders(params.marketingSessionToken),
+    },
+    signal: params.signal,
+    cache: 'no-store',
+  });
   const payload = (await response.json()) as {
     transactionId?: string;
     status?: string;

@@ -12,6 +12,7 @@ import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentTransactionDocument } from '@/domain/payment-types';
 import { getDb } from '@/lib/mongodb';
+import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 
 export type CreateCheckoutSessionParams = {
   readonly gatewayId: PaymentGatewayId;
@@ -27,6 +28,8 @@ export type CreateCheckoutSessionParams = {
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
+  /** When true, PSP success URL targets a minimal HTML route for in-app browser completion. */
+  readonly nativeInAppPaymentReturn?: boolean;
 };
 
 export type CreateCheckoutSessionResult =
@@ -43,17 +46,6 @@ export type CreateCheckoutSessionResult =
       readonly code: string;
       readonly error: string;
     };
-
-function buildReturnUrls(
-  appBaseUrl: string,
-  transactionId: string,
-): { readonly successUrl: string; readonly cancelUrl: string } {
-  const base = appBaseUrl.replace(/\/$/, '');
-  return {
-    successUrl: `${base}/book/payment/return?transactionId=${encodeURIComponent(transactionId)}`,
-    cancelUrl: `${base}/book?payment=cancelled`,
-  };
-}
 
 async function updateTransactionProvider(
   transactionId: ObjectId,
@@ -165,7 +157,12 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   }
   const credentials = await getGatewayCredentials(params.gatewayId);
   const useMock = credentials === null && process.env.NODE_ENV === 'development';
-  const { successUrl, cancelUrl } = buildReturnUrls(params.appBaseUrl, transactionId);
+  const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
+    appBaseUrl: params.appBaseUrl,
+    transactionId,
+    nativeInAppPaymentReturn: params.nativeInAppPaymentReturn === true,
+    cancelRelativeUrl: '/book?payment=cancelled',
+  });
   const adapter =
     useMock
       ? createMockPaymentAdapter(successUrl)

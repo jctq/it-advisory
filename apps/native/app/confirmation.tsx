@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
+import { ThemedText } from '../src/components/themed-text';
 import { useDiagnosticFlow } from '../src/providers/diagnostic-flow-provider';
 import { useAppTheme } from '../src/theme/use-app-theme';
 
@@ -51,24 +52,26 @@ export default function ConfirmationScreen() {
       subtitle="Your consultation slot is reserved. Email and calendar automation can be connected next."
       footer={
         <View style={styles.footerGroup}>
-          <AppButton onPress={() => router.replace('/')}>Back to home</AppButton>
-          <AppButton onPress={() => router.replace('/diagnostic')} variant="secondary">
+          <AppButton iconName="home-outline" onPress={() => router.replace('/(tabs)')} showTrailingIcon>
+            Back to home
+          </AppButton>
+          <AppButton iconName="sparkles-outline" onPress={() => router.replace('/diagnostic')} variant="secondary">
             Run another diagnostic
           </AppButton>
         </View>
       }
     >
       <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Booking summary</Text>
+        <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>Booking summary</ThemedText>
         <View style={styles.summaryRow}>
-          <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>When</Text>
-          <Text style={[styles.summaryValue, { color: theme.text }]}>{displayDate}</Text>
-          <Text style={[styles.summaryMeta, { color: theme.textMuted }]}>{displayTime} · {PRIMARY_TIMEZONE}</Text>
+          <ThemedText style={[styles.summaryLabel, { color: theme.textMuted }]}>When</ThemedText>
+          <ThemedText style={[styles.summaryValue, { color: theme.text }]}>{displayDate}</ThemedText>
+          <ThemedText style={[styles.summaryMeta, { color: theme.textMuted }]}>{displayTime} · {PRIMARY_TIMEZONE}</ThemedText>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Format</Text>
-          <Text style={[styles.summaryValue, { color: theme.text }]}>Remote video call</Text>
-          <Text style={[styles.summaryMeta, { color: theme.textMuted }]}>Meeting link can be sent when email delivery is wired.</Text>
+          <ThemedText style={[styles.summaryLabel, { color: theme.textMuted }]}>Format</ThemedText>
+          <ThemedText style={[styles.summaryValue, { color: theme.text }]}>Remote video call</ThemedText>
+          <ThemedText style={[styles.summaryMeta, { color: theme.textMuted }]}>Meeting link can be sent when email delivery is wired.</ThemedText>
         </View>
       </AppCard>
     </AppScreen>

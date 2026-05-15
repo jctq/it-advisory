@@ -143,6 +143,7 @@ export function GuestBookingManageFlow(): ReactElement {
     try {
       const result = await createGuestBookingManageCheckout({
         apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+        appBaseUrl: MARKETING_CLIENT_API_BASE_URL.length > 0 ? MARKETING_CLIENT_API_BASE_URL : undefined,
         credentials,
         gatewayId: selectedGatewayId,
         paymentMethodId: selectedPaymentMethodId,

@@ -547,6 +547,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       try {
         const session = await createPaymentCheckoutSession({
           apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+          appBaseUrl: MARKETING_CLIENT_API_BASE_URL.length > 0 ? MARKETING_CLIENT_API_BASE_URL : undefined,
           gatewayId: selectedGatewayId,
           paymentMethodId: selectedPaymentMethodId,
           date: dateParam,

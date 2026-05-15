@@ -145,6 +145,11 @@ export type UserAccountDocument = {
   passwordHash: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Display name for bookings and profile (optional). */
+  fullName?: string;
+  company?: string;
+  /** Philippine mobile in E.164 form (+639xxxxxxxxx), optional. */
+  phone?: string;
 };
 
 /** Server-side session row backing the `it_auth_session` HTTP-only cookie. */

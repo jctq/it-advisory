@@ -177,6 +177,17 @@ export class DiagnosticApiClient {
   }
 
   /**
+   * Loads a specific quiz session by opaque marketing ref (must belong to the current visitor or account).
+   */
+  public async fetchQuizSessionBySessionRef(sessionRef: string): Promise<QuizSessionPayload> {
+    const trimmed = sessionRef.trim();
+    const query = trimmed.length > 0 ? `?sessionId=${encodeURIComponent(trimmed)}` : '';
+    return this.executeJsonRequest<QuizSessionPayload>({
+      pathname: `/api/quiz/session${query}`,
+    });
+  }
+
+  /**
    * Saves the current diagnostic progress for this anonymous visitor.
    */
   public async saveQuizSession(input: SaveQuizSessionInput): Promise<SaveQuizSessionPayload> {

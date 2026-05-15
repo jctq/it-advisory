@@ -28,7 +28,7 @@ export function ProgressBar(props: ProgressBarProps) {
 
 const styles = StyleSheet.create({
   track: {
-    height: 10,
+    height: 12,
     borderRadius: 999,
     overflow: 'hidden',
   },

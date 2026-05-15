@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createPaymentCheckoutForExistingBooking } from '@/lib/payments/payment-checkout-resume';
 import { guestBookingManageCheckoutSchema } from '@/lib/marketing/guest-booking-manage-schema';
-
-function resolveAppBaseUrl(request: Request): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (configured !== undefined && configured.length > 0) {
-    return configured.replace(/\/$/, '');
-  }
-  return new URL(request.url).origin;
-}
+import { resolveCheckoutAppBaseUrl } from '@/lib/server/resolve-checkout-app-base-url';
 
 export async function POST(request: Request): Promise<NextResponse> {
   let json: unknown;
@@ -30,7 +23,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     gatewayId: parsed.data.gatewayId,
     paymentMethodId: parsed.data.paymentMethodId,
     paymentMethodLabel: parsed.data.paymentMethodLabel,
-    appBaseUrl: resolveAppBaseUrl(request),
+    appBaseUrl: resolveCheckoutAppBaseUrl(request, parsed.data.appBaseUrl),
+    nativeInAppPaymentReturn: parsed.data.nativeInAppPaymentReturn === true,
   });
   if (!result.ok) {
     const status =

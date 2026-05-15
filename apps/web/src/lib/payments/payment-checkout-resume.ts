@@ -8,6 +8,7 @@ import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot
 import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout';
 import { getDb } from '@/lib/mongodb';
+import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 
 type ResumeCheckoutParams = {
   readonly credentials: GuestBookingManageCredentials;
@@ -15,18 +16,8 @@ type ResumeCheckoutParams = {
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
+  readonly nativeInAppPaymentReturn?: boolean;
 };
-
-function buildReturnUrls(
-  appBaseUrl: string,
-  transactionId: string,
-): { readonly successUrl: string; readonly cancelUrl: string } {
-  const base = appBaseUrl.replace(/\/$/, '');
-  return {
-    successUrl: `${base}/book/payment/return?transactionId=${encodeURIComponent(transactionId)}`,
-    cancelUrl: `${base}/book/manage?payment=cancelled`,
-  };
-}
 
 async function updateTransactionProvider(
   transactionId: ObjectId,
@@ -124,7 +115,12 @@ export async function createPaymentCheckoutForExistingBooking(
   }
   const credentials = await getGatewayCredentials(params.gatewayId);
   const useMock = credentials === null && process.env.NODE_ENV === 'development';
-  const { successUrl, cancelUrl } = buildReturnUrls(params.appBaseUrl, transactionId);
+  const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
+    appBaseUrl: params.appBaseUrl,
+    transactionId,
+    nativeInAppPaymentReturn: params.nativeInAppPaymentReturn === true,
+    cancelRelativeUrl: '/book/manage?payment=cancelled',
+  });
   const adapter =
     useMock
       ? createMockPaymentAdapter(successUrl)

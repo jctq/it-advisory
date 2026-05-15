@@ -52,6 +52,8 @@ export async function createGuestBookingManageCheckout(params: {
   readonly gatewayId: PaymentGatewayId;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
+  readonly appBaseUrl?: string;
+  readonly nativeInAppPaymentReturn?: boolean;
   readonly signal?: AbortSignal;
 }): Promise<{
   readonly transactionId: string;
@@ -60,7 +62,7 @@ export async function createGuestBookingManageCheckout(params: {
   readonly mock?: boolean;
 }> {
   const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/manage/checkout');
-  const body: Record<string, string> = {
+  const body: Record<string, string | boolean> = {
     bookingReference: params.credentials.bookingReference,
     email: params.credentials.email,
     phoneLastFour: params.credentials.phoneLastFour,
@@ -69,6 +71,13 @@ export async function createGuestBookingManageCheckout(params: {
   };
   if (params.paymentMethodLabel !== undefined) {
     body.paymentMethodLabel = params.paymentMethodLabel;
+  }
+  const trimmedAppBase = params.appBaseUrl?.trim() ?? '';
+  if (trimmedAppBase.length > 0) {
+    body.appBaseUrl = trimmedAppBase;
+  }
+  if (params.nativeInAppPaymentReturn === true) {
+    body.nativeInAppPaymentReturn = true;
   }
   const response = await fetch(url, {
     method: 'POST',

@@ -1,4 +1,8 @@
-import { MarketingAuthApiClient, type MarketingAuthUser } from '@techmd/api-client/marketing-auth-api-client';
+import {
+  MarketingAuthApiClient,
+  type MarketingAuthUser,
+  type MarketingPatchProfileInput,
+} from '@techmd/api-client/marketing-auth-api-client';
 import * as SecureStore from 'expo-secure-store';
 import {
   createContext,
@@ -23,6 +27,8 @@ type MarketingAuthContextValue = {
   readonly executeLogin: (email: string, password: string) => Promise<void>;
   readonly executeRegister: (email: string, password: string) => Promise<void>;
   readonly executeLogout: () => Promise<void>;
+  readonly executeRefreshUser: () => Promise<MarketingAuthUser | null>;
+  readonly executePatchProfile: (input: MarketingPatchProfileInput) => Promise<void>;
 };
 
 const MarketingAuthContext = createContext<MarketingAuthContextValue | null>(null);
@@ -144,6 +150,34 @@ export function MarketingAuthProvider(props: PropsWithChildren): ReactNode {
     }
   }, [config.apiBaseUrl, deviceId, sessionToken]);
 
+  const executeRefreshUser = useCallback(async (): Promise<MarketingAuthUser | null> => {
+    if (deviceId === null || sessionToken === null) {
+      return null;
+    }
+    const client = new MarketingAuthApiClient({
+      apiOrigin: config.apiBaseUrl,
+      deviceId,
+    });
+    const me = await client.fetchMe(sessionToken);
+    setUser(me.user);
+    return me.user;
+  }, [config.apiBaseUrl, deviceId, sessionToken]);
+
+  const executePatchProfile = useCallback(
+    async (input: MarketingPatchProfileInput): Promise<void> => {
+      if (deviceId === null || sessionToken === null) {
+        throw new Error('Sign in to update your profile.');
+      }
+      const client = new MarketingAuthApiClient({
+        apiOrigin: config.apiBaseUrl,
+        deviceId,
+      });
+      const nextUser = await client.patchProfile(sessionToken, input);
+      setUser(nextUser);
+    },
+    [config.apiBaseUrl, deviceId, sessionToken],
+  );
+
   const value = useMemo<MarketingAuthContextValue>(
     () => ({
       deviceId,
@@ -153,8 +187,20 @@ export function MarketingAuthProvider(props: PropsWithChildren): ReactNode {
       executeLogin,
       executeRegister,
       executeLogout,
+      executeRefreshUser,
+      executePatchProfile,
     }),
-    [deviceId, user, sessionToken, isReady, executeLogin, executeRegister, executeLogout],
+    [
+      deviceId,
+      user,
+      sessionToken,
+      isReady,
+      executeLogin,
+      executeRegister,
+      executeLogout,
+      executeRefreshUser,
+      executePatchProfile,
+    ],
   );
 
   return <MarketingAuthContext.Provider value={value}>{props.children}</MarketingAuthContext.Provider>;

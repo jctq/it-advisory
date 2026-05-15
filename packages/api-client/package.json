@@ -9,7 +9,8 @@
     "./marketing-auth-api-client": "./src/marketing-auth-api-client.ts",
     "./marketing-booking-api-client": "./src/marketing-booking-api-client.ts",
     "./marketing-payment-api-client": "./src/marketing-payment-api-client.ts",
-    "./marketing-booking-manage-api-client": "./src/marketing-booking-manage-api-client.ts"
+    "./marketing-booking-manage-api-client": "./src/marketing-booking-manage-api-client.ts",
+    "./marketing-my-diagnostics-api-client": "./src/marketing-my-diagnostics-api-client.ts"
   },
   "dependencies": {
     "@techmd/domain": "workspace:*"

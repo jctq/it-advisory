@@ -11,4 +11,7 @@ export const guestBookingManageCheckoutSchema = guestBookingManageCredentialsSch
   gatewayId: z.enum(PAYMENT_GATEWAY_IDS),
   paymentMethodId: z.string().min(1).max(64),
   paymentMethodLabel: z.string().min(1).max(120).optional(),
+  /** When set (e.g. native), must match request origin, NEXT_PUBLIC_APP_URL, or CHECKOUT_ALLOWED_APP_BASE_URLS. */
+  appBaseUrl: z.string().max(240).optional(),
+  nativeInAppPaymentReturn: z.boolean().optional(),
 });
