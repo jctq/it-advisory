@@ -1,5 +1,5 @@
 {
-  "name": "@it-advisory/diagnostic-core",
+  "name": "@techmd/diagnostic-core",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -14,6 +14,6 @@
     "./project-rescue-service-context": "./src/project-rescue-service-context.ts"
   },
   "dependencies": {
-    "@it-advisory/domain": "workspace:*"
+    "@techmd/domain": "workspace:*"
   }
 }

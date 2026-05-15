@@ -1,1 +1,1 @@
-export * from '@it-advisory/diagnostic-core/situation-options';
+export * from '@techmd/diagnostic-core/situation-options';

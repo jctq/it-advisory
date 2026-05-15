@@ -2,7 +2,7 @@ import { Suspense, type ReactElement } from 'react';
 import { PaymentReturnClient } from './payment-return-client';
 
 export const metadata = {
-  title: 'Payment — IT Advisory',
+  title: 'Payment — TechMD',
 };
 
 export default function PaymentReturnPage(): ReactElement {

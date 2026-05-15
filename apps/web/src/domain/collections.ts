@@ -1,1 +1,1 @@
-export * from '@it-advisory/domain/collections';
+export * from '@techmd/domain/collections';

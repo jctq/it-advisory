@@ -1,5 +1,8 @@
-export const ADMIN_COLOR_MODE_STORAGE_KEY = 'it-advisory-admin-color-mode';
-export const ADMIN_COLOR_THEME_STORAGE_KEY = 'it-advisory-admin-color-theme';
+export const ADMIN_COLOR_MODE_STORAGE_KEY = 'techmd-admin-color-mode';
+export const ADMIN_COLOR_THEME_STORAGE_KEY = 'techmd-admin-color-theme';
+
+export const MARKETING_COLOR_MODE_STORAGE_KEY = 'techmd-marketing-color-mode';
+export const MARKETING_COLOR_THEME_STORAGE_KEY = 'techmd-marketing-color-theme';
 
 export const ADMIN_COLOR_MODES = ['light', 'dark', 'system'] as const;
 export const ADMIN_COLOR_THEMES = ['indigo', 'emerald', 'amber', 'rose'] as const;
@@ -9,6 +12,9 @@ export type AdminColorTheme = (typeof ADMIN_COLOR_THEMES)[number];
 
 export const DEFAULT_ADMIN_COLOR_MODE: AdminColorMode = 'system';
 export const DEFAULT_ADMIN_COLOR_THEME: AdminColorTheme = 'indigo';
+
+export const DEFAULT_MARKETING_COLOR_MODE: AdminColorMode = 'light';
+export const DEFAULT_MARKETING_COLOR_THEME: AdminColorTheme = 'indigo';
 
 export type AdminColorModeOption = {
   readonly value: AdminColorMode;
@@ -47,4 +53,12 @@ export function resolveAdminColorMode(value: string | null): AdminColorMode {
 
 export function resolveAdminColorTheme(value: string | null): AdminColorTheme {
   return isAdminColorTheme(value) ? value : DEFAULT_ADMIN_COLOR_THEME;
+}
+
+export function resolveMarketingColorMode(value: string | null): AdminColorMode {
+  return isAdminColorMode(value) ? value : DEFAULT_MARKETING_COLOR_MODE;
+}
+
+export function resolveMarketingColorTheme(value: string | null): AdminColorTheme {
+  return isAdminColorTheme(value) ? value : DEFAULT_MARKETING_COLOR_THEME;
 }

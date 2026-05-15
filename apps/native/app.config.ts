@@ -1,10 +1,10 @@
 import type { ExpoConfig } from 'expo/config';
 
-const DEFAULT_APP_NAME = 'IT Advisory';
-const DEFAULT_SLUG = 'it-advisory-native';
-const DEFAULT_SCHEME = 'itadvisory';
-const DEFAULT_IOS_BUNDLE_ID = 'com.itadvisory.native';
-const DEFAULT_ANDROID_PACKAGE = 'com.itadvisory.native';
+const DEFAULT_APP_NAME = 'TechMD';
+const DEFAULT_SLUG = 'techmd-native';
+const DEFAULT_SCHEME = 'techmd';
+const DEFAULT_IOS_BUNDLE_ID = 'com.techmd.native';
+const DEFAULT_ANDROID_PACKAGE = 'com.techmd.native';
 const DEFAULT_APP_VERSION = '1.0.0';
 const DEFAULT_IOS_BUILD_NUMBER = '1';
 
@@ -28,7 +28,7 @@ export default (): ExpoConfig => ({
   splash: {
     image: './assets/splash-icon.png',
     resizeMode: 'contain',
-    backgroundColor: '#2843C4',
+    backgroundColor: '#001F3F',
   },
   ios: {
     supportsTablet: true,
@@ -39,7 +39,7 @@ export default (): ExpoConfig => ({
     package: readOptionalEnv('EXPO_PUBLIC_ANDROID_PACKAGE') ?? DEFAULT_ANDROID_PACKAGE,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#2843C4',
+      backgroundColor: '#001F3F',
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: true,

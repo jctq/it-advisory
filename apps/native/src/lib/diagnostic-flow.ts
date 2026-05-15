@@ -7,7 +7,7 @@ import {
   type ActiveGuidedRound,
   type CompletedRoundBundle,
   type GuidedDiagnosticV1,
-} from '@it-advisory/diagnostic-core/guided-diagnostic-types';
+} from '@techmd/diagnostic-core/guided-diagnostic-types';
 
 export const MIN_PROMPT_LENGTH = 8;
 

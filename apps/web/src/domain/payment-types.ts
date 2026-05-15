@@ -1,1 +1,1 @@
-export * from '@it-advisory/domain/payment-types';
+export * from '@techmd/domain/payment-types';

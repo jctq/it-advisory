@@ -1,5 +1,5 @@
 {
-  "name": "@it-advisory/api-client",
+  "name": "@techmd/api-client",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -12,6 +12,6 @@
     "./marketing-booking-manage-api-client": "./src/marketing-booking-manage-api-client.ts"
   },
   "dependencies": {
-    "@it-advisory/domain": "workspace:*"
+    "@techmd/domain": "workspace:*"
   }
 }

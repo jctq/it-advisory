@@ -19,7 +19,7 @@ import {
   resolveProjectRescueBriefAssessment,
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
-} from '@it-advisory/diagnostic-core/project-rescue-service-context';
+} from '@techmd/diagnostic-core/project-rescue-service-context';
 
 const qaSchema = z.object({
   questionId: z.string(),

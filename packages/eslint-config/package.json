@@ -1,5 +1,5 @@
 {
-  "name": "@it-advisory/eslint-config",
+  "name": "@techmd/eslint-config",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",

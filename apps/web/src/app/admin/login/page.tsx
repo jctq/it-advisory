@@ -4,7 +4,7 @@ import { buildApiUrl } from '@/lib/config/build-api-url';
 type SearchParams = { readonly next?: string; readonly error?: string };
 
 export const metadata = {
-  title: 'Admin sign in — IT Advisory',
+  title: 'Admin sign in — TechMD',
 };
 
 export default async function AdminLoginPage(props: {

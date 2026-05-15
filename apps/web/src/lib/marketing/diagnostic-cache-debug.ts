@@ -1,1 +1,1 @@
-export * from '@it-advisory/diagnostic-core/diagnostic-cache-debug';
+export * from '@techmd/diagnostic-core/diagnostic-cache-debug';

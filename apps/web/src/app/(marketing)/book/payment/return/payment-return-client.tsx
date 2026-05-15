@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react';
-import { fetchPaymentTransactionStatus } from '@it-advisory/api-client/marketing-payment-api-client';
+import { fetchPaymentTransactionStatus } from '@techmd/api-client/marketing-payment-api-client';
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 
@@ -33,9 +33,9 @@ export function PaymentReturnClient(): ReactElement {
     setStatus('loading');
     setPollGeneration((current) => current + 1);
   }, []);
+  const displayStatus: ReturnStatus = transactionId.length === 0 ? 'failed' : status;
   useEffect(() => {
     if (transactionId.length === 0) {
-      setStatus('failed');
       return;
     }
     let cancelled = false;
@@ -80,7 +80,7 @@ export function PaymentReturnClient(): ReactElement {
       cancelled = true;
     };
   }, [isMock, pollGeneration, router, transactionId]);
-  if (status === 'loading') {
+  if (displayStatus === 'loading') {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 text-center">
         <Loader2 className="mx-auto size-10 animate-spin text-primary" />
@@ -89,7 +89,7 @@ export function PaymentReturnClient(): ReactElement {
       </div>
     );
   }
-  if (status === 'timed_out') {
+  if (displayStatus === 'timed_out') {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 text-center">
         <Loader2 className="mx-auto size-10 text-muted-foreground" />
@@ -109,7 +109,7 @@ export function PaymentReturnClient(): ReactElement {
       </div>
     );
   }
-  if (status === 'failed') {
+  if (displayStatus === 'failed') {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 text-center">
         <XCircle className="mx-auto size-12 text-destructive" />

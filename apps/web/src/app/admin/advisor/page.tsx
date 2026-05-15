@@ -2,7 +2,7 @@ import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { AdvisorChat } from '@/components/admin/advisor-chat';
 
 export const metadata = {
-  title: 'Advisor — IT Advisory Admin',
+  title: 'Advisor — TechMD Admin',
 };
 
 export default function AdminAdvisorPage() {

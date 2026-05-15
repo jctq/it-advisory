@@ -8,12 +8,14 @@ import {
   type AdminColorTheme,
 } from '@/lib/admin/admin-appearance';
 import { NativeSelect } from '@/components/ui/native-select';
+import { cn } from '@/lib/utils';
 
 type AdminAppearanceControlsProps = {
   readonly mode: AdminColorMode;
   readonly theme: AdminColorTheme;
   readonly onModeChange: (mode: AdminColorMode) => void;
   readonly onThemeChange: (theme: AdminColorTheme) => void;
+  readonly className?: string;
 };
 
 function renderModeIcon(mode: AdminColorMode) {
@@ -43,7 +45,7 @@ function renderModeIcon(mode: AdminColorMode) {
 
 export function AdminAppearanceControls(props: AdminAppearanceControlsProps) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-3">
+    <div className={cn('flex flex-wrap items-center justify-end gap-2 sm:gap-3', props.className)}>
       <label className="min-w-[140px] space-y-1">
         <div className="relative">
           {renderModeIcon(props.mode)}
@@ -51,7 +53,7 @@ export function AdminAppearanceControls(props: AdminAppearanceControlsProps) {
             aria-label="Color mode"
             value={props.mode}
             onChange={(event) => props.onModeChange(event.target.value as AdminColorMode)}
-            className="min-h-11 min-w-[140px] pl-9"
+            className="min-h-11 min-w-[128px] pl-9 text-sm"
           >
             {ADMIN_COLOR_MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -68,7 +70,7 @@ export function AdminAppearanceControls(props: AdminAppearanceControlsProps) {
             aria-label="Color theme"
             value={props.theme}
             onChange={(event) => props.onThemeChange(event.target.value as AdminColorTheme)}
-            className="min-h-11 min-w-[160px] pl-9"
+            className="min-h-11 min-w-[132px] pl-9 text-sm"
           >
             {ADMIN_COLOR_THEME_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>

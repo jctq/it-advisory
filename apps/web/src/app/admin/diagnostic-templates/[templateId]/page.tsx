@@ -9,7 +9,7 @@ type AdminDiagnosticTemplateDetailPageProps = {
 };
 
 export const metadata = {
-  title: 'Edit Diagnostic Template — IT Advisory Admin',
+  title: 'Edit Diagnostic Template — TechMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
-const DEVICE_ID_KEY = 'it-advisory-device-id';
+const DEVICE_ID_KEY = 'techmd-device-id';
 
 /**
  * Reads the persisted anonymous device id or creates one on first launch.

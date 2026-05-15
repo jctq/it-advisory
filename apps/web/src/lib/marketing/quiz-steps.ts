@@ -1,1 +1,1 @@
-export * from '@it-advisory/diagnostic-core/quiz-steps';
+export * from '@techmd/diagnostic-core/quiz-steps';

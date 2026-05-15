@@ -1,4 +1,4 @@
-import { MarketingAuthApiClient, type MarketingAuthUser } from '@it-advisory/api-client/marketing-auth-api-client';
+import { MarketingAuthApiClient, type MarketingAuthUser } from '@techmd/api-client/marketing-auth-api-client';
 import * as SecureStore from 'expo-secure-store';
 import {
   createContext,
@@ -13,7 +13,7 @@ import {
 import { readOrCreateDeviceId } from '../lib/device-id';
 import { readNativeAppConfig } from '../lib/native-app-config';
 
-const MARKETING_SESSION_KEY = 'it-advisory-marketing-auth-session';
+const MARKETING_SESSION_KEY = 'techmd-marketing-auth-session';
 
 type MarketingAuthContextValue = {
   readonly deviceId: string | null;

@@ -1,7 +1,7 @@
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import { getGatewayCredentials } from '@/lib/data/payment-settings';
 import { processWebhookPaymentEvent } from '@/lib/payments/payment-completion';
-import { resolvePaymentAdapter } from '@it-advisory/payments';
+import { resolvePaymentAdapter } from '@techmd/payments';
 
 export async function handlePaymentGatewayWebhook(input: {
   readonly gatewayId: PaymentGatewayId;

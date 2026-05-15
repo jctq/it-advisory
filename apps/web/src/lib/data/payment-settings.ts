@@ -16,7 +16,7 @@ import {
   maskCredentialHint,
 } from '@/lib/server/payment-credentials-crypto';
 import { getDb } from '@/lib/mongodb';
-import type { GatewayCredentials } from '@it-advisory/payments';
+import type { GatewayCredentials } from '@techmd/payments';
 
 export const PAYMENT_SETTINGS_DOCUMENT_ID = 'default';
 

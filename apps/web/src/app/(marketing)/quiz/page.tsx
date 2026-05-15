@@ -4,7 +4,7 @@ import { QuizFlow } from './quiz-flow';
 import { QuizRouteLoadingFallback } from './quiz-route-loading-fallback';
 
 export const metadata: Metadata = {
-  title: 'Guided diagnostic · IT Advisory',
+  title: 'Guided diagnostic · TechMD',
   description:
     'Describe your situation, answer short guided intake questions, then finish the diagnostic for a tailored recommendation.',
 };

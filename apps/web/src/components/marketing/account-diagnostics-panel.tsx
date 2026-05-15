@@ -333,6 +333,8 @@ export function AccountDiagnosticsPanel(): ReactElement {
     ],
     [deletingId, handleRequestDelete],
   );
+  // TanStack Table returns unstable function references; React Compiler intentionally skips memoizing here.
+  // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable is documented as incompatible with compiler memoization
   const table = useReactTable({
     data: tableData,
     columns,

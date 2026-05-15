@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createDefaultAdvisorBookingSettingsDocument } from '@it-advisory/domain/booking-schedule';
+import { createDefaultAdvisorBookingSettingsDocument } from '@techmd/domain/booking-schedule';
 import type { AdvisorBookingSettingsDocument, AdvisorWeekdayOverride } from '@/domain/types';
 import {
   findAdvisorBookingSettingsDocument,

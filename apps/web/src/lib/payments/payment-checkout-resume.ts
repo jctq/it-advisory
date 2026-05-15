@@ -5,7 +5,7 @@ import { findVerifiedGuestBookingForCheckout, type GuestBookingManageCredentials
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
-import { createMockPaymentAdapter, resolvePaymentAdapter } from '@it-advisory/payments';
+import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout';
 import { getDb } from '@/lib/mongodb';
 
@@ -139,7 +139,7 @@ export async function createPaymentCheckoutForExistingBooking(
     providerSession = await adapter.createCheckoutSession({
       amountCentavos: publicSettings.checkoutAmountCentavos,
       currency: 'PHP',
-      description: 'IT Advisory consultation booking',
+      description: 'TechMD consultation booking',
       successUrl,
       cancelUrl,
       referenceId: bookingDraftId,

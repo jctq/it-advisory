@@ -1,1 +1,1 @@
-export * from '@it-advisory/domain/types';
+export * from '@techmd/domain/types';

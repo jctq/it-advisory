@@ -26,13 +26,13 @@ importers:
       '@expo/metro-runtime':
         specifier: ~6.1.2
         version: 6.1.2(expo@54.0.34)(react-dom@19.1.0(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
-      '@it-advisory/api-client':
+      '@techmd/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
-      '@it-advisory/diagnostic-core':
+      '@techmd/diagnostic-core':
         specifier: workspace:*
         version: link:../../packages/diagnostic-core
-      '@it-advisory/domain':
+      '@techmd/domain':
         specifier: workspace:*
         version: link:../../packages/domain
       date-fns:
@@ -132,18 +132,6 @@ importers:
       '@fullcalendar/timegrid':
         specifier: ^6.1.20
         version: 6.1.20(@fullcalendar/core@6.1.20)
-      '@it-advisory/api-client':
-        specifier: workspace:*
-        version: link:../../packages/api-client
-      '@it-advisory/diagnostic-core':
-        specifier: workspace:*
-        version: link:../../packages/diagnostic-core
-      '@it-advisory/domain':
-        specifier: workspace:*
-        version: link:../../packages/domain
-      '@it-advisory/payments':
-        specifier: workspace:*
-        version: link:../../packages/payments
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.1.17))(@types/react@19.1.17)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -165,6 +153,18 @@ importers:
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@techmd/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
+      '@techmd/diagnostic-core':
+        specifier: workspace:*
+        version: link:../../packages/diagnostic-core
+      '@techmd/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@techmd/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       ai:
         specifier: ^6.0.177
         version: 6.0.177(zod@3.25.76)
@@ -211,12 +211,12 @@ importers:
         specifier: ^3.24.4
         version: 3.25.76
     devDependencies:
-      '@it-advisory/typescript-config':
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
       '@tailwindcss/postcss':
         specifier: ^4.1.7
         version: 4.3.0
+      '@techmd/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
       '@types/node':
         specifier: ^22.15.17
         version: 22.19.18
@@ -247,13 +247,13 @@ importers:
 
   packages/api-client:
     dependencies:
-      '@it-advisory/domain':
+      '@techmd/domain':
         specifier: workspace:*
         version: link:../domain
 
   packages/diagnostic-core:
     dependencies:
-      '@it-advisory/domain':
+      '@techmd/domain':
         specifier: workspace:*
         version: link:../domain
 
@@ -269,7 +269,7 @@ importers:
         specifier: ^6.16.0
         version: 6.21.0
     devDependencies:
-      '@it-advisory/typescript-config':
+      '@techmd/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
       typescript:
@@ -308,11 +308,11 @@ importers:
 
   packages/payments:
     dependencies:
-      '@it-advisory/domain':
+      '@techmd/domain':
         specifier: workspace:*
         version: link:../domain
     devDependencies:
-      '@it-advisory/typescript-config':
+      '@techmd/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
       typescript:

@@ -3,12 +3,12 @@ import type {
   CompletedRoundBundle,
   DiagnosticThreadRound,
   GuidedDiagnosticOutcome,
-} from '@it-advisory/diagnostic-core/guided-diagnostic-types';
+} from '@techmd/diagnostic-core/guided-diagnostic-types';
 import {
   resolveProjectRescueBriefAssessment,
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
-} from '@it-advisory/diagnostic-core/project-rescue-service-context';
+} from '@techmd/diagnostic-core/project-rescue-service-context';
 import {
   buildDiagnosticAnswerLookup,
   findFirstVisibleQuestionIndex,
@@ -180,4 +180,4 @@ export function buildTemplateDiagnosticOutcome(
   };
 }
 
-export { buildTemplateFallbackAdvisorSummary } from '@it-advisory/diagnostic-core/template-diagnostic-flow';
+export { buildTemplateFallbackAdvisorSummary } from '@techmd/diagnostic-core/template-diagnostic-flow';

@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   type ReactElement,
@@ -95,14 +96,25 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const onStateChangeRef = useRef(props.onStateChange);
-  onStateChangeRef.current = props.onStateChange;
-  const currentPayload: SettingsPayload = {
-    diagnosticAiEnabled,
-    diagnosticMaxRounds,
-    diagnosticQuestionsPerRound,
-    diagnosticOptionsPerQuestion,
-    diagnosticCacheDebugEnabled,
-  };
+  useEffect(() => {
+    onStateChangeRef.current = props.onStateChange;
+  }, [props.onStateChange]);
+  const currentPayload: SettingsPayload = useMemo(
+    () => ({
+      diagnosticAiEnabled,
+      diagnosticMaxRounds,
+      diagnosticQuestionsPerRound,
+      diagnosticOptionsPerQuestion,
+      diagnosticCacheDebugEnabled,
+    }),
+    [
+      diagnosticAiEnabled,
+      diagnosticCacheDebugEnabled,
+      diagnosticMaxRounds,
+      diagnosticOptionsPerQuestion,
+      diagnosticQuestionsPerRound,
+    ],
+  );
   const isDirty = savedSnapshot !== null && !areSettingsEqual(currentPayload, savedSnapshot);
   useEffect(() => {
     let cancelled = false;

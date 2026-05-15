@@ -31,6 +31,6 @@ export function getMongoClientPromise(): Promise<MongoClient> {
 
 export async function getDb(): Promise<Db> {
   const client = await getMongoClientPromise();
-  const dbName = process.env.MONGODB_DB_NAME ?? 'it_advisory';
+  const dbName = process.env.MONGODB_DB_NAME ?? 'techmd';
   return client.db(dbName);
 }

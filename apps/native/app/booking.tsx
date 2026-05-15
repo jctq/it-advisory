@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { addDays, format } from 'date-fns';
-import { getBookingAvailabilitySlots, fetchMarketingServerClockOffsetMs } from '@it-advisory/api-client/marketing-booking-api-client';
+import { getBookingAvailabilitySlots, fetchMarketingServerClockOffsetMs } from '@techmd/api-client/marketing-booking-api-client';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';

@@ -1,7 +1,7 @@
 import { AdminAdvisorSchedulePageContent } from '@/components/admin/admin-advisor-schedule-manager';
 
 export const metadata = {
-  title: 'Schedule — IT Advisory Admin',
+  title: 'Schedule — TechMD Admin',
 };
 
 export default function AdminSchedulePage() {

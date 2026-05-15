@@ -79,7 +79,7 @@ import {
   resolveProjectRescueBriefAssessment,
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
-} from '@it-advisory/diagnostic-core/project-rescue-service-context';
+} from '@techmd/diagnostic-core/project-rescue-service-context';
 
 const MIN_PROMPT_LENGTH = 8;
 const MAX_ANSWER_NOTE_LENGTH = 2000;
@@ -1055,8 +1055,6 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(true);
   const hasAppliedTemplateBootstrapRef = useRef<boolean>(false);
   const hasAppliedReadOnlyPeekRef = useRef<boolean>(false);
-  const guidedRef = useRef(guided);
-  guidedRef.current = guided;
   const initialTemplateRound = useMemo(() => {
     if (activeTemplate === null) {
       return null;
@@ -1354,7 +1352,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       if (sessionReadOnly) {
         return false;
       }
-      const trimmed = guidedRef.current.initialPrompt.trim();
+      const trimmed = guided.initialPrompt.trim();
       const clientEmptyRoundRetryLimit = 3;
       for (let attempt = 0; attempt <= clientEmptyRoundRetryLimit; attempt += 1) {
         const response = await fetch(DIAGNOSTIC_ROUND_API_URL, {
@@ -1448,7 +1446,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       }
       return false;
     },
-    [cacheDebugUiEnabled, onGuidedChange, sessionReadOnly],
+    [cacheDebugUiEnabled, guided, onGuidedChange, sessionReadOnly],
   );
   const executeFetchTemplateSummary = useCallback(
     async (completedBundles: CompletedRoundBundle[]): Promise<GuidedDiagnosticOutcome> => {

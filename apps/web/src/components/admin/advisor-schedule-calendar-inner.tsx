@@ -8,7 +8,7 @@ import type { DatesSetArg, EventInput } from '@fullcalendar/core';
 import {
   listYmdsForVisibleRange,
   type FullCalendarBusinessHourSegment,
-} from '@it-advisory/domain/booking-schedule';
+} from '@techmd/domain/booking-schedule';
 
 export type AdvisorScheduleCalendarInnerProps = {
   readonly businessHours: readonly FullCalendarBusinessHourSegment[];
@@ -33,13 +33,14 @@ function areYmdWeeksEqual(a: readonly string[], b: readonly string[]): boolean {
  * Read-only week-grid preview for admin schedule settings (single view, compact toolbar).
  */
 export function AdvisorScheduleCalendarInner(props: AdvisorScheduleCalendarInnerProps): ReactElement {
+  const { businessHours, timeZone, initialAnchorYmd, onVisibleWeekChange } = props;
   const lastWeekRef = useRef<readonly string[] | null>(null);
   const executeDatesSet = useCallback(
     (arg: DatesSetArg): void => {
-      if (props.onVisibleWeekChange === undefined) {
+      if (onVisibleWeekChange === undefined) {
         return;
       }
-      const ymds = listYmdsForVisibleRange(arg.start, arg.end, props.timeZone);
+      const ymds = listYmdsForVisibleRange(arg.start, arg.end, timeZone);
       if (ymds.length !== 7) {
         return;
       }
@@ -47,11 +48,11 @@ export function AdvisorScheduleCalendarInner(props: AdvisorScheduleCalendarInner
         return;
       }
       lastWeekRef.current = ymds;
-      props.onVisibleWeekChange(ymds);
+      onVisibleWeekChange(ymds);
     },
-    [props.onVisibleWeekChange, props.timeZone],
+    [onVisibleWeekChange, timeZone],
   );
-  const bh: EventInput['businessHours'] = props.businessHours.map((s) => ({
+  const bh: EventInput['businessHours'] = businessHours.map((s) => ({
     daysOfWeek: [...s.daysOfWeek],
     startTime: s.startTime,
     endTime: s.endTime,
@@ -82,13 +83,13 @@ export function AdvisorScheduleCalendarInner(props: AdvisorScheduleCalendarInner
           },
         }}
         allDaySlot={false}
-        timeZone={props.timeZone}
+        timeZone={timeZone}
         businessHours={bh}
         datesSet={executeDatesSet}
         editable={false}
         selectable={false}
         nowIndicator
-        initialDate={props.initialAnchorYmd}
+        initialDate={initialAnchorYmd}
       />
     </div>
   );

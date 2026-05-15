@@ -5,7 +5,7 @@ import { GuestBookingManageFlow } from '@/components/marketing/guest-booking-man
 import { BookRouteLoadingFallback } from '../book-route-loading-fallback';
 
 export const metadata: Metadata = {
-  title: 'Manage your booking · IT Advisory',
+  title: 'Manage your booking · TechMD',
   description: 'Look up your booking reference to check status or complete payment.',
 };
 

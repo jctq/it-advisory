@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { ConfirmationFlow } from './confirmation-flow';
 
 export const metadata: Metadata = {
-  title: 'Booking confirmed · IT Advisory',
+  title: 'Booking confirmed · TechMD',
   description: 'Your consultation slot is reserved.',
 };
 

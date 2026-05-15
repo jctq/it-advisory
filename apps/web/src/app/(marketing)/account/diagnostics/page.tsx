@@ -5,7 +5,7 @@ import { AccountDiagnosticsPanel } from '@/components/marketing/account-diagnost
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 
 export const metadata = {
-  title: 'My diagnostics — IT Advisory',
+  title: 'My diagnostics — TechMD',
 };
 
 export const dynamic = 'force-dynamic';

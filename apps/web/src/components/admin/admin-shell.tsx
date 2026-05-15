@@ -6,13 +6,21 @@ import { LayoutDashboard, Menu } from 'lucide-react';
 import {
   ADMIN_COLOR_MODE_STORAGE_KEY,
   ADMIN_COLOR_THEME_STORAGE_KEY,
-  DEFAULT_ADMIN_COLOR_MODE,
-  DEFAULT_ADMIN_COLOR_THEME,
-  resolveAdminColorMode,
-  resolveAdminColorTheme,
   type AdminColorMode,
   type AdminColorTheme,
 } from '@/lib/admin/admin-appearance';
+import {
+  applyDocumentAppearance,
+  resolveClientAdminAppearanceMode,
+  resolveClientAdminAppearanceTheme,
+  resolveClientSystemPrefersDark,
+  resolveServerAdminAppearanceMode,
+  resolveServerAdminAppearanceTheme,
+  resolveServerSystemPrefersDark,
+  subscribeToAdminAppearanceStorage,
+  subscribeToSystemColorScheme,
+  syncMarketingDocumentAppearanceFromStorage,
+} from '@/lib/admin/document-appearance';
 import { AdminAppearanceControls } from '@/components/admin/admin-appearance-controls';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { Button } from '@/components/ui/button';
@@ -22,32 +30,21 @@ type AdminShellProps = {
   readonly children: ReactNode;
 };
 
-const ADMIN_SIDEBAR_STORAGE_KEY = 'it-advisory-admin-sidebar-collapsed';
-
-type ApplyAdminAppearanceParams = {
-  readonly colorTheme: AdminColorTheme;
-  readonly isDark: boolean;
-};
-
-const ADMIN_DARK_BACKGROUND = '#0f172a';
-const ADMIN_LIGHT_BACKGROUND = '#ffffff';
+const ADMIN_SIDEBAR_STORAGE_KEY = 'techmd-admin-sidebar-collapsed';
 
 function subscribeToAdminStorage(onStoreChange: () => void): () => void {
   if (typeof window === 'undefined') {
     return () => undefined;
   }
+  const unsubscribeAppearance = subscribeToAdminAppearanceStorage(onStoreChange);
   const executeHandleStorageChange = (event: StorageEvent): void => {
-    if (
-      event.key === null ||
-      event.key === ADMIN_SIDEBAR_STORAGE_KEY ||
-      event.key === ADMIN_COLOR_MODE_STORAGE_KEY ||
-      event.key === ADMIN_COLOR_THEME_STORAGE_KEY
-    ) {
+    if (event.key === null || event.key === ADMIN_SIDEBAR_STORAGE_KEY) {
       onStoreChange();
     }
   };
   window.addEventListener('storage', executeHandleStorageChange);
   return () => {
+    unsubscribeAppearance();
     window.removeEventListener('storage', executeHandleStorageChange);
   };
 }
@@ -61,53 +58,6 @@ function resolveClientSidebarCollapsed(): boolean {
     return resolveServerSidebarCollapsed();
   }
   return window.localStorage.getItem(ADMIN_SIDEBAR_STORAGE_KEY) === 'true';
-}
-
-function resolveServerColorMode(): AdminColorMode {
-  return DEFAULT_ADMIN_COLOR_MODE;
-}
-
-function resolveClientColorMode(): AdminColorMode {
-  if (typeof window === 'undefined') {
-    return resolveServerColorMode();
-  }
-  return resolveAdminColorMode(window.localStorage.getItem(ADMIN_COLOR_MODE_STORAGE_KEY));
-}
-
-function resolveServerColorTheme(): AdminColorTheme {
-  return DEFAULT_ADMIN_COLOR_THEME;
-}
-
-function resolveClientColorTheme(): AdminColorTheme {
-  if (typeof window === 'undefined') {
-    return resolveServerColorTheme();
-  }
-  return resolveAdminColorTheme(window.localStorage.getItem(ADMIN_COLOR_THEME_STORAGE_KEY));
-}
-
-function subscribeToSystemColorScheme(onStoreChange: () => void): () => void {
-  if (typeof window === 'undefined') {
-    return () => undefined;
-  }
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  const executeHandleChange = (): void => {
-    onStoreChange();
-  };
-  mediaQuery.addEventListener('change', executeHandleChange);
-  return () => {
-    mediaQuery.removeEventListener('change', executeHandleChange);
-  };
-}
-
-function resolveServerSystemPrefersDark(): boolean {
-  return false;
-}
-
-function resolveClientSystemPrefersDark(): boolean {
-  if (typeof window === 'undefined') {
-    return resolveServerSystemPrefersDark();
-  }
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 function resolveAdminTitle(pathname: string): string {
@@ -141,29 +91,6 @@ function resolveAdminTitle(pathname: string): string {
   return 'Admin';
 }
 
-function applyAdminAppearanceToDocument(params: ApplyAdminAppearanceParams): void {
-  if (typeof document === 'undefined') {
-    return;
-  }
-  const documentElement = document.documentElement;
-  const backgroundColor = params.isDark ? ADMIN_DARK_BACKGROUND : ADMIN_LIGHT_BACKGROUND;
-  documentElement.classList.toggle('dark', params.isDark);
-  documentElement.style.colorScheme = params.isDark ? 'dark' : 'light';
-  documentElement.style.backgroundColor = backgroundColor;
-  documentElement.dataset.colorTheme = params.colorTheme;
-}
-
-function resetAdminAppearanceFromDocument(): void {
-  if (typeof document === 'undefined') {
-    return;
-  }
-  const documentElement = document.documentElement;
-  documentElement.classList.remove('dark');
-  documentElement.style.colorScheme = 'light';
-  documentElement.style.backgroundColor = '';
-  delete documentElement.dataset.colorTheme;
-}
-
 export function AdminShell(props: AdminShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
@@ -176,14 +103,14 @@ export function AdminShell(props: AdminShellProps) {
     resolveServerSidebarCollapsed,
   );
   const storedColorMode = useSyncExternalStore(
-    subscribeToAdminStorage,
-    resolveClientColorMode,
-    resolveServerColorMode,
+    subscribeToAdminAppearanceStorage,
+    resolveClientAdminAppearanceMode,
+    resolveServerAdminAppearanceMode,
   );
   const storedColorTheme = useSyncExternalStore(
-    subscribeToAdminStorage,
-    resolveClientColorTheme,
-    resolveServerColorTheme,
+    subscribeToAdminAppearanceStorage,
+    resolveClientAdminAppearanceTheme,
+    resolveServerAdminAppearanceTheme,
   );
   const systemPrefersDark = useSyncExternalStore(
     subscribeToSystemColorScheme,
@@ -196,9 +123,9 @@ export function AdminShell(props: AdminShellProps) {
   const pageTitle = useMemo(() => resolveAdminTitle(pathname), [pathname]);
   const isDark = colorMode === 'dark' || (colorMode === 'system' && systemPrefersDark);
   useLayoutEffect(() => {
-    applyAdminAppearanceToDocument({ colorTheme, isDark });
+    applyDocumentAppearance({ colorTheme, isDark });
     return () => {
-      resetAdminAppearanceFromDocument();
+      syncMarketingDocumentAppearanceFromStorage();
     };
   }, [colorTheme, isDark]);
   const executeToggleCollapsed = (): void => {
@@ -210,12 +137,12 @@ export function AdminShell(props: AdminShellProps) {
     const nextIsDark = nextColorMode === 'dark' || (nextColorMode === 'system' && systemPrefersDark);
     window.localStorage.setItem(ADMIN_COLOR_MODE_STORAGE_KEY, nextColorMode);
     setColorModeOverride(nextColorMode);
-    applyAdminAppearanceToDocument({ colorTheme, isDark: nextIsDark });
+    applyDocumentAppearance({ colorTheme, isDark: nextIsDark });
   };
   const executeChangeColorTheme = (nextColorTheme: AdminColorTheme): void => {
     window.localStorage.setItem(ADMIN_COLOR_THEME_STORAGE_KEY, nextColorTheme);
     setColorThemeOverride(nextColorTheme);
-    applyAdminAppearanceToDocument({ colorTheme: nextColorTheme, isDark });
+    applyDocumentAppearance({ colorTheme: nextColorTheme, isDark });
   };
   if (pathname === '/admin/login') {
     return props.children;

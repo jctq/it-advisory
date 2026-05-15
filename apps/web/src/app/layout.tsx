@@ -8,6 +8,10 @@ import {
   ADMIN_COLOR_THEME_STORAGE_KEY,
   DEFAULT_ADMIN_COLOR_MODE,
   DEFAULT_ADMIN_COLOR_THEME,
+  DEFAULT_MARKETING_COLOR_MODE,
+  DEFAULT_MARKETING_COLOR_THEME,
+  MARKETING_COLOR_MODE_STORAGE_KEY,
+  MARKETING_COLOR_THEME_STORAGE_KEY,
 } from '@/lib/admin/admin-appearance';
 import { resolveConfiguredAppOrigin } from '@/lib/config/app-origin';
 import './globals.css';
@@ -33,25 +37,56 @@ function resolveMetadataBase(): URL | undefined {
 
 export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
-  title: 'IT Advisory',
-  description: 'Solve the right technology problem — guided diagnostic and consultations.',
+  title: 'TechMD — IT Advisory',
+  description:
+    'Technology consultation. Better decisions. Stronger business. Guided diagnostics and expert sessions.',
+  icons: {
+    icon: [
+      {
+        url: '/brand/techmd-mark.png',
+        type: 'image/png',
+        sizes: '382x354',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/brand/techmd-mark-dark.png',
+        type: 'image/png',
+        sizes: '382x354',
+        media: '(prefers-color-scheme: dark)',
+      },
+      {
+        url: '/brand/techmd-mark-dark.png',
+        type: 'image/png',
+        sizes: '382x354',
+      },
+    ],
+    apple: [{ url: '/brand/techmd-mark-dark.png', sizes: '382x354', type: 'image/png' }],
+  },
 };
 
 const ADMIN_APPEARANCE_BOOTSTRAP_SCRIPT = `
 (() => {
-  if (!window.location.pathname.startsWith('/admin')) {
-    return;
-  }
   const root = document.documentElement;
   const validModes = ${JSON.stringify(ADMIN_COLOR_MODES)};
   const validThemes = ${JSON.stringify(ADMIN_COLOR_THEMES)};
-  const defaultMode = ${JSON.stringify(DEFAULT_ADMIN_COLOR_MODE)};
-  const defaultTheme = ${JSON.stringify(DEFAULT_ADMIN_COLOR_THEME)};
+  const adminDefaultMode = ${JSON.stringify(DEFAULT_ADMIN_COLOR_MODE)};
+  const adminDefaultTheme = ${JSON.stringify(DEFAULT_ADMIN_COLOR_THEME)};
+  const marketingDefaultMode = ${JSON.stringify(DEFAULT_MARKETING_COLOR_MODE)};
+  const marketingDefaultTheme = ${JSON.stringify(DEFAULT_MARKETING_COLOR_THEME)};
+  const adminModeKey = ${JSON.stringify(ADMIN_COLOR_MODE_STORAGE_KEY)};
+  const adminThemeKey = ${JSON.stringify(ADMIN_COLOR_THEME_STORAGE_KEY)};
+  const marketingModeKey = ${JSON.stringify(MARKETING_COLOR_MODE_STORAGE_KEY)};
+  const marketingThemeKey = ${JSON.stringify(MARKETING_COLOR_THEME_STORAGE_KEY)};
   const darkBackground = '#0f172a';
   const lightBackground = '#ffffff';
   try {
-    const storedMode = window.localStorage.getItem(${JSON.stringify(ADMIN_COLOR_MODE_STORAGE_KEY)});
-    const storedTheme = window.localStorage.getItem(${JSON.stringify(ADMIN_COLOR_THEME_STORAGE_KEY)});
+    const isAdminRoute = window.location.pathname.startsWith('/admin');
+    const modeKey = isAdminRoute ? adminModeKey : marketingModeKey;
+    const themeKey = isAdminRoute ? adminThemeKey : marketingThemeKey;
+    const defaultMode = isAdminRoute ? adminDefaultMode : marketingDefaultMode;
+    const defaultTheme = isAdminRoute ? adminDefaultTheme : marketingDefaultTheme;
+    const storedMode = window.localStorage.getItem(modeKey);
+    const storedTheme = window.localStorage.getItem(themeKey);
     const mode = validModes.includes(storedMode) ? storedMode : defaultMode;
     const theme = validThemes.includes(storedTheme) ? storedTheme : defaultTheme;
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -65,7 +100,7 @@ const ADMIN_APPEARANCE_BOOTSTRAP_SCRIPT = `
     root.classList.remove('dark');
     root.style.colorScheme = 'light';
     root.style.backgroundColor = lightBackground;
-    root.dataset.colorTheme = defaultTheme;
+    root.dataset.colorTheme = marketingDefaultTheme;
   }
 })();
 `;

@@ -17,15 +17,15 @@ import {
   Shield,
   Video,
 } from 'lucide-react';
-import { fetchMarketingServerClockOffsetMs } from '@it-advisory/api-client/marketing-booking-api-client';
+import { fetchMarketingServerClockOffsetMs } from '@techmd/api-client/marketing-booking-api-client';
 import {
   createPaymentCheckoutSession,
   fetchPaymentConfigPublic,
   fetchPaymentTransactionStatus,
   type PaymentConfigPublic,
-} from '@it-advisory/api-client/marketing-payment-api-client';
+} from '@techmd/api-client/marketing-payment-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
-import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SESSION_DURATION } from '@it-advisory/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SESSION_DURATION } from '@techmd/diagnostic-core/project-rescue-service-context';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import { Button } from '@/components/ui/button';
@@ -268,7 +268,9 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       return;
     }
     const controller = new AbortController();
-    setPhase('processing');
+    queueMicrotask(() => {
+      setPhase('processing');
+    });
     void fetchPaymentTransactionStatus({
       apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
       transactionId: returnTransactionId,
@@ -319,18 +321,25 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     }
     return paymentConfig.gateways.find((gateway) => gateway.id === selectedGatewayId) ?? null;
   }, [paymentConfig, selectedGatewayId]);
-  const availablePaymentMethods = selectedGateway?.methods ?? [];
+  const availablePaymentMethods = useMemo(
+    () => selectedGateway?.methods ?? [],
+    [selectedGateway],
+  );
   const isLivePaymentsCheckout =
     paymentConfig?.paymentsEnabled === true && (paymentConfig.gateways.length ?? 0) > 0;
   const hasMultiplePaymentGateways = (paymentConfig?.gateways.length ?? 0) > 1;
   useEffect(() => {
     if (availablePaymentMethods.length === 0) {
-      setSelectedPaymentMethodId(null);
+      queueMicrotask(() => {
+        setSelectedPaymentMethodId(null);
+      });
       return;
     }
     const stillValid = availablePaymentMethods.some((method) => method.id === selectedPaymentMethodId);
     if (!stillValid) {
-      setSelectedPaymentMethodId(availablePaymentMethods[0]!.id);
+      queueMicrotask(() => {
+        setSelectedPaymentMethodId(availablePaymentMethods[0]!.id);
+      });
     }
   }, [availablePaymentMethods, selectedPaymentMethodId]);
   useEffect(() => {

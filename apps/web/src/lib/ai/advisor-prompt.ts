@@ -22,7 +22,7 @@ export type AdvisorContext = {
 
 /** Default project context derived from `README.md`; override via call sites if needed. */
 export const DEFAULT_ADVISOR_CONTEXT: AdvisorContext = {
-  systemName: 'IT Advisory',
+  systemName: 'TechMD',
   industry: 'Independent IT consulting / SMB Philippines',
   targetUsers:
     'SMB leaders dealing with vendor delivery, scope, UX, budget, or governance pain on IT projects',

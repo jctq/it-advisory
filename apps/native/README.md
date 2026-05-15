@@ -24,7 +24,7 @@ pnpm --filter native run android
 
 - Native public funnel screens: home, diagnostic, service (post-diagnostic recommendation), booking, confirmation
 - Anonymous device-backed quiz session persistence via `X-Device-Id`
-- Shared business logic reused from `@it-advisory/diagnostic-core`
+- Shared business logic reused from `@techmd/diagnostic-core`
 
 ## Next likely steps
 

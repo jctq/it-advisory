@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@it-advisory/diagnostic-core', '@it-advisory/domain', '@it-advisory/payments'],
+  transpilePackages: ['@techmd/diagnostic-core', '@techmd/domain', '@techmd/payments'],
   async redirects() {
     return [
       { source: '/recommendation', destination: '/quiz', permanent: true },

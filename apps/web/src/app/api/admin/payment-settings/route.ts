@@ -6,7 +6,7 @@ import {
   type PaymentGatewayId,
 } from '@/domain/payment-types';
 import { updatePaymentSettings, getPaymentSettingsAdminView } from '@/lib/data/payment-settings';
-import { resolvePaymentAdapter } from '@it-advisory/payments';
+import { resolvePaymentAdapter } from '@techmd/payments';
 import { getGatewayCredentials } from '@/lib/data/payment-settings';
 
 const gatewayCredentialsSchema = z.record(z.string(), z.string()).nullable().optional();

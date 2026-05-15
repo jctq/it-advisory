@@ -1,7 +1,7 @@
 import {
   listSunToSatYmdsForWeekContaining,
   resolveAdvisorSchedulePreviewAnchorYmd,
-} from '@it-advisory/domain/booking-schedule';
+} from '@techmd/domain/booking-schedule';
 import { addDays, parse } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
 import { COLLECTIONS } from '@/domain/collections';

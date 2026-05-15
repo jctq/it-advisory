@@ -7,7 +7,7 @@ import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data
 import { createManualConfirmBooking, createPendingBookingForHoldPolicy } from '@/lib/payments/payment-completion';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
-import { createMockPaymentAdapter, resolvePaymentAdapter } from '@it-advisory/payments';
+import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentTransactionDocument } from '@/domain/payment-types';
@@ -180,7 +180,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     providerSession = await adapter.createCheckoutSession({
       amountCentavos: publicSettings.checkoutAmountCentavos,
       currency: 'PHP',
-      description: 'IT Advisory consultation booking',
+      description: 'TechMD consultation booking',
       successUrl,
       cancelUrl,
       referenceId: bookingDraftId,

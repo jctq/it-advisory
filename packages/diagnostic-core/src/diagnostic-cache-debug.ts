@@ -1,4 +1,4 @@
-import type { DiagnosticRoundDebugMeta, DiagnosticRoundMatchTier } from '@it-advisory/domain/types';
+import type { DiagnosticRoundDebugMeta, DiagnosticRoundMatchTier } from '@techmd/domain/types';
 
 function parseMatchTier(value: string | null): DiagnosticRoundMatchTier | null {
   if (value === 'exact' || value === 'semantic' || value === 'ai') {

@@ -9,7 +9,6 @@ import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { useEffect, useRef, type ReactElement } from 'react';
 
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
-import { cn } from '@/lib/utils';
 
 export type BookingMonthFullCalendarProps = {
   readonly visibleManilaYearMonth: string;
@@ -50,9 +49,8 @@ export function BookingMonthFullCalendar(props: BookingMonthFullCalendarProps): 
     }
   }, [props.visibleManilaYearMonth]);
   return (
-    <div className={cn('booking-month-fc text-foreground [&_.fc]:text-foreground')}>
+    <div className="booking-month-fc">
       <FullCalendar
-        key={`${props.selectedManilaYmd ?? 'none'}-${props.pendingManilaYmd ?? 'none'}`}
         ref={calendarRef}
         plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
@@ -85,18 +83,9 @@ export function BookingMonthFullCalendar(props: BookingMonthFullCalendarProps): 
             props.pendingManilaYmd !== null &&
             ymd === props.pendingManilaYmd;
           if (isConfirmed) {
-            classes.push(
-              'relative',
-              'z-[1]',
-              'bg-primary/18',
-              'font-semibold',
-              'text-primary',
-              'ring-2',
-              'ring-inset',
-              'ring-primary',
-            );
+            classes.push('booking-month-day-selected');
           } else if (isPending) {
-            classes.push('bg-muted/90', 'ring-1', 'ring-inset', 'ring-primary/35');
+            classes.push('booking-month-day-pending');
           }
           return classes;
         }}

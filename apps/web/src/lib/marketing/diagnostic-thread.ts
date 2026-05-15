@@ -1,1 +1,1 @@
-export * from '@it-advisory/diagnostic-core/diagnostic-thread';
+export * from '@techmd/diagnostic-core/diagnostic-thread';

@@ -4,7 +4,7 @@ import {
   isUtcInstantBookable,
   normalizeAdvisorBookingSettings,
   type PublicAvailabilitySlot,
-} from '@it-advisory/domain/booking-schedule';
+} from '@techmd/domain/booking-schedule';
 import { formatInTimeZone } from 'date-fns-tz';
 import {
   findAdvisorBookingSettingsDocument,

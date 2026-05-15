@@ -1,1 +1,1 @@
-export * from '@it-advisory/domain/visitor-session';
+export * from '@techmd/domain/visitor-session';

@@ -1,5 +1,5 @@
 {
-  "name": "@it-advisory/domain",
+  "name": "@techmd/domain",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -22,7 +22,7 @@
     "mongodb": "^6.16.0"
   },
   "devDependencies": {
-    "@it-advisory/typescript-config": "workspace:*",
+    "@techmd/typescript-config": "workspace:*",
     "typescript": "~5.8.3",
     "vitest": "^3.2.4"
   }

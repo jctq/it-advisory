@@ -1,4 +1,4 @@
-import type { PaymentGatewayId, PaymentStatus } from '@it-advisory/domain/payment-types';
+import type { PaymentGatewayId, PaymentStatus } from '@techmd/domain/payment-types';
 
 export type CreateCheckoutSessionInput = {
   readonly amountCentavos: number;

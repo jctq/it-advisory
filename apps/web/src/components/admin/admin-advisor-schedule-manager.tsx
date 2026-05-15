@@ -26,7 +26,7 @@ import {
   listSunToSatYmdsForWeekContaining,
   normalizeAdvisorBookingSettings,
   resolveAdvisorSchedulePreviewAnchorYmd,
-} from '@it-advisory/domain/booking-schedule';
+} from '@techmd/domain/booking-schedule';
 import type { AdvisorBookingSettingsDocument, AdvisorWeekdayOverride } from '@/domain/types';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';

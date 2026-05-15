@@ -7,7 +7,7 @@ import {
   PROJECT_RESCUE_SERVICE_TAGLINE,
   PROJECT_RESCUE_SERVICE_TITLE,
   resolveProjectRescueGoodFitBullets,
-} from '@it-advisory/diagnostic-core/project-rescue-service-context';
+} from '@techmd/diagnostic-core/project-rescue-service-context';
 import { getDb } from '@/lib/mongodb';
 import type { DiagnosticRoundForThread } from '@/lib/marketing/diagnostic-thread';
 import {

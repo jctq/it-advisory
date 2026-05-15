@@ -3,7 +3,7 @@ import { MarketingUsersTable } from '@/components/admin/marketing-users-table';
 import { listMarketingUsersForAdmin } from '@/lib/data/marketing-users-admin';
 
 export const metadata = {
-  title: 'Users — IT Advisory Admin',
+  title: 'Users — TechMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

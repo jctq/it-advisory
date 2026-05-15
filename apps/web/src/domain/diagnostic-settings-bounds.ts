@@ -1,1 +1,1 @@
-export * from '@it-advisory/domain/diagnostic-settings-bounds';
+export * from '@techmd/domain/diagnostic-settings-bounds';

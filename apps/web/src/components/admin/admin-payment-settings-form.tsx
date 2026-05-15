@@ -150,7 +150,9 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [testingGatewayId, setTestingGatewayId] = useState<PaymentGatewayId | null>(null);
   const onStateChangeRef = useRef(props.onStateChange);
-  onStateChangeRef.current = props.onStateChange;
+  useEffect(() => {
+    onStateChangeRef.current = props.onStateChange;
+  }, [props.onStateChange]);
   const isDirty =
     settings !== null &&
     savedSnapshot !== null &&

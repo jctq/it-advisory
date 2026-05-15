@@ -1,4 +1,4 @@
-import type { PaymentGatewayId } from '@it-advisory/domain/payment-types';
+import type { PaymentGatewayId } from '@techmd/domain/payment-types';
 import { createHitpayAdapter } from './hitpay-adapter';
 import { createPaymongoAdapter } from './paymongo-adapter';
 import { createPaypalAdapter } from './paypal-adapter';

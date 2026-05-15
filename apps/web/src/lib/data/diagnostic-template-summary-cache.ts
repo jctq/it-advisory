@@ -15,7 +15,7 @@ import {
   isDiagnosticCacheEnabled,
   resolveDiagnosticCacheVersion,
 } from '@/lib/data/diagnostic-round-cache';
-import { resolveProjectRescueGoodFitBullets } from '@it-advisory/diagnostic-core/project-rescue-service-context';
+import { resolveProjectRescueGoodFitBullets } from '@techmd/diagnostic-core/project-rescue-service-context';
 
 const cachedResponseSchema = z.object({
   summaryForAdvisor: z.string(),

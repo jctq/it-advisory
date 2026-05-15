@@ -12,9 +12,9 @@
   "dependencies": {
     "@botjaeger/expo-dnd": "^0.4.0",
     "@expo/metro-runtime": "~6.1.2",
-    "@it-advisory/api-client": "workspace:*",
-    "@it-advisory/diagnostic-core": "workspace:*",
-    "@it-advisory/domain": "workspace:*",
+    "@techmd/api-client": "workspace:*",
+    "@techmd/diagnostic-core": "workspace:*",
+    "@techmd/domain": "workspace:*",
     "date-fns": "^4.1.0",
     "expo": "~54.0.33",
     "expo-crypto": "~15.0.9",

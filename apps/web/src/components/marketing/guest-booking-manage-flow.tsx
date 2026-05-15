@@ -10,11 +10,11 @@ import {
   lookupGuestBooking,
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
-} from '@it-advisory/api-client/marketing-booking-manage-api-client';
+} from '@techmd/api-client/marketing-booking-manage-api-client';
 import {
   fetchPaymentConfigPublic,
   type PaymentConfigPublic,
-} from '@it-advisory/api-client/marketing-payment-api-client';
+} from '@techmd/api-client/marketing-payment-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

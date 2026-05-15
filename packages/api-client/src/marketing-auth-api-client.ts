@@ -1,4 +1,4 @@
-import { VISITOR_SESSION_CONFIG } from '@it-advisory/domain/visitor-session';
+import { VISITOR_SESSION_CONFIG } from '@techmd/domain/visitor-session';
 
 type AuthEmailPasswordInput = {
   readonly email: string;

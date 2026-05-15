@@ -7,8 +7,8 @@ import {
   fetchPaymentConfigPublic,
   fetchPaymentTransactionStatus,
   type PaymentConfigPublic,
-} from '@it-advisory/api-client/marketing-payment-api-client';
-import type { PaymentGatewayId } from '@it-advisory/domain/payment-types';
+} from '@techmd/api-client/marketing-payment-api-client';
+import type { PaymentGatewayId } from '@techmd/domain/payment-types';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';

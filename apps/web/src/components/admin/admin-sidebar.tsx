@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -114,13 +115,39 @@ export function AdminSidebar(props: AdminSidebarProps) {
             )}
           >
             {props.collapsed ? (
-              <span className="flex size-10 items-center justify-center rounded-2xl bg-sidebar-primary/15 text-sidebar-primary shadow-sm">
-                IA
+              <span className="flex size-10 items-center justify-center overflow-hidden rounded-2xl bg-sidebar-primary/10 shadow-sm">
+                <Image
+                  src="/brand/techmd-mark.png"
+                  alt="TECHMD"
+                  width={382}
+                  height={354}
+                  className="size-9 object-contain dark:hidden"
+                />
+                <Image
+                  src="/brand/techmd-mark-dark.png"
+                  alt="TECHMD"
+                  width={382}
+                  height={354}
+                  className="hidden size-9 object-contain dark:block"
+                />
               </span>
             ) : (
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-sidebar-foreground">IT Advisory</p>
-                <p className="text-xs text-sidebar-foreground/70">Admin console</p>
+                <Image
+                  src="/brand/techmd-logo-compact.png"
+                  alt="TECHMD"
+                  width={1748}
+                  height={368}
+                  className="h-7 w-auto max-w-[min(100%,14rem)] object-contain object-left dark:hidden"
+                />
+                <Image
+                  src="/brand/techmd-logo-compact-dark.png"
+                  alt="TECHMD"
+                  width={1748}
+                  height={368}
+                  className="hidden h-7 w-auto max-w-[min(100%,14rem)] object-contain object-left dark:block"
+                />
+                <p className="mt-1 text-xs text-sidebar-foreground/70">Admin console</p>
               </div>
             )}
             <Button

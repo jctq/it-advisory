@@ -5,7 +5,7 @@ import { BookingPicker } from '../booking-picker';
 import { BookRouteLoadingFallback } from '../book-route-loading-fallback';
 
 export const metadata: Metadata = {
-  title: 'Book a session · IT Advisory',
+  title: 'Book a session · TechMD',
   description: 'Choose a Philippine-time slot for your consultation.',
 };
 
