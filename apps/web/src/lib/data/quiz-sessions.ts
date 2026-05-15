@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId, type Document } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type {
   BookingDocument,
@@ -11,6 +11,7 @@ import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extra
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import { getActiveDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
 import { getDb } from '@/lib/mongodb';
+import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
 const DEFAULT_QUIZ_SESSION_LIST_LIMIT = 500;
@@ -105,8 +106,24 @@ function mapQuizSessionListRow(
   };
 }
 
+type LinkedBookingSummary = {
+  readonly bookingId: string;
+  readonly bookingStatus: BookingDocument['status'];
+};
+
 async function fetchPrimaryBookingIdByQuizSessionIds(sessionIds: readonly ObjectId[]): Promise<Map<string, string>> {
+  const linked = await fetchPrimaryBookingByQuizSessionIds(sessionIds);
   const result = new Map<string, string>();
+  for (const [sessionKey, booking] of linked) {
+    result.set(sessionKey, booking.bookingId);
+  }
+  return result;
+}
+
+async function fetchPrimaryBookingByQuizSessionIds(
+  sessionIds: readonly ObjectId[],
+): Promise<Map<string, LinkedBookingSummary>> {
+  const result = new Map<string, LinkedBookingSummary>();
   if (sessionIds.length === 0) {
     return result;
   }
@@ -115,7 +132,7 @@ async function fetchPrimaryBookingIdByQuizSessionIds(sessionIds: readonly Object
     .collection<BookingDocument>(COLLECTIONS.bookings)
     .find(
       { quizSessionId: { $in: [...sessionIds] } },
-      { projection: { _id: 1, quizSessionId: 1 } },
+      { projection: { _id: 1, quizSessionId: 1, status: 1 } },
     )
     .toArray();
   for (const doc of docs) {
@@ -124,11 +141,16 @@ async function fetchPrimaryBookingIdByQuizSessionIds(sessionIds: readonly Object
     }
     const sessionKey = doc.quizSessionId.toString();
     if (!result.has(sessionKey)) {
-      result.set(sessionKey, doc._id.toString());
+      result.set(sessionKey, {
+        bookingId: doc._id.toString(),
+        bookingStatus: doc.status,
+      });
     }
   }
   return result;
 }
+
+export { formatBookingReferenceId };
 
 /**
  * Admin list: all persisted quiz session snapshots (latest row per visitor when upserts target the same document).
@@ -296,6 +318,17 @@ export async function findQuizSessionForBookingSnapshot(visitorId: string): Prom
   return findLatestQuizSession(visitorId);
 }
 
+export type VisitorQuizSessionListStatusFilter = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'all';
+
+export type PaginatedVisitorQuizSessionsResult = {
+  readonly sessions: readonly VisitorQuizSessionSummary[];
+  readonly totalCount: number;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly totalPages: number;
+  readonly hasAnySessions: boolean;
+};
+
 export type VisitorQuizSessionSummary = {
   readonly id: string;
   /** Value for `/quiz/[sessionRef]` links and quiz session API calls (opaque when `QUIZ_SESSION_URL_SECRET` is set). */
@@ -306,14 +339,19 @@ export type VisitorQuizSessionSummary = {
   readonly situationPreview: string | null;
   readonly hasGuidedDiagnostic: boolean;
   readonly isBooked: boolean;
+  readonly bookingId: string | null;
+  /** Display/search token derived from {@link bookingId} (last 8 hex chars, uppercase). */
+  readonly bookingReferenceId: string | null;
+  readonly bookingStatus: BookingDocument['status'] | null;
 };
 
 function mapVisitorQuizSessionSummary(
   doc: QuizSessionDocument & { _id: ObjectId },
-  isBooked: boolean,
+  linkedBooking: LinkedBookingSummary | null,
 ): VisitorQuizSessionSummary {
   const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
   const idHex = doc._id.toString();
+  const bookingId = linkedBooking?.bookingId ?? null;
   return {
     id: idHex,
     marketingSessionRef: encodeQuizSessionRefForMarketingUrl(idHex),
@@ -322,7 +360,10 @@ function mapVisitorQuizSessionSummary(
     completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
     situationPreview: resolveSituationPreview(doc.answers),
     hasGuidedDiagnostic: guidedRaw !== null,
-    isBooked,
+    isBooked: bookingId !== null,
+    bookingId,
+    bookingReferenceId: bookingId !== null ? formatBookingReferenceId(bookingId) : null,
+    bookingStatus: linkedBooking?.bookingStatus ?? null,
   };
 }
 
@@ -345,19 +386,136 @@ export async function listQuizSessionsForVisitor(
     .toArray();
   const validDocs = docs.filter((doc): doc is QuizSessionDocument & { _id: ObjectId } => doc._id !== undefined);
   const sessionIds = validDocs.map((doc) => doc._id);
-  const bookedIdSet = new Set<string>();
-  if (sessionIds.length > 0) {
-    const bookingDocs = await db
-      .collection<BookingDocument>(COLLECTIONS.bookings)
-      .find({ quizSessionId: { $in: sessionIds } }, { projection: { quizSessionId: 1 } })
-      .toArray();
-    for (const bookingDoc of bookingDocs) {
-      if (bookingDoc.quizSessionId !== undefined && bookingDoc.quizSessionId !== null) {
-        bookedIdSet.add(bookingDoc.quizSessionId.toString());
-      }
-    }
+  const bookingBySessionId = await fetchPrimaryBookingByQuizSessionIds(sessionIds);
+  return validDocs.map((doc) =>
+    mapVisitorQuizSessionSummary(doc, bookingBySessionId.get(doc._id.toString()) ?? null),
+  );
+}
+
+function buildVisitorSessionStatusMatch(status: VisitorQuizSessionListStatusFilter): Document {
+  switch (status) {
+    case 'all':
+      return {};
+    case 'pending':
+      return {
+        $or: [
+          { 'linkedBooking.status': 'pending' },
+          {
+            $and: [
+              { linkedBooking: null },
+              { $or: [{ completedAt: { $exists: false } }, { completedAt: null }] },
+            ],
+          },
+        ],
+      };
+    case 'confirmed':
+      return { 'linkedBooking.status': 'confirmed' };
+    case 'cancelled':
+      return { 'linkedBooking.status': 'cancelled' };
+    case 'completed':
+      return { completedAt: { $exists: true, $ne: null } };
+    default:
+      return {};
   }
-  return validDocs.map((doc) => mapVisitorQuizSessionSummary(doc, bookedIdSet.has(doc._id.toString())));
+}
+
+type AggregatedVisitorQuizSessionRow = QuizSessionDocument & {
+  _id: ObjectId;
+  linkedBooking: { _id: ObjectId; status: BookingDocument['status'] } | null;
+};
+
+/**
+ * Paginated account diagnostics list with server-side status and booking-reference filters.
+ */
+export async function listQuizSessionsForVisitorPaginated(input: {
+  readonly visitorId: string;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly status: VisitorQuizSessionListStatusFilter;
+  readonly bookingReference?: string;
+}): Promise<PaginatedVisitorQuizSessionsResult> {
+  const page = Math.max(1, input.page);
+  const pageSize = Math.min(50, Math.max(1, input.pageSize));
+  const emptyResult: PaginatedVisitorQuizSessionsResult = {
+    sessions: [],
+    totalCount: 0,
+    page,
+    pageSize,
+    totalPages: 0,
+    hasAnySessions: false,
+  };
+  if (!hasMongoUri()) {
+    return emptyResult;
+  }
+  const db = await getDb();
+  const hasAnySessions =
+    (await db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).countDocuments(
+      { visitorId: input.visitorId },
+      { limit: 1 },
+    )) > 0;
+  const pipeline: Document[] = [
+    { $match: { visitorId: input.visitorId } },
+    {
+      $lookup: {
+        from: COLLECTIONS.bookings,
+        let: { sessionId: '$_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$quizSessionId', '$$sessionId'] } } },
+          { $sort: { createdAt: 1 } },
+          { $limit: 1 },
+          { $project: { _id: 1, status: 1 } },
+        ],
+        as: 'linkedBookings',
+      },
+    },
+    { $addFields: { linkedBooking: { $arrayElemAt: ['$linkedBookings', 0] } } },
+  ];
+  const statusMatch = buildVisitorSessionStatusMatch(input.status);
+  if (Object.keys(statusMatch).length > 0) {
+    pipeline.push({ $match: statusMatch });
+  }
+  const bookingReference = input.bookingReference?.trim() ?? '';
+  if (bookingReference.length > 0) {
+    const escapedReference = bookingReference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    pipeline.push({
+      $match: {
+        linkedBooking: { $ne: null },
+        $expr: {
+          $regexMatch: {
+            input: { $toString: '$linkedBooking._id' },
+            regex: escapedReference,
+            options: 'i',
+          },
+        },
+      },
+    });
+  }
+  const skip = (page - 1) * pageSize;
+  pipeline.push({
+    $facet: {
+      total: [{ $count: 'count' }],
+      rows: [{ $sort: { updatedAt: -1 } }, { $skip: skip }, { $limit: pageSize }],
+    },
+  });
+  const facetRows = await db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).aggregate(pipeline).toArray();
+  const facetResult = facetRows[0] as { total?: { count: number }[]; rows?: AggregatedVisitorQuizSessionRow[] } | undefined;
+  const totalCount = facetResult?.total?.[0]?.count ?? 0;
+  const rows = facetResult?.rows ?? [];
+  const sessions = rows.map((row) => {
+    const linkedBooking =
+      row.linkedBooking !== null && row.linkedBooking !== undefined
+        ? { bookingId: row.linkedBooking._id.toString(), bookingStatus: row.linkedBooking.status }
+        : null;
+    return mapVisitorQuizSessionSummary(row, linkedBooking);
+  });
+  return {
+    sessions,
+    totalCount,
+    page,
+    pageSize,
+    totalPages: totalCount === 0 ? 0 : Math.ceil(totalCount / pageSize),
+    hasAnySessions,
+  };
 }
 
 /**

@@ -21,4 +21,7 @@ export const COLLECTIONS = {
   diagnosticTemplates: 'diagnostic_templates',
   /** Singleton `{ _id: 'app' }` — diagnostic quiz tuning (admin). */
   appSettings: 'app_settings',
+  /** Singleton `{ _id: 'default' }` — payment gateways and checkout policy (admin). */
+  paymentSettings: 'payment_settings',
+  paymentTransactions: 'payment_transactions',
 } as const;

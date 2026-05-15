@@ -1,19 +1,9 @@
-import { AdminPageHeader } from '@/components/admin/admin-page-header';
-import { AdminSettingsForm } from '@/components/admin/admin-settings-form';
+import { AdminSettingsWorkspace } from '@/components/admin/admin-settings-workspace';
 
 export const metadata = {
   title: 'Settings — IT Advisory Admin',
 };
 
 export default function AdminSettingsPage() {
-  return (
-    <section className="mx-auto space-y-8">
-      <AdminPageHeader
-        eyebrow="Configuration"
-        title="Settings"
-        description="Control how customer-facing diagnostic intake behaves across the web and native front-facing experiences."
-      />
-      <AdminSettingsForm />
-    </section>
-  );
+  return <AdminSettingsWorkspace />;
 }

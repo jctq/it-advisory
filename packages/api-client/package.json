@@ -7,7 +7,9 @@
   "exports": {
     "./diagnostic-api-client": "./src/diagnostic-api-client.ts",
     "./marketing-auth-api-client": "./src/marketing-auth-api-client.ts",
-    "./marketing-booking-api-client": "./src/marketing-booking-api-client.ts"
+    "./marketing-booking-api-client": "./src/marketing-booking-api-client.ts",
+    "./marketing-payment-api-client": "./src/marketing-payment-api-client.ts",
+    "./marketing-booking-manage-api-client": "./src/marketing-booking-manage-api-client.ts"
   },
   "dependencies": {
     "@it-advisory/domain": "workspace:*"

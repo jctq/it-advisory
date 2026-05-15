@@ -28,7 +28,16 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactElement,
+  type SetStateAction,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
@@ -84,6 +93,10 @@ function scheduleScrollQuizWizardToTop(): void {
   requestAnimationFrame(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
+}
+
+function isGuidedStateEmptyForTemplateBootstrap(guided: GuidedDiagnosticV1): boolean {
+  return guided.activeRound === null && guided.completedBundles.length === 0 && guided.outcome === null;
 }
 
 function togglePromptWithSeed(currentPrompt: string, phrase: string): string {
@@ -483,11 +496,15 @@ function NestedOptionsRoundRenderer(props: {
   readonly onToggleChildOption: (parentOptionId: string, childOptionId: string) => void;
   readonly onToggleOption: (optionId: string) => void;
 }): ReactElement {
-  const visibleOptions = getVisibleQuestionOptions({
-    baseAnswers: props.baseAnswers,
-    question: props.question,
-    selection: props.selection,
-  });
+  const visibleOptions = useMemo(
+    () =>
+      getVisibleQuestionOptions({
+        baseAnswers: props.baseAnswers,
+        question: props.question,
+        selection: props.selection,
+      }),
+    [props.baseAnswers, props.question, props.selection],
+  );
   const supportsSingleSelectCascade = hasSingleSelectCascade(props.question);
   const terminalSelectedOptionId =
     props.question.selectionMode === 'single' ? getTerminalSelectedOptionId(props.selection) : null;
@@ -900,7 +917,7 @@ export type GuidedDiagnosticWizardProps = {
    */
   readonly templateSessionMarketingRef?: string | null;
   readonly onGoBack: () => void;
-  readonly onGuidedChange: (next: GuidedDiagnosticV1) => void;
+  readonly onGuidedChange: Dispatch<SetStateAction<GuidedDiagnosticV1>>;
 };
 
 function resolveVisibleStepIndex(params: {
@@ -1036,6 +1053,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(true);
+  const hasAppliedTemplateBootstrapRef = useRef<boolean>(false);
+  const hasAppliedReadOnlyPeekRef = useRef<boolean>(false);
+  const guidedRef = useRef(guided);
+  guidedRef.current = guided;
   const initialTemplateRound = useMemo(() => {
     if (activeTemplate === null) {
       return null;
@@ -1090,46 +1111,61 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     };
   }, [templateSessionMarketingRef]);
   useEffect(() => {
+    hasAppliedTemplateBootstrapRef.current = false;
+  }, [templateSessionMarketingRef]);
+  useEffect(() => {
     if (suppressEmptyTemplateBootstrap) {
       return;
     }
     if (diagnosticAiEnabled || isLoadingConfig || initialTemplateRound === null) {
       return;
     }
-    if (guided.activeRound !== null || guided.completedBundles.length > 0 || guided.outcome !== null) {
+    if (hasAppliedTemplateBootstrapRef.current) {
       return;
     }
-    onGuidedChange({
-      ...guided,
-      initialPrompt: '',
-      completedBundles: [],
-      activeRound: initialTemplateRound,
-      outcome: null,
+    onGuidedChange((previous) => {
+      if (!isGuidedStateEmptyForTemplateBootstrap(previous)) {
+        return previous;
+      }
+      hasAppliedTemplateBootstrapRef.current = true;
+      return {
+        ...previous,
+        activeRound: initialTemplateRound,
+        outcome: null,
+      };
     });
-  }, [diagnosticAiEnabled, guided, initialTemplateRound, isLoadingConfig, onGuidedChange, suppressEmptyTemplateBootstrap]);
+  }, [diagnosticAiEnabled, initialTemplateRound, isLoadingConfig, onGuidedChange, suppressEmptyTemplateBootstrap]);
   useEffect(() => {
     if (!sessionReadOnly) {
+      hasAppliedReadOnlyPeekRef.current = false;
       return;
     }
-    if (guided.activeRound !== null || guided.outcome !== null || guided.completedBundles.length === 0) {
+    if (hasAppliedReadOnlyPeekRef.current) {
       return;
     }
-    const nextGuided = applyGuidedPeekCompletedBundleIndex(guided, 0);
-    if (nextGuided !== null) {
-      onGuidedChange(nextGuided);
-    }
-  }, [guided, onGuidedChange, sessionReadOnly]);
+    onGuidedChange((previous) => {
+      if (previous.activeRound !== null || previous.outcome !== null || previous.completedBundles.length === 0) {
+        return previous;
+      }
+      const nextGuided = applyGuidedPeekCompletedBundleIndex(previous, 0);
+      if (nextGuided === null) {
+        return previous;
+      }
+      hasAppliedReadOnlyPeekRef.current = true;
+      return nextGuided;
+    });
+  }, [onGuidedChange, sessionReadOnly]);
   const executeUpdatePrompt = useCallback(
     (value: string): void => {
       if (sessionReadOnly) {
         return;
       }
-      onGuidedChange({
-        ...guided,
+      onGuidedChange((previous) => ({
+        ...previous,
         initialPrompt: value,
-      });
+      }));
     },
-    [guided, onGuidedChange, sessionReadOnly],
+    [onGuidedChange, sessionReadOnly],
   );
   const executeToggleSeedChip = useCallback(
     (phrase: string): void => {
@@ -1137,178 +1173,188 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         return;
       }
       setErrorMessage(null);
-      const next = togglePromptWithSeed(guided.initialPrompt, phrase);
-      onGuidedChange({
-        ...guided,
-        initialPrompt: next,
-      });
+      onGuidedChange((previous) => ({
+        ...previous,
+        initialPrompt: togglePromptWithSeed(previous.initialPrompt, phrase),
+      }));
     },
-    [guided, onGuidedChange, sessionReadOnly],
+    [onGuidedChange, sessionReadOnly],
   );
   const executeSelectOption = useCallback(
     (question: DiagnosticQuestionBlock, optionId: string): void => {
       if (sessionReadOnly) {
         return;
       }
-      if (guided.activeRound === null) {
-        return;
-      }
-      const baseAnswers = buildDiagnosticAnswerLookup({
-        completedBundles: guided.completedBundles,
-        activeRound: guided.activeRound,
-      });
-      const nextSelection = toggleQuestionOptionSelection({
-        baseAnswers,
-        question,
-        selection: guided.activeRound.answers[question.id],
-        optionId,
-      });
-      let nextActiveRound = synchronizeActiveRound({
-        completedBundles: guided.completedBundles,
-        activeRound: {
-          ...guided.activeRound,
-          answers: {
-            ...guided.activeRound.answers,
-            [question.id]: nextSelection,
-          },
-        },
-      });
-      if (nextActiveRound === null) {
-        return;
-      }
-      if (
-        !shouldShowQuestionDetailNoteInput({
+      onGuidedChange((previous) => {
+        if (previous.activeRound === null) {
+          return previous;
+        }
+        const baseAnswers = buildDiagnosticAnswerLookup({
+          completedBundles: previous.completedBundles,
+          activeRound: previous.activeRound,
+        });
+        const nextSelection = toggleQuestionOptionSelection({
           baseAnswers,
           question,
-          selection: nextSelection,
-        })
-      ) {
-        const nextAnswerNotes = { ...nextActiveRound.answerNotes };
-        delete nextAnswerNotes[question.id];
-        nextActiveRound = {
-          ...nextActiveRound,
-          answerNotes: nextAnswerNotes,
+          selection: previous.activeRound.answers[question.id],
+          optionId,
+        });
+        let nextActiveRound = synchronizeActiveRound({
+          completedBundles: previous.completedBundles,
+          activeRound: {
+            ...previous.activeRound,
+            answers: {
+              ...previous.activeRound.answers,
+              [question.id]: nextSelection,
+            },
+          },
+        });
+        if (nextActiveRound === null) {
+          return previous;
+        }
+        if (
+          !shouldShowQuestionDetailNoteInput({
+            baseAnswers,
+            question,
+            selection: nextSelection,
+          })
+        ) {
+          const nextAnswerNotes = { ...nextActiveRound.answerNotes };
+          delete nextAnswerNotes[question.id];
+          nextActiveRound = {
+            ...nextActiveRound,
+            answerNotes: nextAnswerNotes,
+          };
+        }
+        return {
+          ...previous,
+          activeRound: nextActiveRound,
         };
-      }
-      onGuidedChange({
-        ...guided,
-        activeRound: nextActiveRound,
       });
     },
-    [guided, onGuidedChange, sessionReadOnly],
+    [onGuidedChange, sessionReadOnly],
   );
   const executeSelectChildOption = useCallback(
     (question: DiagnosticQuestionBlock, parentOptionId: string, childOptionId: string): void => {
       if (sessionReadOnly) {
         return;
       }
-      if (guided.activeRound === null) {
-        return;
-      }
-      const nextSelection = toggleChildQuestionOptionSelection({
-        baseAnswers: buildDiagnosticAnswerLookup({
-          completedBundles: guided.completedBundles,
-          activeRound: guided.activeRound,
-        }),
-        question,
-        selection: guided.activeRound.answers[question.id],
-        parentOptionId,
-        childOptionId,
-      });
-      const nextActiveRound = synchronizeActiveRound({
-        completedBundles: guided.completedBundles,
-        activeRound: {
-          ...guided.activeRound,
-          answers: {
-            ...guided.activeRound.answers,
-            [question.id]: nextSelection,
+      onGuidedChange((previous) => {
+        if (previous.activeRound === null) {
+          return previous;
+        }
+        const nextSelection = toggleChildQuestionOptionSelection({
+          baseAnswers: buildDiagnosticAnswerLookup({
+            completedBundles: previous.completedBundles,
+            activeRound: previous.activeRound,
+          }),
+          question,
+          selection: previous.activeRound.answers[question.id],
+          parentOptionId,
+          childOptionId,
+        });
+        const nextActiveRound = synchronizeActiveRound({
+          completedBundles: previous.completedBundles,
+          activeRound: {
+            ...previous.activeRound,
+            answers: {
+              ...previous.activeRound.answers,
+              [question.id]: nextSelection,
+            },
           },
-        },
-      });
-      onGuidedChange({
-        ...guided,
-        activeRound: nextActiveRound,
+        });
+        if (nextActiveRound === null) {
+          return previous;
+        }
+        return {
+          ...previous,
+          activeRound: nextActiveRound,
+        };
       });
     },
-    [guided, onGuidedChange, sessionReadOnly],
+    [onGuidedChange, sessionReadOnly],
   );
   const executeSetQuestionSelection = useCallback(
     (questionId: string, nextSelection: DiagnosticQuestionSelection): void => {
       if (sessionReadOnly) {
         return;
       }
-      if (guided.activeRound === null) {
-        return;
-      }
-      const questionBlock = guided.activeRound.questions.find((candidate) => candidate.id === questionId);
-      const baseAnswers = buildDiagnosticAnswerLookup({
-        completedBundles: guided.completedBundles,
-        activeRound: guided.activeRound,
-      });
-      let nextActiveRound = synchronizeActiveRound({
-        completedBundles: guided.completedBundles,
-        activeRound: {
-          ...guided.activeRound,
-          answers: {
-            ...guided.activeRound.answers,
-            [questionId]: nextSelection,
+      onGuidedChange((previous) => {
+        if (previous.activeRound === null) {
+          return previous;
+        }
+        const questionBlock = previous.activeRound.questions.find((candidate) => candidate.id === questionId);
+        const baseAnswers = buildDiagnosticAnswerLookup({
+          completedBundles: previous.completedBundles,
+          activeRound: previous.activeRound,
+        });
+        let nextActiveRound = synchronizeActiveRound({
+          completedBundles: previous.completedBundles,
+          activeRound: {
+            ...previous.activeRound,
+            answers: {
+              ...previous.activeRound.answers,
+              [questionId]: nextSelection,
+            },
           },
-        },
-      });
-      if (nextActiveRound === null) {
-        return;
-      }
-      if (
-        questionBlock !== undefined &&
-        !shouldShowQuestionDetailNoteInput({
-          baseAnswers,
-          question: questionBlock,
-          selection: nextSelection,
-        })
-      ) {
-        const nextAnswerNotes = { ...nextActiveRound.answerNotes };
-        delete nextAnswerNotes[questionId];
-        nextActiveRound = {
-          ...nextActiveRound,
-          answerNotes: nextAnswerNotes,
+        });
+        if (nextActiveRound === null) {
+          return previous;
+        }
+        if (
+          questionBlock !== undefined &&
+          !shouldShowQuestionDetailNoteInput({
+            baseAnswers,
+            question: questionBlock,
+            selection: nextSelection,
+          })
+        ) {
+          const nextAnswerNotes = { ...nextActiveRound.answerNotes };
+          delete nextAnswerNotes[questionId];
+          nextActiveRound = {
+            ...nextActiveRound,
+            answerNotes: nextAnswerNotes,
+          };
+        }
+        return {
+          ...previous,
+          activeRound: nextActiveRound,
         };
-      }
-      onGuidedChange({
-        ...guided,
-        activeRound: nextActiveRound,
       });
     },
-    [guided, onGuidedChange, sessionReadOnly],
+    [onGuidedChange, sessionReadOnly],
   );
   const executeUpdateAnswerNote = useCallback(
     (questionId: string, value: string): void => {
       if (sessionReadOnly) {
         return;
       }
-      if (guided.activeRound === null) {
-        return;
-      }
       const capped =
         value.length > MAX_ANSWER_NOTE_LENGTH ? value.slice(0, MAX_ANSWER_NOTE_LENGTH) : value;
-      onGuidedChange({
-        ...guided,
-        activeRound: {
-          ...guided.activeRound,
-          answerNotes: {
-            ...guided.activeRound.answerNotes,
-            [questionId]: capped,
+      onGuidedChange((previous) => {
+        if (previous.activeRound === null) {
+          return previous;
+        }
+        return {
+          ...previous,
+          activeRound: {
+            ...previous.activeRound,
+            answerNotes: {
+              ...previous.activeRound.answerNotes,
+              [questionId]: capped,
+            },
           },
-        },
+        };
       });
     },
-    [guided, onGuidedChange, sessionReadOnly],
+    [onGuidedChange, sessionReadOnly],
   );
   const executeFetchRound = useCallback(
     async (completedBundles: CompletedRoundBundle[]): Promise<boolean> => {
       if (sessionReadOnly) {
         return false;
       }
-      const trimmed = guided.initialPrompt.trim();
+      const trimmed = guidedRef.current.initialPrompt.trim();
       const clientEmptyRoundRetryLimit = 3;
       for (let attempt = 0; attempt <= clientEmptyRoundRetryLimit; attempt += 1) {
         const response = await fetch(DIAGNOSTIC_ROUND_API_URL, {
@@ -1359,12 +1405,12 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               Array.isArray(data.goodFitBullets) ? data.goodFitBullets : null,
             ),
           };
-          onGuidedChange({
-            ...guided,
+          onGuidedChange((previous) => ({
+            ...previous,
             completedBundles,
             activeRound: null,
             outcome,
-          });
+          }));
           return true;
         }
         const mappedQuestions: DiagnosticQuestionBlock[] = (Array.isArray(data.questions) ? data.questions : [])
@@ -1380,8 +1426,8 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           }))
           .filter((block) => block.options.length > 0);
         if (mappedQuestions.length > 0) {
-          onGuidedChange({
-            ...guided,
+          onGuidedChange((previous) => ({
+            ...previous,
             completedBundles,
             activeRound: {
               roundIndex: completedBundles.length,
@@ -1392,7 +1438,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               stepIndex: 0,
               guidance: typeof data.guidance === 'string' ? data.guidance : null,
             },
-          });
+          }));
           return true;
         }
         if (attempt === clientEmptyRoundRetryLimit) {
@@ -1402,7 +1448,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       }
       return false;
     },
-    [cacheDebugUiEnabled, guided, onGuidedChange, sessionReadOnly],
+    [cacheDebugUiEnabled, onGuidedChange, sessionReadOnly],
   );
   const executeFetchTemplateSummary = useCallback(
     async (completedBundles: CompletedRoundBundle[]): Promise<GuidedDiagnosticOutcome> => {
@@ -1508,13 +1554,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         currentIndex: activeRound.stepIndex,
       });
       if (nextQuestionIndex !== null) {
-        onGuidedChange({
-          ...guided,
+        onGuidedChange((previous) => ({
+          ...previous,
           activeRound: {
             ...activeRound,
             stepIndex: nextQuestionIndex,
           },
-        });
+        }));
         scheduleScrollQuizWizardToTop();
         return;
       }
@@ -1523,16 +1569,16 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       if (nextBundleIndex < guided.completedBundles.length) {
         const peeked = applyGuidedPeekCompletedBundleIndex(guided, nextBundleIndex);
         if (peeked !== null) {
-          onGuidedChange(peeked);
+          onGuidedChange(() => peeked);
         }
         scheduleScrollQuizWizardToTop();
         return;
       }
       if (guided.outcome !== null) {
-        onGuidedChange({
-          ...guided,
+        onGuidedChange((previous) => ({
+          ...previous,
           activeRound: null,
-        });
+        }));
         scheduleScrollQuizWizardToTop();
       }
       return;
@@ -1564,22 +1610,22 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           startRoundIndex: activeRound.roundIndex + 1,
         });
         if (nextRound !== null) {
-          onGuidedChange({
-            ...guided,
+          onGuidedChange((previous) => ({
+            ...previous,
             activeRound: nextRound,
             outcome: null,
-          });
+          }));
           scheduleScrollQuizWizardToTop();
           return;
         }
         setIsAwaitingApi(true);
         try {
           const outcome = await executeFetchTemplateSummary(guided.completedBundles);
-          onGuidedChange({
-            ...guided,
+          onGuidedChange((previous) => ({
+            ...previous,
             activeRound: null,
             outcome,
-          });
+          }));
           scheduleScrollQuizWizardToTop();
         } catch (error: unknown) {
           setErrorMessage(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
@@ -1627,13 +1673,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       currentIndex: activeRound.stepIndex,
     });
     if (nextQuestionIndex !== null) {
-      onGuidedChange({
-        ...guided,
+      onGuidedChange((previous) => ({
+        ...previous,
         activeRound: {
           ...activeRound,
           stepIndex: nextQuestionIndex,
         },
-      });
+      }));
       scheduleScrollQuizWizardToTop();
       return;
     }
@@ -1656,24 +1702,24 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         startRoundIndex: activeRound.roundIndex + 1,
       });
       if (nextRound !== null) {
-        onGuidedChange({
-          ...guided,
+        onGuidedChange((previous) => ({
+          ...previous,
           completedBundles: nextCompleted,
           activeRound: nextRound,
           outcome: null,
-        });
+        }));
         scheduleScrollQuizWizardToTop();
         return;
       }
       setIsAwaitingApi(true);
       try {
         const outcome = await executeFetchTemplateSummary(nextCompleted);
-        onGuidedChange({
-          ...guided,
+        onGuidedChange((previous) => ({
+          ...previous,
           completedBundles: nextCompleted,
           activeRound: null,
           outcome,
-        });
+        }));
         scheduleScrollQuizWizardToTop();
       } catch (error: unknown) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to generate advisor summary.');

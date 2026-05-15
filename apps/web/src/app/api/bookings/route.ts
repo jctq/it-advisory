@@ -11,6 +11,7 @@ import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
+import { getPaymentSettings } from '@/lib/data/payment-settings';
 import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
 const PAYMENT_METHOD_IDS = ['card', 'gcash', 'maya', 'bank_transfer', 'paypal'] as const;
@@ -93,6 +94,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid date or time' }, { status: 400 });
   }
   const serviceKey = parsed.data.serviceKey;
+  const paymentSettings = await getPaymentSettings();
   const hasFullCheckout =
     parsed.data.customerName !== undefined &&
     parsed.data.customerName.trim().length > 0 &&
@@ -101,6 +103,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     parsed.data.customerPhone !== undefined &&
     parsed.data.customerPhone.trim().length > 0 &&
     parsed.data.paymentMethod !== undefined;
+  if (hasFullCheckout && paymentSettings.paymentsEnabled) {
+    return NextResponse.json(
+      {
+        error: 'Use the payment checkout API to complete this booking.',
+        code: 'payments_checkout_required',
+      },
+      { status: 400 },
+    );
+  }
   const checkoutContact: MarketingBookingLeadContact | null = hasFullCheckout
     ? {
         name: parsed.data.customerName!.trim(),

@@ -1,4 +1,5 @@
 import type { ObjectId } from 'mongodb';
+import type { PaymentGatewayId, PaymentStatus } from './payment-types.js';
 
 export type QuizAnswers = Readonly<Record<string, string | string[] | number | boolean>>;
 
@@ -66,6 +67,11 @@ export type BookingDocument = {
   status: 'pending' | 'confirmed' | 'cancelled';
   /** Human-readable payment method from checkout (e.g. GCash); optional for legacy bookings. */
   paymentMethodLabel?: string | null;
+  paymentStatus?: PaymentStatus | null;
+  paymentGatewayId?: PaymentGatewayId | null;
+  paymentTransactionId?: ObjectId | null;
+  paymentProviderRef?: string | null;
+  paymentExpiresAt?: Date | null;
   meetingUrl?: string;
   /** Raw guided diagnostic JSON (string or legacy object stringified) at booking time — full rounds, questions, options. */
   guidedDiagnosticSnapshot?: string | null;

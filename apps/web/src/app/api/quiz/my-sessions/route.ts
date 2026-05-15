@@ -1,19 +1,47 @@
 import { NextResponse } from 'next/server';
-import { insertBlankQuizSessionForVisitor, listQuizSessionsForVisitor } from '@/lib/data/quiz-sessions';
+import { z } from 'zod';
+import {
+  insertBlankQuizSessionForVisitor,
+  listQuizSessionsForVisitorPaginated,
+  type VisitorQuizSessionListStatusFilter,
+} from '@/lib/data/quiz-sessions';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
+const listQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(8),
+  status: z.enum(['pending', 'confirmed', 'cancelled', 'completed', 'all']).default('pending'),
+  bookingReference: z.string().trim().optional(),
+});
+
 /**
- * Lists quiz session snapshots for the signed-in marketing account (`acct:<userId>` rows).
+ * Lists quiz session snapshots for the signed-in marketing account with server-side pagination and filters.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const user = await getAuthenticatedMarketingUser(request);
   if (user === null) {
     return NextResponse.json({ error: 'Sign in required', code: 'auth_required' }, { status: 401 });
   }
+  const url = new URL(request.url);
+  const parsed = listQuerySchema.safeParse({
+    page: url.searchParams.get('page') ?? undefined,
+    pageSize: url.searchParams.get('pageSize') ?? undefined,
+    status: url.searchParams.get('status') ?? undefined,
+    bookingReference: url.searchParams.get('bookingReference') ?? undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid query parameters', code: 'invalid_query' }, { status: 400 });
+  }
   const visitorId = buildAccountVisitorId(user.id);
-  const sessions = await listQuizSessionsForVisitor(visitorId);
-  return NextResponse.json({ sessions });
+  const result = await listQuizSessionsForVisitorPaginated({
+    visitorId,
+    page: parsed.data.page,
+    pageSize: parsed.data.pageSize,
+    status: parsed.data.status as VisitorQuizSessionListStatusFilter,
+    bookingReference: parsed.data.bookingReference,
+  });
+  return NextResponse.json(result);
 }
 
 /**

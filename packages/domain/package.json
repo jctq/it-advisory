@@ -8,6 +8,7 @@
     "./booking-schedule": "./src/booking-schedule.ts",
     "./collections": "./src/collections.ts",
     "./diagnostic-settings-bounds": "./src/diagnostic-settings-bounds.ts",
+    "./payment-types": "./src/payment-types.ts",
     "./types": "./src/types.ts",
     "./visitor-session": "./src/visitor-session.ts"
   },

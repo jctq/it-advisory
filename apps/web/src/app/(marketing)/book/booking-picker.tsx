@@ -18,6 +18,13 @@ import {
   Video,
 } from 'lucide-react';
 import { fetchMarketingServerClockOffsetMs } from '@it-advisory/api-client/marketing-booking-api-client';
+import {
+  createPaymentCheckoutSession,
+  fetchPaymentConfigPublic,
+  fetchPaymentTransactionStatus,
+  type PaymentConfigPublic,
+} from '@it-advisory/api-client/marketing-payment-api-client';
+import type { PaymentGatewayId } from '@/domain/payment-types';
 import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SESSION_DURATION } from '@it-advisory/diagnostic-core/project-rescue-service-context';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
@@ -35,6 +42,7 @@ import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar
 import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-slot-times-for-manila-date';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import {
   buildMarketingBookSessionPath,
   buildMarketingQuizSessionPath,
@@ -42,6 +50,7 @@ import {
 } from '@/lib/marketing/quiz-session-marketing-ref';
 
 const BOOKINGS_API_URL = '/api/bookings';
+const PAYMENT_CONFIG_API_URL = buildApiUrl('/api/checkout/payment-config');
 const AVAILABILITY_API_URL = buildApiUrl('/api/booking/availability');
 
 function resolveMarketingClientApiBaseUrl(): string {
@@ -54,7 +63,7 @@ function resolveMarketingClientApiBaseUrl(): string {
 const MARKETING_CLIENT_API_BASE_URL = resolveMarketingClientApiBaseUrl();
 const DEFAULT_SERVICE_KEY = 'project-rescue' as const;
 
-const CHECKOUT_AMOUNT_LABEL = '₱6,000.00';
+const DEFAULT_CHECKOUT_AMOUNT_LABEL = '₱6,000.00';
 type BookingSlotPhase = 'date' | 'details' | 'payment';
 
 type BookingPhase = BookingSlotPhase | 'processing' | 'success' | 'error';
@@ -91,6 +100,19 @@ function addManilaYearMonth(manilaYearMonth: string, deltaMonths: number): strin
     PRIMARY_TIMEZONE,
   );
   return formatInTimeZone(addMonths(pivot, deltaMonths), PRIMARY_TIMEZONE, 'yyyy-MM');
+}
+
+type ConfirmedSlotDisplay = {
+  readonly dateLong: string;
+  readonly timeLabel: string;
+};
+
+function formatConfirmedSlotFromStartsAt(startsAtIso: string, timezone: string): ConfirmedSlotDisplay {
+  const startsAt = new Date(startsAtIso);
+  return {
+    dateLong: formatInTimeZone(startsAt, timezone, 'EEEE, MMMM d, yyyy'),
+    timeLabel: formatInTimeZone(startsAt, timezone, 'h:mm a'),
+  };
 }
 
 function resolveStepStatus(params: {
@@ -205,12 +227,112 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [phone, setPhone] = useState<string>('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId | null>('card');
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfigPublic | null>(null);
+  const [selectedGatewayId, setSelectedGatewayId] = useState<PaymentGatewayId | null>(null);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
   const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, readonly string[]>>({});
   const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle');
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successPaymentLabel, setSuccessPaymentLabel] = useState<string>('');
+  const [confirmedBookingReference, setConfirmedBookingReference] = useState<string | null>(null);
+  const [confirmedSlotDisplay, setConfirmedSlotDisplay] = useState<ConfirmedSlotDisplay | null>(null);
 
+  const checkoutAmountLabel = paymentConfig?.checkoutAmountLabel ?? DEFAULT_CHECKOUT_AMOUNT_LABEL;
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchPaymentConfigPublic({ apiBaseUrl: MARKETING_CLIENT_API_BASE_URL, signal: controller.signal })
+      .then((config) => {
+        if (!controller.signal.aborted) {
+          setPaymentConfig(config);
+          if (config.gateways.length > 0) {
+            const firstGateway = config.gateways[0]!;
+            setSelectedGatewayId(firstGateway.id);
+            setSelectedPaymentMethodId(firstGateway.methods[0]?.id ?? null);
+          }
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setPaymentConfig(null);
+        }
+      });
+    return () => {
+      controller.abort();
+    };
+  }, []);
+  useLayoutEffect(() => {
+    const paymentResult = searchParams.get('payment')?.trim() ?? '';
+    const returnTransactionId = searchParams.get('transactionId')?.trim() ?? '';
+    if (paymentResult !== 'success' || returnTransactionId.length === 0) {
+      return;
+    }
+    const controller = new AbortController();
+    setPhase('processing');
+    void fetchPaymentTransactionStatus({
+      apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+      transactionId: returnTransactionId,
+      signal: controller.signal,
+    })
+      .then((result) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (result.status !== 'paid' || result.bookingId === null) {
+          setErrorMessage('Your payment is still processing. If you were charged, check your email shortly.');
+          setPhase('error');
+          return;
+        }
+        if (result.startsAtIso !== null) {
+          setConfirmedSlotDisplay(
+            formatConfirmedSlotFromStartsAt(result.startsAtIso, result.timezone ?? PRIMARY_TIMEZONE),
+          );
+        }
+        setSuccessPaymentLabel(result.paymentMethodLabel ?? result.gatewayId);
+        if (result.bookingId !== null) {
+          setConfirmedBookingReference(formatBookingReferenceId(result.bookingId));
+        }
+        setPhase('success');
+        const cleanPath =
+          pathname.startsWith('/book/') && hasValidQuizSessionParam
+            ? buildMarketingBookSessionPath(quizSessionRef)
+            : '/book';
+        router.replace(cleanPath);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        setErrorMessage('Could not load your booking confirmation. Please check your email.');
+        setPhase('error');
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [hasValidQuizSessionParam, pathname, quizSessionRef, router, searchParams]);
+  const selectedGateway = useMemo(() => {
+    if (paymentConfig === null || selectedGatewayId === null) {
+      return null;
+    }
+    return paymentConfig.gateways.find((gateway) => gateway.id === selectedGatewayId) ?? null;
+  }, [paymentConfig, selectedGatewayId]);
+  const availablePaymentMethods = selectedGateway?.methods ?? [];
+  const isLivePaymentsCheckout =
+    paymentConfig?.paymentsEnabled === true && (paymentConfig.gateways.length ?? 0) > 0;
+  const hasMultiplePaymentGateways = (paymentConfig?.gateways.length ?? 0) > 1;
+  useEffect(() => {
+    if (availablePaymentMethods.length === 0) {
+      setSelectedPaymentMethodId(null);
+      return;
+    }
+    const stillValid = availablePaymentMethods.some((method) => method.id === selectedPaymentMethodId);
+    if (!stillValid) {
+      setSelectedPaymentMethodId(availablePaymentMethods[0]!.id);
+    }
+  }, [availablePaymentMethods, selectedPaymentMethodId]);
   useEffect(() => {
     const controller = new AbortController();
     void fetchMarketingServerClockOffsetMs({ apiBaseUrl: MARKETING_CLIENT_API_BASE_URL, signal: controller.signal }).then((offset) => {
@@ -363,6 +485,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       ? formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'EEEE, MMMM d, yyyy')
       : '';
   const displayTimeLabel = selectedTime ?? '';
+  const confirmedDateLong = confirmedSlotDisplay?.dateLong ?? displayDateLong;
+  const confirmedTimeLabel = confirmedSlotDisplay?.timeLabel ?? displayTimeLabel;
   const activeDiagnosticHref = hasValidQuizSessionParam
     ? buildMarketingQuizSessionPath(quizSessionRef)
     : '/quiz';
@@ -398,7 +522,51 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   };
 
   const executePay = async (): Promise<void> => {
-    if (!selectedDate || !selectedTime || paymentMethod === null) {
+    if (!selectedDate || !selectedTime) {
+      return;
+    }
+    const paymentsLive = paymentConfig?.paymentsEnabled === true && (paymentConfig.gateways.length ?? 0) > 0;
+    if (paymentsLive) {
+      if (selectedGatewayId === null || selectedPaymentMethodId === null) {
+        return;
+      }
+      const methodOption = availablePaymentMethods.find((method) => method.id === selectedPaymentMethodId);
+      const resolvedPaymentLabel = methodOption?.label ?? selectedPaymentMethodId;
+      setPhase('processing');
+      setErrorMessage(null);
+      const dateParam = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
+      try {
+        const session = await createPaymentCheckoutSession({
+          apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+          gatewayId: selectedGatewayId,
+          paymentMethodId: selectedPaymentMethodId,
+          date: dateParam,
+          time: selectedTime,
+          serviceKey: DEFAULT_SERVICE_KEY,
+          customerName: fullName.trim(),
+          customerEmail: email.trim(),
+          customerPhone: phone.trim(),
+          customerCompany: company.trim().length > 0 ? company.trim() : undefined,
+          quizSessionId: hasValidQuizSessionParam && quizSessionRef.length > 0 ? quizSessionRef : undefined,
+          paymentMethodLabel: resolvedPaymentLabel,
+        });
+        if (session.manualConfirm || session.redirectUrl === null) {
+          void router.refresh();
+          setSuccessPaymentLabel(resolvedPaymentLabel);
+          if (session.bookingId !== null) {
+            setConfirmedBookingReference(formatBookingReferenceId(session.bookingId));
+          }
+          setPhase('success');
+          return;
+        }
+        window.location.href = session.redirectUrl;
+      } catch (error: unknown) {
+        setErrorMessage(error instanceof Error ? error.message : 'Could not start payment.');
+        setPhase('error');
+      }
+      return;
+    }
+    if (paymentMethod === null) {
       return;
     }
     const methodOption = PAYMENT_METHOD_OPTIONS.find((m) => m.id === paymentMethod);
@@ -447,6 +615,16 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       }
       void router.refresh();
       setSuccessPaymentLabel(resolvedPaymentLabel);
+      const bookingId =
+        typeof payload === 'object' &&
+        payload !== null &&
+        'bookingId' in payload &&
+        typeof (payload as { bookingId?: unknown }).bookingId === 'string'
+          ? (payload as { bookingId: string }).bookingId
+          : null;
+      if (bookingId !== null) {
+        setConfirmedBookingReference(formatBookingReferenceId(bookingId));
+      }
       setPhase('success');
     } catch {
       setErrorMessage('Network error while saving your booking. Check your connection and try again.');
@@ -534,8 +712,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             </span>
             <div>
               <p className="text-xs font-medium text-muted-foreground">When</p>
-              <p className="text-sm font-semibold text-foreground">{displayDateLong}</p>
-              <p className="text-sm font-semibold text-foreground">{displayTimeLabel}</p>
+              <p className="text-sm font-semibold text-foreground">{confirmedDateLong}</p>
+              <p className="text-sm font-semibold text-foreground">{confirmedTimeLabel}</p>
               <p className="text-xs text-muted-foreground">{PRIMARY_TIMEZONE}</p>
             </div>
           </div>
@@ -549,6 +727,18 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               <p className="text-xs text-muted-foreground">A calendar invite and meeting link has been sent to your email.</p>
             </div>
           </div>
+          {confirmedBookingReference !== null ? (
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-medium text-muted-foreground">Booking reference</p>
+              <p className="mt-1 font-mono text-sm font-semibold tracking-wider text-foreground">{confirmedBookingReference}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Save this reference to check status or pay later.{' '}
+                <Link href="/book/manage" className="font-medium text-primary underline-offset-4 hover:underline">
+                  Manage booking
+                </Link>
+              </p>
+            </div>
+          ) : null}
         </div>
         <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-5 py-4">
           <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
@@ -558,7 +748,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <div>
               <dt className="text-muted-foreground">Amount paid</dt>
-              <dd className="font-semibold text-foreground">{CHECKOUT_AMOUNT_LABEL}</dd>
+              <dd className="font-semibold text-foreground">{checkoutAmountLabel}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Payment method</dt>
@@ -597,6 +787,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             'We use this information only to confirm your reservation and to send your calendar invite and meeting link.'}
           {phase === 'payment' && 'Choose a payment method to secure your booking.'}
         </p>
+        {phase === 'date' ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            <Link href="/book/manage" className="font-medium text-primary underline-offset-4 hover:underline">
+              Already booked? Manage your booking
+            </Link>
+          </p>
+        ) : null}
         {phase === 'date' ? (
           <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_min(100%,22rem)] lg:items-start lg:gap-x-8 xl:gap-x-10">
             <div className="min-w-0 space-y-8 lg:space-y-0">
@@ -901,37 +1098,118 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         {phase === 'payment' ? (
           <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_340px] lg:items-start">
             <div className="space-y-6">
-              <fieldset>
-                <legend className="text-sm font-semibold text-foreground">Payment method</legend>
-                <div className="mt-4 space-y-3">
-                  {PAYMENT_METHOD_OPTIONS.map((option) => {
-                    const isSelected = paymentMethod === option.id;
-                    return (
-                      <label
-                        key={option.id}
-                        className={cn(
-                          'flex cursor-pointer items-center gap-4 rounded-2xl border bg-card p-4 shadow-xs transition-colors',
-                          isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-border hover:border-primary/30',
-                        )}
-                      >
-                        <input
-                          type="radio"
-                          name="payment-method"
-                          value={option.id}
-                          checked={isSelected}
-                          onChange={() => setPaymentMethod(option.id)}
-                          className="size-4 accent-primary"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                          <p className="text-xs text-muted-foreground">{option.hint}</p>
-                        </div>
-                        {option.id === 'card' ? <CreditCard className="size-6 shrink-0 text-muted-foreground" aria-hidden /> : null}
-                      </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
+              {isLivePaymentsCheckout && hasMultiplePaymentGateways && paymentConfig !== null ? (
+                <fieldset>
+                  <legend className="text-sm font-semibold text-foreground">Payment gateway</legend>
+                  <div className="mt-4 space-y-3">
+                    {paymentConfig.gateways.map((gateway) => {
+                        const isSelected = selectedGatewayId === gateway.id;
+                        return (
+                          <label
+                            key={gateway.id}
+                            className={cn(
+                              'flex cursor-pointer items-center gap-4 rounded-2xl border bg-card p-4 shadow-xs transition-colors',
+                              isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-border hover:border-primary/30',
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="payment-gateway"
+                              value={gateway.id}
+                              checked={isSelected}
+                              onChange={() => {
+                                setSelectedGatewayId(gateway.id);
+                                setSelectedPaymentMethodId(gateway.methods[0]?.id ?? null);
+                              }}
+                              className="size-4 accent-primary"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-foreground">{gateway.label}</p>
+                              <p className="text-xs text-muted-foreground">{gateway.description}</p>
+                            </div>
+                            <CreditCard className="size-6 shrink-0 text-muted-foreground" aria-hidden />
+                          </label>
+                        );
+                      })}
+                  </div>
+                </fieldset>
+              ) : null}
+              {!isLivePaymentsCheckout ? (
+                <fieldset>
+                  <legend className="text-sm font-semibold text-foreground">Payment method</legend>
+                  <div className="mt-4 space-y-3">
+                    {PAYMENT_METHOD_OPTIONS.map((option) => {
+                      const isSelected = paymentMethod === option.id;
+                      return (
+                        <label
+                          key={option.id}
+                          className={cn(
+                            'flex cursor-pointer items-center gap-4 rounded-2xl border bg-card p-4 shadow-xs transition-colors',
+                            isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-border hover:border-primary/30',
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="payment-method"
+                            value={option.id}
+                            checked={isSelected}
+                            onChange={() => setPaymentMethod(option.id)}
+                            className="size-4 accent-primary"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-foreground">{option.label}</p>
+                            <p className="text-xs text-muted-foreground">{option.hint}</p>
+                          </div>
+                          {option.id === 'card' ? (
+                            <CreditCard className="size-6 shrink-0 text-muted-foreground" aria-hidden />
+                          ) : null}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ) : null}
+              {isLivePaymentsCheckout && availablePaymentMethods.length > 0 ? (
+                <fieldset>
+                  <legend className="text-sm font-semibold text-foreground">Payment method</legend>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Choose how you want to pay. You will complete payment on {selectedGateway?.label ?? 'the provider'}.
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    {availablePaymentMethods.map((method) => {
+                      const isSelected = selectedPaymentMethodId === method.id;
+                      return (
+                        <label
+                          key={method.id}
+                          className={cn(
+                            'flex cursor-pointer items-center gap-4 rounded-2xl border bg-card p-4 shadow-xs transition-colors',
+                            isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-border hover:border-primary/30',
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="payment-method-live"
+                            value={method.id}
+                            checked={isSelected}
+                            onChange={() => setSelectedPaymentMethodId(method.id)}
+                            className="size-4 accent-primary"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-foreground">{method.label}</p>
+                            <p className="text-xs text-muted-foreground">{method.hint}</p>
+                          </div>
+                          {method.id === 'card' ? (
+                            <CreditCard className="size-6 shrink-0 text-muted-foreground" aria-hidden />
+                          ) : null}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ) : null}
+              {paymentConfig?.sandboxMode ? (
+                <p className="text-xs font-medium text-amber-700">Sandbox mode — test payments only.</p>
+              ) : null}
             </div>
             <aside className="space-y-4 lg:sticky lg:top-44 lg:z-45">
               <div className="rounded-2xl border border-border bg-muted/30 p-5">
@@ -943,7 +1221,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Amount</dt>
-                    <dd className="mt-1 font-semibold text-foreground">{CHECKOUT_AMOUNT_LABEL}</dd>
+                    <dd className="mt-1 font-semibold text-foreground">{checkoutAmountLabel}</dd>
                   </div>
                 </dl>
                 <p className="mt-2 text-xs text-muted-foreground">Inclusive of VAT</p>
@@ -971,11 +1249,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   type="button"
                   className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
                   size="lg"
-                  disabled={paymentMethod === null}
+                  disabled={
+                    paymentConfig?.paymentsEnabled
+                      ? selectedGatewayId === null || selectedPaymentMethodId === null
+                      : paymentMethod === null
+                  }
                   onClick={() => void executePay()}
                 >
                   <Lock className="size-4 shrink-0" aria-hidden />
-                  Pay {CHECKOUT_AMOUNT_LABEL}
+                  {paymentConfig?.paymentPolicy === 'manual_confirm'
+                    ? 'Submit booking'
+                    : `Pay ${checkoutAmountLabel}`}
                 </Button>
               </div>
             </aside>

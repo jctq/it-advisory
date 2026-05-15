@@ -226,6 +226,9 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
   const hasHydratedRef = useRef<boolean>(false);
+  const lastSessionInitKeyRef = useRef<string | null>(null);
+  const isRetakeQuery = searchParams.get('retake') === '1';
+  const sessionInitKey = `${sessionTargetId ?? 'guest'}:${isRetakeQuery ? 'retake' : 'load'}`;
   const persistGuided = useCallback(
     async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
       if (sessionReadOnlyRef.current) {
@@ -249,12 +252,16 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     [sessionTargetId],
   );
   useEffect(() => {
+    if (lastSessionInitKeyRef.current === sessionInitKey && hasHydratedRef.current) {
+      return;
+    }
+    lastSessionInitKeyRef.current = sessionInitKey;
     let cancelled = false;
     async function initializeSession(): Promise<void> {
       setTargetSessionError(null);
       sessionReadOnlyRef.current = false;
       setSessionReadOnly(false);
-      if (searchParams.get('retake') === '1') {
+      if (isRetakeQuery) {
         await persistGuided(GUIDED_DIAGNOSTIC_EMPTY, false);
         if (cancelled) {
           return;
@@ -317,7 +324,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [persistGuided, router, searchParams, sessionTargetId, pathSessionRef]);
+  }, [isRetakeQuery, persistGuided, router, sessionInitKey, sessionTargetId]);
   useEffect(() => {
     let cancelled = false;
     async function loadProgressMetadata(): Promise<void> {

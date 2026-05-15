@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
+import { MarkBookingPaidButton } from '@/components/admin/mark-booking-paid-button';
 import { findBookingById } from '@/lib/data/bookings';
 
 type AdminBookingDetailPageProps = {
@@ -63,6 +64,9 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
             <dd className="mt-1 text-sm text-foreground">{booking.hasDiagnosticSnapshot ? 'Stored' : 'Not stored'}</dd>
           </div>
         </dl>
+        <div className="mt-6">
+          <MarkBookingPaidButton bookingId={booking.id} status={booking.status} />
+        </div>
       </div>
       <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
         <h2 className="text-lg font-semibold text-foreground">Guided diagnostic</h2>

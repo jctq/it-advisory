@@ -1,0 +1,391 @@
+import { ObjectId } from 'mongodb';
+import { COLLECTIONS } from '@/domain/collections';
+import type { BookingDocument } from '@/domain/types';
+import type { PaymentGatewayId, PaymentPolicy, PaymentStatus } from '@/domain/payment-types';
+import {
+  createBookingWithLatestQuizSnapshot,
+  findBookingByVisitorSlot,
+  insertMarketingBooking,
+} from '@/lib/data/bookings';
+import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
+import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
+import { findPaymentTransactionById, updatePaymentTransactionStatus, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
+import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { getDb } from '@/lib/mongodb';
+import { PRIMARY_TIMEZONE } from '@/lib/timezone';
+
+async function resolveQuizSnapshot(
+  visitorId: string,
+  quizSessionIdHex: string | null,
+): Promise<{ readonly quizSessionId: ObjectId | null; readonly snapshot: string | null }> {
+  const preferredRaw = quizSessionIdHex?.trim() ?? '';
+  let session =
+    preferredRaw.length > 0 && /^[a-f\d]{24}$/i.test(preferredRaw)
+      ? await findQuizSessionForVisitor(visitorId, preferredRaw)
+      : null;
+  if (session === null) {
+    return { quizSessionId: null, snapshot: null };
+  }
+  const quizSessionId = session._id ?? null;
+  const snapshot =
+    session.answers !== undefined ? extractGuidedDiagnosticRawFromQuizAnswers(session.answers) : null;
+  return { quizSessionId, snapshot };
+}
+
+async function confirmBookingRow(bookingId: ObjectId): Promise<void> {
+  const db = await getDb();
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: bookingId },
+    { $set: { status: 'confirmed', updatedAt: new Date() } },
+  );
+}
+
+async function cancelBookingRow(bookingId: ObjectId): Promise<void> {
+  const db = await getDb();
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: bookingId },
+    { $set: { status: 'cancelled', updatedAt: new Date() } },
+  );
+}
+
+export type CompletePaymentTransactionResult =
+  | { readonly kind: 'updated'; readonly transaction: PaymentTransactionRow }
+  | { readonly kind: 'noop'; readonly transaction: PaymentTransactionRow }
+  | null;
+
+export async function applyPaymentStatusToBooking(input: {
+  readonly transaction: PaymentTransactionRow;
+  readonly nextStatus: PaymentStatus;
+}): Promise<CompletePaymentTransactionResult> {
+  const { transaction, nextStatus } = input;
+  if (transaction.status === nextStatus && transaction.bookingId !== null) {
+    return { kind: 'noop', transaction };
+  }
+  if (nextStatus === 'paid') {
+    return fulfillPaidTransaction(transaction);
+  }
+  if (nextStatus === 'failed' || nextStatus === 'expired') {
+    return failTransaction(transaction, nextStatus);
+  }
+  const updated = await updatePaymentTransactionStatus({
+    transactionId: transaction.id,
+    status: nextStatus,
+  });
+  return updated === null ? null : { kind: 'updated', transaction: updated };
+}
+
+async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promise<CompletePaymentTransactionResult> {
+  if (transaction.status === 'paid' && transaction.bookingId !== null) {
+    return { kind: 'noop', transaction };
+  }
+  let bookingId: ObjectId | null = transaction.bookingId !== null ? new ObjectId(transaction.bookingId) : null;
+  if (bookingId === null) {
+    bookingId = await createBookingForTransaction(transaction);
+  }
+  if (bookingId === null) {
+    return null;
+  }
+  await confirmBookingRow(bookingId);
+  const db = await getDb();
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: bookingId },
+    {
+      $set: {
+        paymentStatus: 'paid',
+        paymentGatewayId: transaction.gatewayId,
+        paymentTransactionId: new ObjectId(transaction.id),
+        paymentProviderRef: transaction.providerRef,
+        paymentMethodLabel: transaction.paymentMethodLabel,
+        updatedAt: new Date(),
+      },
+    },
+  );
+  const updated = await updatePaymentTransactionStatus({
+    transactionId: transaction.id,
+    status: 'paid',
+    bookingId,
+  });
+  return updated === null ? null : { kind: 'updated', transaction: updated };
+}
+
+async function failTransaction(
+  transaction: PaymentTransactionRow,
+  nextStatus: PaymentStatus,
+): Promise<CompletePaymentTransactionResult> {
+  if (transaction.bookingId !== null) {
+    await cancelBookingRow(new ObjectId(transaction.bookingId));
+  }
+  const updated = await updatePaymentTransactionStatus({
+    transactionId: transaction.id,
+    status: nextStatus,
+  });
+  return updated === null ? null : { kind: 'updated', transaction: updated };
+}
+
+async function createBookingForTransaction(transaction: PaymentTransactionRow): Promise<ObjectId | null> {
+  const startsAt = await loadTransactionStartsAt(transaction.id);
+  const existing = await findBookingByVisitorSlot({
+    visitorId: transaction.visitorId,
+    serviceKey: transaction.serviceKey,
+    startsAt,
+  });
+  if (existing !== null) {
+    return existing;
+  }
+  const contact: MarketingBookingLeadContact | null =
+    transaction.customerName && transaction.customerEmail && transaction.customerPhone
+      ? {
+          name: transaction.customerName,
+          email: transaction.customerEmail,
+          company: transaction.customerCompany ?? '',
+          phone: transaction.customerPhone,
+        }
+      : null;
+  let leadId =
+    transaction.leadId !== null && transaction.leadId.length > 0 ? new ObjectId(transaction.leadId) : null;
+  if (leadId === null && contact !== null) {
+    const insertedLeadId = await insertMarketingBookingLead(transaction.visitorId, contact);
+    if (insertedLeadId === null) {
+      return null;
+    }
+    leadId = insertedLeadId;
+  }
+  if (leadId === null) {
+    return null;
+  }
+  const created = await createBookingWithLatestQuizSnapshot({
+    visitorId: transaction.visitorId,
+    serviceKey: transaction.serviceKey,
+    startsAt,
+    timezone: transaction.timezone || PRIMARY_TIMEZONE,
+    leadId,
+    preferredQuizSessionId: transaction.quizSessionIdHex,
+    paymentMethodLabel: transaction.paymentMethodLabel,
+  });
+  if (created === null || created === 'duplicate_key') {
+    const retry = await findBookingByVisitorSlot({
+      visitorId: transaction.visitorId,
+      serviceKey: transaction.serviceKey,
+      startsAt: await loadTransactionStartsAt(transaction.id),
+    });
+    return retry;
+  }
+  const db = await getDb();
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: created.bookingId },
+    {
+      $set: {
+        status: transaction.paymentPolicy === 'manual_confirm' ? 'pending' : 'pending',
+        paymentStatus: 'paid',
+        paymentGatewayId: transaction.gatewayId,
+        paymentTransactionId: new ObjectId(transaction.id),
+        paymentProviderRef: transaction.providerRef,
+        updatedAt: new Date(),
+      },
+    },
+  );
+  return created.bookingId;
+}
+
+async function loadTransactionStartsAt(transactionId: string): Promise<Date> {
+  const db = await getDb();
+  const doc = await db.collection(COLLECTIONS.paymentTransactions).findOne({ _id: new ObjectId(transactionId) });
+  if (doc && 'startsAt' in doc && doc.startsAt instanceof Date) {
+    return doc.startsAt;
+  }
+  return new Date();
+}
+
+export async function createPendingBookingForHoldPolicy(input: {
+  readonly transaction: PaymentTransactionRow;
+  readonly expiresAt: Date;
+}): Promise<ObjectId | null> {
+  const { transaction, expiresAt } = input;
+  const contact: MarketingBookingLeadContact = {
+    name: transaction.customerName ?? '',
+    email: transaction.customerEmail ?? '',
+    company: transaction.customerCompany ?? '',
+    phone: transaction.customerPhone ?? '',
+  };
+  const leadId = await insertMarketingBookingLead(transaction.visitorId, contact);
+  if (leadId === null) {
+    return null;
+  }
+  const { quizSessionId, snapshot } = await resolveQuizSnapshot(transaction.visitorId, transaction.quizSessionIdHex);
+  const inserted = await insertMarketingBooking({
+    visitorId: transaction.visitorId,
+    serviceKey: transaction.serviceKey,
+    startsAt: await loadTransactionStartsAt(transaction.id),
+    timezone: transaction.timezone || PRIMARY_TIMEZONE,
+    leadId,
+    quizSessionId,
+    guidedDiagnosticSnapshot: snapshot,
+    paymentMethodLabel: transaction.paymentMethodLabel,
+  });
+  if (inserted === null || inserted.kind === 'duplicate_key') {
+    return findBookingByVisitorSlot({
+      visitorId: transaction.visitorId,
+      serviceKey: transaction.serviceKey,
+      startsAt: await loadTransactionStartsAt(transaction.id),
+    });
+  }
+  const db = await getDb();
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: inserted.id },
+    {
+      $set: {
+        status: 'pending',
+        paymentStatus: 'pending',
+        paymentGatewayId: transaction.gatewayId,
+        paymentTransactionId: new ObjectId(transaction.id),
+        paymentProviderRef: transaction.providerRef,
+        paymentExpiresAt: expiresAt,
+        updatedAt: new Date(),
+      },
+    },
+  );
+  await updatePaymentTransactionStatus({
+    transactionId: transaction.id,
+    status: 'processing',
+    bookingId: inserted.id,
+  });
+  return inserted.id;
+}
+
+export async function createManualConfirmBooking(input: {
+  readonly transaction: PaymentTransactionRow;
+}): Promise<ObjectId | null> {
+  const startsAt = await loadTransactionStartsAt(input.transaction.id);
+  const contact: MarketingBookingLeadContact = {
+    name: input.transaction.customerName ?? '',
+    email: input.transaction.customerEmail ?? '',
+    company: input.transaction.customerCompany ?? '',
+    phone: input.transaction.customerPhone ?? '',
+  };
+  const leadId = await insertMarketingBookingLead(input.transaction.visitorId, contact);
+  if (leadId === null) {
+    return null;
+  }
+  const { quizSessionId, snapshot } = await resolveQuizSnapshot(
+    input.transaction.visitorId,
+    input.transaction.quizSessionIdHex,
+  );
+  const inserted = await insertMarketingBooking({
+    visitorId: input.transaction.visitorId,
+    serviceKey: input.transaction.serviceKey,
+    startsAt,
+    timezone: input.transaction.timezone || PRIMARY_TIMEZONE,
+    leadId,
+    quizSessionId,
+    guidedDiagnosticSnapshot: snapshot,
+    paymentMethodLabel: input.transaction.paymentMethodLabel,
+  });
+  if (inserted === null) {
+    return null;
+  }
+  const bookingId = inserted.kind === 'duplicate_key' ? await findBookingByVisitorSlot({
+    visitorId: input.transaction.visitorId,
+    serviceKey: input.transaction.serviceKey,
+    startsAt,
+  }) : inserted.id;
+  if (bookingId === null) {
+    return null;
+  }
+  const db = await getDb();
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: bookingId },
+    {
+      $set: {
+        status: 'pending',
+        paymentStatus: 'pending',
+        paymentGatewayId: input.transaction.gatewayId,
+        paymentTransactionId: new ObjectId(input.transaction.id),
+        paymentProviderRef: input.transaction.providerRef,
+        updatedAt: new Date(),
+      },
+    },
+  );
+  await updatePaymentTransactionStatus({
+    transactionId: input.transaction.id,
+    status: 'pending',
+    bookingId,
+  });
+  return bookingId;
+}
+
+export async function markBookingPaidByAdmin(bookingId: string): Promise<boolean> {
+  if (!process.env.MONGODB_URI) {
+    return false;
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(bookingId);
+  } catch {
+    return false;
+  }
+  const db = await getDb();
+  const result = await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: objectId, status: 'pending' },
+    {
+      $set: {
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        updatedAt: new Date(),
+      },
+    },
+  );
+  return result.matchedCount === 1;
+}
+
+export async function ensurePaidTransactionFulfilled(transaction: PaymentTransactionRow): Promise<PaymentTransactionRow> {
+  if (transaction.status === 'paid' && transaction.bookingId !== null) {
+    return transaction;
+  }
+  if (transaction.status !== 'paid' && transaction.status !== 'processing') {
+    return transaction;
+  }
+  const result = await applyPaymentStatusToBooking({ transaction, nextStatus: 'paid' });
+  if (result === null) {
+    return transaction;
+  }
+  const refreshed = await findPaymentTransactionById(transaction.id);
+  return refreshed ?? transaction;
+}
+
+export async function completeMockPayment(transactionId: string, visitorId: string): Promise<CompletePaymentTransactionResult | null> {
+  const transaction = await findPaymentTransactionById(transactionId, visitorId);
+  if (transaction === null) {
+    return null;
+  }
+  return applyPaymentStatusToBooking({ transaction, nextStatus: 'paid' });
+}
+
+export async function processWebhookPaymentEvent(input: {
+  readonly gatewayId: PaymentGatewayId;
+  readonly providerSessionId: string;
+  readonly status: PaymentStatus;
+  readonly raw: unknown;
+}): Promise<CompletePaymentTransactionResult | null> {
+  const { findPaymentTransactionByProviderSession } = await import('@/lib/data/payment-transactions');
+  const transaction = await findPaymentTransactionByProviderSession(input.gatewayId, input.providerSessionId);
+  if (transaction === null) {
+    return null;
+  }
+  await updatePaymentTransactionStatus({
+    transactionId: transaction.id,
+    status: input.status === 'paid' ? 'processing' : input.status,
+    rawWebhookPayload: input.raw,
+  });
+  const refreshed = await findPaymentTransactionById(transaction.id);
+  if (refreshed === null) {
+    return null;
+  }
+  return applyPaymentStatusToBooking({ transaction: refreshed, nextStatus: input.status });
+}
+
+export function resolveInitialBookingStatus(policy: PaymentPolicy): BookingDocument['status'] {
+  if (policy === 'pay_before_booking') {
+    return 'pending';
+  }
+  return 'pending';
+}

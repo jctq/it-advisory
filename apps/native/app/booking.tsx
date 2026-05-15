@@ -138,7 +138,7 @@ export default function BookingScreen() {
                 return;
               }
               router.push({
-                pathname: '/confirmation',
+                pathname: '/booking-details',
                 params: {
                   date: selectedDate,
                   time: selectedTime,
