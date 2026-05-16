@@ -502,16 +502,16 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   );
   if (!isSessionReady) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-5 md:px-6 md:py-12">
         <div className="h-2 animate-pulse rounded-full bg-muted" aria-hidden />
-        <div className="mt-10 h-8 max-w-md animate-pulse rounded-md bg-muted" aria-hidden />
-        <div className="mt-4 h-4 max-w-lg animate-pulse rounded-md bg-muted/70" aria-hidden />
+        <div className="mt-6 h-8 max-w-md animate-pulse rounded-md bg-muted md:mt-10" aria-hidden />
+        <div className="mt-3 h-4 max-w-lg animate-pulse rounded-md bg-muted/70 md:mt-4" aria-hidden />
         <p className="sr-only">Loading your diagnostic progress</p>
       </div>
     );
   }
   return (
-    <div className="mx-auto px-6 py-12">
+    <div className="mx-auto px-4 py-6 sm:px-5 md:px-6 md:py-10 lg:py-12">
       {targetSessionError !== null ? (
         <div
           className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -528,19 +528,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           </p>
         </div>
       ) : null}
-      {sessionReadOnly ? (
-        <div
-          className="mb-6 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground"
-          role="status"
-        >
-          <p className="font-medium">View only</p>
-          <p className="mt-1 text-muted-foreground">
-            This diagnostic is linked to a booking. You can review answers here; changes are not saved and you cannot
-            retake this copy.
-          </p>
-        </div>
-      ) : null}
-      <div className="mb-8 space-y-3 lg:sticky lg:top-16 lg:z-40 lg:-mx-6 lg:border-b lg:border-border lg:bg-background lg:px-6 lg:py-2 lg:shadow-md lg:backdrop-blur lg:supports-backdrop-filter:bg-background/92">
+      <div className="mb-4 space-y-2 md:mb-8 md:space-y-3 lg:sticky lg:top-16 lg:z-40 lg:-mx-6 lg:border-b lg:border-border lg:bg-background lg:px-6 lg:py-2 lg:shadow-md lg:backdrop-blur lg:supports-backdrop-filter:bg-background/92">
         {roundProgressSteps.length > 0 && !diagnosticAiEnabled ? (
           <>
             {currentRoundProgressSummary !== null ? (
@@ -642,12 +630,24 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
         )}
       </div>
       <div className="max-w-6xl mx-auto">
+        {sessionReadOnly ? (
+          <div
+            className="mb-6 rounded-lg border border-border px-4 py-3 text-sm text-white dark:text-warning-foreground bg-warning"
+            role="status"
+          >
+            <p className="font-medium">View only</p>
+            <p className="mt-1">
+              This diagnostic is linked to a booking. You can review answers here; changes are not saved and you cannot
+              retake this copy.
+            </p>
+          </div>
+        ) : null}
         {guided.outcome === null && guided.activeRound?.roundIndex === 0 ? (
           <>
-            <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            <h1 className="text-balance text-xl font-semibold tracking-tight text-foreground md:text-2xl lg:text-3xl">
               Guided diagnostic
             </h1>
-            <p className="mt-2 text-pretty text-muted-foreground">
+            <p className="mt-1.5 text-pretty text-sm text-muted-foreground md:mt-2 md:text-base">
               Tell us what is going on in plain language, then move through short multiple-choice screens until we can map
               your situation and brief your advisor.
             </p>
@@ -669,7 +669,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           onGoBack={executeGoBack}
           onGuidedChange={setGuided}
         />
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-2 md:mt-10 md:gap-3">
           <Button type="button" variant="ghost" asChild>
             <Link href="/" className="gap-1">
               <ChevronLeft className="size-4" aria-hidden />

@@ -51,11 +51,11 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 border-b border-border/80 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/75',
+        'sticky top-0 z-50 border-b border-border/80 bg-background/95 backdrop-blur-md supports-backdrop-filter:bg-background/75',
         props.className,
       )}
     >
-      <div className="mx-auto flex min-h-14 max-w-6xl items-center gap-3 px-4 py-2 sm:min-h-16 sm:gap-4 sm:px-0 lg:gap-6">
+      <div className="mx-auto flex min-h-14 max-w-6xl items-center gap-3 px-4 py-2 sm:min-h-16 sm:gap-4 md:px-4 lg:px-0 lg:gap-6">
         <Link
           href="/"
           onClick={executeHomeLogoClick}

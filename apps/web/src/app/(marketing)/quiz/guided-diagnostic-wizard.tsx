@@ -257,6 +257,24 @@ const OPTION_ACCENT_CLASS_NAMES = [
   'bg-violet-50 text-violet-600',
 ] as const;
 
+/** Mobile-first spacing and type — desktop keeps the roomier marketing layout. */
+const WIZARD_UI = {
+  sectionMt: 'mt-4 md:mt-8',
+  sectionStack: 'space-y-3 md:space-y-5',
+  questionTitle: 'text-balance text-xl font-semibold tracking-tight text-foreground md:text-2xl',
+  questionDesc: 'text-pretty text-sm leading-relaxed text-muted-foreground md:text-base',
+  hintText: 'text-xs font-medium text-muted-foreground md:text-sm',
+  optionCard:
+    'rounded-xl border bg-card p-3.5 text-left shadow-xs transition-all md:rounded-2xl md:p-5',
+  optionTitle: 'text-base font-semibold text-foreground md:text-lg',
+  optionSupporting: 'text-sm leading-5 text-muted-foreground md:leading-6',
+  panelShell: 'rounded-2xl border border-border bg-card p-4 shadow-xs md:rounded-3xl md:p-6',
+  gridGap: 'gap-2.5 md:gap-4',
+  gridGapLg: 'gap-3 md:gap-5',
+  footerMt: 'mt-6 md:mt-8',
+  selectIndicator: 'flex size-5 shrink-0 items-center justify-center rounded-md border md:size-6',
+} as const;
+
 function getDisplayOptionTitle(option: DiagnosticQuestionOption): string {
   return option.presentation.title?.trim() || option.label;
 }
@@ -336,8 +354,15 @@ function DiagnosticOptionIcon(props: {
       ? OPTION_ICON_COMPONENTS[props.iconName as keyof typeof OPTION_ICON_COMPONENTS]
       : HelpCircle;
   return (
-    <span className={cn('flex size-12 items-center justify-center rounded-full', getAccentClassName(props.optionIndex))}>
-      <IconComponent className="size-6" aria-hidden />
+    <span
+      className={cn(
+        'hidden shrink-0 items-center justify-center rounded-full md:flex',
+        'size-9 lg:size-12',
+        getAccentClassName(props.optionIndex),
+      )}
+      aria-hidden
+    >
+      <IconComponent className="size-4 lg:size-6" />
     </span>
   );
 }
@@ -358,32 +383,33 @@ function MultipleChoiceRoundRenderer(props: {
   const terminalSelectedOptionId =
     props.question.selectionMode === 'single' ? getTerminalSelectedOptionId(props.selection) : null;
   return (
-    <fieldset className="mt-8 space-y-5">
-      <legend className="text-balance text-2xl font-semibold tracking-tight text-foreground">{props.question.prompt}</legend>
+    <fieldset className={cn(WIZARD_UI.sectionMt, WIZARD_UI.sectionStack)}>
+      <legend className={WIZARD_UI.questionTitle}>{props.question.prompt}</legend>
       {props.question.description !== null ? (
-        <p className="text-pretty text-base text-muted-foreground">{props.question.description}</p>
+        <p className={WIZARD_UI.questionDesc}>{props.question.description}</p>
       ) : null}
-      <p className="text-sm font-medium text-muted-foreground">
+      <p className={WIZARD_UI.hintText}>
         {props.question.selectionMode === 'multiple'
           ? 'Select one or more options.'
           : supportsSingleSelectCascade
             ? 'Choose one path. More choices may appear after your first selection.'
             : 'Select the option that fits best.'}
       </p>
-      <div className="grid gap-4 xl:grid-cols-3 md:grid-cols-2" role="group">
+      <div className={cn('grid xl:grid-cols-3 md:grid-cols-2', WIZARD_UI.gridGap)} role="group">
         {visibleOptions.map((option, optionIndex) => {
           const isInSelectedPath = props.selection.selectedOptionIds.includes(option.id);
           const isSelected = terminalSelectedOptionId !== null ? terminalSelectedOptionId === option.id : isInSelectedPath;
           const supportingText = getDisplayOptionSupportingText(option);
           const selectedChildOptionIds = props.selection.childSelections[option.id] ?? [];
           return (
-            <div key={`${props.question.id}-${option.id}`} className="space-y-3">
+            <div key={`${props.question.id}-${option.id}`} className="space-y-2 md:space-y-3">
               <button
                 type="button"
                 onClick={() => props.onToggleOption(option.id)}
                 aria-pressed={isSelected}
                 className={cn(
-                  'flex h-full w-full flex-col rounded-2xl border bg-card p-5 text-left shadow-xs transition-all',
+                  'flex h-full w-full flex-col text-left transition-all',
+                  WIZARD_UI.optionCard,
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
                   isSelected
                     ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
@@ -392,38 +418,50 @@ function MultipleChoiceRoundRenderer(props: {
                     : 'border-border hover:border-primary/30 hover:bg-muted/30',
                 )}
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 md:gap-4">
                   <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
-                  <span
-                    className={cn(
-                      'flex size-6 shrink-0 items-center justify-center rounded-md border',
-                      isSelected
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : isInSelectedPath
-                          ? 'border-primary/50 bg-primary/10 text-primary'
-                        : 'border-border bg-background text-transparent',
-                    )}
-                    aria-hidden
-                  >
-                    {isSelected ? <Check className="size-4" /> : isInSelectedPath ? <span className="size-2 rounded-full bg-primary" /> : <Check className="size-4" />}
-                  </span>
-                </div>
-                <div className="mt-4 space-y-2">
-                  {option.presentation.eyebrow !== null ? (
-                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">{option.presentation.eyebrow}</p>
-                  ) : null}
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-foreground">{getDisplayOptionTitle(option)}</h3>
-                    {option.presentation.badgeText !== null ? (
-                      <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                        {option.presentation.badgeText}
+                  <div className="min-w-0 flex-1 space-y-1.5 md:space-y-2">
+                    {option.presentation.eyebrow !== null ? (
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-primary md:text-xs">
+                        {option.presentation.eyebrow}
+                      </p>
+                    ) : null}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2">
+                        <h3 className={WIZARD_UI.optionTitle}>{getDisplayOptionTitle(option)}</h3>
+                        {option.presentation.badgeText !== null ? (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 md:px-2 md:py-1 md:text-[11px]">
+                            {option.presentation.badgeText}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span
+                        className={cn(
+                          WIZARD_UI.selectIndicator,
+                          isSelected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : isInSelectedPath
+                              ? 'border-primary/50 bg-primary/10 text-primary'
+                            : 'border-border bg-background text-transparent',
+                        )}
+                        aria-hidden
+                      >
+                        {isSelected ? (
+                          <Check className="size-3.5 md:size-4" />
+                        ) : isInSelectedPath ? (
+                          <span className="size-1.5 rounded-full bg-primary md:size-2" />
+                        ) : (
+                          <Check className="size-3.5 md:size-4" />
+                        )}
                       </span>
+                    </div>
+                    {supportingText !== null ? (
+                      <p className={WIZARD_UI.optionSupporting}>{supportingText}</p>
                     ) : null}
                   </div>
-                  {supportingText !== null ? <p className="text-sm leading-6 text-muted-foreground">{supportingText}</p> : null}
                 </div>
                 {option.presentation.exampleBullets.length > 0 ? (
-                  <div className="mt-5 border-t border-border/70 pt-4">
+                  <div className="mt-3 border-t border-border/70 pt-3 md:mt-5 md:pt-4">
                     <p className="text-xs font-semibold text-primary">Examples:</p>
                     <ul className="mt-2 space-y-1 text-sm text-foreground">
                       {option.presentation.exampleBullets.map((exampleBullet) => (
@@ -437,8 +475,8 @@ function MultipleChoiceRoundRenderer(props: {
                 ) : null}
               </button>
               {isSelected && option.childQuestion !== null ? (
-                <fieldset className="rounded-2xl border border-border/70 bg-muted/25 p-4">
-                  <legend className="px-1 text-sm font-semibold text-foreground">{option.childQuestion.prompt}</legend>
+                <fieldset className="rounded-xl border border-border/70 bg-muted/25 p-3 md:rounded-2xl md:p-4">
+                  <legend className="px-1 text-xs font-semibold text-foreground md:text-sm">{option.childQuestion.prompt}</legend>
                   {option.childQuestion.description !== null ? (
                     <p className="text-sm text-muted-foreground">{option.childQuestion.description}</p>
                   ) : null}
@@ -451,7 +489,7 @@ function MultipleChoiceRoundRenderer(props: {
                           type="button"
                           onClick={() => props.onToggleChildOption(option.id, childOption.id)}
                           className={cn(
-                            'flex w-full items-start justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
+                            'flex w-full items-start justify-between gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors md:gap-3 md:rounded-xl md:px-4 md:py-3',
                             isChildSelected
                               ? 'border-primary bg-background ring-2 ring-primary/15'
                               : 'border-border bg-background/80 hover:border-primary/30',
@@ -540,15 +578,15 @@ function NestedOptionsRoundRenderer(props: {
           supportsSingleSelectCascade,
         });
   return (
-    <section className="mt-8 space-y-5">
+    <section className={cn(WIZARD_UI.sectionMt, WIZARD_UI.sectionStack)}>
       <div>
-        <h2 className="text-balance text-2xl font-semibold tracking-tight text-foreground">{props.question.prompt}</h2>
+        <h2 className={WIZARD_UI.questionTitle}>{props.question.prompt}</h2>
         {props.question.description !== null ? (
-          <p className="mt-2 text-pretty text-base text-muted-foreground">{props.question.description}</p>
+          <p className={cn('mt-1.5 md:mt-2', WIZARD_UI.questionDesc)}>{props.question.description}</p>
         ) : null}
       </div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.25fr)]">
-        <div className="space-y-3">
+      <div className={cn('grid xl:grid-cols-[minmax(280px,0.95fr)_minmax(0,1.25fr)]', WIZARD_UI.gridGapLg)}>
+        <div className="space-y-2 md:space-y-3">
           {visibleOptions.map((option, optionIndex) => {
             const isInSelectedPath = props.selection.selectedOptionIds.includes(option.id);
             const isSelected = terminalSelectedOptionId !== null ? terminalSelectedOptionId === option.id : isInSelectedPath;
@@ -562,7 +600,7 @@ function NestedOptionsRoundRenderer(props: {
                   setRequestedActiveOptionId(option.id);
                 }}
                 className={cn(
-                  'flex w-full items-start gap-4 rounded-2xl border bg-card px-4 py-4 text-left shadow-xs transition-all',
+                  'flex w-full items-start gap-2.5 rounded-xl border bg-card px-3 py-3 text-left shadow-xs transition-all md:gap-4 md:rounded-2xl md:px-4 md:py-4',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
                   isActive || isSelected
                     ? 'border-primary bg-primary/5 ring-2 ring-primary/15'
@@ -573,7 +611,7 @@ function NestedOptionsRoundRenderer(props: {
               >
                 <span
                   className={cn(
-                    'mt-1 flex size-6 shrink-0 items-center justify-center rounded-full border',
+                    'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border md:mt-1 md:size-6',
                     isSelected
                       ? 'border-primary bg-primary text-primary-foreground'
                       : isInSelectedPath
@@ -585,12 +623,14 @@ function NestedOptionsRoundRenderer(props: {
                   {isSelected ? <Check className="size-4" /> : isInSelectedPath ? <span className="size-2 rounded-full bg-primary" /> : <Check className="size-4" />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2 md:gap-3">
                     <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
                     <div className="min-w-0">
-                      <p className="text-lg font-semibold text-foreground">{getDisplayOptionTitle(option)}</p>
+                      <p className={WIZARD_UI.optionTitle}>{getDisplayOptionTitle(option)}</p>
                       {getDisplayOptionSupportingText(option) !== null ? (
-                        <p className="mt-1 text-sm leading-6 text-muted-foreground">{getDisplayOptionSupportingText(option)}</p>
+                        <p className={cn('mt-0.5 md:mt-1', WIZARD_UI.optionSupporting)}>
+                          {getDisplayOptionSupportingText(option)}
+                        </p>
                       ) : null}
                     </div>
                   </div>
@@ -599,36 +639,38 @@ function NestedOptionsRoundRenderer(props: {
             );
           })}
         </div>
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-xs">
+        <div className={WIZARD_UI.panelShell}>
           {activeOption === null ? (
             <div
-              className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center"
+              className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-center md:min-h-[220px] md:gap-3 md:rounded-2xl md:px-6 md:py-10"
               role="status"
               aria-live="polite"
             >
-              <p className="text-base font-medium text-foreground">Choose a category first</p>
+              <p className="text-sm font-medium text-foreground md:text-base">Choose a category first</p>
               <p className="max-w-sm text-pretty text-sm text-muted-foreground">
                 Select a category. Follow-up choices for that category will appear here.
               </p>
             </div>
           ) : (
             <>
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-2 md:gap-4">
                 <DiagnosticOptionIcon
                   iconName={activeOption.presentation.icon}
                   optionIndex={visibleOptions.findIndex((option) => option.id === activeOption.id)}
                 />
-                <div>
-                  <h3 className="text-2xl font-semibold tracking-tight text-foreground">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold tracking-tight text-foreground md:text-2xl">
                     {activeOption.presentation.panelTitle ?? getDisplayOptionTitle(activeOption)}
                   </h3>
                   {activeOption.childQuestion !== null ? (
-                    <p className="mt-2 text-sm text-muted-foreground">{activeOption.childQuestion.prompt}</p>
+                    <p className="mt-1 text-xs text-muted-foreground md:mt-2 md:text-sm">
+                      {activeOption.childQuestion.prompt}
+                    </p>
                   ) : null}
                 </div>
               </div>
               {activeOption.childQuestion !== null ? (
-                <div className="mt-6 space-y-3">
+                <div className="mt-4 space-y-2 md:mt-6 md:space-y-3">
                   {activeOption.childQuestion.options.map((childOption) => {
                     const isSelected = activeChildSelections.includes(childOption.id);
                     return (
@@ -638,7 +680,7 @@ function NestedOptionsRoundRenderer(props: {
                         disabled={!props.selection.selectedOptionIds.includes(activeOption.id)}
                         onClick={() => props.onToggleChildOption(activeOption.id, childOption.id)}
                         className={cn(
-                          'flex w-full items-start justify-between gap-3 rounded-2xl border px-4 py-4 text-left transition-all',
+                          'flex w-full items-start justify-between gap-2 rounded-lg border px-3 py-3 text-left transition-all md:gap-3 md:rounded-2xl md:px-4 md:py-4',
                           isSelected
                             ? 'border-primary bg-primary/5 ring-2 ring-primary/15'
                             : 'border-border bg-background hover:border-primary/30',
@@ -646,7 +688,7 @@ function NestedOptionsRoundRenderer(props: {
                         )}
                       >
                         <span>
-                          <span className="block text-base font-medium text-foreground">{childOption.label}</span>
+                          <span className="block text-sm font-medium text-foreground md:text-base">{childOption.label}</span>
                           {childOption.description !== null ? (
                             <span className="mt-1 block text-sm text-muted-foreground">{childOption.description}</span>
                           ) : null}
@@ -667,12 +709,12 @@ function NestedOptionsRoundRenderer(props: {
                   })}
                 </div>
               ) : (
-                <div className="mt-6 rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/20 px-3 py-4 text-sm text-muted-foreground md:mt-6 md:rounded-2xl md:px-4 md:py-6">
                   Add a follow-up question to this option in the template editor to show detailed choices here.
                 </div>
               )}
               {guidanceMessage !== null ? (
-                <div className="mt-6 rounded-2xl border border-border/70 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+                <div className="mt-4 rounded-xl border border-border/70 bg-amber-50 px-3 py-3 text-sm text-amber-900 md:mt-6 md:rounded-2xl md:px-4 md:py-4">
                   {guidanceMessage}
                 </div>
               ) : null}
@@ -700,26 +742,26 @@ function SortableRankedSelectionItem(props: {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       aria-label={`Drag to reorder ${getDisplayOptionTitle(props.option)}`}
       className={cn(
-        'cursor-grab rounded-2xl border border-border bg-background p-4 shadow-xs transition-shadow active:cursor-grabbing',
+        'cursor-grab rounded-xl border border-border bg-background p-3 shadow-xs transition-shadow active:cursor-grabbing md:rounded-2xl md:p-4',
         isDragging && 'border-primary/40 bg-primary/5 shadow-sm',
       )}
     >
-      <div className="flex items-start gap-4">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground">
+      <div className="flex items-start gap-2.5 md:gap-4">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground md:size-9 md:rounded-xl md:text-sm">
           {props.index + 1}
         </span>
         <DiagnosticOptionIcon iconName={props.option.presentation.icon} optionIndex={props.index} />
         <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-foreground">{getDisplayOptionTitle(props.option)}</p>
+          <p className={cn(WIZARD_UI.optionTitle)}>{getDisplayOptionTitle(props.option)}</p>
           {getDisplayOptionSupportingText(props.option) !== null ? (
-            <p className="mt-1 text-sm text-muted-foreground">{getDisplayOptionSupportingText(props.option)}</p>
+            <p className={cn('mt-0.5 md:mt-1', WIZARD_UI.optionSupporting)}>{getDisplayOptionSupportingText(props.option)}</p>
           ) : null}
         </div>
-        <span className="rounded-lg border border-border bg-card p-2 text-muted-foreground">
-          <ArrowUpDown className="size-4" aria-hidden />
+        <span className="hidden rounded-lg border border-border bg-card p-1.5 text-muted-foreground sm:inline-flex md:p-2">
+          <ArrowUpDown className="size-3.5 md:size-4" aria-hidden />
         </span>
       </div>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
+      <div className="mt-3 flex flex-wrap justify-end gap-2 md:mt-4">
         <Button type="button" variant="outline" size="sm" onClick={props.onRemove}>
           Remove
         </Button>
@@ -800,20 +842,20 @@ function RankedOptionsRoundRenderer(props: {
   }
 
   return (
-    <section className="mt-8 space-y-5">
+    <section className={cn(WIZARD_UI.sectionMt, WIZARD_UI.sectionStack)}>
       <div>
-        <h2 className="text-balance text-2xl font-semibold tracking-tight text-foreground">{props.question.prompt}</h2>
+        <h2 className={WIZARD_UI.questionTitle}>{props.question.prompt}</h2>
         {props.question.description !== null ? (
-          <p className="mt-2 text-pretty text-base text-muted-foreground">{props.question.description}</p>
+          <p className={cn('mt-1.5 md:mt-2', WIZARD_UI.questionDesc)}>{props.question.description}</p>
         ) : null}
-        <div className="mt-3 rounded-2xl border border-border bg-muted/25 px-4 py-3 text-sm text-foreground">
+        <div className="mt-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5 text-xs text-foreground md:mt-3 md:rounded-2xl md:px-4 md:py-3 md:text-sm">
           Drag and drop to rank your top <span className="font-semibold">{props.rankedOptionLimit}</span> outcomes.
         </div>
       </div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(320px,1fr)_minmax(0,1fr)]">
-        <div className="rounded-3xl border border-border bg-card p-5 shadow-xs">
-          <p className="text-sm font-semibold text-foreground">Choose the outcomes you want to rank</p>
-          <div className="mt-4 space-y-3">
+      <div className={cn('grid xl:grid-cols-[minmax(280px,1fr)_minmax(0,1fr)]', WIZARD_UI.gridGapLg)}>
+        <div className="rounded-2xl border border-border bg-card p-3.5 shadow-xs md:rounded-3xl md:p-5">
+          <p className="text-xs font-semibold text-foreground md:text-sm">Choose the outcomes you want to rank</p>
+          <div className="mt-3 space-y-2 md:mt-4 md:space-y-3">
             {visibleOptions.map((option, optionIndex) => {
               const selectedRankIndex = selectedRankLookup.get(option.id);
               const isSelected = selectedRankIndex !== undefined;
@@ -827,7 +869,7 @@ function RankedOptionsRoundRenderer(props: {
                 disabled={isDisabled}
                 aria-pressed={isSelected}
                 className={cn(
-                  'relative flex w-full items-start gap-4 rounded-2xl border bg-background px-4 py-4 text-left transition-all',
+                  'relative flex w-full items-start gap-2.5 rounded-xl border bg-background px-3 py-3 text-left transition-all md:gap-4 md:rounded-2xl md:px-4 md:py-4',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
                   isSelected && 'border-primary/50 bg-primary/5 shadow-xs',
                   isDisabled
@@ -840,7 +882,7 @@ function RankedOptionsRoundRenderer(props: {
                 <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-base font-semibold text-foreground">{optionIndex + 1}. {getDisplayOptionTitle(option)}</p>
+                    <p className={cn(WIZARD_UI.optionTitle)}>{optionIndex + 1}. {getDisplayOptionTitle(option)}</p>
                     {option.presentation.badgeText !== null ? (
                       <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
                         {option.presentation.badgeText}
@@ -851,20 +893,20 @@ function RankedOptionsRoundRenderer(props: {
                     <p className="mt-1 text-sm text-muted-foreground">{getDisplayOptionSupportingText(option)}</p>
                   ) : null}
                 </div>
-                {isSelected ? <Check className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden /> : null}
+                {isSelected ? <Check className="mt-0.5 size-4 shrink-0 text-primary md:size-5" aria-hidden /> : null}
               </button>
               );
             })}
           </div>
         </div>
-        <div className="rounded-3xl border border-border bg-card p-5 shadow-xs">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-foreground">Your Top Outcomes (rank {props.rankedOptionLimit})</p>
+        <div className="rounded-2xl border border-border bg-card p-3.5 shadow-xs md:rounded-3xl md:p-5">
+          <div className="flex items-center justify-between gap-2 md:gap-3">
+            <p className="text-xs font-semibold text-foreground md:text-sm">Your Top Outcomes (rank {props.rankedOptionLimit})</p>
             <p className="text-sm font-medium text-primary">
               {selectedOptionIds.length} / {props.rankedOptionLimit} selected
             </p>
           </div>
-          <div className="mt-4">
+          <div className="mt-3 md:mt-4">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={[...selectedOptionIds]} strategy={verticalListSortingStrategy}>
                 <div className="space-y-3">
@@ -881,7 +923,7 @@ function RankedOptionsRoundRenderer(props: {
                   {Array.from({ length: Math.max(props.rankedOptionLimit - selectedOptions.length, 0) }).map((_, slotIndex) => (
                     <div
                       key={`empty-slot-${slotIndex}`}
-                      className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-5 text-sm text-muted-foreground"
+                      className="rounded-xl border border-dashed border-border bg-muted/20 px-3 py-4 text-sm text-muted-foreground md:rounded-2xl md:px-4 md:py-5"
                     >
                       Slot {selectedOptions.length + slotIndex + 1} is empty.
                     </div>
@@ -1746,12 +1788,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           onClear={() => setDiagnosticDebugLog([])}
         />
         <p className="mt-2 text-pretty text-muted-foreground">
-          {sessionReadOnly ? (
-            <>
-              Review the recommendation from your saved diagnostic. This copy is linked to a booking and cannot be
-              changed here.
-            </>
-          ) : (
+          {!sessionReadOnly && (
             <>
               Here is the session we recommend from your answers. Click{' '}
               <span className="font-medium text-foreground">Book this session</span> below to reserve your consultation, or{' '}
@@ -1759,32 +1796,32 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             </>
           )}
         </p>
-        <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_minmax(0,280px)] lg:items-start">
+        <div className="mt-6 grid gap-6 md:mt-10 md:gap-10 lg:grid-cols-[1fr_minmax(0,280px)] lg:items-start">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">Intake complete</p>
-            <h2 className="mt-2 text-balance text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            <h2 className="mt-1.5 text-balance text-xl font-semibold tracking-tight text-foreground md:mt-2 md:text-2xl lg:text-3xl">
               {sessionTitle}
             </h2>
             <p className="mt-3 text-pretty text-base text-muted-foreground md:text-lg">{briefAssessment}</p>
-            <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-xs">
+            <div className="mt-5 rounded-xl border border-border bg-card p-4 shadow-xs md:mt-8 md:rounded-2xl md:p-6">
               <h3 className="text-lg font-semibold text-foreground">Your advisor summary</h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 Pulled from your diagnostic — the same summary you see at the end of this guided flow.
               </p>
               <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{advisorSummary}</p>
             </div>
-            <div className="mt-10 rounded-2xl border border-border bg-card p-6 shadow-xs">
+            <div className="mt-5 rounded-xl border border-border bg-card p-4 shadow-xs md:mt-10 md:rounded-2xl md:p-6">
               <h3 className="text-lg font-semibold text-foreground">What&apos;s included</h3>
-              <ul className="mt-5 space-y-4">
+              <ul className="mt-3 space-y-2.5 md:mt-5 md:space-y-4">
                 {PROJECT_RESCUE_WHATS_INCLUDED.map((item) => (
                   <li key={item} className="flex gap-3 text-sm text-foreground">
-                    <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                    <CheckCircle2 className="mt-0.5 hidden size-4 shrink-0 text-primary sm:block md:size-5" aria-hidden />
                     <span>{item}</span>
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="mt-10 rounded-2xl border border-dashed border-border bg-muted/30 p-6">
+            <div className="mt-5 rounded-xl border border-dashed border-border bg-muted/30 p-4 md:mt-10 md:rounded-2xl md:p-6">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Good fit if</h3>
               <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
                 {goodFitBullets.map((line, index) => (
@@ -1793,7 +1830,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               </ul>
             </div>
           </div>
-          <aside className="rounded-3xl border border-border bg-card p-6 shadow-xs lg:sticky lg:top-48">
+          <aside className="rounded-2xl border border-border bg-card p-4 shadow-xs md:rounded-3xl md:p-6 lg:sticky lg:top-48">
             <p className="text-sm font-medium text-muted-foreground">Duration</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{PROJECT_RESCUE_SESSION_DURATION}</p>
             <p className="mt-6 text-sm font-medium text-muted-foreground">Investment</p>
@@ -1930,7 +1967,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         <p
           className={cn(
             'text-sm text-muted-foreground',
-            isFirstVisibleQuestionInRound ? 'mt-4' : 'mt-2',
+            isFirstVisibleQuestionInRound ? 'mt-3 md:mt-4' : 'mt-1.5 md:mt-2',
           )}
         >
           Question {positionInRound} of {roundSize} · {activeRound.roundTitle}
@@ -1972,7 +2009,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               />
             )}
             {shouldShowDetailNoteTextbox ? (
-              <div className="mt-6">
+              <div className="mt-4 md:mt-6">
                 <label
                   htmlFor={`diagnostic-exact-answer-${question.id}`}
                   className="text-sm font-medium text-foreground"
@@ -2011,12 +2048,12 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           </p>
         ) : null}
         {isAwaitingApi ? (
-          <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground md:mt-8">
             <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
             {diagnosticAiEnabled ? 'Updating your diagnostic…' : 'Preparing your advisor summary…'}
           </div>
         ) : (
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+          <div className={cn(WIZARD_UI.footerMt, "flex flex-wrap items-center justify-between gap-3")}>
             <div>
               {canGoBack ? (
                 <Button type="button" variant="outline" onClick={executeGoBackWithScroll}>
@@ -2045,7 +2082,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           <p className="mt-2 text-pretty text-muted-foreground">
             Preparing your diagnostic template and saving your progress automatically.
           </p>
-          <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground md:mt-8">
             <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
             Opening the active template…
           </div>
@@ -2058,7 +2095,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           <p className="mt-2 text-pretty text-muted-foreground">
             Template mode is active, but there is no usable active template yet.
           </p>
-          <div className="mt-4 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          <div className="mt-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground md:mt-4 md:rounded-2xl md:px-4 md:py-3">
             Ask an admin to create and activate a diagnostic template before customers start this flow.
           </div>
         </div>
@@ -2085,7 +2122,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         )}
       </p>
       {!diagnosticAiEnabled ? (
-        <div className="mt-4 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <div className="mt-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground md:mt-4 md:rounded-2xl md:px-4 md:py-3">
           {activeTemplate !== null ? (
             <span>
               Template mode: <span className="font-medium text-foreground">{activeTemplate.name}</span>
@@ -2096,7 +2133,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           )}
         </div>
       ) : null}
-      <label htmlFor="diagnostic-prompt" className="mt-6 block text-sm font-medium text-foreground">
+        <label htmlFor="diagnostic-prompt" className="mt-4 block text-sm font-medium text-foreground md:mt-6">
         Your situation
       </label>
       <textarea
