@@ -11,13 +11,14 @@ import {
   type PaginationState,
   type SortingState,
 } from '@tanstack/react-table';
-import { AlertTriangle, CheckCircle2, PencilLine, Plus, Search, Trash2 } from 'lucide-react';
+import { CheckCircle2, PencilLine, Plus, Search, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import type { DiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
 import { cn } from '@/lib/utils';
 
@@ -75,8 +76,6 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
   const [activatingTemplateId, setActivatingTemplateId] = useState<string | null>(null);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   const [newTemplateName, setNewTemplateName] = useState<string>('');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [templateSearchValue, setTemplateSearchValue] = useState<string>('');
   const [templateTablePagination, setTemplateTablePagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -109,8 +108,6 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
 
   async function executeCreateTemplate(templateName?: string): Promise<void> {
     setIsCreating(true);
-    setStatusMessage(null);
-    setErrorMessage(null);
     try {
       const trimmedTemplateName = templateName?.trim() ?? '';
       const response = await fetch(DIAGNOSTIC_TEMPLATES_API_URL, {
@@ -126,7 +123,7 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
       setIsCreateFormOpen(false);
       router.push(`/admin/diagnostic-templates/${data.template.id}`);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to create diagnostic template.');
+      notifyError(error instanceof Error ? error.message : 'Failed to create diagnostic template.');
     } finally {
       setIsCreating(false);
     }
@@ -134,8 +131,6 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
 
   const executeActivateTemplate = useCallback(async (templateId: string): Promise<void> => {
     setActivatingTemplateId(templateId);
-    setStatusMessage(null);
-    setErrorMessage(null);
     try {
       const response = await fetch(`${DIAGNOSTIC_TEMPLATES_API_URL}/${templateId}/activate`, {
         method: 'POST',
@@ -154,9 +149,9 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
               },
         ),
       );
-      setStatusMessage(`"${data.template.name}" is now active for customer-facing diagnostics.`);
+      notifySuccess(`"${data.template.name}" is now active for customer-facing diagnostics.`);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to activate diagnostic template.');
+      notifyError(error instanceof Error ? error.message : 'Failed to activate diagnostic template.');
     } finally {
       setActivatingTemplateId(null);
     }
@@ -172,8 +167,6 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
       return;
     }
     setDeletingTemplateId(templateId);
-    setStatusMessage(null);
-    setErrorMessage(null);
     try {
       const response = await fetch(`${DIAGNOSTIC_TEMPLATES_API_URL}/${templateId}`, {
         method: 'DELETE',
@@ -183,9 +176,9 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
         throw new Error(data.details ?? data.error ?? 'Failed to delete diagnostic template.');
       }
       setTemplates((previous) => previous.filter((template) => template.id !== templateId));
-      setStatusMessage('Template deleted.');
+      notifySuccess('Template deleted.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to delete diagnostic template.');
+      notifyError(error instanceof Error ? error.message : 'Failed to delete diagnostic template.');
     } finally {
       setDeletingTemplateId(null);
     }
@@ -331,18 +324,6 @@ export function DiagnosticTemplatesList(props: DiagnosticTemplatesListProps): Re
           </Button>
         }
       />
-      {errorMessage !== null ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <p>{errorMessage}</p>
-        </div>
-      ) : null}
-      {statusMessage !== null ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-          <p>{statusMessage}</p>
-        </div>
-      ) : null}
       <section>
         <div className="flex flex-col gap-4 border-b border-border pb-4">
           <div className="relative">

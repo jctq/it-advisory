@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
+import { notifyError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 
 function resolveMarketingClientApiBaseUrl(): string {
@@ -85,7 +86,6 @@ export function GuestBookingManageFlow(): ReactElement {
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfigPublic | null>(null);
   const [selectedGatewayId, setSelectedGatewayId] = useState<PaymentGatewayId | null>(null);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAccountBootstrapLoading, setIsAccountBootstrapLoading] = useState(false);
   const paymentCancelled = searchParams.get('payment') === 'cancelled';
@@ -111,7 +111,6 @@ export function GuestBookingManageFlow(): ReactElement {
     }
     hasAttemptedAccountBookingBootstrapRef.current = true;
     setIsAccountBootstrapLoading(true);
-    setErrorMessage(null);
     void lookupAccountManagedBooking({
       apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
       bookingId: bookingIdFromQuery,
@@ -122,7 +121,7 @@ export function GuestBookingManageFlow(): ReactElement {
         setPhase('result');
       })
       .catch((error: unknown) => {
-        setErrorMessage(error instanceof Error ? error.message : 'Booking lookup failed.');
+        notifyError(error instanceof Error ? error.message : 'Booking lookup failed.');
       })
       .finally(() => {
         setIsAccountBootstrapLoading(false);
@@ -160,7 +159,6 @@ export function GuestBookingManageFlow(): ReactElement {
   const executeLookup = useCallback(
     async (event: FormEvent<HTMLFormElement>): Promise<void> => {
       event.preventDefault();
-      setErrorMessage(null);
       setIsSubmitting(true);
       const nextCredentials: GuestBookingManageCredentials = {
         bookingReference: bookingReference.trim(),
@@ -176,7 +174,7 @@ export function GuestBookingManageFlow(): ReactElement {
         setBooking(result);
         setPhase('result');
       } catch (error: unknown) {
-        setErrorMessage(error instanceof Error ? error.message : 'Lookup failed.');
+        notifyError(error instanceof Error ? error.message : 'Lookup failed.');
       } finally {
         setIsSubmitting(false);
       }
@@ -187,7 +185,6 @@ export function GuestBookingManageFlow(): ReactElement {
     if (manageContext === null || booking === null || selectedGatewayId === null || selectedPaymentMethodId === null) {
       return;
     }
-    setErrorMessage(null);
     setIsSubmitting(true);
     setPhase('paying');
     try {
@@ -219,10 +216,10 @@ export function GuestBookingManageFlow(): ReactElement {
         );
         return;
       }
-      setErrorMessage('Payment could not be started. Try again or contact support.');
+      notifyError('Payment could not be started. Try again or contact support.');
       setPhase('result');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Payment failed.');
+      notifyError(error instanceof Error ? error.message : 'Payment failed.');
       setPhase('result');
     } finally {
       setIsSubmitting(false);
@@ -232,7 +229,6 @@ export function GuestBookingManageFlow(): ReactElement {
     setPhase('lookup');
     setBooking(null);
     setManageContext(null);
-    setErrorMessage(null);
   };
   if (isAccountBootstrapLoading) {
     return (
@@ -249,7 +245,6 @@ export function GuestBookingManageFlow(): ReactElement {
         bookingReference={bookingReference}
         email={email}
         phoneLastFour={phoneLastFour}
-        errorMessage={errorMessage}
         paymentCancelled={paymentCancelled}
         isSubmitting={isSubmitting}
         onBookingReferenceChange={setBookingReference}
@@ -265,7 +260,6 @@ export function GuestBookingManageFlow(): ReactElement {
     <ResultView
       booking={booking}
       slotDisplay={slotDisplay}
-      errorMessage={errorMessage}
       isSubmitting={isSubmitting}
       phase={phase}
       showPaymentSection={showPaymentSection}
@@ -291,7 +285,6 @@ type LookupFormProps = {
   readonly bookingReference: string;
   readonly email: string;
   readonly phoneLastFour: string;
-  readonly errorMessage: string | null;
   readonly paymentCancelled: boolean;
   readonly isSubmitting: boolean;
   readonly onBookingReferenceChange: (value: string) => void;
@@ -342,11 +335,6 @@ function LookupForm(props: LookupFormProps): ReactElement {
         maxLength={4}
         className="font-mono tracking-widest"
       />
-      {props.errorMessage !== null ? (
-        <p className="text-sm text-destructive" role="alert">
-          {props.errorMessage}
-        </p>
-      ) : null}
       <Button type="submit" size="lg" className="w-full gap-2" disabled={props.isSubmitting}>
         {props.isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Search className="size-4" aria-hidden />}
         Find my booking
@@ -398,7 +386,6 @@ function ManageField(props: ManageFieldProps): ReactElement {
 type ResultViewProps = {
   readonly booking: GuestBookingManageView;
   readonly slotDisplay: { readonly date: string; readonly time: string };
-  readonly errorMessage: string | null;
   readonly isSubmitting: boolean;
   readonly phase: ManagePhase;
   readonly showPaymentSection: boolean;
@@ -556,11 +543,6 @@ function ResultView(props: ResultViewProps): ReactElement {
                 ))}
               </div>
             </fieldset>
-          ) : null}
-          {props.errorMessage !== null ? (
-            <p className="text-sm text-destructive" role="alert">
-              {props.errorMessage}
-            </p>
           ) : null}
           <Button
             type="button"

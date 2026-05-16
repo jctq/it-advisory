@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { isPlausibleMarketingQuizSessionRef } from '@/lib/marketing/quiz-session-marketing-ref';
+import { notifyError } from '@/lib/notify';
 
 const BOOKINGS_API_URL = '/api/bookings';
 
@@ -86,6 +87,7 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
             typeof (payload as { error?: unknown }).error === 'string'
               ? (payload as { error: string }).error
               : `Booking could not be saved (${response.status}).`;
+          notifyError(message);
           setErrorMessage(message);
           setStatus('error');
           return;
@@ -94,6 +96,7 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
         void router.refresh();
         setStatus('success');
       } catch {
+        notifyError('Network error while saving your booking. Check your connection and try again.');
         setErrorMessage('Network error while saving your booking. Check your connection and try again.');
         setStatus('error');
       }

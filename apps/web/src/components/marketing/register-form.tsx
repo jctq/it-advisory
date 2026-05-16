@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState, type FormEvent, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { notifyError } from '@/lib/notify';
 
 type RegisterFormProps = {
   readonly nextPath: string;
@@ -18,12 +19,10 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [mergeGuestProgress, setMergeGuestProgress] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const executeSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>): Promise<void> => {
       event.preventDefault();
-      setErrorMessage(null);
       setIsSubmitting(true);
       try {
         const response = await fetch('/api/auth/register', {
@@ -37,7 +36,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
             typeof payload === 'object' && payload !== null && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
               ? (payload as { error: string }).error
               : 'Registration failed.';
-          setErrorMessage(message);
+          notifyError(message);
           return;
         }
         router.push(props.nextPath);
@@ -63,7 +62,6 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          aria-invalid={errorMessage !== null}
         />
       </div>
       <div className="space-y-2">
@@ -79,7 +77,6 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
           minLength={8}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          aria-invalid={errorMessage !== null}
         />
         <p className="text-xs text-muted-foreground">Use at least 8 characters.</p>
       </div>
@@ -92,11 +89,6 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
         />
         <span>Move diagnostic and booking activity from this browser onto my new account.</span>
       </label>
-      {errorMessage !== null ? (
-        <p className="text-sm text-destructive" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? 'Creating account…' : 'Create account'}
       </Button>

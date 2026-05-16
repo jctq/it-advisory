@@ -10,7 +10,6 @@ type AdminFormStickyFooterProps = {
   readonly saveLabel: string;
   readonly isSaving: boolean;
   readonly isDisabled: boolean;
-  readonly statusMessage: string | null;
   readonly onSave: () => void;
   readonly resetLabel?: string;
   readonly onReset?: () => void;
@@ -27,13 +26,8 @@ export function AdminFormStickyFooter(props: AdminFormStickyFooterProps): ReactE
       )}
     >
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1">
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{props.hint}</p>
-          {props.statusMessage !== null ? (
-            <p className="text-sm font-medium text-foreground" role="status">
-              {props.statusMessage}
-            </p>
-          ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {props.onReset !== undefined && props.resetLabel !== undefined ? (

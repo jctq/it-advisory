@@ -28,6 +28,7 @@ import type {
   DiagnosticTemplateValue,
 } from '@/lib/diagnostic-template-types';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 
 type DiagnosticTemplatesManagerProps = {
@@ -786,8 +787,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
   const [activatingTemplateId, setActivatingTemplateId] = useState<string | null>(null);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   const [newTemplateName, setNewTemplateName] = useState<string>('');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [templateSearchValue, setTemplateSearchValue] = useState<string>('');
   const [templateTablePagination, setTemplateTablePagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -836,8 +835,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
 
   const executeSelectTemplate = useCallback((templateId: string): void => {
     setSelectedTemplateId(templateId);
-    setStatusMessage(null);
-    setErrorMessage(null);
   }, []);
 
   function executeScrollToTemplateSection(sectionId: string): void {
@@ -944,8 +941,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
   function executeOpenCreateForm(): void {
     setIsCreateFormOpen(true);
     setNewTemplateName('');
-    setStatusMessage(null);
-    setErrorMessage(null);
   }
 
   function updateSelectedTemplate(
@@ -958,14 +953,10 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
     const updatedTemplate = updater(selectedTemplate);
     const nextTemplate = options.shouldReindex === false ? updatedTemplate : reindexTemplate(updatedTemplate);
     replaceTemplateInState(nextTemplate);
-    setStatusMessage(null);
-    setErrorMessage(null);
   }
 
   async function executeCreateTemplate(templateName?: string): Promise<void> {
     setIsCreating(true);
-    setStatusMessage(null);
-    setErrorMessage(null);
     try {
       const trimmedTemplateName = templateName?.trim() ?? '';
       const response = await fetch(DIAGNOSTIC_TEMPLATES_API_URL, {
@@ -986,9 +977,9 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       setTemplateSearchValue('');
       setNewTemplateName('');
       setIsCreateFormOpen(false);
-      setStatusMessage('New template created.');
+      notifySuccess('New template created.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to create diagnostic template.');
+      notifyError(error instanceof Error ? error.message : 'Failed to create diagnostic template.');
     } finally {
       setIsCreating(false);
     }
@@ -999,8 +990,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       return;
     }
     setIsSaving(true);
-    setStatusMessage(null);
-    setErrorMessage(null);
     try {
       const response = await fetch(`${DIAGNOSTIC_TEMPLATES_API_URL}/${selectedTemplate.id}`, {
         method: 'PATCH',
@@ -1017,9 +1006,9 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
         ...previous,
         [savedTemplate.id]: buildTemplatePatchBody(savedTemplate),
       }));
-      setStatusMessage('Template saved.');
+      notifySuccess('Template saved.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to save diagnostic template.');
+      notifyError(error instanceof Error ? error.message : 'Failed to save diagnostic template.');
     } finally {
       setIsSaving(false);
     }
@@ -1027,8 +1016,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
 
   const executeActivateTemplate = useCallback(async (templateId: string): Promise<void> => {
     setActivatingTemplateId(templateId);
-    setStatusMessage(null);
-    setErrorMessage(null);
     try {
       const response = await fetch(`${DIAGNOSTIC_TEMPLATES_API_URL}/${templateId}/activate`, {
         method: 'POST',
@@ -1047,9 +1034,9 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
               },
         ),
       );
-      setStatusMessage(`"${data.template.name}" is now active for customer-facing diagnostics.`);
+      notifySuccess(`"${data.template.name}" is now active for customer-facing diagnostics.`);
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to activate diagnostic template.');
+      notifyError(error instanceof Error ? error.message : 'Failed to activate diagnostic template.');
     } finally {
       setActivatingTemplateId(null);
     }
@@ -1065,8 +1052,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       return;
     }
     setDeletingTemplateId(templateId);
-    setStatusMessage(null);
-    setErrorMessage(null);
     try {
       const response = await fetch(`${DIAGNOSTIC_TEMPLATES_API_URL}/${templateId}`, {
         method: 'DELETE',
@@ -1087,12 +1072,12 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
         }
         return remainingTemplates[0]?.id ?? null;
       });
-      setStatusMessage('Template deleted.');
+      notifySuccess('Template deleted.');
       if (isEditorMode) {
         router.push(listHref);
       }
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to delete diagnostic template.');
+      notifyError(error instanceof Error ? error.message : 'Failed to delete diagnostic template.');
     } finally {
       setDeletingTemplateId(null);
     }
@@ -2112,18 +2097,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
           )
         }
       />
-      {errorMessage !== null ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <p>{errorMessage}</p>
-        </div>
-      ) : null}
-      {statusMessage !== null ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-          <p>{statusMessage}</p>
-        </div>
-      ) : null}
       <div className={cn('grid gap-6', isEditorMode ? 'grid-cols-1' : 'xl:grid-cols-[320px_minmax(0,1fr)]')}>
         {!isEditorMode ? (
           <section className="rounded-3xl border border-border bg-card p-4 shadow-xs">

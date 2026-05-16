@@ -50,6 +50,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 
@@ -280,12 +281,11 @@ export function AdminAdvisorScheduleManager(): ReactElement {
   const [lastSavedSettings, setLastSavedSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState<number>(0);
   const executeRetryLoad = useCallback((): void => {
     setIsLoading(true);
-    setErrorMessage(null);
+    setLoadErrorMessage(null);
     setRetryToken((previous) => previous + 1);
   }, []);
   useEffect(() => {
@@ -310,7 +310,8 @@ export function AdminAdvisorScheduleManager(): ReactElement {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load schedule.');
+          setLoadErrorMessage(error instanceof Error ? error.message : 'Failed to load schedule.');
+          notifyError(error instanceof Error ? error.message : 'Failed to load schedule.');
         }
       })
       .finally(() => {
@@ -398,8 +399,6 @@ export function AdminAdvisorScheduleManager(): ReactElement {
     if (settings === null) {
       return;
     }
-    setStatusMessage(null);
-    setErrorMessage(null);
     setIsSaving(true);
     try {
       const response = await fetch(BOOKING_SCHEDULE_API_URL, {
@@ -427,9 +426,9 @@ export function AdminAdvisorScheduleManager(): ReactElement {
       const cloned = cloneSettings(data.settings);
       setSettings(cloned);
       setLastSavedSettings(cloneSettings(data.settings));
-      setStatusMessage('Saved.');
+      notifySuccess('Your booking schedule is published to the API.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Save failed.');
+      notifyError(error instanceof Error ? error.message : 'Save failed.');
     } finally {
       setIsSaving(false);
     }
@@ -439,8 +438,6 @@ export function AdminAdvisorScheduleManager(): ReactElement {
       return;
     }
     setSettings(cloneSettings(lastSavedSettings));
-    setStatusMessage(null);
-    setErrorMessage(null);
   }, [lastSavedSettings]);
   const hasScheduleChanges: boolean = useMemo(() => {
     if (settings === null || lastSavedSettings === null) {
@@ -461,30 +458,10 @@ export function AdminAdvisorScheduleManager(): ReactElement {
       />
       {isLoading ? <SchedulePageSkeleton /> : null}
       {!isLoading && settings === null ? (
-        <ScheduleLoadFailurePanel errorMessage={errorMessage} onRetry={executeRetryLoad} />
+        <ScheduleLoadFailurePanel errorMessage={loadErrorMessage} onRetry={executeRetryLoad} />
       ) : null}
       {!isLoading && settings !== null ? (
         <div className="space-y-6">
-          {errorMessage !== null ? (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertTitle>Save failed</AlertTitle>
-              <AlertDescription>{errorMessage}</AlertDescription>
-            </Alert>
-          ) : null}
-          {statusMessage !== null ? (
-            <Alert
-              role="status"
-              aria-live="polite"
-              className="border-emerald-500/35 bg-emerald-500/8 text-emerald-950 dark:text-emerald-100 [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-400"
-            >
-              <CheckCircle2 aria-hidden />
-              <AlertTitle>Saved</AlertTitle>
-              <AlertDescription>
-                {statusMessage === 'Saved.' ? 'Your booking schedule is published to the API.' : statusMessage}
-              </AlertDescription>
-            </Alert>
-          ) : null}
           <Tabs defaultValue="hours-grid" className="w-full">
             <TabsList
               aria-label="Schedule sections"

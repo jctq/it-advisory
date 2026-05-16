@@ -19,7 +19,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { notifyActionResult, notifyError, notifySuccess } from '@/lib/notify';
 
 const MEETING_SETTINGS_API_URL: string = buildApiUrl('/api/admin/meeting-settings');
 
@@ -148,18 +150,22 @@ function SettingsCard(props: {
   readonly icon: ReactElement;
   readonly title: string;
   readonly description: string;
+  readonly actions?: ReactNode;
   readonly children: ReactNode;
 }): ReactElement {
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-xs">
-      <div className="flex gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground">
-          {props.icon}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground">
+            {props.icon}
+          </div>
+          <div className="min-w-0 space-y-1">
+            <h2 className="text-base font-semibold text-foreground">{props.title}</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">{props.description}</p>
+          </div>
         </div>
-        <div className="min-w-0 space-y-1">
-          <h2 className="text-base font-semibold text-foreground">{props.title}</h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">{props.description}</p>
-        </div>
+        {props.actions !== undefined ? <div className="flex shrink-0 items-start gap-2">{props.actions}</div> : null}
       </div>
       {props.children}
     </section>
@@ -170,8 +176,6 @@ export type AdminMeetingSettingsFormState = {
   readonly isDirty: boolean;
   readonly isSaving: boolean;
   readonly isLoading: boolean;
-  readonly statusMessage: string | null;
-  readonly errorMessage: string | null;
 };
 
 export type AdminMeetingSettingsFormHandle = {
@@ -194,8 +198,6 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [testingProviderId, setTestingProviderId] = useState<VideoMeetingProviderId | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const onStateChangeRef = useRef(props.onStateChange);
   useEffect(() => {
     onStateChangeRef.current = props.onStateChange;
@@ -222,7 +224,7 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load meeting settings.');
+          notifyError(error instanceof Error ? error.message : 'Failed to load meeting settings.');
         }
       })
       .finally(() => {
@@ -238,8 +240,6 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
     if (settings === null) {
       return;
     }
-    setStatusMessage(null);
-    setErrorMessage(null);
     setIsSaving(true);
     try {
       const providerCredentials: Partial<Record<VideoMeetingProviderId, Record<string, string> | null>> = {};
@@ -275,16 +275,15 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
       setSavedSnapshot(data);
       setCredentialDrafts({});
       setClearProviders({});
-      setStatusMessage('Meeting settings saved.');
+      notifySuccess('Meeting settings saved.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Save failed.');
+      notifyError(error instanceof Error ? error.message : 'Save failed.');
     } finally {
       setIsSaving(false);
     }
   }, [clearProviders, credentialDrafts, settings]);
   const executeTestProvider = useCallback(async (providerId: VideoMeetingProviderId): Promise<void> => {
     setTestingProviderId(providerId);
-    setErrorMessage(null);
     try {
       const response = await fetch(MEETING_SETTINGS_API_URL, {
         method: 'PATCH',
@@ -295,9 +294,9 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
       if (!response.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Test failed');
       }
-      setStatusMessage(data.message ?? (data.ok ? 'Connection OK.' : 'Test failed.'));
+      notifyActionResult(data.ok === true, data.message ?? 'Connection OK.', data.message ?? 'Test failed.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Test failed.');
+      notifyError(error instanceof Error ? error.message : 'Test failed.');
     } finally {
       setTestingProviderId(null);
     }
@@ -309,8 +308,6 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
     setSettings(savedSnapshot);
     setCredentialDrafts({});
     setClearProviders({});
-    setStatusMessage(null);
-    setErrorMessage(null);
   }, [savedSnapshot]);
   useImperativeHandle(
     props.formRef,
@@ -325,20 +322,13 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
       isDirty,
       isSaving,
       isLoading,
-      statusMessage,
-      errorMessage,
     });
-  }, [errorMessage, isDirty, isLoading, isSaving, statusMessage]);
+  }, [isDirty, isLoading, isSaving]);
   if (isLoading || settings === null) {
     return <p className="text-sm text-muted-foreground">Loading meeting settings…</p>;
   }
   return (
     <div className="space-y-6">
-      {errorMessage !== null ? (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
       {!settings.canStoreCredentials ? (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
           Set <code className="font-mono text-xs">MEETINGS_CREDENTIALS_MASTER_KEY</code> (min 32 characters) on the server before
@@ -384,28 +374,28 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
         description="Choose how confirmed bookings get a join URL. Only the active provider is used when creating meetings."
       >
         <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold text-foreground">Active provider</legend>
-          <div className="space-y-2">
+          <legend className="text-sm font-medium text-foreground">Active provider</legend>
+          <div className="grid gap-3 lg:grid-cols-2">
             {ACTIVE_OPTIONS.map((option) => (
               <label
                 key={option.value}
-                className="flex cursor-pointer gap-3 rounded-xl border border-border p-3 hover:border-primary/30"
+                className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4 has-checked:border-primary/50 has-checked:bg-primary/5"
               >
                 <input
                   type="radio"
-                  name="meeting-active-provider"
+                  name="meetingActiveProvider"
                   checked={settings.activeProvider === option.value}
                   onChange={() => {
                     setSettings((previous) =>
                       previous === null ? previous : { ...previous, activeProvider: option.value },
                     );
                   }}
-                  className="mt-1 size-4 accent-primary"
+                  className="mt-1"
                 />
-                <span>
-                  <span className="block text-sm font-medium text-foreground">{option.title}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">{option.description}</span>
-                </span>
+                <div>
+                  <p className="text-sm font-medium text-foreground">{option.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{option.description}</p>
+                </div>
               </label>
             ))}
           </div>
@@ -419,20 +409,57 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
         const copy = PROVIDER_CARD_COPY[providerId];
         const fields = PROVIDER_FIELD_DEFS[providerId];
         const secretKeys = new Set(['clientSecret', 'refreshToken']);
+        const willClear = clearProviders[providerId] === true;
+        const canTestConnection = !willClear && row.configured;
         return (
           <SettingsCard
             key={providerId}
             icon={<Video className="size-5" aria-hidden />}
             title={copy.title}
             description={copy.description}
+            actions={
+              <>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  className={getAdminPrimaryActionButtonClass('w-33')}
+                  disabled={!canTestConnection || testingProviderId !== null}
+                  onClick={() => void executeTestProvider(providerId)}
+                >
+                  {testingProviderId === providerId ? 'Testing…' : 'Test connection'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  className={getAdminPrimaryActionButtonClass('w-40')}
+                  disabled={!row.configured && !willClear}
+                  onClick={() => {
+                    setClearProviders((previous) => ({ ...previous, [providerId]: !willClear }));
+                    setCredentialDrafts((previous) => {
+                      const next = { ...previous };
+                      delete next[providerId];
+                      return next;
+                    });
+                  }}
+                >
+                  {willClear ? 'Undo clear' : 'Clear credentials'}
+                </Button>
+              </>
+            }
           >
             <div className="space-y-3">
               {row.configured && row.credentialHint !== null ? (
                 <p className="text-xs text-muted-foreground">
-                  Saved credential hint: <span className="font-mono">{row.credentialHint}</span>
+                  Stored credentials: <span className="font-mono text-foreground">{row.credentialHint}</span>
                 </p>
               ) : null}
-              {fields.map((field) => (
+              {willClear ? (
+                <p className="text-xs text-amber-700 dark:text-amber-400">Marked for removal on save.</p>
+              ) : null}
+              {!willClear
+                ? fields.map((field) => (
                 <div key={field.key} className="space-y-1.5">
                   <Label
                     htmlFor={`${providerId}-${field.key}`}
@@ -458,29 +485,8 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
                     }}
                   />
                 </div>
-              ))}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={testingProviderId !== null}
-                  onClick={() => void executeTestProvider(providerId)}
-                >
-                  {testingProviderId === providerId ? 'Testing…' : `Test ${row.label} connection`}
-                </Button>
-                {row.configured ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setClearProviders((previous) => ({ ...previous, [providerId]: true }));
-                      setCredentialDrafts((previous) => ({ ...previous, [providerId]: {} }));
-                    }}
-                  >
-                    Clear saved {row.label} keys
-                  </Button>
-                ) : null}
-              </div>
+                  ))
+                : null}
             </div>
           </SettingsCard>
         );

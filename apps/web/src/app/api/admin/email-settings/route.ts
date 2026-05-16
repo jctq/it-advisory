@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { TRANSACTIONAL_EMAIL_PROVIDER_IDS, type TransactionalEmailProviderId } from '@/domain/email-types';
 import {
+  EmailSettingsCredentialValidationError,
   executeTransactionalEmailProviderConnectionTest,
   getEmailSettingsAdminView,
   updateEmailSettings,
@@ -72,6 +73,9 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     return NextResponse.json(updated);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
+    if (error instanceof EmailSettingsCredentialValidationError) {
+      return NextResponse.json({ error: 'Invalid email credentials.', details: message }, { status: 400 });
+    }
     return NextResponse.json({ error: 'Failed to save email settings.', details: message }, { status: 500 });
   }
 }

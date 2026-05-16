@@ -8,6 +8,7 @@ import {
   buildPhilippineMobileE164FromNationalDigits,
   normalizePhilippineMobileNationalDigits,
 } from '@/lib/marketing/philippine-profile-phone';
+import { notifyError, notifySuccess } from '@/lib/notify';
 
 type AccountProfileFormInitial = {
   readonly email: string;
@@ -54,9 +55,7 @@ export function AccountProfileForm(props: AccountProfileFormProps): ReactElement
   const [fullName, setFullName] = useState<string>(props.initial.fullName);
   const [company, setCompany] = useState<string>(props.initial.company);
   const [phoneNationalDigits, setPhoneNationalDigits] = useState<string>(props.initial.phoneNationalDigits);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const executePhoneNationalChange = useCallback((raw: string): void => {
     setPhoneNationalDigits(normalizePhilippineMobileNationalDigits(raw));
@@ -64,9 +63,7 @@ export function AccountProfileForm(props: AccountProfileFormProps): ReactElement
   const executeSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>): Promise<void> => {
       event.preventDefault();
-      setErrorMessage(null);
       setFieldErrors({});
-      setSuccessMessage(null);
       const phoneE164 = buildPhilippineMobileE164FromNationalDigits(phoneNationalDigits);
       if (phoneE164 === null) {
         setFieldErrors({ phone: ['Enter a 10-digit Philippine mobile number after +63 (starts with 9).'] });
@@ -93,10 +90,10 @@ export function AccountProfileForm(props: AccountProfileFormProps): ReactElement
             typeof payload === 'object' && payload !== null && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
               ? (payload as { error: string }).error
               : 'Could not save your profile.';
-          setErrorMessage(message);
+          notifyError(message);
           return;
         }
-        setSuccessMessage('Profile saved.');
+        notifySuccess('Profile saved.');
         router.refresh();
       } finally {
         setIsSubmitting(false);
@@ -192,16 +189,6 @@ export function AccountProfileForm(props: AccountProfileFormProps): ReactElement
             </p>
           ) : null}
         </div>
-        {errorMessage !== null ? (
-          <p className="text-sm text-destructive" role="alert">
-            {errorMessage}
-          </p>
-        ) : null}
-        {successMessage !== null ? (
-          <p className="text-sm text-primary" role="status">
-            {successMessage}
-          </p>
-        ) : null}
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Saving…' : 'Save profile'}
         </Button>

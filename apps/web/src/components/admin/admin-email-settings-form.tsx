@@ -7,6 +7,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type FocusEvent,
   type ReactElement,
   type ReactNode,
   type Ref,
@@ -14,7 +15,9 @@ import {
 import type { TransactionalEmailActiveProvider, TransactionalEmailProviderId } from '@/domain/email-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { notifyActionResult, notifyError, notifySuccess } from '@/lib/notify';
 
 const EMAIL_SETTINGS_API_URL: string = buildApiUrl('/api/admin/email-settings');
 
@@ -35,20 +38,29 @@ type SettingsPayload = {
   readonly envResendFallbackAvailable: boolean;
 };
 
-const CREDENTIAL_FIELDS: Record<TransactionalEmailProviderId, readonly { readonly key: string; readonly label: string }[]> = {
+const EMAIL_CREDENTIAL_SECRET_KEYS = new Set(['apiKey', 'serverToken']);
+
+const CREDENTIAL_FIELDS: Record<
+  TransactionalEmailProviderId,
+  readonly { readonly key: string; readonly label: string; readonly autoComplete: string }[]
+> = {
   resend: [
-    { key: 'apiKey', label: 'API key' },
-    { key: 'from', label: 'From address' },
+    { key: 'apiKey', label: 'API key', autoComplete: 'new-password' },
+    { key: 'from', label: 'From address', autoComplete: 'off' },
   ],
   postmark: [
-    { key: 'serverToken', label: 'Server API token' },
-    { key: 'from', label: 'From address' },
+    { key: 'serverToken', label: 'Server API token', autoComplete: 'new-password' },
+    { key: 'from', label: 'From address', autoComplete: 'off' },
   ],
   sendgrid: [
-    { key: 'apiKey', label: 'API key' },
-    { key: 'from', label: 'From address' },
+    { key: 'apiKey', label: 'API key', autoComplete: 'new-password' },
+    { key: 'from', label: 'From address', autoComplete: 'off' },
   ],
 };
+
+function enableCredentialInput(event: FocusEvent<HTMLInputElement>): void {
+  event.currentTarget.removeAttribute('readonly');
+}
 
 const ACTIVE_OPTIONS: readonly {
   readonly value: TransactionalEmailActiveProvider;
@@ -112,8 +124,6 @@ export type AdminEmailSettingsFormState = {
   readonly isDirty: boolean;
   readonly isSaving: boolean;
   readonly isLoading: boolean;
-  readonly statusMessage: string | null;
-  readonly errorMessage: string | null;
 };
 
 export type AdminEmailSettingsFormHandle = {
@@ -136,8 +146,6 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [testingProviderId, setTestingProviderId] = useState<TransactionalEmailProviderId | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const onStateChangeRef = useRef(props.onStateChange);
   useEffect(() => {
     onStateChangeRef.current = props.onStateChange;
@@ -164,7 +172,7 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load email settings.');
+          notifyError(error instanceof Error ? error.message : 'Failed to load email settings.');
         }
       })
       .finally(() => {
@@ -177,11 +185,12 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
     };
   }, []);
   const executeSave = useCallback(async (): Promise<void> => {
-    if (settings === null) {
+    if (settings === null || savedSnapshot === null) {
       return;
     }
-    setStatusMessage(null);
-    setErrorMessage(null);
+    if (areEmailSettingsEqual(settings, savedSnapshot, credentialDrafts, clearFlags)) {
+      return;
+    }
     setIsSaving(true);
     try {
       const providerCredentials: Partial<Record<TransactionalEmailProviderId, Record<string, string> | null>> = {};
@@ -190,8 +199,13 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
           providerCredentials[providerId] = null;
         } else {
           const draft = credentialDrafts[providerId];
-          if (draft !== undefined && Object.values(draft).some((v) => v.trim().length > 0)) {
-            providerCredentials[providerId] = draft;
+          if (draft !== undefined) {
+            const filledEntries = Object.entries(draft).filter(([, value]) => value.trim().length > 0);
+            if (filledEntries.length > 0) {
+              providerCredentials[providerId] = Object.fromEntries(
+                filledEntries.map(([key, value]) => [key, value.trim()]),
+              );
+            }
           }
         }
       }
@@ -213,16 +227,15 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
       setSavedSnapshot(data);
       setCredentialDrafts({});
       setClearFlags({});
-      setStatusMessage('Email settings saved.');
+      notifySuccess('Email settings saved.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Save failed.');
+      notifyError(error instanceof Error ? error.message : 'Save failed.');
     } finally {
       setIsSaving(false);
     }
-  }, [clearFlags, credentialDrafts, settings]);
+  }, [clearFlags, credentialDrafts, savedSnapshot, settings]);
   const executeTestProvider = useCallback(async (providerId: TransactionalEmailProviderId): Promise<void> => {
     setTestingProviderId(providerId);
-    setErrorMessage(null);
     try {
       const response = await fetch(EMAIL_SETTINGS_API_URL, {
         method: 'PATCH',
@@ -233,9 +246,13 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
       if (!response.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Test failed');
       }
-      setStatusMessage(data.message ?? (data.ok ? 'Test email sent.' : 'Test send failed.'));
+      notifyActionResult(
+        data.ok === true,
+        data.message ?? 'Test email sent.',
+        data.message ?? 'Test send failed.',
+      );
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Test failed.');
+      notifyError(error instanceof Error ? error.message : 'Test failed.');
     } finally {
       setTestingProviderId(null);
     }
@@ -247,8 +264,6 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
     setSettings(savedSnapshot);
     setCredentialDrafts({});
     setClearFlags({});
-    setStatusMessage(null);
-    setErrorMessage(null);
   }, [savedSnapshot]);
   useImperativeHandle(
     props.formRef,
@@ -263,20 +278,13 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
       isDirty,
       isSaving,
       isLoading,
-      statusMessage,
-      errorMessage,
     });
-  }, [errorMessage, isDirty, isLoading, isSaving, statusMessage]);
+  }, [isDirty, isLoading, isSaving]);
   if (isLoading || settings === null) {
     return <p className="text-sm text-muted-foreground">Loading email settings…</p>;
   }
   return (
     <div className="space-y-6">
-      {errorMessage !== null ? (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
       {!settings.canStoreCredentials ? (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
           Set <code className="font-mono text-xs">EMAIL_CREDENTIALS_MASTER_KEY</code> (min 32 characters) on the server before
@@ -388,8 +396,9 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
-                      variant="secondary"
+                      variant="default"
                       size="sm"
+                      className={getAdminPrimaryActionButtonClass('min-w-36')}
                       disabled={!canTestThisProvider || testingProviderId === provider.id}
                       onClick={() => void executeTestProvider(provider.id)}
                     >
@@ -397,8 +406,9 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                     </Button>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="default"
                       size="sm"
+                      className={getAdminPrimaryActionButtonClass('min-w-44')}
                       disabled={!provider.configured && !willClear}
                       onClick={() => {
                         setClearFlags((prev) => ({ ...prev, [provider.id]: !willClear }));
@@ -424,10 +434,22 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                         </label>
                         <Input
                           id={`${provider.id}-${field.key}`}
-                          type={field.key === 'from' ? 'text' : 'password'}
-                          autoComplete="off"
-                          placeholder={field.key === 'from' ? 'Bookings <bookings@yourdomain.com>' : ''}
+                          name={`email-credential-${provider.id}-${field.key}`}
+                          type={EMAIL_CREDENTIAL_SECRET_KEYS.has(field.key) ? 'password' : 'text'}
+                          autoComplete={field.autoComplete}
+                          readOnly={EMAIL_CREDENTIAL_SECRET_KEYS.has(field.key)}
+                          data-1p-ignore={EMAIL_CREDENTIAL_SECRET_KEYS.has(field.key) ? true : undefined}
+                          data-lpignore={EMAIL_CREDENTIAL_SECRET_KEYS.has(field.key) ? 'true' : undefined}
+                          data-form-type="other"
+                          placeholder={
+                            EMAIL_CREDENTIAL_SECRET_KEYS.has(field.key) && provider.configured
+                              ? 'Leave blank to keep saved value'
+                              : field.key === 'from'
+                                ? 'Bookings <bookings@yourdomain.com>'
+                                : ''
+                          }
                           value={draft[field.key] ?? ''}
+                          onFocus={EMAIL_CREDENTIAL_SECRET_KEYS.has(field.key) ? enableCredentialInput : undefined}
                           onChange={(event) => {
                             const value = event.target.value;
                             setCredentialDrafts((prev) => ({

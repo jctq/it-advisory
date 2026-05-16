@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState, type FormEvent, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { notifyError } from '@/lib/notify';
 
 type LoginFormProps = {
   readonly nextPath: string;
@@ -18,12 +19,10 @@ export function LoginForm(props: LoginFormProps): ReactElement {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [mergeGuestProgress, setMergeGuestProgress] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const executeSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>): Promise<void> => {
       event.preventDefault();
-      setErrorMessage(null);
       setIsSubmitting(true);
       try {
         const response = await fetch('/api/auth/login', {
@@ -37,7 +36,7 @@ export function LoginForm(props: LoginFormProps): ReactElement {
             typeof payload === 'object' && payload !== null && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
               ? (payload as { error: string }).error
               : 'Sign-in failed.';
-          setErrorMessage(message);
+          notifyError(message);
           return;
         }
         router.push(props.nextPath);
@@ -63,7 +62,6 @@ export function LoginForm(props: LoginFormProps): ReactElement {
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          aria-invalid={errorMessage !== null}
         />
       </div>
       <div className="space-y-2">
@@ -79,7 +77,6 @@ export function LoginForm(props: LoginFormProps): ReactElement {
           minLength={8}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          aria-invalid={errorMessage !== null}
         />
       </div>
       <label className="flex cursor-pointer items-start gap-3 text-sm text-muted-foreground">
@@ -91,11 +88,6 @@ export function LoginForm(props: LoginFormProps): ReactElement {
         />
         <span>Move diagnostic and booking activity from this browser onto my signed-in profile.</span>
       </label>
-      {errorMessage !== null ? (
-        <p className="text-sm text-destructive" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? 'Signing in…' : 'Sign in'}
       </Button>

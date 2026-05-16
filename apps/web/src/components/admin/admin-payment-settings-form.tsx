@@ -14,7 +14,9 @@ import {
 import { PAYMENT_POLICIES, type PaymentGatewayId, type PaymentPolicy } from '@/domain/payment-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { notifyActionResult, notifyError, notifySuccess } from '@/lib/notify';
 
 const PAYMENT_SETTINGS_API_URL: string = buildApiUrl('/api/admin/payment-settings');
 
@@ -42,8 +44,6 @@ export type AdminPaymentSettingsFormState = {
   readonly isDirty: boolean;
   readonly isSaving: boolean;
   readonly isLoading: boolean;
-  readonly statusMessage: string | null;
-  readonly errorMessage: string | null;
 };
 
 export type AdminPaymentSettingsFormHandle = {
@@ -146,8 +146,6 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
   const [credentialDrafts, setCredentialDrafts] = useState<Partial<Record<PaymentGatewayId, Record<string, string>>>>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [testingGatewayId, setTestingGatewayId] = useState<PaymentGatewayId | null>(null);
   const onStateChangeRef = useRef(props.onStateChange);
   useEffect(() => {
@@ -175,7 +173,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load payment settings.');
+          notifyError(error instanceof Error ? error.message : 'Failed to load payment settings.');
         }
       })
       .finally(() => {
@@ -191,8 +189,6 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
     if (settings === null) {
       return;
     }
-    setStatusMessage(null);
-    setErrorMessage(null);
     setIsSaving(true);
     try {
       const response = await fetch(PAYMENT_SETTINGS_API_URL, {
@@ -215,9 +211,9 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
       setSettings(data);
       setSavedSnapshot(data);
       setCredentialDrafts({});
-      setStatusMessage('Payment settings saved.');
+      notifySuccess('Payment settings saved.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Save failed.');
+      notifyError(error instanceof Error ? error.message : 'Save failed.');
     } finally {
       setIsSaving(false);
     }
@@ -228,12 +224,9 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
     }
     setSettings(savedSnapshot);
     setCredentialDrafts({});
-    setStatusMessage(null);
-    setErrorMessage(null);
   }, [savedSnapshot]);
   const executeTestGateway = useCallback(async (gatewayId: PaymentGatewayId): Promise<void> => {
     setTestingGatewayId(gatewayId);
-    setErrorMessage(null);
     try {
       const response = await fetch(PAYMENT_SETTINGS_API_URL, {
         method: 'PATCH',
@@ -244,9 +237,13 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
       if (!response.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Test failed');
       }
-      setStatusMessage(data.message ?? (data.ok ? 'Connection OK.' : 'Connection failed.'));
+      notifyActionResult(
+        data.ok === true,
+        data.message ?? 'Connection OK.',
+        data.message ?? 'Connection failed.',
+      );
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Test failed.');
+      notifyError(error instanceof Error ? error.message : 'Test failed.');
     } finally {
       setTestingGatewayId(null);
     }
@@ -264,21 +261,14 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
       isDirty,
       isSaving,
       isLoading,
-      statusMessage,
-      errorMessage,
     });
-  }, [errorMessage, isDirty, isLoading, isSaving, statusMessage]);
+  }, [isDirty, isLoading, isSaving]);
   if (isLoading || settings === null) {
     return <p className="text-sm text-muted-foreground">Loading payment settings…</p>;
   }
   const checkoutAmountPesos = (settings.checkoutAmountCentavos / 100).toFixed(2);
   return (
     <div className="space-y-6">
-      {errorMessage !== null ? (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
       {!settings.canStoreCredentials ? (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
           Set <code className="font-mono text-xs">PAYMENT_CREDENTIALS_MASTER_KEY</code> (min 32 characters) on the server
@@ -403,9 +393,40 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
       <SettingsCard
         icon={<CreditCard className="size-5" aria-hidden />}
         title="Payment gateways"
-        description="Enable providers and enter API keys. Webhook URLs: /api/webhooks/paymongo, xendit, hitpay, paypal."
+        description="Enable one or more providers for checkout, then enter API keys below. Webhook URLs: /api/webhooks/paymongo, xendit, hitpay, paypal."
       >
-        <div className="space-y-4">
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium text-foreground">Enabled gateways</legend>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {settings.gateways.map((gateway) => (
+              <label
+                key={gateway.id}
+                className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4 has-checked:border-primary/50 has-checked:bg-primary/5"
+              >
+                <input
+                  type="checkbox"
+                  checked={gateway.enabled}
+                  onChange={(event) => {
+                    setSettings({
+                      ...settings,
+                      gateways: settings.gateways.map((row) =>
+                        row.id === gateway.id ? { ...row, enabled: event.target.checked } : row,
+                      ),
+                    });
+                  }}
+                  className="mt-1 size-4 rounded border-input"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{gateway.label}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{gateway.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{gateway.methodLabels.join(' · ')}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div className="space-y-6">
+          <p className="text-sm font-medium text-foreground">Gateway credentials</p>
           {settings.gateways.map((gateway) => {
             const fields = GATEWAY_CREDENTIAL_FIELDS[gateway.id] ?? [];
             const draft = credentialDrafts[gateway.id] ?? {};
@@ -415,33 +436,27 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{gateway.label}</p>
                     <p className="text-xs text-muted-foreground">{gateway.description}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{gateway.methodLabels.join(' · ')}</p>
-                    {gateway.configured ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Credentials stored {gateway.credentialHint ?? ''}
+                    {gateway.configured && gateway.credentialHint !== null ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Stored credentials: <span className="font-mono text-foreground">{gateway.credentialHint}</span>
                       </p>
                     ) : null}
                   </div>
-                  <label className="flex min-h-11 shrink-0 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={gateway.enabled}
-                      onChange={(event) => {
-                        setSettings({
-                          ...settings,
-                          gateways: settings.gateways.map((row) =>
-                            row.id === gateway.id ? { ...row, enabled: event.target.checked } : row,
-                          ),
-                        });
-                      }}
-                    />
-                    Enabled
-                  </label>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className={getAdminPrimaryActionButtonClass('w-33')}
+                    disabled={testingGatewayId === gateway.id}
+                    onClick={() => void executeTestGateway(gateway.id)}
+                  >
+                    {testingGatewayId === gateway.id ? 'Testing…' : 'Test connection'}
+                  </Button>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {fields.map((field) => (
-                    <div key={field.key} className="space-y-1 sm:col-span-2 lg:col-span-1">
-                      <label className="text-xs font-medium text-foreground" htmlFor={`${gateway.id}-${field.key}`}>
+                    <div key={field.key} className="space-y-2 sm:col-span-2 lg:col-span-1">
+                      <label className="text-sm font-medium text-foreground" htmlFor={`${gateway.id}-${field.key}`}>
                         {field.label}
                       </label>
                       <Input
@@ -460,16 +475,6 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
                     </div>
                   ))}
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="min-h-10"
-                  disabled={testingGatewayId === gateway.id}
-                  onClick={() => void executeTestGateway(gateway.id)}
-                >
-                  {testingGatewayId === gateway.id ? 'Testing…' : 'Test connection'}
-                </Button>
               </div>
             );
           })}

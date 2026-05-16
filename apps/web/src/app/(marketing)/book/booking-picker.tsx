@@ -43,6 +43,7 @@ import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
 import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-slot-times-for-manila-date';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
+import { notifyError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import {
@@ -357,6 +358,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           return;
         }
         if (result.status !== 'paid' || result.bookingId === null) {
+          notifyError('Your payment is still processing. If you were charged, check your email shortly.');
           setErrorMessage('Your payment is still processing. If you were charged, check your email shortly.');
           setPhase('error');
           return;
@@ -391,6 +393,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
+        notifyError('Could not load your booking confirmation. Please check your email.');
         setErrorMessage('Could not load your booking confirmation. Please check your email.');
         setPhase('error');
       });
@@ -665,6 +668,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         }
         window.location.href = session.redirectUrl;
       } catch (error: unknown) {
+        notifyError(error instanceof Error ? error.message : 'Could not start payment.');
         setErrorMessage(error instanceof Error ? error.message : 'Could not start payment.');
         setPhase('error');
       }
@@ -713,6 +717,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           typeof (payload as { error?: unknown }).error === 'string'
             ? (payload as { error: string }).error
             : `Booking could not be saved (${response.status}).`;
+        notifyError(message);
         setErrorMessage(message);
         setPhase('error');
         return;
@@ -767,6 +772,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       }
       setPhase('success');
     } catch {
+      notifyError('Network error while saving your booking. Check your connection and try again.');
       setErrorMessage('Network error while saving your booking. Check your connection and try again.');
       setPhase('error');
     }

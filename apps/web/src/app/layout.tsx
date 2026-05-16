@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Roboto, Roboto_Mono } from 'next/font/google';
 import { QueryProvider } from '@/components/providers/query-provider';
+import { Toaster } from '@/components/ui/sonner';
 import { brandAssetUrl } from '@/lib/brand/brand-assets';
 import { resolveConfiguredAppOrigin } from '@/lib/config/app-origin';
 import './globals.css';
@@ -65,7 +66,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           src="/scripts/techmd-appearance-bootstrap.js"
           strategy="beforeInteractive"
         />
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          {children}
+          <Toaster closeButton position="top-right" richColors />
+        </QueryProvider>
       </body>
     </html>
   );

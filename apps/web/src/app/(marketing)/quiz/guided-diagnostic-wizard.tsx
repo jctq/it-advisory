@@ -71,6 +71,7 @@ import {
   shouldShowQuestionDetailNoteInput,
 } from '@/lib/marketing/guided-diagnostic-types';
 import { getSituationSeed } from '@/lib/marketing/situation-options';
+import { notifyError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import {
@@ -1228,7 +1229,6 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     onGoBack();
     scheduleScrollQuizWizardToTop();
   }, [onGoBack]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAwaitingApi, setIsAwaitingApi] = useState<boolean>(false);
   const [diagnosticDebugLog, setDiagnosticDebugLog] = useState<DiagnosticDebugLogEntry[]>([]);
   const [cacheDebugUiEnabled, setCacheDebugUiEnabled] = useState<boolean>(false);
@@ -1352,7 +1352,6 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       if (sessionReadOnly) {
         return;
       }
-      setErrorMessage(null);
       onGuidedChange((previous) => ({
         ...previous,
         initialPrompt: togglePromptWithSeed(previous.initialPrompt, phrase),
@@ -1548,10 +1547,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         const data = (await response.json()) as DiagnosticRoundApiBody;
         if (!response.ok) {
           if (response.status === 503 && data.code === 'missing_key') {
-            setErrorMessage('Add OPENAI_API_KEY to enable guided intake.');
+            notifyError('Add OPENAI_API_KEY to enable guided intake.');
           } else {
             const hint = typeof data.details === 'string' ? ` ${data.details}` : '';
-            setErrorMessage(`${data.error ?? 'Something went wrong. Try again.'}${hint}`);
+            notifyError(`${data.error ?? 'Something went wrong. Try again.'}${hint}`);
           }
           return false;
         }
@@ -1622,7 +1621,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           return true;
         }
         if (attempt === clientEmptyRoundRetryLimit) {
-          setErrorMessage('No follow-up questions were returned. Try again.');
+          notifyError('No follow-up questions were returned. Try again.');
           return false;
         }
       }
@@ -1679,10 +1678,9 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     if (sessionReadOnly) {
       return;
     }
-    setErrorMessage(null);
     const trimmed = guided.initialPrompt.trim();
     if (trimmed.length < MIN_PROMPT_LENGTH) {
-      setErrorMessage(`Add a bit more detail (at least ~${MIN_PROMPT_LENGTH} characters) so we can tailor questions.`);
+      notifyError(`Add a bit more detail (at least ~${MIN_PROMPT_LENGTH} characters) so we can tailor questions.`);
       return;
     }
     setIsAwaitingApi(true);
@@ -1693,7 +1691,6 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     }
   }, [executeFetchRound, guided.initialPrompt, sessionReadOnly]);
   const executeAdvanceOrSubmitRound = useCallback(async (): Promise<void> => {
-    setErrorMessage(null);
     if (guided.activeRound === null) {
       return;
     }
@@ -1724,7 +1721,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         detailNote,
       });
       if (!validation.isValid) {
-        setErrorMessage(validation.message ?? 'Pick an option above or type your exact answer below.');
+        notifyError(validation.message ?? 'Pick an option above or type your exact answer below.');
         return;
       }
       const nextQuestionIndex = findNextVisibleQuestionIndex({
@@ -1781,7 +1778,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     if (answerableQuestionIndexes.length === 0) {
       if (!diagnosticAiEnabled) {
         if (activeTemplate === null) {
-          setErrorMessage('AI Diagnostic is off, but no active template is ready yet.');
+          notifyError('AI Diagnostic is off, but no active template is ready yet.');
           return;
         }
         const nextRound = buildNextTemplateRoundFromState({
@@ -1808,7 +1805,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           }));
           scheduleScrollQuizWizardToTop();
         } catch (error: unknown) {
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
+          notifyError(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
         } finally {
           setIsAwaitingApi(false);
         }
@@ -1841,7 +1838,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       detailNote,
     });
     if (!validation.isValid) {
-      setErrorMessage(validation.message ?? 'Pick an option above or type your exact answer below.');
+      notifyError(validation.message ?? 'Pick an option above or type your exact answer below.');
       return;
     }
     const nextQuestionIndex = findNextVisibleQuestionIndex({
@@ -1873,7 +1870,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     const nextCompleted = [...guided.completedBundles, bundle];
     if (!diagnosticAiEnabled) {
       if (activeTemplate === null) {
-        setErrorMessage('AI Diagnostic is off, but no active template is ready yet.');
+        notifyError('AI Diagnostic is off, but no active template is ready yet.');
         return;
       }
       const nextRound = buildNextTemplateRoundFromState({
@@ -1902,7 +1899,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         }));
         scheduleScrollQuizWizardToTop();
       } catch (error: unknown) {
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
+        notifyError(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
       } finally {
         setIsAwaitingApi(false);
       }
@@ -2185,11 +2182,6 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             ) : null}
           </>
         ) : null}
-        {errorMessage !== null ? (
-          <p className="mt-4 text-sm text-destructive" role="alert">
-            {errorMessage}
-          </p>
-        ) : null}
         {isAwaitingApi ? (
           <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground md:mt-8">
             <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
@@ -2321,11 +2313,6 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           })}
         </div>
       </div>
-      {errorMessage !== null ? (
-        <p className="mt-4 text-sm text-destructive" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
       {isAwaitingApi ? (
         <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin text-primary" aria-hidden />

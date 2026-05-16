@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { Input } from '@/components/ui/input';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { notifyError, notifySuccess } from '@/lib/notify';
 import {
   DIAGNOSTIC_MAX_ROUNDS_MAX,
   DIAGNOSTIC_MAX_ROUNDS_MIN,
@@ -37,8 +38,6 @@ export type AdminSettingsFormState = {
   readonly isDirty: boolean;
   readonly isSaving: boolean;
   readonly isLoading: boolean;
-  readonly statusMessage: string | null;
-  readonly errorMessage: string | null;
 };
 
 export type AdminSettingsFormHandle = {
@@ -93,8 +92,6 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   const [savedSnapshot, setSavedSnapshot] = useState<SettingsPayload | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const onStateChangeRef = useRef(props.onStateChange);
   useEffect(() => {
     onStateChangeRef.current = props.onStateChange;
@@ -146,7 +143,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load settings.');
+          notifyError(error instanceof Error ? error.message : 'Failed to load settings.');
         }
       })
       .finally(() => {
@@ -159,8 +156,6 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     };
   }, []);
   const executeSave = useCallback(async (): Promise<void> => {
-    setStatusMessage(null);
-    setErrorMessage(null);
     setIsSaving(true);
     try {
       const response = await fetch(ADMIN_SETTINGS_API_URL, {
@@ -185,9 +180,9 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       setDiagnosticOptionsPerQuestion(snapshot.diagnosticOptionsPerQuestion);
       setDiagnosticCacheDebugEnabled(snapshot.diagnosticCacheDebugEnabled);
       setSavedSnapshot(snapshot);
-      setStatusMessage('Diagnostic settings saved.');
+      notifySuccess('Diagnostic settings saved.');
     } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Save failed.');
+      notifyError(error instanceof Error ? error.message : 'Save failed.');
     } finally {
       setIsSaving(false);
     }
@@ -201,8 +196,6 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     setDiagnosticQuestionsPerRound(savedSnapshot.diagnosticQuestionsPerRound);
     setDiagnosticOptionsPerQuestion(savedSnapshot.diagnosticOptionsPerQuestion);
     setDiagnosticCacheDebugEnabled(savedSnapshot.diagnosticCacheDebugEnabled);
-    setStatusMessage(null);
-    setErrorMessage(null);
   }, [savedSnapshot]);
   useImperativeHandle(
     props.formRef,
@@ -217,21 +210,14 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       isDirty,
       isSaving,
       isLoading,
-      statusMessage,
-      errorMessage,
     });
-  }, [errorMessage, isDirty, isLoading, isSaving, statusMessage]);
+  }, [isDirty, isLoading, isSaving]);
   const disableAiNumericFields = isLoading || !diagnosticAiEnabled;
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading diagnostic settings…</p>;
   }
   return (
     <div className="space-y-6">
-      {errorMessage !== null ? (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
       <SettingsCard
         icon={<LayoutTemplate className="size-5" aria-hidden />}
         title="Intake mode"

@@ -18,6 +18,16 @@ export const EMAIL_SETTINGS_DOCUMENT_ID = 'default';
 
 const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+export class EmailSettingsCredentialValidationError extends Error {
+  public override readonly name = 'EmailSettingsCredentialValidationError';
+}
+
+const EMAIL_PROVIDER_CREDENTIAL_KEYS: Record<TransactionalEmailProviderId, readonly string[]> = {
+  resend: ['apiKey', 'from'],
+  postmark: ['serverToken', 'from'],
+  sendgrid: ['apiKey', 'from'],
+};
+
 export type EmailProviderAdminStatus = {
   readonly id: TransactionalEmailProviderId;
   readonly label: string;
@@ -158,6 +168,49 @@ function isValidFromAddress(from: string): boolean {
   const angle = /^[^<]+<([^>]+)>$/.exec(t);
   const emailPart = angle !== null ? angle[1]!.trim() : t;
   return EMAIL_ADDRESS_PATTERN.test(emailPart);
+}
+
+function mergeCredentialFields(
+  keys: readonly string[],
+  incoming: Record<string, string>,
+  existingBlob: EncryptedCredentialBlob | undefined,
+): PaymentGatewayCredentialsPlain {
+  let previous: PaymentGatewayCredentialsPlain = {};
+  if (existingBlob !== undefined) {
+    try {
+      previous = decryptEmailCredentials(existingBlob);
+    } catch {
+      previous = {};
+    }
+  }
+  const merged: Record<string, string> = {};
+  for (const key of keys) {
+    const inc = incoming[key]?.trim() ?? '';
+    if (inc.length > 0) {
+      merged[key] = inc;
+    } else {
+      const fromPrev = typeof previous[key] === 'string' ? previous[key].trim() : '';
+      if (fromPrev.length > 0) {
+        merged[key] = fromPrev;
+      }
+    }
+  }
+  return merged;
+}
+
+function encryptValidatedEmailProviderBlob(
+  providerId: TransactionalEmailProviderId,
+  filtered: Record<string, string>,
+  existingBlob: EncryptedCredentialBlob | undefined,
+): EncryptedCredentialBlob {
+  const merged = mergeCredentialFields(EMAIL_PROVIDER_CREDENTIAL_KEYS[providerId], filtered, existingBlob);
+  if (extractPlainForProvider(providerId, merged) === null) {
+    const label = providerId === 'postmark' ? 'server token and From address' : 'API key and From address';
+    throw new EmailSettingsCredentialValidationError(
+      `${providerId === 'resend' ? 'Resend' : providerId === 'postmark' ? 'Postmark' : 'SendGrid'} credentials must include a valid ${label}.`,
+    );
+  }
+  return encryptEmailCredentials(merged);
 }
 
 function extractPlainForProvider(
@@ -323,10 +376,9 @@ export async function updateEmailSettings(patch: UpdateEmailSettingsPatch): Prom
         }
       }
       if (Object.keys(filtered).length === 0) {
-        delete blobs[providerId];
         continue;
       }
-      blobs[providerId] = encryptEmailCredentials(filtered);
+      blobs[providerId] = encryptValidatedEmailProviderBlob(providerId, filtered, blobs[providerId]);
     }
   }
   if (!process.env.MONGODB_URI) {

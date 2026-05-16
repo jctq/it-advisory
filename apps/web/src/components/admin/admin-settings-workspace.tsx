@@ -32,32 +32,24 @@ const EMPTY_DIAGNOSTICS_STATE: AdminSettingsFormState = {
   isDirty: false,
   isSaving: false,
   isLoading: true,
-  statusMessage: null,
-  errorMessage: null,
 };
 
 const EMPTY_PAYMENTS_STATE: AdminPaymentSettingsFormState = {
   isDirty: false,
   isSaving: false,
   isLoading: true,
-  statusMessage: null,
-  errorMessage: null,
 };
 
 const EMPTY_EMAIL_STATE: AdminEmailSettingsFormState = {
   isDirty: false,
   isSaving: false,
   isLoading: true,
-  statusMessage: null,
-  errorMessage: null,
 };
 
 const EMPTY_MEETINGS_STATE: AdminMeetingSettingsFormState = {
   isDirty: false,
   isSaving: false,
   isLoading: true,
-  statusMessage: null,
-  errorMessage: null,
 };
 
 export function AdminSettingsWorkspace(): ReactElement {
@@ -177,7 +169,6 @@ export function AdminSettingsWorkspace(): ReactElement {
         saveLabel={saveLabel}
         isSaving={activeState.isSaving}
         isDisabled={activeState.isLoading || activeState.isSaving || !activeState.isDirty}
-        statusMessage={activeState.statusMessage}
         onSave={executeSaveActive}
         resetLabel="Reset to saved"
         onReset={executeResetActive}
