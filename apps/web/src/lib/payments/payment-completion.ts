@@ -12,6 +12,7 @@ import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extra
 import { findPaymentTransactionById, updatePaymentTransactionStatus, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
 import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { getDb } from '@/lib/mongodb';
+import { executeSendBookingConfirmationEmail } from '@/lib/email/send-booking-confirmation-email';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
 async function resolveQuizSnapshot(
@@ -105,7 +106,16 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
     status: 'paid',
     bookingId,
   });
-  return updated === null ? null : { kind: 'updated', transaction: updated };
+  if (updated === null) {
+    return null;
+  }
+  void executeSendBookingConfirmationEmail({
+    bookingId: bookingId.toHexString(),
+    transaction: updated,
+  }).catch((err: unknown) => {
+    console.error('[booking-email] fulfillPaidTransaction', err);
+  });
+  return { kind: 'updated', transaction: updated };
 }
 
 async function failTransaction(
@@ -334,7 +344,16 @@ export async function markBookingPaidByAdmin(bookingId: string): Promise<boolean
       },
     },
   );
-  return result.matchedCount === 1;
+  const matched = result.matchedCount === 1;
+  if (matched) {
+    void executeSendBookingConfirmationEmail({
+      bookingId,
+      transaction: null,
+    }).catch((err: unknown) => {
+      console.error('[booking-email] markBookingPaidByAdmin', err);
+    });
+  }
+  return matched;
 }
 
 export async function ensurePaidTransactionFulfilled(transaction: PaymentTransactionRow): Promise<PaymentTransactionRow> {

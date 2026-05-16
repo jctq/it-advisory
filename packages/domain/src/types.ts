@@ -133,7 +133,10 @@ export type EmailSendDocument = {
   to: string;
   templateKey: string;
   payload: Readonly<Record<string, unknown>>;
-  status: 'mock_sent' | 'failed';
+  /** `mock_sent` when no provider API key (audit-only). */
+  status: 'mock_sent' | 'sent' | 'failed';
+  /** Resend (or other provider) message id when `status` is `sent`. */
+  providerMessageId?: string;
   createdAt: Date;
 };
 

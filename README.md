@@ -41,6 +41,7 @@ Suggested indexes (create in Atlas when you begin writing documents):
 - `bookings`: `{ startsAt: 1 }`, `{ leadId: 1 }`, `{ visitorId: 1, serviceKey: 1, startsAt: 1 }` (idempotent re-confirmation / slot lookup). For solo-advisor slot exclusivity, add a **partial unique** index: `{ serviceKey: 1, startsAt: 1 }` unique with `partialFilterExpression: { status: { $in: ['pending', 'confirmed'] } }` so cancelled rows do not block reuse.
 - `advisor_booking_settings`: singleton `{ _id: 'default' }` (no extra index required beyond `_id`).
 - `availability_slots`: `{ startsAt: 1, timezone: 1 }` (legacy / unused by current rule-based schedule)
+- `email_settings`: singleton `{ _id: 'default' }` (admin transactional email providers).
 - `email_sends`: `{ createdAt: -1 }`, `{ to: 1 }`
 - `diagnostic_round_cache`: `{ threadHash: 1 }` unique. For **semantic** reuse of similar prompts, add an Atlas **Vector Search** index on path `embedding` (1536 dimensions, cosine, matching `OPENAI_EMBEDDING_MODEL` / `OPENAI_EMBEDDING_DIMENSIONS`) and **filter** fields `cacheVersion`, `roundsCompleted`; set `DIAGNOSTIC_CACHE_VECTOR_INDEX_NAME` to that index name in `apps/web/.env.local`.
 
@@ -67,10 +68,10 @@ The native app talks to the existing Next.js backend and persists anonymous quiz
 
 ## Mock integrations
 
-- **Email:** `src/lib/email/mock-email.ts` writes to `email_sends`.
+- **Email:** Admin **Settings → Email** tab (MongoDB `email_settings`): one active provider (Resend, Postmark, or SendGrid), optional BCC, and **Sandbox mode** (redirects `To` to [Resend test inboxes](https://resend.com/docs/dashboard/emails/send-test-emails) such as `delivered@resend.dev`, skips BCC, stores real recipient on `email_sends`). Provider secrets use `EMAIL_CREDENTIALS_MASTER_KEY` (AES-256-GCM); older installs may still decrypt blobs written with `PAYMENT_CREDENTIALS_MASTER_KEY` until credentials are re-saved. With **Active provider = None**, `RESEND_API_KEY` + `EMAIL_FROM` env fallback still applies.
 - **Payments:** `src/lib/payments/mock-payments.ts` returns fake references.
 
-Replace with Resend/SendGrid and Stripe/PayMongo when ready.
+Replace payment mocks with live gateways when ready.
 
 ## Auth
 

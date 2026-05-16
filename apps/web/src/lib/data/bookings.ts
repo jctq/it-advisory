@@ -18,6 +18,8 @@ export type BookingRow = {
   timezone: string;
   status: BookingDocument['status'];
   meetingUrl?: string;
+  /** Linked checkout transaction when payment was taken online. */
+  paymentTransactionId: string | null;
   hasDiagnosticSnapshot: boolean;
   /** Quiz session document id captured at booking time, when Mongo had a session row. */
   quizSessionId: string | null;
@@ -37,6 +39,10 @@ function mapBooking(
     timezone: doc.timezone,
     status: doc.status,
     meetingUrl: doc.meetingUrl,
+    paymentTransactionId:
+      doc.paymentTransactionId !== undefined && doc.paymentTransactionId !== null
+        ? doc.paymentTransactionId.toString()
+        : null,
     hasDiagnosticSnapshot:
       typeof doc.guidedDiagnosticSnapshot === 'string' && doc.guidedDiagnosticSnapshot.trim().length > 0,
     quizSessionId,

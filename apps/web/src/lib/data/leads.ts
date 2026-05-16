@@ -82,3 +82,34 @@ export async function insertMarketingBookingLead(
   const result = await db.collection<LeadDocument>(COLLECTIONS.leads).insertOne(doc);
   return result.insertedId;
 }
+
+export type MarketingLeadContactRow = {
+  readonly name: string;
+  readonly email: string;
+};
+
+/**
+ * Loads a marketing lead by id for transactional email and CRM reads.
+ */
+export async function findLeadById(leadIdHex: string): Promise<MarketingLeadContactRow | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(leadIdHex);
+  } catch {
+    return null;
+  }
+  const db = await getDb();
+  const doc = await db.collection<LeadDocument>(COLLECTIONS.leads).findOne({ _id: objectId });
+  if (doc === null) {
+    return null;
+  }
+  const name = typeof doc.name === 'string' ? doc.name.trim() : '';
+  const email = typeof doc.email === 'string' ? doc.email.trim() : '';
+  return {
+    name: name.length > 0 ? name : 'Customer',
+    email,
+  };
+}

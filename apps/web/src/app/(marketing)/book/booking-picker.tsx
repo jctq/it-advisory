@@ -52,6 +52,40 @@ import {
 const BOOKINGS_API_URL = '/api/bookings';
 const PAYMENT_CONFIG_API_URL = buildApiUrl('/api/checkout/payment-config');
 const AVAILABILITY_API_URL = buildApiUrl('/api/booking/availability');
+const AUTH_ME_API_URL = buildApiUrl('/api/auth/me');
+
+type MarketingProfilePrefill = {
+  readonly fullName: string | null;
+  readonly email: string | null;
+  readonly company: string | null;
+  readonly phone: string | null;
+};
+
+function pickNonEmptyTrimmedString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseMarketingProfilePrefillFromAuthMePayload(payload: unknown): MarketingProfilePrefill | null {
+  if (typeof payload !== 'object' || payload === null) {
+    return null;
+  }
+  const root = payload as { readonly user?: unknown };
+  const user = root.user;
+  if (user === null || typeof user !== 'object') {
+    return null;
+  }
+  const row = user as Record<string, unknown>;
+  return {
+    fullName: pickNonEmptyTrimmedString(row.fullName),
+    email: pickNonEmptyTrimmedString(row.email),
+    company: pickNonEmptyTrimmedString(row.company),
+    phone: pickNonEmptyTrimmedString(row.phone),
+  };
+}
 
 function resolveMarketingClientApiBaseUrl(): string {
   if (AVAILABILITY_API_URL.startsWith('http://') || AVAILABILITY_API_URL.startsWith('https://')) {
@@ -255,6 +289,38 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       .catch(() => {
         if (!controller.signal.aborted) {
           setPaymentConfig(null);
+        }
+      });
+    return () => {
+      controller.abort();
+    };
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(AUTH_ME_API_URL, { credentials: 'include', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok || controller.signal.aborted) {
+          return;
+        }
+        const payload: unknown = await response.json();
+        if (controller.signal.aborted) {
+          return;
+        }
+        const profile = parseMarketingProfilePrefillFromAuthMePayload(payload);
+        if (profile === null) {
+          return;
+        }
+        setFullName((previous) => (previous.trim().length === 0 && profile.fullName !== null ? profile.fullName : previous));
+        setEmail((previous) => (previous.trim().length === 0 && profile.email !== null ? profile.email : previous));
+        setCompany((previous) => (previous.trim().length === 0 && profile.company !== null ? profile.company : previous));
+        setPhone((previous) => (previous.trim().length === 0 && profile.phone !== null ? profile.phone : previous));
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
         }
       });
     return () => {

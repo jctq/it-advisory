@@ -10,6 +10,8 @@ export const COLLECTIONS = {
   advisorBookingSettings: 'advisor_booking_settings',
   availabilitySlots: 'availability_slots',
   emailSends: 'email_sends',
+  /** Singleton `{ _id: 'default' }` — transactional email providers (admin). */
+  emailSettings: 'email_settings',
   users: 'users',
   /** Opaque bearer sessions for marketing-site accounts (`it_auth_session` cookie). */
   userAuthSessions: 'user_auth_sessions',

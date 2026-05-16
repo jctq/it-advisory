@@ -3,7 +3,7 @@ import { getDb } from '@/lib/mongodb';
 import type { EmailSendDocument } from '@/domain/types';
 
 /**
- * Persists a mock "sent" email for audit. Replace with Resend/SendGrid later.
+ * Persists a mock "sent" email for audit. Prefer {@link executeSendBookingConfirmationEmail} for booking flows.
  */
 export async function sendMockEmail(
   to: string,
