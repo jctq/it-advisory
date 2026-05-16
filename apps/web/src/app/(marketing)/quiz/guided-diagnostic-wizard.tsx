@@ -7,6 +7,8 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
   BarChart3,
   Check,
   CheckCircle2,
@@ -816,13 +818,26 @@ function SortableRankedSelectionItem(props: {
   );
 }
 
+function RankedOptionRankBadge(props: { readonly rank: number }): ReactElement {
+  return (
+    <span
+      className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold tabular-nums text-primary-foreground md:hidden"
+      aria-hidden
+    >
+      {props.rank}
+    </span>
+  );
+}
+
 function RankedOptionsRoundRenderer(props: {
   readonly baseAnswers: Readonly<Record<string, DiagnosticQuestionSelection>>;
   readonly onSelectionChange: (nextSelection: DiagnosticQuestionSelection) => void;
   readonly question: DiagnosticQuestionBlock;
   readonly rankedOptionLimit: number;
   readonly selection: DiagnosticQuestionSelection;
+  readonly sessionReadOnly?: boolean;
 }): ReactElement {
+  const sessionReadOnly = props.sessionReadOnly === true;
   const visibleOptions = getVisibleQuestionOptions({
     baseAnswers: props.baseAnswers,
     question: props.question,
@@ -841,6 +856,14 @@ function RankedOptionsRoundRenderer(props: {
   const selectedOptions = selectedOptionIds
     .map((optionId) => visibleOptions.find((option) => option.id === optionId))
     .filter((option): option is DiagnosticQuestionOption => option !== undefined);
+  const pickerOptions = useMemo(() => {
+    const selected = selectedOptionIds.flatMap((optionId) => {
+      const option = visibleOptions.find((candidate) => candidate.id === optionId);
+      return option === undefined ? [] : [option];
+    });
+    const unselected = visibleOptions.filter((option) => !selectedOptionIds.includes(option.id));
+    return [...selected, ...unselected];
+  }, [selectedOptionIds, visibleOptions]);
 
   function updateRankedOptionIds(nextSelectedOptionIds: readonly string[]): void {
     const nextChildSelections = Object.fromEntries(
@@ -895,18 +918,30 @@ function RankedOptionsRoundRenderer(props: {
           <p className={cn('mt-1.5 md:mt-2', WIZARD_UI.questionDesc)}>{props.question.description}</p>
         ) : null}
         <div className="mt-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5 text-xs text-foreground md:mt-3 md:rounded-2xl md:px-4 md:py-3 md:text-sm">
-          Drag and drop to rank your top <span className="font-semibold">{props.rankedOptionLimit}</span> outcomes.
+          <span className="md:hidden">
+            Select your top <span className="font-semibold">{props.rankedOptionLimit}</span> outcomes, then use the
+            arrows to set rank order.
+          </span>
+          <span className="hidden md:inline">
+            Drag and drop to rank your top <span className="font-semibold">{props.rankedOptionLimit}</span> outcomes.
+          </span>
         </div>
       </div>
       <div className={cn('grid xl:grid-cols-[minmax(280px,1fr)_minmax(0,1fr)]', WIZARD_UI.gridGapLg)}>
         <div className="rounded-2xl border border-border bg-card p-3.5 shadow-xs md:rounded-3xl md:p-5">
-          <p className="text-xs font-semibold text-foreground md:text-sm">Choose the outcomes you want to rank</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-foreground md:text-sm">Choose the outcomes you want to rank</p>
+            <p className="text-xs font-medium text-primary md:hidden">
+              {selectedOptionIds.length} / {props.rankedOptionLimit} selected
+            </p>
+          </div>
           <div className="mt-3 space-y-2 md:mt-4 md:space-y-3">
-            {visibleOptions.map((option, optionIndex) => {
+            {pickerOptions.map((option) => {
+              const optionIndex = visibleOptions.findIndex((candidate) => candidate.id === option.id);
               const selectedRankIndex = selectedRankLookup.get(option.id);
               const isSelected = selectedRankIndex !== undefined;
               const isAtLimit = selectedOptionIds.length >= props.rankedOptionLimit;
-              const isDisabled = isSelected === false && isAtLimit;
+              const isDisabled = sessionReadOnly || (isSelected === false && isAtLimit);
               return (
               <button
                 key={option.id}
@@ -925,13 +960,18 @@ function RankedOptionsRoundRenderer(props: {
                       : 'border-border hover:border-primary/30 hover:bg-muted/20',
                 )}
               >
-                <div className="flex w-full items-start gap-3 md:gap-4">
+                <div className="flex w-full items-start gap-2 md:gap-4">
+                  {isSelected && selectedRankIndex !== undefined ? (
+                    <RankedOptionRankBadge rank={selectedRankIndex + 1} />
+                  ) : null}
                   <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
                   <div className="min-w-0 flex-1 space-y-1.5 md:space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2">
                         <p className={WIZARD_UI.optionTitle}>
-                          {optionIndex + 1}. {getDisplayOptionTitle(option)}
+                          {isSelected
+                            ? getDisplayOptionTitle(option)
+                            : `${optionIndex + 1}. ${getDisplayOptionTitle(option)}`}
                         </p>
                         {option.presentation.badgeText !== null ? (
                           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 md:px-2 md:py-1 md:text-[11px]">
@@ -939,17 +979,55 @@ function RankedOptionsRoundRenderer(props: {
                           </span>
                         ) : null}
                       </div>
-                      <span
-                        className={cn(
-                          WIZARD_UI.selectIndicator,
-                          isSelected
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border bg-background text-transparent',
-                        )}
-                        aria-hidden
-                      >
-                        <Check className="size-3.5 md:size-4" />
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {isSelected && selectedRankIndex !== undefined && !sessionReadOnly ? (
+                          <div
+                            className="flex flex-col gap-0.5 md:hidden"
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            role="group"
+                            aria-label={`Reorder ${getDisplayOptionTitle(option)}`}
+                          >
+                            <button
+                              type="button"
+                              disabled={selectedRankIndex === 0}
+                              onClick={() => executeMoveOption(option.id, -1)}
+                              className={cn(
+                                'flex size-7 items-center justify-center rounded-md border border-border bg-card text-muted-foreground',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
+                                'disabled:cursor-not-allowed disabled:opacity-40',
+                              )}
+                              aria-label={`Move ${getDisplayOptionTitle(option)} up`}
+                            >
+                              <ChevronUp className="size-4" aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={selectedRankIndex === selectedOptionIds.length - 1}
+                              onClick={() => executeMoveOption(option.id, 1)}
+                              className={cn(
+                                'flex size-7 items-center justify-center rounded-md border border-border bg-card text-muted-foreground',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
+                                'disabled:cursor-not-allowed disabled:opacity-40',
+                              )}
+                              aria-label={`Move ${getDisplayOptionTitle(option)} down`}
+                            >
+                              <ChevronDown className="size-4" aria-hidden />
+                            </button>
+                          </div>
+                        ) : null}
+                        <span
+                          className={cn(
+                            WIZARD_UI.selectIndicator,
+                            isSelected
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-background text-transparent',
+                          )}
+                          aria-hidden
+                        >
+                          <Check className="size-3.5 md:size-4" />
+                        </span>
+                      </div>
                     </div>
                     {getDisplayOptionSupportingText(option) !== null ? (
                       <p className={WIZARD_UI.optionSupporting}>{getDisplayOptionSupportingText(option)}</p>
@@ -961,7 +1039,7 @@ function RankedOptionsRoundRenderer(props: {
             })}
           </div>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-3.5 shadow-xs md:rounded-3xl md:p-5">
+        <div className="hidden rounded-2xl border border-border bg-card p-3.5 shadow-xs md:block md:rounded-3xl md:p-5">
           <div className="flex items-center justify-between gap-2 md:gap-3">
             <p className="text-xs font-semibold text-foreground md:text-sm">Your Top Outcomes (rank {props.rankedOptionLimit})</p>
             <p className="text-sm font-medium text-primary">
@@ -2058,6 +2136,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
                 question={question}
                 rankedOptionLimit={question.rankedOptionLimit ?? 3}
                 selection={questionSelection}
+                sessionReadOnly={sessionReadOnly}
                 onSelectionChange={(nextSelection) => executeSetQuestionSelection(question.id, nextSelection)}
               />
             ) : (
