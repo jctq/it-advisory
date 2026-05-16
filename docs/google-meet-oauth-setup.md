@@ -56,6 +56,8 @@ Build a URL like this (replace `YOUR_CLIENT_ID`, `YOUR_ENCODED_REDIRECT_URI`):
 https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_ENCODED_REDIRECT_URI&response_type=code&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events&access_type=offline&prompt=consent
 ```
 
+https://accounts.google.com/o/oauth2/v2/auth?client_id=716011573405-fbcr9an5h7aadd26rp7auds8vci2fkfo.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fit-advisory-production.up.railway.app%2F&response_type=code&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcalendar.events&access_type=offline&prompt=consent
+
 Important query parameters:
 
 | Parameter        | Value | Purpose |
@@ -128,6 +130,20 @@ then OAuth is working but **Calendar API is off** for the **same** Google Cloud 
 3. Wait **a few minutes** for propagation, then confirm a **new** paid booking (or re-run whatever triggers Meet creation).
 
 The **“Test Google Meet connection”** button only refreshes the access token; it does **not** call Calendar to create an event, so it can succeed while event creation still fails with `403` until the API is enabled.
+
+## Troubleshooting: `Error 400: redirect_uri_mismatch`
+
+You see this on **Google’s “Sign in with Google”** page when the **`redirect_uri`** sent in the authorization request is **not** listed exactly on your OAuth **Web client** (or does not match the client type rules for **Desktop** / **iOS** / **Android** clients).
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials** → open the **OAuth 2.0 Client ID** you use for this flow.
+2. Under **Authorized redirect URIs**, add the URI your app (or script) **actually sends** as `redirect_uri` — **character-for-character**:
+   - Same scheme: **`https`** vs **`http`**
+   - Same host: **`www`** vs apex, or custom domain vs default Vercel URL
+   - Same path and **trailing slash** if present (e.g. `https://yourdomain.com/callback` vs `https://yourdomain.com/callback/`)
+3. **Production vs local**: URIs you used for localhost **do not** apply to production. Add a **separate** entry for your live site (e.g. `https://app.yourdomain.com/api/.../callback` or whatever your auth library uses).
+4. After saving in Google Cloud, wait a minute and retry.
+
+To see the exact value Google rejected: open **error details** on Google’s error page, or inspect the first redirect to `accounts.google.com` and read the `redirect_uri=` query parameter — that string must appear in **Authorized redirect URIs**.
 
 ## Troubleshooting: `invalid_grant`
 
