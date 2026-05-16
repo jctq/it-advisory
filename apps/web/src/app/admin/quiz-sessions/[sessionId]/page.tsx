@@ -1,10 +1,16 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ObjectId } from 'mongodb';
+import { formatInTimeZone } from 'date-fns-tz';
+import {
+  BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
+  buildBookingCalendarLinkBundle,
+} from '@techmd/domain/booking-calendar-links';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
 import { QuizSessionAuditTable } from '@/components/admin/quiz-session-audit-table';
 import { findQuizSessionById, listQuizAuditForSession } from '@/lib/data/quiz-sessions';
+import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 
 type AdminQuizSessionDetailPageProps = {
   readonly params: Promise<{ readonly sessionId: string }>;
@@ -16,11 +22,15 @@ export const metadata = {
 
 export const dynamic = 'force-dynamic';
 
-const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-  timeZone: 'Asia/Manila',
-});
+function formatServiceKeyLabel(serviceKey: string): string {
+  const parts = serviceKey.split(/[-_]/).filter((part) => part.length > 0);
+  if (parts.length === 0) {
+    return 'Consultation';
+  }
+  return parts
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(' ');
+}
 
 export default async function AdminQuizSessionDetailPage(props: AdminQuizSessionDetailPageProps) {
   const { sessionId } = await props.params;
@@ -58,20 +68,20 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Created</dt>
             <dd className="mt-1 text-sm text-foreground">
-              {DATE_TIME_FORMATTER.format(new Date(session.createdAtIso))}
+              {formatInTimeZone(new Date(session.createdAtIso), 'Asia/Manila', 'MMM d, yyyy · h:mm a')}
             </dd>
           </div>
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Updated</dt>
             <dd className="mt-1 text-sm text-foreground">
-              {DATE_TIME_FORMATTER.format(new Date(session.updatedAtIso))}
+              {formatInTimeZone(new Date(session.updatedAtIso), 'Asia/Manila', 'MMM d, yyyy · h:mm a')}
             </dd>
           </div>
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Completed</dt>
             <dd className="mt-1 text-sm text-foreground">
               {session.completedAtIso !== null
-                ? DATE_TIME_FORMATTER.format(new Date(session.completedAtIso))
+                ? formatInTimeZone(new Date(session.completedAtIso), 'Asia/Manila', 'MMM d, yyyy · h:mm a')
                 : '—'}
             </dd>
           </div>
@@ -100,24 +110,70 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
           <p className="mt-1 text-sm text-muted-foreground">
             Web bookings that stored this quiz session id (`bookings.quizSessionId`).
           </p>
-          <ul className="mt-4 space-y-2">
-            {session.linkedBookings.map((booking) => (
-              <li
-                key={booking.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-              >
-                <span className="text-muted-foreground">
-                  {DATE_TIME_FORMATTER.format(new Date(booking.startsAtIso))} ·{' '}
-                  <span className="font-medium text-foreground">{booking.status}</span>
-                </span>
-                <Link
-                  href={`/admin/bookings/${booking.id}`}
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Open booking
-                </Link>
-              </li>
-            ))}
+          <ul className="mt-4 space-y-3">
+            {session.linkedBookings.map((booking) => {
+              const bookingReference = formatBookingReferenceId(booking.id);
+              const startsAt = new Date(booking.startsAtIso);
+              const meetingUrl =
+                booking.meetingUrl !== null && booking.meetingUrl.trim().length > 0 ? booking.meetingUrl.trim() : '';
+              const calendarBundle =
+                booking.status === 'confirmed'
+                  ? buildBookingCalendarLinkBundle({
+                      title: `${formatServiceKeyLabel(booking.serviceKey)} — ${bookingReference}`,
+                      description: `Booking reference ${bookingReference}. Quiz session ${session.id}.`,
+                      location: meetingUrl,
+                      startsAtUtc: startsAt,
+                      durationMinutes: BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
+                      icsUidSeed: bookingReference,
+                    })
+                  : null;
+              return (
+                <li key={booking.id} className="rounded-lg border border-border px-3 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-muted-foreground">
+                      {formatInTimeZone(startsAt, booking.timezone, 'MMM d, yyyy · h:mm a')}{' '}
+                      <span className="text-xs">({booking.timezone})</span> ·{' '}
+                      <span className="font-medium text-foreground">{booking.status}</span>
+                    </span>
+                    <Link
+                      href={`/admin/bookings/${booking.id}`}
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Open booking
+                    </Link>
+                  </div>
+                  {calendarBundle !== null ? (
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-medium">
+                      <a
+                        href={calendarBundle.googleCalendarUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        Google Calendar
+                      </a>
+                      <span className="text-muted-foreground">·</span>
+                      <a
+                        href={calendarBundle.outlookCalendarUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        Outlook
+                      </a>
+                      <span className="text-muted-foreground">·</span>
+                      <a
+                        href={calendarBundle.icsDataUrl}
+                        download={`booking-${bookingReference}.ics`}
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        Apple (.ics)
+                      </a>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}

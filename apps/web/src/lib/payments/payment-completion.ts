@@ -13,6 +13,7 @@ import { findPaymentTransactionById, updatePaymentTransactionStatus, type Paymen
 import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { getDb } from '@/lib/mongodb';
 import { executeSendBookingConfirmationEmail } from '@/lib/email/send-booking-confirmation-email';
+import { ensureVideoMeetingStoredForBooking } from '@/lib/video-meetings/ensure-video-meeting-for-booking';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
 async function resolveQuizSnapshot(
@@ -101,6 +102,7 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
       },
     },
   );
+  await ensureVideoMeetingStoredForBooking(bookingId);
   const updated = await updatePaymentTransactionStatus({
     transactionId: transaction.id,
     status: 'paid',
@@ -346,6 +348,7 @@ export async function markBookingPaidByAdmin(bookingId: string): Promise<boolean
   );
   const matched = result.matchedCount === 1;
   if (matched) {
+    await ensureVideoMeetingStoredForBooking(objectId);
     void executeSendBookingConfirmationEmail({
       bookingId,
       transaction: null,

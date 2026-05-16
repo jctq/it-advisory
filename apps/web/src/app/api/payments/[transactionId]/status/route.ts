@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { findBookingById } from '@/lib/data/bookings';
 import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
 import { completeMockPayment, ensurePaidTransactionFulfilled } from '@/lib/payments/payment-completion';
 import { reconcilePaymentTransactionIfPending } from '@/lib/payments/payment-reconciliation';
@@ -22,6 +23,17 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
   }
   transaction = await reconcilePaymentTransactionIfPending(transaction);
   transaction = await ensurePaidTransactionFulfilled(transaction);
+  let meetingUrl: string | null = null;
+  let bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null = null;
+  const bookingIdHex = transaction.bookingId?.trim() ?? '';
+  if (bookingIdHex.length > 0) {
+    const booking = await findBookingById(bookingIdHex);
+    if (booking !== null) {
+      bookingStatus = booking.status;
+      const raw = booking.meetingUrl?.trim();
+      meetingUrl = raw !== undefined && raw.length > 0 ? raw : null;
+    }
+  }
   return NextResponse.json({
     transactionId: transaction.id,
     status: transaction.status,
@@ -33,5 +45,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     timezone: transaction.timezone,
     paidAtIso: transaction.paidAtIso,
     expiresAtIso: transaction.expiresAtIso,
+    meetingUrl,
+    bookingStatus,
   });
 }

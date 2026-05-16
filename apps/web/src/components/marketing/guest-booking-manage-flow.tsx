@@ -2,15 +2,18 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { AlertCircle, CalendarClock, CheckCircle2, CreditCard, Loader2, Search } from 'lucide-react';
+import { AlertCircle, CalendarClock, CheckCircle2, CreditCard, Loader2, Search, Video } from 'lucide-react';
 import {
+  createAccountBookingManageCheckout,
   createGuestBookingManageCheckout,
+  lookupAccountManagedBooking,
   lookupGuestBooking,
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
 } from '@techmd/api-client/marketing-booking-manage-api-client';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import {
   fetchPaymentConfigPublic,
   type PaymentConfigPublic,
@@ -20,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { cn } from '@/lib/utils';
 
 function resolveMarketingClientApiBaseUrl(): string {
@@ -31,6 +35,12 @@ function resolveMarketingClientApiBaseUrl(): string {
 }
 
 const MARKETING_CLIENT_API_BASE_URL = resolveMarketingClientApiBaseUrl();
+
+const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
+
+type ManageAuthContext =
+  | { readonly kind: 'guest'; readonly credentials: GuestBookingManageCredentials }
+  | { readonly kind: 'account'; readonly bookingId: string };
 
 type ManagePhase = 'lookup' | 'result' | 'paying';
 
@@ -70,14 +80,54 @@ export function GuestBookingManageFlow(): ReactElement {
   const [bookingReference, setBookingReference] = useState('');
   const [email, setEmail] = useState('');
   const [phoneLastFour, setPhoneLastFour] = useState('');
-  const [credentials, setCredentials] = useState<GuestBookingManageCredentials | null>(null);
+  const [manageContext, setManageContext] = useState<ManageAuthContext | null>(null);
   const [booking, setBooking] = useState<GuestBookingManageView | null>(null);
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfigPublic | null>(null);
   const [selectedGatewayId, setSelectedGatewayId] = useState<PaymentGatewayId | null>(null);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAccountBootstrapLoading, setIsAccountBootstrapLoading] = useState(false);
   const paymentCancelled = searchParams.get('payment') === 'cancelled';
+  const hasAppliedBookingReferenceQueryRef = useRef(false);
+  const hasAttemptedAccountBookingBootstrapRef = useRef(false);
+  useEffect(() => {
+    if (hasAppliedBookingReferenceQueryRef.current) {
+      return;
+    }
+    const fromQuery = searchParams.get('bookingReference')?.trim();
+    if (fromQuery !== undefined && fromQuery.length > 0) {
+      setBookingReference(fromQuery);
+      hasAppliedBookingReferenceQueryRef.current = true;
+    }
+  }, [searchParams]);
+  useEffect(() => {
+    if (hasAttemptedAccountBookingBootstrapRef.current) {
+      return;
+    }
+    const bookingIdFromQuery = searchParams.get('bookingId')?.trim() ?? '';
+    if (!MONGO_OBJECT_ID_HEX.test(bookingIdFromQuery)) {
+      return;
+    }
+    hasAttemptedAccountBookingBootstrapRef.current = true;
+    setIsAccountBootstrapLoading(true);
+    setErrorMessage(null);
+    void lookupAccountManagedBooking({
+      apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+      bookingId: bookingIdFromQuery,
+    })
+      .then((result) => {
+        setManageContext({ kind: 'account', bookingId: bookingIdFromQuery });
+        setBooking(result);
+        setPhase('result');
+      })
+      .catch((error: unknown) => {
+        setErrorMessage(error instanceof Error ? error.message : 'Booking lookup failed.');
+      })
+      .finally(() => {
+        setIsAccountBootstrapLoading(false);
+      });
+  }, [searchParams]);
   useEffect(() => {
     const controller = new AbortController();
     void fetchPaymentConfigPublic({ apiBaseUrl: MARKETING_CLIENT_API_BASE_URL, signal: controller.signal })
@@ -122,7 +172,7 @@ export function GuestBookingManageFlow(): ReactElement {
           apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
           credentials: nextCredentials,
         });
-        setCredentials(nextCredentials);
+        setManageContext({ kind: 'guest', credentials: nextCredentials });
         setBooking(result);
         setPhase('result');
       } catch (error: unknown) {
@@ -134,21 +184,31 @@ export function GuestBookingManageFlow(): ReactElement {
     [bookingReference, email, phoneLastFour],
   );
   const executePay = useCallback(async (): Promise<void> => {
-    if (credentials === null || booking === null || selectedGatewayId === null || selectedPaymentMethodId === null) {
+    if (manageContext === null || booking === null || selectedGatewayId === null || selectedPaymentMethodId === null) {
       return;
     }
     setErrorMessage(null);
     setIsSubmitting(true);
     setPhase('paying');
     try {
-      const result = await createGuestBookingManageCheckout({
-        apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
-        appBaseUrl: MARKETING_CLIENT_API_BASE_URL.length > 0 ? MARKETING_CLIENT_API_BASE_URL : undefined,
-        credentials,
-        gatewayId: selectedGatewayId,
-        paymentMethodId: selectedPaymentMethodId,
-        paymentMethodLabel: selectedGateway?.methods.find((method) => method.id === selectedPaymentMethodId)?.label,
-      });
+      const result =
+        manageContext.kind === 'guest'
+          ? await createGuestBookingManageCheckout({
+              apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+              appBaseUrl: MARKETING_CLIENT_API_BASE_URL.length > 0 ? MARKETING_CLIENT_API_BASE_URL : undefined,
+              credentials: manageContext.credentials,
+              gatewayId: selectedGatewayId,
+              paymentMethodId: selectedPaymentMethodId,
+              paymentMethodLabel: selectedGateway?.methods.find((method) => method.id === selectedPaymentMethodId)?.label,
+            })
+          : await createAccountBookingManageCheckout({
+              apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+              appBaseUrl: MARKETING_CLIENT_API_BASE_URL.length > 0 ? MARKETING_CLIENT_API_BASE_URL : undefined,
+              bookingId: manageContext.bookingId,
+              gatewayId: selectedGatewayId,
+              paymentMethodId: selectedPaymentMethodId,
+              paymentMethodLabel: selectedGateway?.methods.find((method) => method.id === selectedPaymentMethodId)?.label,
+            });
       if (result.redirectUrl !== null && result.redirectUrl.length > 0) {
         window.location.assign(result.redirectUrl);
         return;
@@ -167,14 +227,23 @@ export function GuestBookingManageFlow(): ReactElement {
     } finally {
       setIsSubmitting(false);
     }
-  }, [booking, credentials, selectedGateway, selectedGatewayId, selectedPaymentMethodId]);
+  }, [booking, manageContext, selectedGateway, selectedGatewayId, selectedPaymentMethodId]);
   const resetLookup = (): void => {
     setPhase('lookup');
     setBooking(null);
-    setCredentials(null);
+    setManageContext(null);
     setErrorMessage(null);
   };
-  if (phase === 'lookup' || booking === null || credentials === null) {
+  if (isAccountBootstrapLoading) {
+    return (
+      <div className="mx-auto flex max-w-lg flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-card px-8 py-16 shadow-xs">
+        <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+        <p className="text-center text-sm font-medium text-foreground">Opening your booking…</p>
+        <p className="text-center text-xs text-muted-foreground">Signed-in lookup — no need to re-enter email or phone.</p>
+      </div>
+    );
+  }
+  if (phase === 'lookup' || booking === null || manageContext === null) {
     return (
       <LookupForm
         bookingReference={bookingReference}
@@ -346,6 +415,13 @@ type ResultViewProps = {
 
 function ResultView(props: ResultViewProps): ReactElement {
   const hasMultipleGateways = (props.paymentConfig?.gateways.length ?? 0) > 1;
+  const bookingTitle =
+    props.booking.serviceKey === 'project-rescue' ? PROJECT_RESCUE_SERVICE_TITLE : props.booking.serviceKey;
+  const manageBase = typeof window !== 'undefined' ? window.location.origin : '';
+  const calendarDescription =
+    manageBase.length > 0
+      ? `Booking reference ${props.booking.bookingReference}. Manage: ${manageBase}/book/manage`
+      : `Booking reference ${props.booking.bookingReference}.`;
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
@@ -366,6 +442,16 @@ function ResultView(props: ResultViewProps): ReactElement {
               <dd className="text-xs text-muted-foreground">{props.booking.timezone}</dd>
             </div>
           </div>
+          {props.booking.status === 'confirmed' ? (
+            <AddToCalendarButtons
+              className="mt-2 pl-8"
+              startsAtIso={props.booking.startsAtIso}
+              title={bookingTitle}
+              description={calendarDescription}
+              location={props.booking.meetingUrl ?? undefined}
+              icsUidSeed={props.booking.bookingReference}
+            />
+          ) : null}
           <div>
             <dt className="text-xs font-medium text-muted-foreground">Name</dt>
             <dd className="text-sm font-semibold text-foreground">{props.booking.customerName}</dd>
@@ -382,7 +468,22 @@ function ResultView(props: ResultViewProps): ReactElement {
         {props.booking.status === 'confirmed' ? (
           <div className="mt-6 flex gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
             <CheckCircle2 className="size-4 shrink-0" aria-hidden />
-            <p>Your booking is confirmed. Check your email for meeting details.</p>
+            <div className="min-w-0 space-y-2">
+              <p>Your booking is confirmed. Check your email for meeting details.</p>
+              {props.booking.meetingUrl !== null ? (
+                <p className="flex flex-wrap items-center gap-2">
+                  <Video className="size-4 shrink-0" aria-hidden />
+                  <a
+                    href={props.booking.meetingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-emerald-900 underline-offset-4 hover:underline dark:text-emerald-200"
+                  >
+                    Join video meeting
+                  </a>
+                </p>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {props.booking.payBlockedReason !== null ? (

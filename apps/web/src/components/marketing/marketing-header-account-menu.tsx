@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronDown, LogOut, LayoutList, User } from 'lucide-react';
+import { CalendarDays, ChevronDown, LogOut, LayoutList, User } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import type { AuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -115,6 +115,15 @@ export function MarketingHeaderAccountMenu(props: MarketingHeaderAccountMenuProp
           >
             <LayoutList className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             My diagnostics
+          </Link>
+          <Link
+            href="/book/manage"
+            role="menuitem"
+            className="flex items-center gap-2 px-3 py-2.5 text-sm text-popover-foreground hover:bg-accent"
+            onClick={() => setOpen(false)}
+          >
+            <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            Manage booking
           </Link>
           <button
             type="button"

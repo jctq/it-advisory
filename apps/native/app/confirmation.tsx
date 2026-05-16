@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';
@@ -32,11 +32,19 @@ function formatDisplayDate(isoDate: string | undefined): string {
 export default function ConfirmationScreen() {
   const router = useRouter();
   const theme = useAppTheme();
-  const params = useLocalSearchParams<{ date?: string; time?: string }>();
+  const params = useLocalSearchParams<{ date?: string; time?: string; meetingUrl?: string | string[] }>();
   const { executeReset } = useDiagnosticFlow();
   const hasResetRef = useRef<boolean>(false);
   const displayDate = formatDisplayDate(params.date);
   const displayTime = params.time ?? 'your selected time';
+  const rawMeetingParam = params.meetingUrl;
+  const meetingUrlFromParams =
+    typeof rawMeetingParam === 'string'
+      ? rawMeetingParam.trim()
+      : Array.isArray(rawMeetingParam) && typeof rawMeetingParam[0] === 'string'
+        ? rawMeetingParam[0].trim()
+        : '';
+  const meetingUrl = meetingUrlFromParams.length > 0 ? meetingUrlFromParams : null;
 
   useEffect((): void => {
     if (hasResetRef.current) {
@@ -49,7 +57,11 @@ export default function ConfirmationScreen() {
   return (
     <AppScreen
       title="You're all set"
-      subtitle="Your consultation slot is reserved. Email and calendar automation can be connected next."
+      subtitle={
+        meetingUrl !== null
+          ? 'Your booking is confirmed. Use the meeting link below or check your email for the same join URL.'
+          : 'Your consultation slot is reserved. Check your email for confirmation and meeting details.'
+      }
       footer={
         <View style={styles.footerGroup}>
           <AppButton iconName="home-outline" onPress={() => router.replace('/(tabs)')} showTrailingIcon>
@@ -70,8 +82,23 @@ export default function ConfirmationScreen() {
         </View>
         <View style={styles.summaryRow}>
           <ThemedText style={[styles.summaryLabel, { color: theme.textMuted }]}>Format</ThemedText>
-          <ThemedText style={[styles.summaryValue, { color: theme.text }]}>Remote video call</ThemedText>
-          <ThemedText style={[styles.summaryMeta, { color: theme.textMuted }]}>Meeting link can be sent when email delivery is wired.</ThemedText>
+          <ThemedText style={[styles.summaryValue, { color: theme.text }]}>Video call</ThemedText>
+          {meetingUrl !== null ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Open video meeting"
+              onPress={() => {
+                void Linking.openURL(meetingUrl);
+              }}
+              style={({ pressed }) => [styles.joinLink, { opacity: pressed ? 0.85 : 1 }]}
+            >
+              <ThemedText style={[styles.joinLinkText, { color: theme.primary }]}>Open meeting</ThemedText>
+            </Pressable>
+          ) : (
+            <ThemedText style={[styles.summaryMeta, { color: theme.textMuted }]}>
+              The join link is sent by email after payment is confirmed.
+            </ThemedText>
+          )}
         </View>
       </AppCard>
     </AppScreen>
@@ -104,5 +131,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     marginTop: 6,
+  },
+  joinLink: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+  },
+  joinLinkText: {
+    fontSize: 16,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

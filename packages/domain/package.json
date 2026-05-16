@@ -5,10 +5,12 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./booking-calendar-links": "./src/booking-calendar-links.ts",
     "./booking-schedule": "./src/booking-schedule.ts",
     "./collections": "./src/collections.ts",
     "./diagnostic-settings-bounds": "./src/diagnostic-settings-bounds.ts",
     "./email-types": "./src/email-types.ts",
+    "./meeting-types": "./src/meeting-types.ts",
     "./payment-types": "./src/payment-types.ts",
     "./philippine-mobile-phone": "./src/philippine-mobile-phone.ts",
     "./types": "./src/types.ts",

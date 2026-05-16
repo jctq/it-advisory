@@ -58,7 +58,22 @@ export function BookingsTable({ initialData }: BookingsTableProps) {
       }),
       columnHelper.accessor('meetingUrl', {
         header: 'Meeting',
-        cell: (info) => info.getValue() ?? '—',
+        cell: (info) => {
+          const url = info.getValue();
+          if (url === undefined || url === null || url.trim().length === 0) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Open
+            </a>
+          );
+        },
       }),
     ],
     [],

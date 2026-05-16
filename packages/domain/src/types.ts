@@ -73,6 +73,12 @@ export type BookingDocument = {
   paymentProviderRef?: string | null;
   paymentExpiresAt?: Date | null;
   meetingUrl?: string;
+  /** Zoom meeting id when created via API — used to avoid duplicate creates. */
+  zoomMeetingId?: string;
+  /** Google Calendar event id when Meet was attached via API. */
+  googleMeetEventId?: string;
+  /** Microsoft Graph online meeting id when created via API. */
+  teamsOnlineMeetingId?: string;
   /** Raw guided diagnostic JSON (string or legacy object stringified) at booking time — full rounds, questions, options. */
   guidedDiagnosticSnapshot?: string | null;
   quizSessionId?: ObjectId | null;

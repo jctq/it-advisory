@@ -19,6 +19,7 @@ const NAV_LINKS: readonly { readonly href: string; readonly label: string }[] = 
   { href: '/#services', label: 'Services' },
   { href: '/#about', label: 'About' },
   { href: '/#resources', label: 'Resources' },
+  { href: '/book/manage', label: 'Manage booking' },
 ] as const;
 
 export type SiteHeaderClientProps = {
@@ -157,6 +158,12 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                         className="block rounded-lg px-3 py-2 text-sm font-medium text-popover-foreground hover:bg-accent"
                       >
                         My diagnostics
+                      </Link>
+                      <Link
+                        href="/book/manage"
+                        className="block rounded-lg px-3 py-2 text-sm font-medium text-popover-foreground hover:bg-accent"
+                      >
+                        Manage booking
                       </Link>
                       <button
                         type="button"

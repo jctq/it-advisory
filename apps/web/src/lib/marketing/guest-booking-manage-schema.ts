@@ -15,3 +15,22 @@ export const guestBookingManageCheckoutSchema = guestBookingManageCredentialsSch
   appBaseUrl: z.string().max(240).optional(),
   nativeInAppPaymentReturn: z.boolean().optional(),
 });
+
+const mongoObjectIdHexSchema = z
+  .string()
+  .trim()
+  .length(24)
+  .regex(/^[a-f0-9]+$/i, 'Invalid booking id.');
+
+export const accountBookingManageLookupSchema = z.object({
+  bookingId: mongoObjectIdHexSchema,
+});
+
+export const accountBookingManageCheckoutSchema = z.object({
+  bookingId: mongoObjectIdHexSchema,
+  gatewayId: z.enum(PAYMENT_GATEWAY_IDS),
+  paymentMethodId: z.string().min(1).max(64),
+  paymentMethodLabel: z.string().min(1).max(120).optional(),
+  appBaseUrl: z.string().max(240).optional(),
+  nativeInAppPaymentReturn: z.boolean().optional(),
+});

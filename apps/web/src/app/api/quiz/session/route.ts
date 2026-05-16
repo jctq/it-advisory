@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { countBookingsByQuizSessionId } from '@/lib/data/bookings';
+import { countBookingsByQuizSessionId, findPrimaryBookingSlotByQuizSessionId } from '@/lib/data/bookings';
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import {
   deleteQuizSessionForVisitor,
@@ -76,6 +76,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
   }
   const bookedCount = await countBookingsByQuizSessionId(session._id);
+  const linkedBookingSlot =
+    bookedCount > 0 ? await findPrimaryBookingSlotByQuizSessionId(session._id) : null;
   return NextResponse.json({
     session: {
       answers: session.answers,
@@ -83,6 +85,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     },
     readOnly: bookedCount > 0,
     sessionId: encodeQuizSessionRefForMarketingUrl(session._id.toString()),
+    linkedBookingSlot:
+      linkedBookingSlot === null
+        ? null
+        : {
+            status: linkedBookingSlot.status,
+            startsAtIso: linkedBookingSlot.startsAtIso,
+            timezone: linkedBookingSlot.timezone,
+            serviceKey: linkedBookingSlot.serviceKey,
+            meetingUrl: linkedBookingSlot.meetingUrl,
+          },
   });
 }
 

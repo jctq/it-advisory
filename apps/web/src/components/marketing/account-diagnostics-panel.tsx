@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardCopy, Plus, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +28,7 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
+import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import type {
   PaginatedVisitorQuizSessionsResult,
@@ -39,6 +41,8 @@ const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const MY_SESSIONS_API_URL = '/api/quiz/my-sessions';
 const PAGE_SIZE = 8;
 const BOOKING_REFERENCE_DEBOUNCE_MS = 350;
+
+const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
   dateStyle: 'medium',
@@ -53,9 +57,10 @@ const TABLE_COLUMN_CLASS_NAMES: Record<string, string> = {
   updatedAtIso: 'w-[11.5rem]',
   diagnosticStatus: 'w-[7.5rem]',
   bookingStatus: 'w-[7.5rem]',
+  bookingSession: 'min-w-[14rem]',
   situationPreview: 'min-w-[12rem]',
   currentStep: 'w-[4.5rem]',
-  actions: 'w-[8.5rem]',
+  actions: 'min-w-[14rem]',
 };
 
 function BookingReferenceCell(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
@@ -116,6 +121,13 @@ function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }):
   );
 }
 
+function buildBookManageHref(bookingId: string | null): string {
+  if (bookingId !== null && MONGO_OBJECT_ID_HEX.test(bookingId)) {
+    return `/book/manage?bookingId=${encodeURIComponent(bookingId)}`;
+  }
+  return '/book/manage';
+}
+
 function SessionActions(props: {
   readonly row: VisitorQuizSessionSummary;
   readonly deletingId: string | null;
@@ -124,9 +136,14 @@ function SessionActions(props: {
   return (
     <div className="flex flex-wrap justify-end gap-2">
       {props.row.isBooked ? (
-        <Button type="button" variant="outline" size="sm" asChild>
-          <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
-        </Button>
+        <>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
+          </Button>
+          <Button type="button" variant="secondary" size="sm" asChild>
+            <Link href={buildBookManageHref(props.row.bookingId)}>Manage</Link>
+          </Button>
+        </>
       ) : (
         <Button type="button" size="sm" asChild>
           <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>Continue</Link>
@@ -299,6 +316,43 @@ export function AccountDiagnosticsPanel(): ReactElement {
         id: 'bookingStatus',
         header: 'Booking',
         cell: (info) => <BookingStatusBadge row={info.row.original} />,
+      }),
+      columnHelper.display({
+        id: 'bookingSession',
+        header: 'Scheduled session',
+        cell: (info) => {
+          const row = info.row.original;
+          if (row.bookingStartsAtIso === null || row.bookingTimezone === null) {
+            return <span className="text-sm text-muted-foreground">—</span>;
+          }
+          const slotFormatter = new Intl.DateTimeFormat('en-PH', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+            timeZone: row.bookingTimezone,
+          });
+          const title =
+            row.bookingServiceKey === 'project-rescue'
+              ? PROJECT_RESCUE_SERVICE_TITLE
+              : row.bookingServiceKey ?? 'Consultation';
+          return (
+            <div className="flex max-w-[18rem] flex-col gap-2">
+              <span className="text-xs text-muted-foreground">{slotFormatter.format(new Date(row.bookingStartsAtIso))}</span>
+              {row.bookingStatus === 'confirmed' ? (
+                <AddToCalendarButtons
+                  startsAtIso={row.bookingStartsAtIso}
+                  title={title}
+                  description={
+                    row.bookingReferenceId !== null
+                      ? `Booking reference ${row.bookingReferenceId}. Account diagnostics.`
+                      : 'Account diagnostics.'
+                  }
+                  location={row.bookingMeetingUrl ?? undefined}
+                  icsUidSeed={row.bookingReferenceId ?? row.bookingStartsAtIso}
+                />
+              ) : null}
+            </div>
+          );
+        },
       }),
       columnHelper.accessor('situationPreview', {
         id: 'situationPreview',

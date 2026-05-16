@@ -25,8 +25,9 @@ import {
   type PaymentConfigPublic,
 } from '@techmd/api-client/marketing-payment-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
-import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SESSION_DURATION } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SESSION_DURATION } from '@techmd/diagnostic-core/project-rescue-service-context';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
+import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +39,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
 import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-slot-times-for-manila-date';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
@@ -139,6 +141,11 @@ function addManilaYearMonth(manilaYearMonth: string, deltaMonths: number): strin
 type ConfirmedSlotDisplay = {
   readonly dateLong: string;
   readonly timeLabel: string;
+};
+
+type ConfirmedCalendarSlot = {
+  readonly startsAtIso: string;
+  readonly timezone: string;
 };
 
 function formatConfirmedSlotFromStartsAt(startsAtIso: string, timezone: string): ConfirmedSlotDisplay {
@@ -270,7 +277,10 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successPaymentLabel, setSuccessPaymentLabel] = useState<string>('');
   const [confirmedBookingReference, setConfirmedBookingReference] = useState<string | null>(null);
+  const [confirmedMeetingUrl, setConfirmedMeetingUrl] = useState<string | null>(null);
   const [confirmedSlotDisplay, setConfirmedSlotDisplay] = useState<ConfirmedSlotDisplay | null>(null);
+  const [confirmedCalendarSlot, setConfirmedCalendarSlot] = useState<ConfirmedCalendarSlot | null>(null);
+  const [successBookingStatus, setSuccessBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled' | null>(null);
 
   const checkoutAmountLabel = paymentConfig?.checkoutAmountLabel ?? DEFAULT_CHECKOUT_AMOUNT_LABEL;
   useEffect(() => {
@@ -351,10 +361,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           setPhase('error');
           return;
         }
+        const meetingTrimmed = result.meetingUrl?.trim() ?? '';
+        setConfirmedMeetingUrl(meetingTrimmed.length > 0 ? meetingTrimmed : null);
+        setSuccessBookingStatus(result.bookingStatus);
         if (result.startsAtIso !== null) {
           setConfirmedSlotDisplay(
             formatConfirmedSlotFromStartsAt(result.startsAtIso, result.timezone ?? PRIMARY_TIMEZONE),
           );
+          setConfirmedCalendarSlot({
+            startsAtIso: result.startsAtIso,
+            timezone: result.timezone ?? PRIMARY_TIMEZONE,
+          });
         }
         setSuccessPaymentLabel(result.paymentMethodLabel ?? result.gatewayId);
         if (result.bookingId !== null) {
@@ -629,8 +646,19 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         if (session.manualConfirm || session.redirectUrl === null) {
           void router.refresh();
           setSuccessPaymentLabel(resolvedPaymentLabel);
+          setSuccessBookingStatus(session.bookingStatus ?? null);
           if (session.bookingId !== null) {
             setConfirmedBookingReference(formatBookingReferenceId(session.bookingId));
+          }
+          try {
+            const slotUtc = parseBookingSlotToUtc(dateParam, selectedTime);
+            setConfirmedSlotDisplay({
+              dateLong: formatInTimeZone(slotUtc, PRIMARY_TIMEZONE, 'EEEE, MMMM d, yyyy'),
+              timeLabel: formatInTimeZone(slotUtc, PRIMARY_TIMEZONE, 'h:mm a'),
+            });
+            setConfirmedCalendarSlot({ startsAtIso: slotUtc.toISOString(), timezone: PRIMARY_TIMEZONE });
+          } catch {
+            // Leave labels from the picker when parsing fails unexpectedly.
           }
           setPhase('success');
           return;
@@ -698,6 +726,42 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         typeof (payload as { bookingId?: unknown }).bookingId === 'string'
           ? (payload as { bookingId: string }).bookingId
           : null;
+      const startsAtIsoFromServer =
+        typeof payload === 'object' &&
+        payload !== null &&
+        'startsAtIso' in payload &&
+        typeof (payload as { startsAtIso?: unknown }).startsAtIso === 'string'
+          ? (payload as { startsAtIso: string }).startsAtIso
+          : null;
+      const timezoneFromServer =
+        typeof payload === 'object' &&
+        payload !== null &&
+        'timezone' in payload &&
+        typeof (payload as { timezone?: unknown }).timezone === 'string'
+          ? (payload as { timezone: string }).timezone
+          : PRIMARY_TIMEZONE;
+      const bookingStatusRaw =
+        typeof payload === 'object' && payload !== null && 'bookingStatus' in payload
+          ? (payload as { bookingStatus?: unknown }).bookingStatus
+          : null;
+      const parsedBookingStatus =
+        bookingStatusRaw === 'pending' || bookingStatusRaw === 'confirmed' || bookingStatusRaw === 'cancelled'
+          ? bookingStatusRaw
+          : null;
+      setSuccessBookingStatus(parsedBookingStatus);
+      const resolvedStartsIso =
+        startsAtIsoFromServer ??
+        ((): string | null => {
+          try {
+            return parseBookingSlotToUtc(dateParam, selectedTime).toISOString();
+          } catch {
+            return null;
+          }
+        })();
+      if (resolvedStartsIso !== null) {
+        setConfirmedCalendarSlot({ startsAtIso: resolvedStartsIso, timezone: timezoneFromServer });
+        setConfirmedSlotDisplay(formatConfirmedSlotFromStartsAt(resolvedStartsIso, timezoneFromServer));
+      }
       if (bookingId !== null) {
         setConfirmedBookingReference(formatBookingReferenceId(bookingId));
       }
@@ -791,6 +855,20 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               <p className="text-sm font-semibold text-foreground">{confirmedDateLong}</p>
               <p className="text-sm font-semibold text-foreground">{confirmedTimeLabel}</p>
               <p className="text-xs text-muted-foreground">{PRIMARY_TIMEZONE}</p>
+              {confirmedCalendarSlot !== null && successBookingStatus === 'confirmed' ? (
+                <AddToCalendarButtons
+                  className="mt-3"
+                  startsAtIso={confirmedCalendarSlot.startsAtIso}
+                  title={PROJECT_RESCUE_SERVICE_TITLE}
+                  description={
+                    confirmedBookingReference !== null
+                      ? `Booking reference ${confirmedBookingReference}. ${PROJECT_RESCUE_SERVICE_TAGLINE}`
+                      : PROJECT_RESCUE_SERVICE_TAGLINE
+                  }
+                  icsUidSeed={confirmedBookingReference ?? confirmedCalendarSlot.startsAtIso}
+                  location={confirmedMeetingUrl ?? undefined}
+                />
+              ) : null}
             </div>
           </div>
           <div className="flex gap-3 border-t border-border pt-4">
@@ -799,8 +877,30 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             </span>
             <div>
               <p className="text-xs font-medium text-muted-foreground">Meeting</p>
-              <p className="text-sm font-semibold text-foreground">Zoom meeting</p>
-              <p className="text-xs text-muted-foreground">A calendar invite and meeting link has been sent to your email.</p>
+              {confirmedMeetingUrl !== null ? (
+                <>
+                  <p className="text-sm font-semibold text-foreground">Video call</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Join link:{' '}
+                    <a
+                      href={confirmedMeetingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Open meeting
+                    </a>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">The same link is in your confirmation email.</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-foreground">Video meeting</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your confirmation email will include the join link once the meeting is provisioned.
+                  </p>
+                </>
+              )}
             </div>
           </div>
           {confirmedBookingReference !== null ? (

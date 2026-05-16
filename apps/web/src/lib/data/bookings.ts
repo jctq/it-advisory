@@ -18,6 +18,9 @@ export type BookingRow = {
   timezone: string;
   status: BookingDocument['status'];
   meetingUrl?: string;
+  zoomMeetingId?: string;
+  googleMeetEventId?: string;
+  teamsOnlineMeetingId?: string;
   /** Linked checkout transaction when payment was taken online. */
   paymentTransactionId: string | null;
   hasDiagnosticSnapshot: boolean;
@@ -39,6 +42,9 @@ function mapBooking(
     timezone: doc.timezone,
     status: doc.status,
     meetingUrl: doc.meetingUrl,
+    zoomMeetingId: doc.zoomMeetingId,
+    googleMeetEventId: doc.googleMeetEventId,
+    teamsOnlineMeetingId: doc.teamsOnlineMeetingId,
     paymentTransactionId:
       doc.paymentTransactionId !== undefined && doc.paymentTransactionId !== null
         ? doc.paymentTransactionId.toString()
@@ -313,4 +319,41 @@ export async function countBookingsByQuizSessionId(sessionId: ObjectId): Promise
   }
   const db = await getDb();
   return db.collection<BookingDocument>(COLLECTIONS.bookings).countDocuments({ quizSessionId: sessionId });
+}
+
+export type PrimaryBookingSlotRow = {
+  readonly status: BookingDocument['status'];
+  readonly startsAtIso: string;
+  readonly timezone: string;
+  readonly serviceKey: string;
+  readonly meetingUrl: string | null;
+};
+
+/**
+ * Earliest booking row for a quiz session (matches the paginated account list lookup order).
+ */
+export async function findPrimaryBookingSlotByQuizSessionId(quizSessionId: ObjectId): Promise<PrimaryBookingSlotRow | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const db = await getDb();
+  const doc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
+    { quizSessionId },
+    {
+      sort: { createdAt: 1 },
+      projection: { status: 1, startsAt: 1, timezone: 1, serviceKey: 1, meetingUrl: 1 },
+    },
+  );
+  if (doc === null || doc._id === undefined || doc.startsAt === undefined) {
+    return null;
+  }
+  const meetingRaw = doc.meetingUrl;
+  const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+  return {
+    status: doc.status,
+    startsAtIso: doc.startsAt.toISOString(),
+    timezone: doc.timezone,
+    serviceKey: doc.serviceKey,
+    meetingUrl,
+  };
 }

@@ -1,13 +1,28 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import {
+  BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
+  buildBookingCalendarLinkBundle,
+} from '@techmd/domain/booking-calendar-links';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
 import { MarkBookingPaidButton } from '@/components/admin/mark-booking-paid-button';
 import { findBookingById } from '@/lib/data/bookings';
+import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 
 type AdminBookingDetailPageProps = {
   readonly params: Promise<{ readonly bookingId: string }>;
 };
+
+function formatServiceKeyLabel(serviceKey: string): string {
+  const parts = serviceKey.split(/[-_]/).filter((part) => part.length > 0);
+  if (parts.length === 0) {
+    return 'Consultation';
+  }
+  return parts
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(' ');
+}
 
 export default async function AdminBookingDetailPage(props: AdminBookingDetailPageProps) {
   const { bookingId } = await props.params;
@@ -15,6 +30,23 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
   if (booking === null) {
     notFound();
   }
+  const bookingReference = formatBookingReferenceId(booking.id);
+  const startsAt = new Date(booking.startsAtIso);
+  const meetingUrl =
+    booking.meetingUrl !== undefined && typeof booking.meetingUrl === 'string' && booking.meetingUrl.trim().length > 0
+      ? booking.meetingUrl.trim()
+      : '';
+  const calendarBundle =
+    booking.status === 'confirmed'
+      ? buildBookingCalendarLinkBundle({
+          title: `${formatServiceKeyLabel(booking.serviceKey)} — ${bookingReference}`,
+          description: `Booking reference ${bookingReference}. Admin booking id ${booking.id}.`,
+          location: meetingUrl,
+          startsAtUtc: startsAt,
+          durationMinutes: BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
+          icsUidSeed: bookingReference,
+        })
+      : null;
   return (
     <section className="mx-auto space-y-8">
       <AdminPageHeader
@@ -55,6 +87,38 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Timezone</dt>
             <dd className="mt-1 text-sm text-foreground">{booking.timezone}</dd>
           </div>
+          {calendarBundle !== null ? (
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Add to calendar</dt>
+              <dd className="mt-2 flex flex-wrap gap-2 text-sm">
+                <a
+                  href={calendarBundle.googleCalendarUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Google Calendar
+                </a>
+                <span className="text-muted-foreground">·</span>
+                <a
+                  href={calendarBundle.outlookCalendarUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Outlook
+                </a>
+                <span className="text-muted-foreground">·</span>
+                <a
+                  href={calendarBundle.icsDataUrl}
+                  download={`booking-${bookingReference}.ics`}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Apple (.ics)
+                </a>
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lead id</dt>
             <dd className="mt-1 font-mono text-sm text-foreground">{booking.leadId}</dd>

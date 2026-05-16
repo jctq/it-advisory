@@ -1,7 +1,12 @@
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import { findPaymentMethodOption, type PaymentGatewayId, type PaymentTransactionDocument } from '@/domain/payment-types';
-import { findVerifiedGuestBookingForCheckout, type GuestBookingManageCredentials } from '@/lib/data/booking-guest-manage';
+import {
+  findVerifiedAccountBookingForCheckout,
+  findVerifiedGuestBookingForCheckout,
+  type GuestBookingManageCredentials,
+  type VerifiedGuestBooking,
+} from '@/lib/data/booking-guest-manage';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
@@ -12,6 +17,14 @@ import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-
 
 type ResumeCheckoutParams = {
   readonly credentials: GuestBookingManageCredentials;
+  readonly gatewayId: PaymentGatewayId;
+  readonly paymentMethodId: string;
+  readonly paymentMethodLabel?: string;
+  readonly appBaseUrl: string;
+  readonly nativeInAppPaymentReturn?: boolean;
+};
+
+type ResumeCheckoutCommonParams = {
   readonly gatewayId: PaymentGatewayId;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
@@ -41,20 +54,10 @@ async function updateTransactionProvider(
   );
 }
 
-/**
- * Starts a new gateway checkout for an existing pending booking (guest manage flow).
- */
-export async function createPaymentCheckoutForExistingBooking(
-  params: ResumeCheckoutParams,
+async function createPaymentCheckoutForVerifiedBooking(
+  verified: VerifiedGuestBooking,
+  params: ResumeCheckoutCommonParams,
 ): Promise<CreateCheckoutSessionResult> {
-  const verified = await findVerifiedGuestBookingForCheckout(params.credentials);
-  if (verified === null) {
-    return {
-      ok: false,
-      code: 'booking_not_payable',
-      error: 'This booking cannot be paid online. Check your details or contact support.',
-    };
-  }
   const publicSettings = await getPaymentSettingsPublicView();
   if (!publicSettings.paymentsEnabled) {
     return { ok: false, code: 'payments_disabled', error: 'Online payments are not enabled.' };
@@ -109,12 +112,11 @@ export async function createPaymentCheckoutForExistingBooking(
     return { ok: false, code: 'database_unavailable', error: 'Could not create payment session.' };
   }
   const transactionId = insertedId.toString();
-  const row = await findPaymentTransactionById(transactionId);
-  if (row === null) {
+  if ((await findPaymentTransactionById(transactionId)) === null) {
     return { ok: false, code: 'database_unavailable', error: 'Could not load payment session.' };
   }
-  const credentials = await getGatewayCredentials(params.gatewayId);
-  const useMock = credentials === null && process.env.NODE_ENV === 'development';
+  const gatewayCredentials = await getGatewayCredentials(params.gatewayId);
+  const useMock = gatewayCredentials === null && process.env.NODE_ENV === 'development';
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: params.appBaseUrl,
     transactionId,
@@ -124,8 +126,8 @@ export async function createPaymentCheckoutForExistingBooking(
   const adapter =
     useMock
       ? createMockPaymentAdapter(successUrl)
-      : credentials !== null
-        ? resolvePaymentAdapter(params.gatewayId, credentials)
+      : gatewayCredentials !== null
+        ? resolvePaymentAdapter(params.gatewayId, gatewayCredentials)
         : null;
   if (adapter === null) {
     return { ok: false, code: 'gateway_not_configured', error: 'Payment gateway credentials are not configured.' };
@@ -169,5 +171,52 @@ export async function createPaymentCheckoutForExistingBooking(
     bookingId: verified.bookingId,
     manualConfirm: false,
     mock: useMock,
+    bookingStatus: verified.booking.status,
   };
+}
+
+/**
+ * Starts a new gateway checkout for an existing pending booking (guest manage flow).
+ */
+export async function createPaymentCheckoutForExistingBooking(
+  params: ResumeCheckoutParams,
+): Promise<CreateCheckoutSessionResult> {
+  const verified = await findVerifiedGuestBookingForCheckout(params.credentials);
+  if (verified === null) {
+    return {
+      ok: false,
+      code: 'booking_not_payable',
+      error: 'This booking cannot be paid online. Check your details or contact support.',
+    };
+  }
+  return createPaymentCheckoutForVerifiedBooking(verified, params);
+}
+
+/**
+ * Starts checkout for a booking owned by the signed-in marketing account (no guest credential form).
+ */
+export async function createPaymentCheckoutForAccountBooking(params: {
+  readonly bookingId: string;
+  readonly visitorId: string;
+  readonly gatewayId: PaymentGatewayId;
+  readonly paymentMethodId: string;
+  readonly paymentMethodLabel?: string;
+  readonly appBaseUrl: string;
+  readonly nativeInAppPaymentReturn?: boolean;
+}): Promise<CreateCheckoutSessionResult> {
+  const verified = await findVerifiedAccountBookingForCheckout(params.bookingId, params.visitorId);
+  if (verified === null) {
+    return {
+      ok: false,
+      code: 'booking_not_payable',
+      error: 'This booking cannot be paid online. Check your details or contact support.',
+    };
+  }
+  return createPaymentCheckoutForVerifiedBooking(verified, {
+    gatewayId: params.gatewayId,
+    paymentMethodId: params.paymentMethodId,
+    paymentMethodLabel: params.paymentMethodLabel,
+    appBaseUrl: params.appBaseUrl,
+    nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
+  });
 }

@@ -26,4 +26,6 @@ export const COLLECTIONS = {
   /** Singleton `{ _id: 'default' }` — payment gateways and checkout policy (admin). */
   paymentSettings: 'payment_settings',
   paymentTransactions: 'payment_transactions',
+  /** Singleton `{ _id: 'default' }` — video meeting providers (Zoom, etc.) for booking links (admin). */
+  meetingSettings: 'meeting_settings',
 } as const;

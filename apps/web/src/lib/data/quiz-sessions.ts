@@ -43,6 +43,9 @@ export type QuizSessionListRow = {
 export type QuizSessionLinkedBooking = {
   readonly id: string;
   readonly startsAtIso: string;
+  readonly timezone: string;
+  readonly serviceKey: string;
+  readonly meetingUrl: string | null;
   readonly status: BookingDocument['status'];
 };
 
@@ -109,6 +112,10 @@ function mapQuizSessionListRow(
 type LinkedBookingSummary = {
   readonly bookingId: string;
   readonly bookingStatus: BookingDocument['status'];
+  readonly bookingStartsAtIso: string;
+  readonly bookingTimezone: string;
+  readonly bookingServiceKey: string;
+  readonly bookingMeetingUrl: string | null;
 };
 
 async function fetchPrimaryBookingIdByQuizSessionIds(sessionIds: readonly ObjectId[]): Promise<Map<string, string>> {
@@ -132,7 +139,7 @@ async function fetchPrimaryBookingByQuizSessionIds(
     .collection<BookingDocument>(COLLECTIONS.bookings)
     .find(
       { quizSessionId: { $in: [...sessionIds] } },
-      { projection: { _id: 1, quizSessionId: 1, status: 1 } },
+      { projection: { _id: 1, quizSessionId: 1, status: 1, startsAt: 1, timezone: 1, serviceKey: 1, meetingUrl: 1 } },
     )
     .toArray();
   for (const doc of docs) {
@@ -141,9 +148,15 @@ async function fetchPrimaryBookingByQuizSessionIds(
     }
     const sessionKey = doc.quizSessionId.toString();
     if (!result.has(sessionKey)) {
+      const meetingRaw = doc.meetingUrl;
+      const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
       result.set(sessionKey, {
         bookingId: doc._id.toString(),
         bookingStatus: doc.status,
+        bookingStartsAtIso: doc.startsAt.toISOString(),
+        bookingTimezone: doc.timezone,
+        bookingServiceKey: doc.serviceKey,
+        bookingMeetingUrl: meetingUrl,
       });
     }
   }
@@ -202,11 +215,18 @@ export async function findQuizSessionById(sessionId: string): Promise<QuizSessio
     .toArray();
   const linkedBookings: QuizSessionLinkedBooking[] = linkedBookingDocs
     .filter((b): b is BookingDocument & { _id: ObjectId } => b._id !== undefined)
-    .map((b) => ({
-      id: b._id.toString(),
-      startsAtIso: b.startsAt.toISOString(),
-      status: b.status,
-    }));
+    .map((b) => {
+      const meetingRaw = b.meetingUrl;
+      const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+      return {
+        id: b._id.toString(),
+        startsAtIso: b.startsAt.toISOString(),
+        timezone: b.timezone,
+        serviceKey: b.serviceKey,
+        meetingUrl,
+        status: b.status,
+      };
+    });
   return {
     id: doc._id.toString(),
     visitorId: doc.visitorId,
@@ -343,6 +363,10 @@ export type VisitorQuizSessionSummary = {
   /** Display/search token derived from {@link bookingId} (last 8 hex chars, uppercase). */
   readonly bookingReferenceId: string | null;
   readonly bookingStatus: BookingDocument['status'] | null;
+  readonly bookingStartsAtIso: string | null;
+  readonly bookingTimezone: string | null;
+  readonly bookingServiceKey: string | null;
+  readonly bookingMeetingUrl: string | null;
 };
 
 function mapVisitorQuizSessionSummary(
@@ -364,6 +388,10 @@ function mapVisitorQuizSessionSummary(
     bookingId,
     bookingReferenceId: bookingId !== null ? formatBookingReferenceId(bookingId) : null,
     bookingStatus: linkedBooking?.bookingStatus ?? null,
+    bookingStartsAtIso: linkedBooking?.bookingStartsAtIso ?? null,
+    bookingTimezone: linkedBooking?.bookingTimezone ?? null,
+    bookingServiceKey: linkedBooking?.bookingServiceKey ?? null,
+    bookingMeetingUrl: linkedBooking?.bookingMeetingUrl ?? null,
   };
 }
 
@@ -421,7 +449,14 @@ function buildVisitorSessionStatusMatch(status: VisitorQuizSessionListStatusFilt
 
 type AggregatedVisitorQuizSessionRow = QuizSessionDocument & {
   _id: ObjectId;
-  linkedBooking: { _id: ObjectId; status: BookingDocument['status'] } | null;
+  linkedBooking: {
+    _id: ObjectId;
+    status: BookingDocument['status'];
+    startsAt: Date;
+    timezone: string;
+    serviceKey: string;
+    meetingUrl?: string;
+  } | null;
 };
 
 /**
@@ -463,7 +498,7 @@ export async function listQuizSessionsForVisitorPaginated(input: {
           { $match: { $expr: { $eq: ['$quizSessionId', '$$sessionId'] } } },
           { $sort: { createdAt: 1 } },
           { $limit: 1 },
-          { $project: { _id: 1, status: 1 } },
+          { $project: { _id: 1, status: 1, startsAt: 1, timezone: 1, serviceKey: 1, meetingUrl: 1 } },
         ],
         as: 'linkedBookings',
       },
@@ -504,7 +539,19 @@ export async function listQuizSessionsForVisitorPaginated(input: {
   const sessions = rows.map((row) => {
     const linkedBooking =
       row.linkedBooking !== null && row.linkedBooking !== undefined
-        ? { bookingId: row.linkedBooking._id.toString(), bookingStatus: row.linkedBooking.status }
+        ? (() => {
+            const meetingRaw = row.linkedBooking.meetingUrl;
+            const meetingUrl =
+              typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+            return {
+              bookingId: row.linkedBooking._id.toString(),
+              bookingStatus: row.linkedBooking.status,
+              bookingStartsAtIso: row.linkedBooking.startsAt.toISOString(),
+              bookingTimezone: row.linkedBooking.timezone,
+              bookingServiceKey: row.linkedBooking.serviceKey,
+              bookingMeetingUrl: meetingUrl,
+            };
+          })()
         : null;
     return mapVisitorQuizSessionSummary(row, linkedBooking);
   });

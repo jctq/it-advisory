@@ -8,6 +8,11 @@ import { getDb } from '@/lib/mongodb';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import { formatInTimeZone } from 'date-fns-tz';
 import { executeDispatchTransactionalEmail } from '@/lib/email/send-transactional-email';
+import {
+  BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
+  buildBookingCalendarLinkBundle,
+  type BookingCalendarLinkBundle,
+} from '@techmd/domain/booking-calendar-links';
 
 const BOOKING_PAYMENT_CONFIRMED_TEMPLATE_KEY = 'booking_payment_confirmed';
 
@@ -50,9 +55,108 @@ function resolveMarketingSiteBaseUrl(): string {
   return raw.replace(/\/$/, '');
 }
 
+/**
+ * Prefer public app URL; fall back to Vercel deployment host so transactional links work when only `VERCEL_URL` is set.
+ */
+function resolveAbsoluteSiteOrigin(): string {
+  const fromPublic = resolveMarketingSiteBaseUrl();
+  if (fromPublic.length > 0) {
+    return fromPublic;
+  }
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel === undefined || vercel.length === 0) {
+    return '';
+  }
+  if (vercel.startsWith('http://') || vercel.startsWith('https://')) {
+    return vercel.replace(/\/$/, '');
+  }
+  return `https://${vercel.replace(/\/$/, '')}`;
+}
+
 function formatAmountPhp(centavos: number): string {
   const pesos = centavos / 100;
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(pesos);
+}
+
+const TRANSACTIONAL_EMAIL_BRAND_NAME = 'TechMD';
+const EMAIL_INNER_WIDTH_PX = 600;
+const EMAIL_FONT_STACK =
+  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
+
+function buildEmailSectionHeading(heading: string): string {
+  return `<p style="margin:0 0 12px 0;font-family:${EMAIL_FONT_STACK};font-size:11px;font-weight:600;line-height:16px;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">${escapeHtml(heading)}</p>`;
+}
+
+function buildEmailDetailRow(label: string, value: string): string {
+  return `<tr><td style="padding:6px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;width:148px;vertical-align:top;"><strong style="color:#18181b;">${escapeHtml(label)}</strong></td><td style="padding:6px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#18181b;vertical-align:top;">${escapeHtml(value)}</td></tr>`;
+}
+
+function buildBulletproofButton(label: string, href: string): string {
+  const safeHref = escapeHtml(href);
+  const safeLabel = escapeHtml(label);
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tr><td bgcolor="#0f172a" style="background-color:#0f172a;border-radius:8px;mso-padding-alt:0;"><a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-family:${EMAIL_FONT_STACK};font-size:15px;font-weight:600;line-height:20px;color:#ffffff;text-decoration:none;border-radius:8px;">${safeLabel}</a></td></tr></table>`;
+}
+
+function buildCalendarLinksBlock(input: {
+  readonly googleCalendarUrl: string;
+  readonly outlookCalendarUrl: string;
+  readonly icsDataUrl: string;
+}): string {
+  const googleHref = escapeHtml(input.googleCalendarUrl);
+  const outlookHref = escapeHtml(input.outlookCalendarUrl);
+  const icsHref = escapeHtml(input.icsDataUrl);
+  return `${buildEmailSectionHeading('Add to calendar')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px 0;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tr><td style="padding:16px 18px;border:1px solid #e4e4e7;border-radius:10px;background-color:#fafafa;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:24px;color:#3f3f46;"><a href="${googleHref}" style="color:#0f172a;font-weight:600;text-decoration:underline;">Google Calendar</a><span style="color:#a1a1aa;"> · </span><a href="${outlookHref}" style="color:#0f172a;font-weight:600;text-decoration:underline;">Outlook</a><span style="color:#a1a1aa;"> · </span><a href="${icsHref}" style="color:#0f172a;font-weight:600;text-decoration:underline;">Apple (.ics)</a></td></tr></table>`;
+}
+
+function buildConfirmationPlainText(input: {
+  readonly customerName: string;
+  readonly bookingReference: string;
+  readonly serviceLabel: string;
+  readonly dateLong: string;
+  readonly timeLabel: string;
+  readonly manageUrl: string;
+  readonly meetingUrl: string | null;
+  readonly calendarBundle: BookingCalendarLinkBundle;
+  readonly paymentPlainLines: readonly string[] | null;
+}): string {
+  const lines: string[] = [];
+  lines.push(`Hi ${input.customerName},`);
+  lines.push('');
+  lines.push('Your booking is confirmed. Thank you — we have received your payment and reserved your slot.');
+  lines.push('');
+  lines.push('RESERVATION');
+  lines.push(`Service: ${input.serviceLabel}`);
+  lines.push(`When: ${input.dateLong} · ${input.timeLabel}`);
+  lines.push(`Booking reference: ${input.bookingReference}`);
+  lines.push('');
+  lines.push('ADD TO CALENDAR');
+  lines.push(`Google Calendar: ${input.calendarBundle.googleCalendarUrl}`);
+  lines.push(`Outlook: ${input.calendarBundle.outlookCalendarUrl}`);
+  lines.push(`Apple (.ics): ${input.calendarBundle.icsDataUrl}`);
+  lines.push('');
+  if (input.meetingUrl !== null && input.meetingUrl.trim().length > 0) {
+    lines.push('VIDEO MEETING');
+    lines.push(input.meetingUrl.trim());
+    lines.push('');
+  } else {
+    lines.push('Your meeting link will follow in a separate message if your advisor attaches one to this booking.');
+    lines.push('');
+  }
+  if (input.manageUrl.length > 0) {
+    lines.push('MANAGE BOOKING');
+    lines.push(input.manageUrl);
+    lines.push('');
+  } else {
+    lines.push('To view or manage this booking, open the TechMD site and use Manage booking with your reference, email, and phone last four.');
+    lines.push('');
+  }
+  if (input.paymentPlainLines !== null) {
+    lines.push(...input.paymentPlainLines);
+    lines.push('');
+  }
+  lines.push('—');
+  lines.push(`This message was sent automatically by ${TRANSACTIONAL_EMAIL_BRAND_NAME}. If you did not make this booking, please contact support.`);
+  return lines.join('\n');
 }
 
 function resolveRecipientEmail(
@@ -78,44 +182,92 @@ function buildConfirmationHtml(input: {
   readonly timeLabel: string;
   readonly manageUrl: string;
   readonly meetingUrl: string | null;
+  readonly siteOrigin: string;
+  readonly calendarBundle: BookingCalendarLinkBundle;
   readonly paymentSectionHtml: string | null;
 }): string {
-  const meetingBlock =
-    input.meetingUrl !== null && input.meetingUrl.trim().length > 0
-      ? `<p><strong>Meeting link:</strong> <a href="${escapeHtml(input.meetingUrl)}">${escapeHtml(input.meetingUrl)}</a></p>`
-      : '<p>Your meeting link will follow in a separate message if your advisor attaches one to this booking.</p>';
+  const preheader = `Your ${TRANSACTIONAL_EMAIL_BRAND_NAME} consultation is confirmed. Reference ${input.bookingReference}.`;
+  const trimmedMeeting =
+    input.meetingUrl !== null && input.meetingUrl.trim().length > 0 ? input.meetingUrl.trim() : '';
+  const logoBlock =
+    input.siteOrigin.length > 0
+      ? `<tr><td style="padding:0 0 24px 0;"><img src="${escapeHtml(`${input.siteOrigin}/brand/techmd-logo-full.png`)}" width="152" alt="${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)}" style="display:block;width:152px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr>`
+      : `<tr><td style="padding:0 0 16px 0;font-family:${EMAIL_FONT_STACK};font-size:22px;font-weight:700;line-height:28px;color:#0f172a;letter-spacing:-0.02em;">${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)}</td></tr>`;
+  const reservationRows = [
+    buildEmailDetailRow('Service', input.serviceLabel),
+    buildEmailDetailRow('When', `${input.dateLong} · ${input.timeLabel}`),
+    buildEmailDetailRow('Booking reference', input.bookingReference),
+  ].join('');
+  const reservationCard = `${buildEmailSectionHeading('Reservation details')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px 0;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tr><td style="padding:18px 20px;border:1px solid #e4e4e7;border-radius:10px;background-color:#fafafa;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${reservationRows}</table></td></tr></table>`;
+  const calendarHtml = buildCalendarLinksBlock(input.calendarBundle);
+  const meetingSection =
+    trimmedMeeting.length > 0
+      ? `${buildEmailSectionHeading('Video meeting')}${buildBulletproofButton('Join video meeting', trimmedMeeting)}<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;word-break:break-word;">If the button above does not open your call, copy this link into your browser:<br /><a href="${escapeHtml(trimmedMeeting)}" style="color:#1d4ed8;text-decoration:underline;">${escapeHtml(trimmedMeeting)}</a></p>`
+      : `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">Your meeting link will follow in a separate message if your advisor attaches one to this booking.</p>`;
+  const manageSection =
+    input.manageUrl.length > 0
+      ? `${buildEmailSectionHeading('Manage booking')}<p style="margin:0 0 12px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">You will need your booking reference, email, and the last four digits of your phone number.</p>${buildBulletproofButton('View or manage booking', input.manageUrl)}`
+      : `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">To update this reservation, visit the ${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)} website and use <strong style="color:#18181b;">Manage booking</strong> with your reference, email, and phone last four.</p>`;
   const paymentBlock =
     input.paymentSectionHtml !== null && input.paymentSectionHtml.length > 0
-      ? `<h2 style="margin:24px 0 8px;font-size:16px;">Payment</h2>${input.paymentSectionHtml}`
+      ? `${buildEmailSectionHeading('Payment')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px 0;"><tr><td style="padding:16px 18px;border:1px solid #e4e4e7;border-radius:10px;background-color:#fafafa;">${input.paymentSectionHtml}</td></tr></table>`
       : '';
   return `<!DOCTYPE html>
-<html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#111;">
-<p>Hi ${escapeHtml(input.customerName)},</p>
-<p>Your booking is <strong>confirmed</strong>. Thank you — we have received your payment and reserved your slot.</p>
-<h2 style="margin:24px 0 8px;font-size:16px;">Reservation</h2>
-<p><strong>Service:</strong> ${escapeHtml(input.serviceLabel)}</p>
-<p><strong>When:</strong> ${escapeHtml(input.dateLong)} · ${escapeHtml(input.timeLabel)}</p>
-<p><strong>Booking reference:</strong> ${escapeHtml(input.bookingReference)}</p>
-${meetingBlock}
-<p><a href="${escapeHtml(input.manageUrl)}">View or manage this booking</a> (reference, email, and phone last four).</p>
-${paymentBlock}
-<p style="margin-top:28px;font-size:13px;color:#555;">This message was sent automatically. If you did not make this booking, please contact support.</p>
-</body></html>`;
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title>${escapeHtml(`Booking confirmed — ${input.bookingReference}`)}</title>
+<!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f4f4f5;width:0;opacity:0;">
+${escapeHtml(preheader)}&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;
+</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background-color:#f4f4f5;border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;">
+<tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="${EMAIL_INNER_WIDTH_PX}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${EMAIL_INNER_WIDTH_PX}px;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;">
+<tr><td style="padding:32px 28px 28px 28px;background-color:#ffffff;border:1px solid #e4e4e7;border-radius:12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoBlock}<tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;line-height:28px;color:#18181b;">Booking confirmed</td></tr><tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.customerName)}, we have received your payment and reserved your consultation time.</td></tr><tr><td>${reservationCard}</td></tr><tr><td>${calendarHtml}</td></tr><tr><td>${meetingSection}</td></tr><tr><td>${manageSection}</td></tr><tr><td>${paymentBlock}</td></tr><tr><td style="padding:24px 0 0 0;border-top:1px solid #e4e4e7;"><p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:12px;line-height:18px;color:#71717a;">This message was sent automatically by ${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)}. If you did not make this booking, please contact support.</p></td></tr></table>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 function buildPaymentSectionHtml(transaction: PaymentTransactionRow): string {
-  const lines: string[] = [];
-  lines.push(`<p><strong>Amount:</strong> ${escapeHtml(formatAmountPhp(transaction.amountCentavos))}</p>`);
-  lines.push(`<p><strong>Gateway:</strong> ${escapeHtml(resolveGatewayLabel(transaction.gatewayId))}</p>`);
+  const rows: string[] = [
+    buildEmailDetailRow('Amount', formatAmountPhp(transaction.amountCentavos)),
+    buildEmailDetailRow('Gateway', resolveGatewayLabel(transaction.gatewayId)),
+  ];
   const method = transaction.paymentMethodLabel?.trim() ?? '';
   if (method.length > 0) {
-    lines.push(`<p><strong>Method:</strong> ${escapeHtml(method)}</p>`);
+    rows.push(buildEmailDetailRow('Method', method));
   }
   const ref = transaction.providerRef.trim();
   if (ref.length > 0) {
-    lines.push(`<p><strong>Reference:</strong> ${escapeHtml(ref.length > 64 ? `${ref.slice(0, 64)}…` : ref)}</p>`);
+    const displayRef = ref.length > 64 ? `${ref.slice(0, 64)}…` : ref;
+    rows.push(buildEmailDetailRow('Reference', displayRef));
   }
-  return lines.join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tbody>${rows.join('')}</tbody></table>`;
+}
+
+function buildPaymentSectionPlainLines(transaction: PaymentTransactionRow): string[] {
+  const lines: string[] = ['PAYMENT'];
+  lines.push(`Amount: ${formatAmountPhp(transaction.amountCentavos)}`);
+  lines.push(`Gateway: ${resolveGatewayLabel(transaction.gatewayId)}`);
+  const method = transaction.paymentMethodLabel?.trim() ?? '';
+  if (method.length > 0) {
+    lines.push(`Method: ${method}`);
+  }
+  const ref = transaction.providerRef.trim();
+  if (ref.length > 0) {
+    lines.push(`Reference: ${ref.length > 64 ? `${ref.slice(0, 64)}…` : ref}`);
+  }
+  return lines;
 }
 
 async function persistEmailSend(doc: Omit<EmailSendDocument, '_id'>): Promise<void> {
@@ -173,14 +325,22 @@ async function runSendBookingConfirmationEmail(input: {
   const dateLong = formatInTimeZone(startsAt, booking.timezone, 'EEEE, MMMM d, yyyy');
   const timeLabel = formatInTimeZone(startsAt, booking.timezone, 'h:mm a');
   const bookingReference = formatBookingReferenceId(booking.id);
-  const baseUrl = resolveMarketingSiteBaseUrl();
-  const manageUrl =
-    baseUrl.length > 0 ? `${baseUrl}/book/manage` : '/book/manage';
+  const siteOrigin = resolveAbsoluteSiteOrigin();
+  const manageUrl = siteOrigin.length > 0 ? `${siteOrigin}/book/manage` : '';
   const meetingUrl =
     booking.meetingUrl !== undefined && typeof booking.meetingUrl === 'string' && booking.meetingUrl.trim().length > 0
       ? booking.meetingUrl.trim()
       : null;
   const paymentSectionHtml = transaction !== null ? buildPaymentSectionHtml(transaction) : null;
+  const paymentPlainLines = transaction !== null ? buildPaymentSectionPlainLines(transaction) : null;
+  const calendarBundle = buildBookingCalendarLinkBundle({
+    title: `${formatServiceKeyLabel(booking.serviceKey)} — ${bookingReference}`,
+    description: `Booking reference ${bookingReference}. ${manageUrl.length > 0 ? `Manage: ${manageUrl}` : `Manage on ${TRANSACTIONAL_EMAIL_BRAND_NAME}.`}`,
+    location: meetingUrl ?? '',
+    startsAtUtc: startsAt,
+    durationMinutes: BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
+    icsUidSeed: bookingReference,
+  });
   const html = buildConfirmationHtml({
     customerName,
     bookingReference,
@@ -189,7 +349,20 @@ async function runSendBookingConfirmationEmail(input: {
     timeLabel,
     manageUrl,
     meetingUrl,
+    siteOrigin,
+    calendarBundle,
     paymentSectionHtml,
+  });
+  const text = buildConfirmationPlainText({
+    customerName,
+    bookingReference,
+    serviceLabel: formatServiceKeyLabel(booking.serviceKey),
+    dateLong,
+    timeLabel,
+    manageUrl,
+    meetingUrl,
+    calendarBundle,
+    paymentPlainLines,
   });
   const subject = `Booking confirmed — ${bookingReference}`;
   const basePayload: Record<string, unknown> = {
@@ -197,7 +370,7 @@ async function runSendBookingConfirmationEmail(input: {
     transactionId: transaction?.id ?? null,
     bookingReference,
   };
-  const outcome = await executeDispatchTransactionalEmail({ to, subject, html });
+  const outcome = await executeDispatchTransactionalEmail({ to, subject, html, text });
   if (outcome.kind === 'audit_only') {
     await persistEmailSend({
       to,

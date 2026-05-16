@@ -4,13 +4,29 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { CalendarClock, CheckCircle2, Loader2, Video } from 'lucide-react';
+import { PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { Button } from '@/components/ui/button';
+import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { isPlausibleMarketingQuizSessionRef } from '@/lib/marketing/quiz-session-marketing-ref';
 
 const BOOKINGS_API_URL = '/api/bookings';
 
 type ConfirmationStatus = 'pending' | 'success' | 'error' | 'invalid';
+
+type BookingLifecycleStatus = 'pending' | 'confirmed' | 'cancelled';
+
+function parseBookingLifecycleStatusFromPayload(payload: unknown): BookingLifecycleStatus | null {
+  if (typeof payload !== 'object' || payload === null) {
+    return null;
+  }
+  const raw = (payload as { bookingStatus?: unknown }).bookingStatus;
+  if (raw === 'pending' || raw === 'confirmed' || raw === 'cancelled') {
+    return raw;
+  }
+  return null;
+}
 
 type ConfirmationFlowProps = {
   readonly displayDate: string;
@@ -29,6 +45,7 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
   const router = useRouter();
   const [status, setStatus] = useState<ConfirmationStatus>('pending');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successBookingStatus, setSuccessBookingStatus] = useState<BookingLifecycleStatus | null>(null);
   const hasRunRef = useRef<boolean>(false);
   useEffect(() => {
     if (hasRunRef.current) {
@@ -73,6 +90,7 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
           setStatus('error');
           return;
         }
+        setSuccessBookingStatus(parseBookingLifecycleStatusFromPayload(payload));
         void router.refresh();
         setStatus('success');
       } catch {
@@ -117,6 +135,13 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
       </div>
     );
   }
+  let confirmationCalendarSlot: { readonly startsAtIso: string; readonly timezone: string } | null = null;
+  try {
+    const startsAtUtc = parseBookingSlotToUtc(props.dateRaw.trim(), props.timeRaw.trim());
+    confirmationCalendarSlot = { startsAtIso: startsAtUtc.toISOString(), timezone: PRIMARY_TIMEZONE };
+  } catch {
+    confirmationCalendarSlot = null;
+  }
   return (
     <>
       <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
@@ -124,8 +149,8 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
       </div>
       <h1 className="mt-8 text-balance text-3xl font-semibold tracking-tight text-foreground">You&apos;re all set!</h1>
       <p className="mt-3 text-muted-foreground">
-        Your consultation is reserved. A calendar invite and remote meeting link can be wired when email delivery is
-        connected.
+        Your consultation slot is reserved. After payment is confirmed, we email a calendar summary and video meeting
+        join link when meetings are enabled for your account.
       </p>
       <div className="mt-10 rounded-2xl border border-border bg-card p-6 text-left shadow-xs">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Booking summary</h2>
@@ -140,14 +165,27 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
                 {props.displayTime}
               </dd>
               <dd className="text-xs text-muted-foreground">{PRIMARY_TIMEZONE}</dd>
+              {confirmationCalendarSlot !== null && successBookingStatus === 'confirmed' ? (
+                <AddToCalendarButtons
+                  className="mt-3"
+                  startsAtIso={confirmationCalendarSlot.startsAtIso}
+                  title={PROJECT_RESCUE_SERVICE_TITLE}
+                  description={PROJECT_RESCUE_SERVICE_TAGLINE}
+                  icsUidSeed={confirmationCalendarSlot.startsAtIso}
+                />
+              ) : null}
             </div>
           </div>
           <div className="flex gap-3">
             <Video className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
             <div>
               <dt className="text-xs font-medium text-muted-foreground">Format</dt>
-              <dd className="text-sm font-semibold text-foreground">Zoom meeting</dd>
-              <dd className="text-xs text-muted-foreground">Link will be included in your confirmation email</dd>
+              <dd className="text-sm font-semibold text-foreground">Video meeting</dd>
+              <dd className="text-xs text-muted-foreground">
+                {props.quizSessionIdRaw !== undefined && props.quizSessionIdRaw.trim().length > 0
+                  ? 'A join link is added after online payment completes (check email and your account diagnostics).'
+                  : 'Complete checkout to confirm; the join link is emailed after payment and appears in your account.'}
+              </dd>
             </div>
           </div>
         </dl>

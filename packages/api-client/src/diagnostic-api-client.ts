@@ -64,6 +64,14 @@ type DiagnosticThreadRound = {
   }[];
 };
 
+type QuizSessionLinkedBookingSlot = {
+  readonly status: 'pending' | 'confirmed' | 'cancelled';
+  readonly startsAtIso: string;
+  readonly timezone: string;
+  readonly serviceKey: string;
+  readonly meetingUrl: string | null;
+};
+
 type QuizSessionPayload = {
   readonly session: {
     readonly answers: QuizAnswers;
@@ -72,6 +80,7 @@ type QuizSessionPayload = {
   /** Encoded ref for `/quiz/[sessionRef]` and scoped template loads; omitted when no row or legacy response. */
   readonly sessionId?: string | null;
   readonly readOnly?: boolean;
+  readonly linkedBookingSlot?: QuizSessionLinkedBookingSlot | null;
 };
 
 type SaveQuizSessionInput = {

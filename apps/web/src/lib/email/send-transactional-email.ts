@@ -64,6 +64,7 @@ async function sendViaPostmark(input: {
   readonly to: string;
   readonly subject: string;
   readonly html: string;
+  readonly text?: string;
   readonly bcc: readonly string[];
 }): Promise<TransactionalSendResult> {
   const body: Record<string, unknown> = {
@@ -73,6 +74,10 @@ async function sendViaPostmark(input: {
     HtmlBody: input.html,
     MessageStream: 'outbound',
   };
+  const textTrimmed = input.text?.trim() ?? '';
+  if (textTrimmed.length > 0) {
+    body.TextBody = textTrimmed;
+  }
   if (input.bcc.length > 0) {
     body.Bcc = input.bcc.join(',');
   }
@@ -105,6 +110,7 @@ async function sendViaSendGrid(input: {
   readonly to: string;
   readonly subject: string;
   readonly html: string;
+  readonly text?: string;
   readonly bcc: readonly string[];
 }): Promise<TransactionalSendResult> {
   const fromParsed = parseFromForSendGrid(input.from);
@@ -114,6 +120,12 @@ async function sendViaSendGrid(input: {
   if (input.bcc.length > 0) {
     personalization.bcc = input.bcc.map((email) => ({ email }));
   }
+  const textTrimmed = input.text?.trim() ?? '';
+  const content: Array<{ readonly type: string; readonly value: string }> = [];
+  if (textTrimmed.length > 0) {
+    content.push({ type: 'text/plain', value: textTrimmed });
+  }
+  content.push({ type: 'text/html', value: input.html });
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
     headers: {
@@ -124,7 +136,7 @@ async function sendViaSendGrid(input: {
       personalizations: [personalization],
       from: fromParsed.name !== undefined ? { email: fromParsed.email, name: fromParsed.name } : { email: fromParsed.email },
       subject: input.subject,
-      content: [{ type: 'text/html', value: input.html }],
+      content,
     }),
   });
   if (!response.ok) {
@@ -142,14 +154,17 @@ async function sendViaResend(input: {
   readonly to: string;
   readonly subject: string;
   readonly html: string;
+  readonly text?: string;
   readonly bcc: readonly string[];
 }): Promise<TransactionalSendResult> {
   const resend = new Resend(input.apiKey);
+  const textTrimmed = input.text?.trim() ?? '';
   const sendResult = await resend.emails.send({
     from: input.from,
     to: input.to,
     subject: input.subject,
     html: input.html,
+    ...(textTrimmed.length > 0 ? { text: textTrimmed } : {}),
     ...(input.bcc.length > 0 ? { bcc: [...input.bcc] } : {}),
   });
   if (sendResult.error !== null) {
@@ -224,6 +239,8 @@ export async function executeDispatchTransactionalEmail(input: {
   readonly to: string;
   readonly subject: string;
   readonly html: string;
+  /** Plain-text alternative for accessibility and clients that prefer text. */
+  readonly text?: string;
 }): Promise<TransactionalDispatchOutcome> {
   const ctx = await getTransactionalEmailDispatchContext();
   if (ctx.kind === 'audit_only') {
@@ -246,6 +263,7 @@ export async function executeDispatchTransactionalEmail(input: {
       to: effectiveTo,
       subject: input.subject,
       html: input.html,
+      text: input.text,
       bcc: effectiveBcc,
     });
   } else if (ctx.kind === 'postmark') {
@@ -255,6 +273,7 @@ export async function executeDispatchTransactionalEmail(input: {
       to: effectiveTo,
       subject: input.subject,
       html: input.html,
+      text: input.text,
       bcc: effectiveBcc,
     });
   } else {
@@ -264,6 +283,7 @@ export async function executeDispatchTransactionalEmail(input: {
       to: effectiveTo,
       subject: input.subject,
       html: input.html,
+      text: input.text,
       bcc: effectiveBcc,
     });
   }

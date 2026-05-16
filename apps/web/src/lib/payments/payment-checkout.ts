@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { findPaymentMethodOption, type PaymentGatewayId } from '@/domain/payment-types';
 import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
+import { findBookingById } from '@/lib/data/bookings';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
@@ -40,6 +41,7 @@ export type CreateCheckoutSessionResult =
       readonly bookingId: string | null;
       readonly manualConfirm: boolean;
       readonly mock?: boolean;
+      readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null;
     }
   | {
       readonly ok: false;
@@ -67,6 +69,20 @@ async function updateTransactionProvider(
       },
     },
   );
+}
+
+async function resolveBookingStatusByBookingId(
+  bookingId: ObjectId | string | null,
+): Promise<'pending' | 'confirmed' | 'cancelled' | null> {
+  if (bookingId === null) {
+    return null;
+  }
+  const id = typeof bookingId === 'string' ? bookingId.trim() : bookingId.toString();
+  if (id.length === 0) {
+    return null;
+  }
+  const booking = await findBookingById(id);
+  return booking?.status ?? null;
 }
 
 export async function createPaymentCheckoutSession(params: CreateCheckoutSessionParams): Promise<CreateCheckoutSessionResult> {
@@ -144,12 +160,14 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   }
   if (settings.paymentPolicy === 'manual_confirm') {
     const bookingId = await createManualConfirmBooking({ transaction: row });
+    const bookingStatus = await resolveBookingStatusByBookingId(bookingId);
     return {
       ok: true,
       transactionId,
       redirectUrl: null,
       bookingId: bookingId?.toString() ?? null,
       manualConfirm: true,
+      bookingStatus,
     };
   }
   if (settings.paymentPolicy === 'pay_after_hold' && expiresAt !== null) {
@@ -201,6 +219,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     };
   }
   await updateTransactionProvider(insertedId, providerSession);
+  const bookingStatus = await resolveBookingStatusByBookingId(row.bookingId);
   return {
     ok: true,
     transactionId,
@@ -208,5 +227,6 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     bookingId: row.bookingId,
     manualConfirm: false,
     mock: useMock,
+    bookingStatus,
   };
 }

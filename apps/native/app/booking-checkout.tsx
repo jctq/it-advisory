@@ -22,13 +22,18 @@ const POLL_INTERVAL_MS = 2000;
 const MAX_PAID_POLLS = 30;
 const CANCEL_POLL_CAP = 10;
 
+type PaymentPollOutcome =
+  | { readonly kind: 'paid'; readonly meetingUrl: string | null }
+  | { readonly kind: 'failed' }
+  | { readonly kind: 'pending' };
+
 async function waitUntilTransactionPaidOrTerminal(params: {
   readonly apiBaseUrl: string;
   readonly transactionId: string;
   readonly deviceId?: string | null;
   readonly marketingSessionToken?: string | null;
   readonly maxPolls?: number;
-}): Promise<'paid' | 'failed' | 'pending'> {
+}): Promise<PaymentPollOutcome> {
   const maxPolls = params.maxPolls ?? MAX_PAID_POLLS;
   for (let polls = 0; polls < maxPolls; polls += 1) {
     if (polls > 0) {
@@ -43,13 +48,13 @@ async function waitUntilTransactionPaidOrTerminal(params: {
       marketingSessionToken: params.marketingSessionToken,
     });
     if (result.status === 'paid') {
-      return 'paid';
+      return { kind: 'paid', meetingUrl: result.meetingUrl };
     }
     if (result.status === 'failed' || result.status === 'expired') {
-      return 'failed';
+      return { kind: 'failed' };
     }
   }
-  return 'pending';
+  return { kind: 'pending' };
 }
 
 export default function BookingCheckoutScreen() {
@@ -172,8 +177,16 @@ export default function BookingCheckoutScreen() {
           marketingSessionToken: sessionToken,
           maxPolls,
         });
-        if (outcome === 'paid') {
-          router.replace({ pathname: '/confirmation', params: { date, time } });
+        if (outcome.kind === 'paid') {
+          const meeting = outcome.meetingUrl?.trim() ?? '';
+          router.replace({
+            pathname: '/confirmation',
+            params: {
+              date,
+              time,
+              ...(meeting.length > 0 ? { meetingUrl: meeting } : {}),
+            },
+          });
           return;
         }
       }

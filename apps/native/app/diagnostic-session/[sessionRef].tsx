@@ -4,10 +4,12 @@ import {
   parseGuidedDiagnosticJson,
   type GuidedDiagnosticV1,
 } from '@techmd/diagnostic-core/guided-diagnostic-types';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { AppButton } from '../../src/components/app-button';
+import { AddToCalendarLinkRow } from '../../src/components/add-to-calendar-link-row';
 import { AppCard } from '../../src/components/app-card';
 import { AppScreen } from '../../src/components/app-screen';
 import { ThemedText } from '../../src/components/themed-text';
@@ -15,6 +17,14 @@ import { normalizeGuidedDiagnosticRaw } from '../../src/lib/diagnostic-flow';
 import { readNativeAppConfig } from '../../src/lib/native-app-config';
 import { useMarketingAuth } from '../../src/providers/marketing-auth-provider';
 import { useAppTheme } from '../../src/theme/use-app-theme';
+
+type LinkedBookingSlot = {
+  readonly status: 'pending' | 'confirmed' | 'cancelled';
+  readonly startsAtIso: string;
+  readonly timezone: string;
+  readonly serviceKey: string;
+  readonly meetingUrl: string | null;
+};
 
 function buildGuidedFromAnswers(answers: Record<string, unknown> | undefined): GuidedDiagnosticV1 {
   if (answers === undefined) {
@@ -55,6 +65,7 @@ export default function DiagnosticSessionDetailScreen() {
   const [readOnly, setReadOnly] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<string, unknown> | undefined>(undefined);
+  const [linkedBookingSlot, setLinkedBookingSlot] = useState<LinkedBookingSlot | null>(null);
 
   useEffect(() => {
     const resolvedRef = Array.isArray(rawRef) ? rawRef[0] : rawRef;
@@ -89,11 +100,39 @@ export default function DiagnosticSessionDetailScreen() {
           setAnswers(undefined);
           setCurrentStep(0);
           setReadOnly(Boolean(payload.readOnly));
+          setLinkedBookingSlot(null);
           setErrorMessage('This session could not be found for your account.');
         } else {
           setAnswers(payload.session.answers as Record<string, unknown>);
           setCurrentStep(payload.session.currentStep);
           setReadOnly(Boolean(payload.readOnly));
+          const rawSlot = (payload as { linkedBookingSlot?: unknown }).linkedBookingSlot;
+          if (
+            rawSlot !== null &&
+            typeof rawSlot === 'object' &&
+            rawSlot !== undefined &&
+            'startsAtIso' in rawSlot &&
+            typeof (rawSlot as { startsAtIso?: unknown }).startsAtIso === 'string' &&
+            'timezone' in rawSlot &&
+            typeof (rawSlot as { timezone?: unknown }).timezone === 'string' &&
+            'serviceKey' in rawSlot &&
+            typeof (rawSlot as { serviceKey?: unknown }).serviceKey === 'string' &&
+            'status' in rawSlot &&
+            typeof (rawSlot as { status?: unknown }).status === 'string'
+          ) {
+            const meetingUrlRaw = (rawSlot as { meetingUrl?: unknown }).meetingUrl;
+            const meetingUrl =
+              typeof meetingUrlRaw === 'string' && meetingUrlRaw.trim().length > 0 ? meetingUrlRaw.trim() : null;
+            setLinkedBookingSlot({
+              status: (rawSlot as { status: 'pending' | 'confirmed' | 'cancelled' }).status,
+              startsAtIso: (rawSlot as { startsAtIso: string }).startsAtIso,
+              timezone: (rawSlot as { timezone: string }).timezone,
+              serviceKey: (rawSlot as { serviceKey: string }).serviceKey,
+              meetingUrl,
+            });
+          } else {
+            setLinkedBookingSlot(null);
+          }
         }
       } catch (error: unknown) {
         if (!isCancelled) {
@@ -122,7 +161,25 @@ export default function DiagnosticSessionDetailScreen() {
       : mappedFromOutcome.length > 0
         ? mappedFromOutcome
         : situationFromAnswers ?? 'Diagnostic session';
-
+  const calendarTitle =
+    linkedBookingSlot?.serviceKey === 'project-rescue'
+      ? PROJECT_RESCUE_SERVICE_TITLE
+      : linkedBookingSlot?.serviceKey ?? 'Consultation';
+  const slotLabel =
+    linkedBookingSlot !== null
+      ? new Intl.DateTimeFormat('en-PH', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          timeZone: linkedBookingSlot.timezone,
+        }).format(new Date(linkedBookingSlot.startsAtIso))
+      : null;
+  const calendarThemeSlice = {
+    border: theme.border,
+    surface: theme.surface,
+    surfaceMuted: theme.surfaceMuted,
+    primary: theme.primary,
+    textMuted: theme.textMuted,
+  };
   return (
     <AppScreen
       subtitle="Saved answers and summary for this diagnostic."
@@ -155,6 +212,39 @@ export default function DiagnosticSessionDetailScreen() {
               <ThemedText style={[styles.body, { color: theme.textMuted, marginTop: 8 }]}>Diagnostic not finalized yet.</ThemedText>
             ) : null}
           </AppCard>
+          {linkedBookingSlot !== null && linkedBookingSlot.status !== 'cancelled' && slotLabel !== null ? (
+            <AppCard>
+              <ThemedText style={[styles.kicker, { color: theme.textMuted }]}>Booked session</ThemedText>
+              <ThemedText style={[styles.body, { color: theme.text }]}>{slotLabel}</ThemedText>
+              <ThemedText style={[styles.body, { color: theme.textMuted, marginTop: 4, fontSize: 13 }]}>
+                {linkedBookingSlot.timezone} · {linkedBookingSlot.status}
+              </ThemedText>
+              {linkedBookingSlot.status === 'confirmed' ? (
+                <AddToCalendarLinkRow
+                  startsAtIso={linkedBookingSlot.startsAtIso}
+                  title={calendarTitle}
+                  description="Booked consultation from your TechMD diagnostic."
+                  location={linkedBookingSlot.meetingUrl ?? undefined}
+                  icsUidSeed={linkedBookingSlot.startsAtIso}
+                  theme={calendarThemeSlice}
+                />
+              ) : null}
+              {linkedBookingSlot.status === 'confirmed' && linkedBookingSlot.meetingUrl !== null ? (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel="Open video meeting"
+                  onPress={() => {
+                    void Linking.openURL(linkedBookingSlot.meetingUrl!);
+                  }}
+                  style={({ pressed }) => [{ marginTop: 12, opacity: pressed ? 0.85 : 1 }]}
+                >
+                  <ThemedText style={{ color: theme.primary, fontSize: 16, fontWeight: '700', textDecorationLine: 'underline' }}>
+                    Open meeting
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+            </AppCard>
+          ) : null}
           <AppCard>
             <ThemedText style={[styles.kicker, { color: theme.textMuted }]}>Situation</ThemedText>
             <ThemedText style={[styles.body, { color: theme.text }]}>{headline}</ThemedText>

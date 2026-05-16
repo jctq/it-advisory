@@ -1,4 +1,5 @@
 import { fetchMarketingMyDiagnosticSessions, type MarketingDiagnosticSessionSummary } from '@techmd/api-client/marketing-my-diagnostics-api-client';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import {
   buildPhilippineMobileE164FromNationalDigits,
   normalizePhilippineMobileNationalDigits,
@@ -9,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { AppButton } from '../../src/components/app-button';
+import { AddToCalendarLinkRow } from '../../src/components/add-to-calendar-link-row';
 import { AppCard } from '../../src/components/app-card';
 import { AppScreen } from '../../src/components/app-screen';
 import { ThemedText } from '../../src/components/themed-text';
@@ -53,6 +56,16 @@ function formatSessionTitle(row: MarketingDiagnosticSessionSummary): string {
     return preview.length > 72 ? `${preview.slice(0, 69)}…` : preview;
   }
   return 'Diagnostic session';
+}
+
+const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
+
+function buildNativeBookManageUrl(apiBaseUrl: string, bookingId: string | null): string {
+  const origin = apiBaseUrl.replace(/\/$/, '');
+  if (bookingId !== null && MONGO_OBJECT_ID_HEX.test(bookingId)) {
+    return `${origin}/book/manage?bookingId=${encodeURIComponent(bookingId)}`;
+  }
+  return `${origin}/book/manage`;
 }
 
 /**
@@ -155,32 +168,106 @@ export default function ProfileTabScreen() {
   const renderDiagnosticSessionRow = useCallback(
     ({ item }: { readonly item: MarketingDiagnosticSessionSummary }) => {
       const bookingLine = formatBookingStatusLine(item);
+      const hasBookedSlot =
+        item.bookingStartsAtIso !== null &&
+        item.bookingTimezone !== null &&
+        item.bookingStatus !== null &&
+        item.bookingStatus !== 'cancelled';
+      const showCalendarLinks = item.bookingStatus === 'confirmed';
+      const slotLabel =
+        hasBookedSlot === true
+          ? new Intl.DateTimeFormat('en-PH', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+              timeZone: item.bookingTimezone!,
+            }).format(new Date(item.bookingStartsAtIso!))
+          : null;
+      const calendarTitle =
+        item.bookingServiceKey === 'project-rescue'
+          ? PROJECT_RESCUE_SERVICE_TITLE
+          : item.bookingServiceKey ?? 'Consultation';
+      const calendarThemeSlice = {
+        border: theme.border,
+        surface: theme.surface,
+        surfaceMuted: theme.surfaceMuted,
+        primary: theme.primary,
+        textMuted: theme.textMuted,
+      };
+      const openDiagnosticSession = (): void => {
+        router.push({
+          pathname: '/diagnostic-session/[sessionRef]',
+          params: { sessionRef: item.marketingSessionRef },
+        });
+      };
+      const openBookManage = (): void => {
+        void Linking.openURL(buildNativeBookManageUrl(config.apiBaseUrl, item.bookingId));
+      };
       return (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            router.push({
-              pathname: '/diagnostic-session/[sessionRef]',
-              params: { sessionRef: item.marketingSessionRef },
-            });
-          }}
-          style={({ pressed }) => [
-            styles.sessionRow,
+        <View
+          style={[
+            styles.sessionRowWrap,
             {
               borderColor: theme.border,
-              backgroundColor: pressed ? theme.surfaceMuted : theme.surface,
+              backgroundColor: theme.surface,
             },
           ]}
         >
-          <ThemedText style={[styles.sessionTitle, { color: theme.text }]}>{formatSessionTitle(item)}</ThemedText>
-          <ThemedText style={[styles.sessionMeta, { color: theme.textMuted }]}>
-            {formatDiagnosticPrimaryStatus(item)}
-            {bookingLine !== null ? ` · ${bookingLine}` : ''}
-          </ThemedText>
-        </Pressable>
+          <View style={styles.sessionRowInner}>
+            <ThemedText style={[styles.sessionTitle, { color: theme.text }]}>{formatSessionTitle(item)}</ThemedText>
+            <ThemedText style={[styles.sessionMeta, { color: theme.textMuted }]}>
+              {formatDiagnosticPrimaryStatus(item)}
+              {bookingLine !== null ? ` · ${bookingLine}` : ''}
+            </ThemedText>
+            <View style={styles.sessionActionsRow}>
+              <View style={styles.sessionActionSlot}>
+                <AppButton compact variant="secondary" onPress={openDiagnosticSession}>
+                  {item.isBooked ? 'View' : 'Continue'}
+                </AppButton>
+              </View>
+              {item.isBooked ? (
+                <View style={styles.sessionActionSlot}>
+                  <AppButton compact onPress={openBookManage}>
+                    Manage
+                  </AppButton>
+                </View>
+              ) : null}
+            </View>
+          </View>
+          {hasBookedSlot && slotLabel !== null ? (
+            <View style={[styles.sessionCalendarSection, { borderTopColor: theme.border }]}>
+              <ThemedText style={[styles.sessionSlotLabel, { color: theme.textMuted }]}>{slotLabel}</ThemedText>
+              {showCalendarLinks ? (
+                <AddToCalendarLinkRow
+                  startsAtIso={item.bookingStartsAtIso!}
+                  title={calendarTitle}
+                  description={
+                    item.bookingReferenceId !== null
+                      ? `Booking reference ${item.bookingReferenceId}. Native diagnostics.`
+                      : 'Native diagnostics.'
+                  }
+                  location={item.bookingMeetingUrl ?? undefined}
+                  icsUidSeed={item.bookingReferenceId ?? item.bookingStartsAtIso!}
+                  theme={calendarThemeSlice}
+                />
+              ) : null}
+              {item.bookingStatus === 'confirmed' && item.bookingMeetingUrl !== null && item.bookingMeetingUrl.length > 0 ? (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel="Open video meeting"
+                  onPress={() => {
+                    void Linking.openURL(item.bookingMeetingUrl!);
+                  }}
+                  style={({ pressed }) => [styles.sessionJoinZoom, { opacity: pressed ? 0.88 : 1 }]}
+                >
+                  <ThemedText style={[styles.sessionJoinZoomText, { color: theme.primary }]}>Open meeting</ThemedText>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       );
     },
-    [router, theme.border, theme.surface, theme.surfaceMuted, theme.text, theme.textMuted],
+    [config.apiBaseUrl, router, theme.border, theme.primary, theme.surface, theme.surfaceMuted, theme.text, theme.textMuted],
   );
 
   const accountFooter: ReactNode =
@@ -252,6 +339,15 @@ export default function ProfileTabScreen() {
             </AppButton>
             <AppButton onPress={() => router.push('/register')} variant="ghost">
               Create account
+            </AppButton>
+            <AppButton
+              iconName="calendar-outline"
+              onPress={() => {
+                void Linking.openURL(buildNativeBookManageUrl(config.apiBaseUrl, null));
+              }}
+              variant="secondary"
+            >
+              Manage booking
             </AppButton>
           </View>
         </AppCard>
@@ -370,6 +466,22 @@ export default function ProfileTabScreen() {
                 <ThemedText style={[styles.error, { color: theme.danger }]}>{profileError}</ThemedText>
               ) : null}
               </AppCard>
+              <View style={styles.manageBookingSection}>
+                <ThemedText style={[styles.fieldHint, { color: theme.textMuted }]}>
+                  Opens the website to pay, check status, or update a booking using your reference, email, and phone last
+                  four.
+                </ThemedText>
+                <AppButton
+                  compact
+                  iconName="open-outline"
+                  onPress={() => {
+                    void Linking.openURL(buildNativeBookManageUrl(config.apiBaseUrl, null));
+                  }}
+                  variant="secondary"
+                >
+                  Manage booking
+                </AppButton>
+              </View>
             </ScrollView>
           ) : (
             <AppCard fillVertical>
@@ -394,6 +506,21 @@ export default function ProfileTabScreen() {
                       {sessionsError !== null ? (
                         <ThemedText style={[styles.error, { color: theme.danger }]}>{sessionsError}</ThemedText>
                       ) : null}
+                      <View style={styles.diagnosticsManageBookingRow}>
+                        <ThemedText style={[styles.fieldHint, { color: theme.textMuted }]}>
+                          Need the web flow (reference + verification)? Open manage booking.
+                        </ThemedText>
+                        <AppButton
+                          compact
+                          iconName="open-outline"
+                          onPress={() => {
+                            void Linking.openURL(buildNativeBookManageUrl(config.apiBaseUrl, null));
+                          }}
+                          variant="secondary"
+                        >
+                          Manage booking
+                        </AppButton>
+                      </View>
                     </View>
                   }
                   onEndReached={handleDiagnosticsEndReached}
@@ -571,12 +698,52 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: 4,
   },
-  sessionRow: {
+  manageBookingSection: {
+    gap: 10,
+    marginTop: 14,
+  },
+  diagnosticsManageBookingRow: {
+    gap: 8,
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  sessionRowWrap: {
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     marginTop: 10,
+    overflow: 'hidden',
+  },
+  sessionRowInner: {
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  sessionActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  sessionActionSlot: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sessionCalendarSection: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 12,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
+  sessionSlotLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sessionJoinZoom: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+  },
+  sessionJoinZoomText: {
+    fontSize: 15,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   sessionTitle: {
     fontSize: 15,

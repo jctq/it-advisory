@@ -56,6 +56,7 @@ export type CreatePaymentCheckoutSessionResult = {
   readonly bookingId: string | null;
   readonly manualConfirm: boolean;
   readonly mock?: boolean;
+  readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null;
 };
 
 function buildApiUrl(apiBaseUrl: string, path: string): string {
@@ -142,8 +143,33 @@ export async function createPaymentCheckoutSession(
   if (!response.ok || payload.ok !== true) {
     throw new Error(typeof payload.error === 'string' ? payload.error : 'Checkout session failed');
   }
-  return payload;
+  const rawBookingStatus = (payload as { bookingStatus?: unknown }).bookingStatus;
+  const bookingStatus =
+    rawBookingStatus === 'pending' || rawBookingStatus === 'confirmed' || rawBookingStatus === 'cancelled'
+      ? rawBookingStatus
+      : null;
+  return {
+    ok: true as const,
+    transactionId: payload.transactionId,
+    redirectUrl: payload.redirectUrl,
+    bookingId: payload.bookingId,
+    manualConfirm: payload.manualConfirm,
+    mock: payload.mock,
+    bookingStatus,
+  };
 }
+
+export type PaymentTransactionStatusPayload = {
+  readonly transactionId: string;
+  readonly status: string;
+  readonly bookingId: string | null;
+  readonly gatewayId: PaymentGatewayId;
+  readonly paymentMethodLabel: string | null;
+  readonly startsAtIso: string | null;
+  readonly timezone: string | null;
+  readonly meetingUrl: string | null;
+  readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null;
+};
 
 export async function fetchPaymentTransactionStatus(params: {
   readonly apiBaseUrl: string;
@@ -152,15 +178,7 @@ export async function fetchPaymentTransactionStatus(params: {
   readonly deviceId?: string | null;
   readonly marketingSessionToken?: string | null;
   readonly signal?: AbortSignal;
-}): Promise<{
-  readonly transactionId: string;
-  readonly status: string;
-  readonly bookingId: string | null;
-  readonly gatewayId: PaymentGatewayId;
-  readonly paymentMethodLabel: string | null;
-  readonly startsAtIso: string | null;
-  readonly timezone: string | null;
-}> {
+}): Promise<PaymentTransactionStatusPayload> {
   const mockSuffix = params.mock === true ? '?mock=1' : '';
   const url = buildApiUrl(
     params.apiBaseUrl,
@@ -183,11 +201,19 @@ export async function fetchPaymentTransactionStatus(params: {
     paymentMethodLabel?: string | null;
     startsAtIso?: string | null;
     timezone?: string | null;
+    meetingUrl?: string | null;
+    bookingStatus?: string | null;
     error?: string;
   };
   if (!response.ok) {
     throw new Error(typeof payload.error === 'string' ? payload.error : 'Failed to load payment status');
   }
+  const meetingRaw = typeof payload.meetingUrl === 'string' ? payload.meetingUrl.trim() : '';
+  const rawBookingStatus = payload.bookingStatus;
+  const bookingStatus =
+    rawBookingStatus === 'pending' || rawBookingStatus === 'confirmed' || rawBookingStatus === 'cancelled'
+      ? rawBookingStatus
+      : null;
   return {
     transactionId: payload.transactionId ?? params.transactionId,
     status: payload.status ?? 'pending',
@@ -196,5 +222,7 @@ export async function fetchPaymentTransactionStatus(params: {
     paymentMethodLabel: payload.paymentMethodLabel ?? null,
     startsAtIso: payload.startsAtIso ?? null,
     timezone: payload.timezone ?? null,
+    meetingUrl: meetingRaw.length > 0 ? meetingRaw : null,
+    bookingStatus,
   };
 }

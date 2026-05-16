@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   createBookingWithLatestQuizSnapshot,
+  findBookingById,
   findBookingByVisitorSlot,
   linkQuizSessionToVisitorBooking,
   syncBookingQuizSessionIfPointerChanged,
@@ -27,6 +28,11 @@ function resolvePaymentMethodLabel(method: PaymentMethodId): string {
     paypal: 'PayPal',
   };
   return labels[method];
+}
+
+async function resolveBookingStatusForId(bookingId: string): Promise<'pending' | 'confirmed' | 'cancelled' | null> {
+  const row = await findBookingById(bookingId);
+  return row?.status ?? null;
 }
 
 const postBodySchema = z
@@ -141,6 +147,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         bookingId: existingId.toString(),
         deduped: true as const,
         quizSessionLinked: true as const,
+        startsAtIso: startsAt.toISOString(),
+        timezone: PRIMARY_TIMEZONE,
+        bookingStatus: await resolveBookingStatusForId(existingId.toString()),
       });
     }
     await syncBookingQuizSessionIfPointerChanged({ bookingId: existingId, visitorId });
@@ -148,6 +157,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       ok: true as const,
       bookingId: existingId.toString(),
       deduped: true as const,
+      startsAtIso: startsAt.toISOString(),
+      timezone: PRIMARY_TIMEZONE,
+      bookingStatus: await resolveBookingStatusForId(existingId.toString()),
     });
   }
   const slotOk = await isMarketingSlotInPublishedAvailability({
@@ -186,5 +198,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     ok: true as const,
     bookingId: created.bookingId.toString(),
     deduped: false as const,
+    startsAtIso: startsAt.toISOString(),
+    timezone: PRIMARY_TIMEZONE,
+    bookingStatus: await resolveBookingStatusForId(created.bookingId.toString()),
   });
 }

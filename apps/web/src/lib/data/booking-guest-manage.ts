@@ -23,6 +23,8 @@ export type GuestBookingManageView = {
   readonly status: BookingDocument['status'];
   readonly startsAtIso: string;
   readonly timezone: string;
+  readonly serviceKey: string;
+  readonly meetingUrl: string | null;
   readonly customerName: string;
   readonly paymentPolicy: PaymentPolicy;
   readonly paymentExpiresAtIso: string | null;
@@ -32,7 +34,7 @@ export type GuestBookingManageView = {
   readonly paymentsEnabled: boolean;
 };
 
-type VerifiedGuestBooking = {
+export type VerifiedGuestBooking = {
   readonly bookingId: string;
   readonly booking: BookingDocument & { _id: ObjectId };
   readonly lead: LeadDocument & { _id: ObjectId };
@@ -142,11 +144,15 @@ export async function buildGuestBookingManageView(
     paymentsEnabled: publicSettings.paymentsEnabled,
     paymentExpiresAt,
   });
+  const meetingRaw = verified.booking.meetingUrl;
+  const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
   return {
     bookingReference: formatBookingReferenceId(verified.bookingId),
     status: verified.booking.status,
     startsAtIso: verified.booking.startsAt.toISOString(),
     timezone: verified.booking.timezone,
+    serviceKey: verified.booking.serviceKey,
+    meetingUrl,
     customerName: verified.lead.name,
     paymentPolicy: publicSettings.paymentPolicy,
     paymentExpiresAtIso: paymentExpiresAt !== null ? paymentExpiresAt.toISOString() : null,
@@ -165,6 +171,73 @@ export async function findGuestBookingManageView(
     return null;
   }
   return buildGuestBookingManageView(resolved);
+}
+
+/**
+ * Resolves a booking when its Mongo id matches and the row belongs to the given marketing visitor id.
+ */
+export async function resolveBookingOwnedByVisitor(
+  bookingId: string,
+  visitorId: string,
+): Promise<ResolveGuestBookingResult> {
+  if (!process.env.MONGODB_URI) {
+    return NOT_FOUND;
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(bookingId);
+  } catch {
+    return NOT_FOUND;
+  }
+  const db = await getDb();
+  const bookingDoc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: objectId });
+  if (
+    bookingDoc === null ||
+    bookingDoc._id === undefined ||
+    bookingDoc.leadId === undefined ||
+    bookingDoc.visitorId !== visitorId
+  ) {
+    return NOT_FOUND;
+  }
+  const leadDoc = await db.collection<LeadDocument>(COLLECTIONS.leads).findOne({ _id: bookingDoc.leadId });
+  if (leadDoc === null || leadDoc._id === undefined) {
+    return NOT_FOUND;
+  }
+  return {
+    bookingId: bookingDoc._id.toString(),
+    booking: bookingDoc as BookingDocument & { _id: ObjectId },
+    lead: leadDoc as LeadDocument & { _id: ObjectId },
+  };
+}
+
+export async function findGuestBookingManageViewForAccountVisitor(
+  bookingId: string,
+  visitorId: string,
+): Promise<GuestBookingManageView | null> {
+  const resolved = await resolveBookingOwnedByVisitor(bookingId, visitorId);
+  if (isGuestBookingNotFound(resolved)) {
+    return null;
+  }
+  return buildGuestBookingManageView(resolved);
+}
+
+export async function findVerifiedAccountBookingForCheckout(
+  bookingId: string,
+  visitorId: string,
+): Promise<VerifiedGuestBooking | null> {
+  const resolved = await resolveBookingOwnedByVisitor(bookingId, visitorId);
+  if (isGuestBookingNotFound(resolved)) {
+    return null;
+  }
+  const view = await buildGuestBookingManageView(resolved);
+  if (!view.canPayOnline) {
+    return null;
+  }
+  const booking = await findBookingById(resolved.bookingId);
+  if (booking === null || booking.status !== 'pending') {
+    return null;
+  }
+  return resolved;
 }
 
 export async function findVerifiedGuestBookingForCheckout(

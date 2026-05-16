@@ -12,6 +12,10 @@ export type MarketingDiagnosticSessionSummary = {
   readonly bookingId: string | null;
   readonly bookingReferenceId: string | null;
   readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null;
+  readonly bookingStartsAtIso: string | null;
+  readonly bookingTimezone: string | null;
+  readonly bookingServiceKey: string | null;
+  readonly bookingMeetingUrl: string | null;
 };
 
 export type MarketingMyDiagnosticsPage = {
