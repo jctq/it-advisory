@@ -371,9 +371,11 @@ function MultipleChoiceRoundRenderer(props: {
   readonly baseAnswers: Readonly<Record<string, DiagnosticQuestionSelection>>;
   readonly question: DiagnosticQuestionBlock;
   readonly selection: DiagnosticQuestionSelection;
+  readonly sessionReadOnly?: boolean;
   readonly onToggleChildOption: (parentOptionId: string, childOptionId: string) => void;
   readonly onToggleOption: (optionId: string) => void;
 }): ReactElement {
+  const sessionReadOnly = props.sessionReadOnly === true;
   const visibleOptions = getVisibleQuestionOptions({
     baseAnswers: props.baseAnswers,
     question: props.question,
@@ -405,6 +407,7 @@ function MultipleChoiceRoundRenderer(props: {
             <div key={`${props.question.id}-${option.id}`} className="space-y-2 md:space-y-3">
               <button
                 type="button"
+                disabled={sessionReadOnly}
                 onClick={() => props.onToggleOption(option.id)}
                 aria-pressed={isSelected}
                 className={cn(
@@ -416,6 +419,7 @@ function MultipleChoiceRoundRenderer(props: {
                     : isInSelectedPath
                       ? 'border-primary/40 bg-primary/5'
                     : 'border-border hover:border-primary/30 hover:bg-muted/30',
+                  sessionReadOnly && 'cursor-default opacity-95',
                 )}
               >
                 <div className="flex items-start gap-3 md:gap-4">
@@ -487,12 +491,14 @@ function MultipleChoiceRoundRenderer(props: {
                         <button
                           key={`${option.childQuestion!.id}-${childOption.id}`}
                           type="button"
+                          disabled={sessionReadOnly}
                           onClick={() => props.onToggleChildOption(option.id, childOption.id)}
                           className={cn(
                             'flex w-full items-start justify-between gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors md:gap-3 md:rounded-xl md:px-4 md:py-3',
                             isChildSelected
                               ? 'border-primary bg-background ring-2 ring-primary/15'
                               : 'border-border bg-background/80 hover:border-primary/30',
+                            sessionReadOnly && 'cursor-default opacity-95',
                           )}
                         >
                           <span>
@@ -526,14 +532,27 @@ function MultipleChoiceRoundRenderer(props: {
   );
 }
 
+function canFocusNestedPanelOption(params: {
+  readonly optionId: string;
+  readonly selection: DiagnosticQuestionSelection;
+  readonly sessionReadOnly: boolean;
+}): boolean {
+  if (!params.sessionReadOnly) {
+    return true;
+  }
+  return params.selection.selectedOptionIds.includes(params.optionId);
+}
+
 function NestedOptionsRoundRenderer(props: {
   readonly baseAnswers: Readonly<Record<string, DiagnosticQuestionSelection>>;
   readonly guidance: string | null;
   readonly question: DiagnosticQuestionBlock;
   readonly selection: DiagnosticQuestionSelection;
+  readonly sessionReadOnly?: boolean;
   readonly onToggleChildOption: (parentOptionId: string, childOptionId: string) => void;
   readonly onToggleOption: (optionId: string) => void;
 }): ReactElement {
+  const sessionReadOnly = props.sessionReadOnly === true;
   const visibleOptions = useMemo(
     () =>
       getVisibleQuestionOptions({
@@ -562,7 +581,13 @@ function NestedOptionsRoundRenderer(props: {
     [props.question, props.selection, visibleOptions],
   );
   const activeOptionId =
-    requestedActiveOptionId !== null && visibleOptions.some((option) => option.id === requestedActiveOptionId)
+    requestedActiveOptionId !== null &&
+    visibleOptions.some((option) => option.id === requestedActiveOptionId) &&
+    canFocusNestedPanelOption({
+      optionId: requestedActiveOptionId,
+      selection: props.selection,
+      sessionReadOnly,
+    })
       ? requestedActiveOptionId
       : selectionDefaultPanelId;
   const activeOption =
@@ -591,11 +616,25 @@ function NestedOptionsRoundRenderer(props: {
             const isInSelectedPath = props.selection.selectedOptionIds.includes(option.id);
             const isSelected = terminalSelectedOptionId !== null ? terminalSelectedOptionId === option.id : isInSelectedPath;
             const isActive = activeOption?.id === option.id;
+            const canFocusPanel = canFocusNestedPanelOption({
+              optionId: option.id,
+              selection: props.selection,
+              sessionReadOnly,
+            });
+            const isCategoryDisabled = sessionReadOnly && !canFocusPanel;
             return (
               <button
                 key={option.id}
                 type="button"
+                disabled={isCategoryDisabled}
+                aria-pressed={isSelected}
                 onClick={() => {
+                  if (sessionReadOnly) {
+                    if (canFocusPanel) {
+                      setRequestedActiveOptionId(option.id);
+                    }
+                    return;
+                  }
                   props.onToggleOption(option.id);
                   setRequestedActiveOptionId(option.id);
                 }}
@@ -607,32 +646,37 @@ function NestedOptionsRoundRenderer(props: {
                     : isInSelectedPath
                       ? 'border-primary/35 bg-primary/5'
                     : 'border-border hover:border-primary/25 hover:bg-muted/30',
+                  isCategoryDisabled && 'cursor-not-allowed opacity-60 hover:border-border hover:bg-card',
                 )}
               >
-                <span
-                  className={cn(
-                    'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border md:mt-1 md:size-6',
-                    isSelected
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : isInSelectedPath
-                        ? 'border-primary/50 bg-primary/10 text-primary'
-                        : 'border-border bg-background text-transparent',
-                  )}
-                  aria-hidden
-                >
-                  {isSelected ? <Check className="size-4" /> : isInSelectedPath ? <span className="size-2 rounded-full bg-primary" /> : <Check className="size-4" />}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start gap-2 md:gap-3">
-                    <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
-                    <div className="min-w-0">
-                      <p className={WIZARD_UI.optionTitle}>{getDisplayOptionTitle(option)}</p>
-                      {getDisplayOptionSupportingText(option) !== null ? (
-                        <p className={cn('mt-0.5 md:mt-1', WIZARD_UI.optionSupporting)}>
-                          {getDisplayOptionSupportingText(option)}
-                        </p>
-                      ) : null}
+                <div className="flex w-full items-start gap-3 md:gap-4">
+                  <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
+                  <div className="min-w-0 flex-1 space-y-1.5 md:space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={cn(WIZARD_UI.optionTitle, 'min-w-0')}>{getDisplayOptionTitle(option)}</p>
+                      <span
+                        className={cn(
+                          WIZARD_UI.selectIndicator,
+                          isSelected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : isInSelectedPath
+                              ? 'border-primary/50 bg-primary/10 text-primary'
+                              : 'border-border bg-background text-transparent',
+                        )}
+                        aria-hidden
+                      >
+                        {isSelected ? (
+                          <Check className="size-3.5 md:size-4" />
+                        ) : isInSelectedPath ? (
+                          <span className="size-1.5 rounded-full bg-primary md:size-2" />
+                        ) : (
+                          <Check className="size-3.5 md:size-4" />
+                        )}
+                      </span>
                     </div>
+                    {getDisplayOptionSupportingText(option) !== null ? (
+                      <p className={WIZARD_UI.optionSupporting}>{getDisplayOptionSupportingText(option)}</p>
+                    ) : null}
                   </div>
                 </div>
               </button>
@@ -677,7 +721,9 @@ function NestedOptionsRoundRenderer(props: {
                       <button
                         key={childOption.id}
                         type="button"
-                        disabled={!props.selection.selectedOptionIds.includes(activeOption.id)}
+                        disabled={
+                          sessionReadOnly || !props.selection.selectedOptionIds.includes(activeOption.id)
+                        }
                         onClick={() => props.onToggleChildOption(activeOption.id, childOption.id)}
                         className={cn(
                           'flex w-full items-start justify-between gap-2 rounded-lg border px-3 py-3 text-left transition-all md:gap-3 md:rounded-2xl md:px-4 md:py-4',
@@ -695,14 +741,14 @@ function NestedOptionsRoundRenderer(props: {
                         </span>
                         <span
                           className={cn(
-                            'mt-0.5 flex size-5 items-center justify-center rounded-sm border',
+                            WIZARD_UI.selectIndicator,
                             isSelected
                               ? 'border-primary bg-primary text-primary-foreground'
                               : 'border-border bg-background text-transparent',
                           )}
                           aria-hidden
                         >
-                          <Check className="size-3.5" />
+                          <Check className="size-3.5 md:size-4" />
                         </span>
                       </button>
                     );
@@ -879,21 +925,37 @@ function RankedOptionsRoundRenderer(props: {
                       : 'border-border hover:border-primary/30 hover:bg-muted/20',
                 )}
               >
-                <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className={cn(WIZARD_UI.optionTitle)}>{optionIndex + 1}. {getDisplayOptionTitle(option)}</p>
-                    {option.presentation.badgeText !== null ? (
-                      <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                        {option.presentation.badgeText}
+                <div className="flex w-full items-start gap-3 md:gap-4">
+                  <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
+                  <div className="min-w-0 flex-1 space-y-1.5 md:space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2">
+                        <p className={WIZARD_UI.optionTitle}>
+                          {optionIndex + 1}. {getDisplayOptionTitle(option)}
+                        </p>
+                        {option.presentation.badgeText !== null ? (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 md:px-2 md:py-1 md:text-[11px]">
+                            {option.presentation.badgeText}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span
+                        className={cn(
+                          WIZARD_UI.selectIndicator,
+                          isSelected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background text-transparent',
+                        )}
+                        aria-hidden
+                      >
+                        <Check className="size-3.5 md:size-4" />
                       </span>
+                    </div>
+                    {getDisplayOptionSupportingText(option) !== null ? (
+                      <p className={WIZARD_UI.optionSupporting}>{getDisplayOptionSupportingText(option)}</p>
                     ) : null}
                   </div>
-                  {getDisplayOptionSupportingText(option) !== null ? (
-                    <p className="mt-1 text-sm text-muted-foreground">{getDisplayOptionSupportingText(option)}</p>
-                  ) : null}
                 </div>
-                {isSelected ? <Check className="mt-0.5 size-4 shrink-0 text-primary md:size-5" aria-hidden /> : null}
               </button>
               );
             })}
@@ -1984,6 +2046,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
                 guidance={activeRound.guidance}
                 question={question}
                 selection={questionSelection}
+                sessionReadOnly={sessionReadOnly}
                 onToggleOption={(optionId) => executeSelectOption(question, optionId)}
                 onToggleChildOption={(parentOptionId, childOptionId) =>
                   executeSelectChildOption(question, parentOptionId, childOptionId)
@@ -2002,6 +2065,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
                 baseAnswers={optionBaseAnswers}
                 question={question}
                 selection={questionSelection}
+                sessionReadOnly={sessionReadOnly}
                 onToggleOption={(optionId) => executeSelectOption(question, optionId)}
                 onToggleChildOption={(parentOptionId, childOptionId) =>
                   executeSelectChildOption(question, parentOptionId, childOptionId)
