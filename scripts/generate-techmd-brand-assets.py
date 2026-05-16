@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-Regenerates TECHMD brand assets from `public/brand/_source/techmd-logo-master.*`
+Regenerates TECHMD brand assets from masters in `public/brand/_source/`.
 
-- Picks the **best master** in `_source/` (PNG → WebP → JPEG).
-- For sources narrower than ~1800px, applies **2× supersampling** on the RGBA canvas
-  before crops (reduces JPEG blockiness before downscale; does not add real detail beyond
-  what a higher-res master would).
-- Crops / tagline strip use coordinates scaled from the **1024×682** reference canvas so
-  larger masters still align.
+- **Light** (`techmd-logo-master.*`): full, compact, mark, SVG wrappers, native app icons.
+- **Dark** (`techmd-logo-master-dark.*`): same crops from the dark-mode master (keys navy backdrop
+  to alpha). Falls back to programmatic recolor of light assets when no dark master exists.
+- Picks the **best master** per mode (PNG → WebP → JPEG).
+- For sources narrower than ~1800px, applies **2× supersampling** on the RGBA canvas before crops.
+- Crops / tagline strip use coordinates scaled from the **1024×682** reference canvas.
 - `techmd-logo-*.svg` embed the PNGs (not true Bézier SVG—export vectors from design for that).
-- **Dark (`*-dark.png`)** variants: supersampled recolor, smoothed blend mask, linear RGB blend,
-  and a luminance guard so small tagline text is not tinted; still prefer a high-res lossless master.
+- **Favicons:** square PNGs at 16–512px from each mark (`techmd-mark-{size}.png`, `*-dark`).
 
 Requires: pip install pillow numpy
 
 Usage (from repo root):
-  python3 scripts/generate-techmd-brand-assets.py [path-to-source-image]
+  python3 scripts/generate-techmd-brand-assets.py [path-to-light-master]
+  python3 scripts/generate-techmd-brand-assets.py --dark [path-to-dark-master]
 
 **Quality ceiling:** raster output cannot exceed the master. For print / retina, add
 `techmd-logo-master.png` at **2400px+** width (lossless) in `_source/` and re-run.
@@ -23,6 +23,7 @@ Usage (from repo root):
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
@@ -44,8 +45,10 @@ SUPERSAMPLE_IF_WIDTH_BELOW_PX = 1800
 SUPERSAMPLE_FACTOR = 2
 WEB_LOGO_MAX_WIDTH_PX = 3200
 MARK_WEB_MAX_WIDTH_PX = 1200
-# Dark-mode recolor works at N× size then scales back down (reduces crawl/speckle on soft masks).
+# Dark-mode recolor (fallback when no dark master) at N× then downscale.
 DARK_RECOLOR_SUPERSAMPLE_FACTOR = 3
+DARK_BACKDROP_KEY_DISTANCE = 32.0
+FAVICON_SIZES_PX = (16, 32, 48, 180, 192, 512)
 
 
 def resolve_source_path(cli_path: Path | None) -> Path:
@@ -63,6 +66,21 @@ def resolve_source_path(cli_path: Path | None) -> Path:
     return SOURCE_DIR / "techmd-logo-master.jpg"
 
 
+def resolve_dark_source_path(cli_path: Path | None) -> Path | None:
+    if cli_path is not None and cli_path.is_file():
+        return cli_path
+    for name in (
+        "techmd-logo-master-dark.png",
+        "techmd-logo-master-dark.webp",
+        "techmd-logo-master-dark.jpg",
+        "techmd-logo-master-dark.jpeg",
+    ):
+        candidate = SOURCE_DIR / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def load_transparent_rgba(path: Path) -> Image.Image:
     """Load image, lift near-white backdrop to alpha (no unsharp—avoids boosting JPEG ringing)."""
     im = Image.open(path).convert("RGBA")
@@ -70,6 +88,28 @@ def load_transparent_rgba(path: Path) -> Image.Image:
     rgb = arr[:, :, :3].astype(np.int16)
     white = (rgb[:, :, 0] > 249) & (rgb[:, :, 1] > 249) & (rgb[:, :, 2] > 249)
     arr[:, :, 3] = np.where(white, 0, arr[:, :, 3])
+    return Image.fromarray(arr, "RGBA")
+
+
+def load_transparent_from_dark_backdrop(path: Path) -> Image.Image:
+    """Key uniform navy backdrop (corner-sampled) to transparent alpha."""
+    im = Image.open(path).convert("RGBA")
+    arr = np.array(im)
+    h, w = arr.shape[0], arr.shape[1]
+    corners = np.array(
+        [
+            arr[0, 0, :3],
+            arr[0, w - 1, :3],
+            arr[h - 1, 0, :3],
+            arr[h - 1, w - 1, :3],
+        ],
+        dtype=np.float32,
+    )
+    backdrop = np.median(corners, axis=0)
+    rgb = arr[:, :, :3].astype(np.float32)
+    distance = np.sqrt(np.sum((rgb - backdrop) ** 2, axis=2))
+    is_backdrop = distance < DARK_BACKDROP_KEY_DISTANCE
+    arr[:, :, 3] = np.where(is_backdrop, 0, arr[:, :, 3])
     return Image.fromarray(arr, "RGBA")
 
 
@@ -154,6 +194,50 @@ def save_png_optimized(im: Image.Image, path: Path) -> None:
     im.save(path, format="PNG", optimize=True, compress_level=6)
 
 
+def write_logo_svg(im: Image.Image, png_name: str, svg_path: Path, aria_label: str = "TECHMD") -> None:
+    w, h = im.size
+    svg_path.write_text(
+        (
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink" '
+            f'width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
+            f'role="img" aria-label="{aria_label}">\n'
+            f'  <image xlink:href="{png_name}" href="{png_name}" '
+            'width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />\n'
+            "</svg>\n"
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_mark_favicons(mark: Image.Image, name_prefix: str, out_dir: Path) -> None:
+    """Square PNG favicons / PWA icons from a trimmed mark."""
+    for side in FAVICON_SIZES_PX:
+        inner = scale_to_max(mark, max(1, side - 12))
+        square = pad_center_square(inner, side)
+        save_png_optimized(square, out_dir / f"{name_prefix}-{side}x{side}.png")
+
+
+def build_variants_from_master(
+    loader,
+    source: Path,
+    *,
+    label: str,
+) -> tuple[Image.Image, Image.Image, Image.Image]:
+    base_raw = loader(source)
+    base = maybe_supersample(base_raw)
+    if base_raw.width < 1600:
+        print(
+            f"Note ({label}): master width {base_raw.width}px is modest—add a 2400px+ PNG to "
+            f"{SOURCE_DIR}/ for maximum sharpness.",
+            file=sys.stderr,
+        )
+    full_src = trim_transparent(base, pad=2)
+    compact_src = trim_transparent(strip_tagline_for_compact(base), pad=2)
+    mark_src = trim_transparent(base.crop(mark_crop_box_px(base)), pad=2)
+    return full_src, compact_src, mark_src
+
+
 def _smoothstep01(x: np.ndarray) -> np.ndarray:
     """Gentler 0..1 ramp than linear (reduces banding on recolor edges)."""
     t = np.clip(x, 0.0, 1.0)
@@ -235,67 +319,122 @@ def supersampled_recolor_for_dark_ui(im: Image.Image, up_factor: int = 2) -> Ima
     return rec.resize((w, h), Image.Resampling.LANCZOS)
 
 
+def write_brand_asset_version(web_brand: Path) -> str:
+    """Fingerprint masters so browsers and Next image cache pick up replacements."""
+    parts: list[str] = []
+    for path in sorted(SOURCE_DIR.glob("techmd-logo-master*")):
+        if path.is_file():
+            stat = path.stat()
+            parts.append(f"{path.name}:{stat.st_mtime_ns}:{stat.st_size}")
+    version = hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+    ts_path = REPO / "apps/web/src/lib/brand/brand-assets.ts"
+    ts_path.parent.mkdir(parents=True, exist_ok=True)
+    ts_path.write_text(
+        (
+            "/** Auto-generated by scripts/generate-techmd-brand-assets.py — do not edit manually. */\n"
+            f"export const BRAND_ASSET_VERSION = '{version}' as const;\n\n"
+            "/** Public URL for a brand raster under `/brand/`, with a cache-busting query param. */\n"
+            "export function brandAssetUrl(fileName: string): string {\n"
+            "  const normalized = fileName.startsWith('/brand/') ? fileName.slice('/brand/'.length) : fileName;\n"
+            f"  return `/brand/${{normalized}}?v=${{BRAND_ASSET_VERSION}}`;\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+    (web_brand / "asset-version.txt").write_text(f"{version}\n", encoding="utf-8")
+    return version
+
+
+def parse_cli_paths() -> tuple[Path | None, Path | None, bool]:
+    """Returns (light_cli, dark_cli, dark_only_flag)."""
+    args = sys.argv[1:]
+    dark_only = False
+    if args and args[0] == "--dark":
+        dark_only = True
+        args = args[1:]
+    light_cli = None
+    dark_cli = None
+    if dark_only:
+        dark_cli = Path(args[0]) if args else None
+    elif len(args) >= 2 and args[0] == "--dark":
+        dark_cli = Path(args[1])
+    elif len(args) == 1:
+        light_cli = Path(args[0])
+    return light_cli, dark_cli, dark_only
+
+
 def main() -> None:
-    cli = Path(sys.argv[1]) if len(sys.argv) > 1 else None
-    source = resolve_source_path(cli)
-    if not source.is_file():
-        print(f"Source not found: {source}", file=sys.stderr)
-        sys.exit(1)
-    base_raw = load_transparent_rgba(source)
-    base = maybe_supersample(base_raw)
-    if base_raw.width < 1600:
-        print(
-            f"Note: master width {base_raw.width}px is modest—add a 2400px+ PNG to "
-            f"{SOURCE_DIR}/techmd-logo-master.png for maximum sharpness.",
-            file=sys.stderr,
-        )
-    full_src = trim_transparent(base, pad=2)
-    compact_src = trim_transparent(strip_tagline_for_compact(base), pad=2)
-    mark_src = trim_transparent(base.crop(mark_crop_box_px(base)), pad=2)
+    light_cli, dark_cli, dark_only = parse_cli_paths()
     web_brand = REPO / "apps/web/public/brand"
-    full_web = scale_to_max_width(full_src, WEB_LOGO_MAX_WIDTH_PX)
-    compact_web = scale_to_max_width(compact_src, WEB_LOGO_MAX_WIDTH_PX)
-    mark_web = scale_to_max_width(mark_src, MARK_WEB_MAX_WIDTH_PX)
-    save_png_optimized(full_web, web_brand / "techmd-logo-full.png")
-    save_png_optimized(compact_web, web_brand / "techmd-logo-compact.png")
-    save_png_optimized(mark_web, web_brand / "techmd-mark.png")
-    save_png_optimized(supersampled_recolor_for_dark_ui(full_web, DARK_RECOLOR_SUPERSAMPLE_FACTOR), web_brand / "techmd-logo-full-dark.png")
-    save_png_optimized(supersampled_recolor_for_dark_ui(compact_web, DARK_RECOLOR_SUPERSAMPLE_FACTOR), web_brand / "techmd-logo-compact-dark.png")
-    save_png_optimized(supersampled_recolor_for_dark_ui(mark_web, DARK_RECOLOR_SUPERSAMPLE_FACTOR), web_brand / "techmd-mark-dark.png")
-    full_w, full_h = full_web.size
-    compact_w, compact_h = compact_web.size
-    (web_brand / "techmd-logo-full.svg").write_text(
-        (
-            '<svg xmlns="http://www.w3.org/2000/svg" '
-            'xmlns:xlink="http://www.w3.org/1999/xlink" '
-            f'width="{full_w}" height="{full_h}" viewBox="0 0 {full_w} {full_h}" '
-            'role="img" aria-label="TECHMD">\n'
-            '  <image xlink:href="techmd-logo-full.png" href="techmd-logo-full.png" '
-            'width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />\n'
-            "</svg>\n"
-        ),
-        encoding="utf-8",
-    )
-    (web_brand / "techmd-logo-compact.svg").write_text(
-        (
-            '<svg xmlns="http://www.w3.org/2000/svg" '
-            'xmlns:xlink="http://www.w3.org/1999/xlink" '
-            f'width="{compact_w}" height="{compact_h}" viewBox="0 0 {compact_w} {compact_h}" '
-            'role="img" aria-label="TECHMD">\n'
-            '  <image xlink:href="techmd-logo-compact.png" href="techmd-logo-compact.png" '
-            'width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />\n'
-            "</svg>\n"
-        ),
-        encoding="utf-8",
-    )
-    native = REPO / "apps/native/assets"
-    expo_icon = scale_to_max(mark_src, 900)
-    save_png_optimized(pad_center_square(expo_icon, 1024), native / "icon.png")
-    adaptive = scale_to_max(mark_src, 660)
-    save_png_optimized(pad_center_square(adaptive, 1024), native / "adaptive-icon.png")
-    splash_logo = scale_to_max(full_src, 900)
-    save_png_optimized(pad_center_square(splash_logo, 1024), native / "splash-icon.png")
-    print("Wrote TECHMD assets to apps/web/public/brand and apps/native/assets")
+    full_web: Image.Image | None = None
+    compact_web: Image.Image | None = None
+    mark_web: Image.Image | None = None
+    if not dark_only:
+        source = resolve_source_path(light_cli)
+        if not source.is_file():
+            print(f"Light source not found: {source}", file=sys.stderr)
+            sys.exit(1)
+        full_src, compact_src, mark_src = build_variants_from_master(
+            load_transparent_rgba, source, label="light"
+        )
+        full_web = scale_to_max_width(full_src, WEB_LOGO_MAX_WIDTH_PX)
+        compact_web = scale_to_max_width(compact_src, WEB_LOGO_MAX_WIDTH_PX)
+        mark_web = scale_to_max_width(mark_src, MARK_WEB_MAX_WIDTH_PX)
+        save_png_optimized(full_web, web_brand / "techmd-logo-full.png")
+        save_png_optimized(compact_web, web_brand / "techmd-logo-compact.png")
+        save_png_optimized(mark_web, web_brand / "techmd-mark.png")
+        write_logo_svg(full_web, "techmd-logo-full.png", web_brand / "techmd-logo-full.svg")
+        write_logo_svg(compact_web, "techmd-logo-compact.png", web_brand / "techmd-logo-compact.svg")
+        write_mark_favicons(mark_web, "techmd-mark", web_brand)
+        native = REPO / "apps/native/assets"
+        expo_icon = scale_to_max(mark_src, 900)
+        save_png_optimized(pad_center_square(expo_icon, 1024), native / "icon.png")
+        adaptive = scale_to_max(mark_src, 660)
+        save_png_optimized(pad_center_square(adaptive, 1024), native / "adaptive-icon.png")
+        splash_logo = scale_to_max(full_src, 900)
+        save_png_optimized(pad_center_square(splash_logo, 1024), native / "splash-icon.png")
+        save_png_optimized(pad_center_square(scale_to_max(mark_src, 256), 256), native / "favicon.png")
+    dark_source = resolve_dark_source_path(dark_cli)
+    if dark_source is not None and dark_source.is_file():
+        full_dark_src, compact_dark_src, mark_dark_src = build_variants_from_master(
+            load_transparent_from_dark_backdrop, dark_source, label="dark"
+        )
+        full_dark_web = scale_to_max_width(full_dark_src, WEB_LOGO_MAX_WIDTH_PX)
+        compact_dark_web = scale_to_max_width(compact_dark_src, WEB_LOGO_MAX_WIDTH_PX)
+        mark_dark_web = scale_to_max_width(mark_dark_src, MARK_WEB_MAX_WIDTH_PX)
+        save_png_optimized(full_dark_web, web_brand / "techmd-logo-full-dark.png")
+        save_png_optimized(compact_dark_web, web_brand / "techmd-logo-compact-dark.png")
+        save_png_optimized(mark_dark_web, web_brand / "techmd-mark-dark.png")
+        write_logo_svg(
+            full_dark_web,
+            "techmd-logo-full-dark.png",
+            web_brand / "techmd-logo-full-dark.svg",
+        )
+        write_logo_svg(
+            compact_dark_web,
+            "techmd-logo-compact-dark.png",
+            web_brand / "techmd-logo-compact-dark.svg",
+        )
+        write_mark_favicons(mark_dark_web, "techmd-mark-dark", web_brand)
+        print(f"Dark assets from master: {dark_source.name}")
+    elif not dark_only and full_web is not None and compact_web is not None and mark_web is not None:
+        save_png_optimized(
+            supersampled_recolor_for_dark_ui(full_web, DARK_RECOLOR_SUPERSAMPLE_FACTOR),
+            web_brand / "techmd-logo-full-dark.png",
+        )
+        save_png_optimized(
+            supersampled_recolor_for_dark_ui(compact_web, DARK_RECOLOR_SUPERSAMPLE_FACTOR),
+            web_brand / "techmd-logo-compact-dark.png",
+        )
+        mark_dark_fallback = supersampled_recolor_for_dark_ui(mark_web, DARK_RECOLOR_SUPERSAMPLE_FACTOR)
+        save_png_optimized(mark_dark_fallback, web_brand / "techmd-mark-dark.png")
+        write_mark_favicons(mark_dark_fallback, "techmd-mark-dark", web_brand)
+        print("Dark assets from programmatic recolor (no dark master in _source/)", file=sys.stderr)
+    elif dark_only:
+        print("Dark source not found in _source/ (techmd-logo-master-dark.*)", file=sys.stderr)
+        sys.exit(1)
+    version = write_brand_asset_version(web_brand)
+    print(f"Wrote TECHMD assets to apps/web/public/brand and apps/native/assets (v={version})")
 
 
 if __name__ == "__main__":

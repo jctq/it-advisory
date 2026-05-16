@@ -1,45 +1,76 @@
-'use client';
-
 import Image from 'next/image';
 import type { ReactElement } from 'react';
-import { useMarketingAppearance } from '@/components/marketing/marketing-appearance-provider';
+import {
+  brandAssetUrl,
+  BRAND_LOGO_COMPACT_DARK,
+  BRAND_LOGO_COMPACT_LIGHT,
+  BRAND_LOGO_FULL_DARK,
+  BRAND_LOGO_FULL_LIGHT,
+} from '@/lib/brand/brand-assets';
 
-// Intrinsic pixels from `scripts/generate-techmd-brand-assets.py` (2× pipeline on 1024px master).
-const LOGO_FULL_WIDTH_PX = 1748;
-const LOGO_FULL_HEIGHT_PX = 368;
-const LOGO_COMPACT_WIDTH_PX = 1748;
-const LOGO_COMPACT_HEIGHT_PX = 368;
+// Intrinsic pixels from `scripts/generate-techmd-brand-assets.py` (2× pipeline on 1024px masters).
+const LOGO_LIGHT_WIDTH_PX = 1748;
+const LOGO_LIGHT_HEIGHT_PX = 368;
+const LOGO_DARK_WIDTH_PX = 1742;
+const LOGO_DARK_HEIGHT_PX = 348;
+
+const LOGO_IMAGE_CLASS =
+  'absolute left-0 top-0 h-full w-auto max-w-none object-contain object-left';
 
 /**
  * Responsive TECHMD logo for the marketing header: full wordmark + tagline on large screens,
- * compact wordmark (no tagline) on smaller breakpoints. Uses light-ink variants in dark mode.
+ * compact wordmark (no tagline) on smaller breakpoints. Light/dark pairs share one slot
+ * (`dark:hidden` / `hidden dark:block`), same pattern as the admin sidebar.
  */
 export function TechmdSiteLogo(): ReactElement {
-  const { isDark } = useMarketingAppearance();
-  const srcFull = isDark ? '/brand/techmd-logo-full-dark.png' : '/brand/techmd-logo-full.png';
-  const srcCompact = isDark ? '/brand/techmd-logo-compact-dark.png' : '/brand/techmd-logo-compact.png';
   return (
     <span className="relative inline-flex max-h-10 items-center sm:max-h-11">
-      <Image
-        key={srcFull}
-        src={srcFull}
-        alt="TECHMD — Technology consultation. Better decisions. Stronger business."
-        width={LOGO_FULL_WIDTH_PX}
-        height={LOGO_FULL_HEIGHT_PX}
-        priority
-        sizes="(min-width: 1024px) 400px, 0px"
-        className="hidden h-8 w-auto max-h-10 object-contain object-left sm:h-9 lg:block lg:h-10"
-      />
-      <Image
-        key={srcCompact}
-        src={srcCompact}
-        alt="TECHMD"
-        width={LOGO_COMPACT_WIDTH_PX}
-        height={LOGO_COMPACT_HEIGHT_PX}
-        priority
-        sizes="(max-width: 1023px) 300px, 0px"
-        className="h-8 w-auto max-h-10 object-contain object-left sm:h-9 lg:hidden"
-      />
+      <span
+        className="relative hidden h-8 sm:h-9 lg:block lg:h-10"
+        style={{ aspectRatio: `${LOGO_LIGHT_WIDTH_PX} / ${LOGO_LIGHT_HEIGHT_PX}` }}
+      >
+        <Image
+          src={brandAssetUrl(BRAND_LOGO_FULL_LIGHT)}
+          alt="TECHMD — Technology consultation. Better decisions. Stronger business."
+          width={LOGO_LIGHT_WIDTH_PX}
+          height={LOGO_LIGHT_HEIGHT_PX}
+          priority
+          sizes="(min-width: 1024px) 384px, 1px"
+          className={`${LOGO_IMAGE_CLASS} block dark:hidden`}
+        />
+        <Image
+          src={brandAssetUrl(BRAND_LOGO_FULL_DARK)}
+          alt="TECHMD — Technology consultation. Better decisions. Stronger business."
+          width={LOGO_DARK_WIDTH_PX}
+          height={LOGO_DARK_HEIGHT_PX}
+          priority
+          sizes="(min-width: 1024px) 384px, 1px"
+          className={`${LOGO_IMAGE_CLASS} hidden dark:block`}
+        />
+      </span>
+      <span
+        className="relative h-8 sm:h-9 lg:hidden"
+        style={{ aspectRatio: `${LOGO_LIGHT_WIDTH_PX} / ${LOGO_LIGHT_HEIGHT_PX}` }}
+      >
+        <Image
+          src={brandAssetUrl(BRAND_LOGO_COMPACT_LIGHT)}
+          alt="TECHMD"
+          width={LOGO_LIGHT_WIDTH_PX}
+          height={LOGO_LIGHT_HEIGHT_PX}
+          priority
+          sizes="(max-width: 1023px) 288px, 1px"
+          className={`${LOGO_IMAGE_CLASS} block dark:hidden`}
+        />
+        <Image
+          src={brandAssetUrl(BRAND_LOGO_COMPACT_DARK)}
+          alt="TECHMD"
+          width={LOGO_DARK_WIDTH_PX}
+          height={LOGO_DARK_HEIGHT_PX}
+          priority
+          sizes="(max-width: 1023px) 288px, 1px"
+          className={`${LOGO_IMAGE_CLASS} hidden dark:block`}
+        />
+      </span>
     </span>
   );
 }

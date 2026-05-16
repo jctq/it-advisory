@@ -17,6 +17,13 @@ import {
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  brandAssetUrl,
+  BRAND_LOGO_COMPACT_DARK,
+  BRAND_LOGO_COMPACT_LIGHT,
+  BRAND_MARK_DARK,
+  BRAND_MARK_LIGHT,
+} from '@/lib/brand/brand-assets';
 import { cn } from '@/lib/utils';
 
 type AdminSidebarProps = {
@@ -117,34 +124,34 @@ export function AdminSidebar(props: AdminSidebarProps) {
             {props.collapsed ? (
               <span className="flex size-10 items-center justify-center overflow-hidden rounded-2xl bg-sidebar-primary/10 shadow-sm">
                 <Image
-                  src="/brand/techmd-mark.png"
+                  src={brandAssetUrl(BRAND_MARK_LIGHT)}
                   alt="TECHMD"
                   width={382}
                   height={354}
                   className="size-9 object-contain dark:hidden"
                 />
                 <Image
-                  src="/brand/techmd-mark-dark.png"
+                  src={brandAssetUrl(BRAND_MARK_DARK)}
                   alt="TECHMD"
-                  width={382}
-                  height={354}
+                  width={381}
+                  height={345}
                   className="hidden size-9 object-contain dark:block"
                 />
               </span>
             ) : (
               <div className="min-w-0">
                 <Image
-                  src="/brand/techmd-logo-compact.png"
+                  src={brandAssetUrl(BRAND_LOGO_COMPACT_LIGHT)}
                   alt="TECHMD"
                   width={1748}
                   height={368}
                   className="h-7 w-auto max-w-[min(100%,14rem)] object-contain object-left dark:hidden"
                 />
                 <Image
-                  src="/brand/techmd-logo-compact-dark.png"
+                  src={brandAssetUrl(BRAND_LOGO_COMPACT_DARK)}
                   alt="TECHMD"
-                  width={1748}
-                  height={368}
+                  width={1742}
+                  height={348}
                   className="hidden h-7 w-auto max-w-[min(100%,14rem)] object-contain object-left dark:block"
                 />
                 <p className="mt-1 text-xs text-sidebar-foreground/70">Admin console</p>
