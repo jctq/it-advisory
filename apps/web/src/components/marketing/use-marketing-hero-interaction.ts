@@ -15,6 +15,10 @@ const HERO_TAP_BOOST_MS = 3500;
 const HERO_IN_VIEW_THRESHOLD = 0.12;
 const HERO_IDLE_CHECK_MS = 200;
 const HERO_PARALLAX_CENTER = 0.5;
+/** Global mouse-parallax intensity (0 = off, 1 = default, 1.5 = stronger). Scales all hero layer shifts in globals.css. */
+export const HERO_PARALLAX_STRENGTH = 10;
+const HERO_SPRING_CONFIG = { stiffness: 52, damping: 32, restDelta: 0.0008, restSpeed: 0.008 };
+const HERO_BOOST_SPRING_CONFIG = { stiffness: 120, damping: 34, restDelta: 0.001, restSpeed: 0.01 };
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -29,7 +33,7 @@ export type MarketingHeroInteraction = {
 
 /**
  * Page-wide pointer tracking while the hero is in view: mouse parallax on layers + idle decay after last move.
- * Tap on the hero extends parallax on touch devices. Disabled when reduced motion is preferred.
+ * Pointer position is preserved across tab blur/focus to avoid spring snap. Disabled when reduced motion is preferred.
  */
 export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -37,13 +41,17 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   const [isInView, setIsInView] = useState(false);
   const [isBoosted, setIsBoosted] = useState(false);
   const boostUntilRef = useRef(0);
+  const isDocumentPausedRef = useRef(false);
   const pointerX = useMotionValue(HERO_PARALLAX_CENTER);
   const pointerY = useMotionValue(HERO_PARALLAX_CENTER);
   const boostTarget = useMotionValue(0);
-  const springX = useSpring(pointerX, { stiffness: 72, damping: 22 });
-  const springY = useSpring(pointerY, { stiffness: 72, damping: 22 });
-  const springBoost = useSpring(boostTarget, { stiffness: 140, damping: 26 });
+  const springX = useSpring(pointerX, HERO_SPRING_CONFIG);
+  const springY = useSpring(pointerY, HERO_SPRING_CONFIG);
+  const springBoost = useSpring(boostTarget, HERO_BOOST_SPRING_CONFIG);
   const executeExtendBoost = useCallback((): void => {
+    if (isDocumentPausedRef.current) {
+      return;
+    }
     boostUntilRef.current = Date.now() + HERO_IDLE_DECAY_MS;
     setIsBoosted(true);
     boostTarget.set(1);
@@ -53,12 +61,16 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     setIsBoosted(true);
     boostTarget.set(1);
   }, [boostTarget]);
+  const executeDecayBoost = useCallback((): void => {
+    setIsBoosted(false);
+    boostTarget.set(0);
+  }, [boostTarget]);
   const sectionRef = useCallback((node: HTMLElement | null) => {
     setSectionElement(node);
   }, []);
   const executeUpdatePointer = useCallback(
     (clientX: number, clientY: number): void => {
-      if (sectionElement === null) {
+      if (sectionElement === null || isDocumentPausedRef.current) {
         return;
       }
       const rect = sectionElement.getBoundingClientRect();
@@ -70,16 +82,15 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     },
     [pointerX, pointerY, sectionElement],
   );
-  const executeResetPointer = useCallback((): void => {
+  const executeResetParallax = useCallback((): void => {
     pointerX.set(HERO_PARALLAX_CENTER);
     pointerY.set(HERO_PARALLAX_CENTER);
-  }, [pointerX, pointerY]);
+    executeDecayBoost();
+  }, [pointerX, pointerY, executeDecayBoost]);
   useEffect(() => {
     if (prefersReducedMotion) {
-      setIsBoosted(false);
+      executeResetParallax();
       setIsInView(false);
-      boostTarget.set(0);
-      executeResetPointer();
       return;
     }
     if (sectionElement === null) {
@@ -95,35 +106,32 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     return () => {
       observer.disconnect();
     };
-  }, [prefersReducedMotion, boostTarget, sectionElement, executeResetPointer]);
+  }, [prefersReducedMotion, sectionElement, executeResetParallax]);
   useEffect(() => {
     if (prefersReducedMotion || !isInView) {
-      setIsBoosted(false);
-      boostTarget.set(0);
-      executeResetPointer();
+      executeResetParallax();
       return;
     }
     const executeOnPointerMove = (event: PointerEvent): void => {
-      if (document.visibilityState === 'hidden') {
+      if (isDocumentPausedRef.current) {
         return;
       }
       executeUpdatePointer(event.clientX, event.clientY);
       executeExtendBoost();
     };
     const executeOnVisibilityChange = (): void => {
-      if (document.visibilityState === 'hidden') {
-        setIsBoosted(false);
-        boostTarget.set(0);
-        executeResetPointer();
-      }
+      const isHidden = document.visibilityState === 'hidden';
+      isDocumentPausedRef.current = isHidden;
     };
+    isDocumentPausedRef.current = document.visibilityState === 'hidden';
     document.addEventListener('pointermove', executeOnPointerMove, { passive: true });
     document.addEventListener('visibilitychange', executeOnVisibilityChange);
     const idleTimer = window.setInterval(() => {
+      if (isDocumentPausedRef.current) {
+        return;
+      }
       if (Date.now() > boostUntilRef.current) {
-        setIsBoosted(false);
-        boostTarget.set(0);
-        executeResetPointer();
+        executeDecayBoost();
       }
     }, HERO_IDLE_CHECK_MS);
     return () => {
@@ -136,8 +144,8 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     isInView,
     executeExtendBoost,
     executeUpdatePointer,
-    executeResetPointer,
-    boostTarget,
+    executeDecayBoost,
+    executeResetParallax,
   ]);
   useEffect(() => {
     if (prefersReducedMotion) {
@@ -169,6 +177,7 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     '--hero-fx': springX,
     '--hero-fy': springY,
     '--hero-boost': springBoost,
+    '--hero-parallax-strength': HERO_PARALLAX_STRENGTH,
   } as CSSProperties;
   return { isBoosted, isInView, rootStyle, sectionRef };
 }

@@ -38,8 +38,11 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
     >
       <div className="marketing-hero-base-wash absolute inset-0" />
       <div className="marketing-hero-art-accent absolute inset-0" aria-hidden />
-      <div className={cn('marketing-hero-canvas absolute inset-0 marketing-hero-art-drift')}>
-        <div className="marketing-hero-art-glow absolute inset-0" aria-hidden />
+      <div className="marketing-hero-canvas absolute inset-0">
+        <div
+          className={cn('marketing-hero-art-glow marketing-hero-art-drift absolute inset-0')}
+          aria-hidden
+        />
         <div className="marketing-hero-art-panel-shift absolute inset-0">
           <svg
             ref={svgRef}

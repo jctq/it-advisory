@@ -279,7 +279,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         ref={heroInteraction.sectionRef}
         className="relative flex min-h-[88dvh] flex-col justify-end overflow-hidden border-b border-border px-6 pb-14 pt-28 md:min-h-[92dvh] md:pb-20 md:pt-32"
         speed={0.11}
-        backgroundSpeed={0.22}
+        backgroundSpeed={0}
         background={<MarketingHeroBackground interaction={heroInteraction} />}
       >
         <div className="mx-auto w-full max-w-6xl">

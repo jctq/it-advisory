@@ -71,6 +71,17 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  --marketing-hero-glow-strong: color-mix(in oklch, var(--primary) 14%, transparent);
+  --marketing-hero-glow-mid: color-mix(in oklch, var(--primary) 8%, transparent);
+  --marketing-hero-glow-soft: color-mix(in oklch, var(--primary) 4%, transparent);
+  --marketing-hero-line: color-mix(in oklch, var(--primary) 88%, var(--foreground));
+  --marketing-hero-line-soft: color-mix(in oklch, var(--primary) 58%, transparent);
+  --marketing-hero-node: var(--primary);
+  --marketing-hero-grid-line: color-mix(in oklch, var(--border) 82%, var(--primary));
+  --marketing-hero-orb: color-mix(in oklch, var(--primary) 16%, transparent);
+  --marketing-hero-orb-soft: color-mix(in oklch, var(--primary) 8%, transparent);
+  --marketing-hero-wireframe-border: color-mix(in oklch, var(--primary) 28%, var(--border));
+  --marketing-hero-wireframe-fill: color-mix(in oklch, var(--card) 92%, var(--primary));
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.35 0.12 264);
@@ -160,6 +171,17 @@
   --border: rgb(255 255 255 / 12%);
   --input: rgb(255 255 255 / 14%);
   --ring: #818cf8;
+  --marketing-hero-glow-strong: color-mix(in oklch, var(--primary) 32%, transparent);
+  --marketing-hero-glow-mid: color-mix(in oklch, var(--primary) 20%, transparent);
+  --marketing-hero-glow-soft: color-mix(in oklch, var(--primary) 10%, transparent);
+  --marketing-hero-line: color-mix(in oklch, var(--primary) 75%, var(--foreground));
+  --marketing-hero-line-soft: color-mix(in oklch, var(--primary) 48%, transparent);
+  --marketing-hero-node: var(--primary);
+  --marketing-hero-grid-line: color-mix(in oklch, var(--border) 70%, var(--primary));
+  --marketing-hero-orb: color-mix(in oklch, var(--primary) 35%, transparent);
+  --marketing-hero-orb-soft: color-mix(in oklch, var(--primary) 18%, transparent);
+  --marketing-hero-wireframe-border: color-mix(in oklch, var(--primary) 35%, var(--border));
+  --marketing-hero-wireframe-fill: color-mix(in oklch, var(--card) 80%, var(--primary));
   --sidebar: #020617;
   --sidebar-foreground: #e2e8f0;
   --sidebar-primary: #818cf8;
@@ -271,44 +293,48 @@
     border: 1px solid var(--marketing-band-border);
     background-color: var(--marketing-band-surface);
   }
+  /*
+   * Hero mouse parallax: tune HERO_PARALLAX_STRENGTH in use-marketing-hero-interaction.ts (default 1).
+   * Layer-specific px/deg below are relative weights; strength scales all transform shifts together.
+   */
+  .marketing-hero-interactive {
+    --hero-parallax-strength: 5;
+  }
   .marketing-hero-base-wash {
     background-image:
       radial-gradient(
         ellipse 120% 90% at 72% 20%,
-        color-mix(in oklch, var(--primary) 14%, transparent) 0%,
-        color-mix(in oklch, var(--primary) 6%, transparent) 45%,
+        var(--marketing-hero-glow-mid) 0%,
         transparent 80%
       ),
       radial-gradient(
         ellipse 70% 55% at 18% 55%,
-        color-mix(in oklch, var(--primary) 8%, transparent) 0%,
+        var(--marketing-hero-glow-soft) 0%,
         transparent 70%
       ),
       radial-gradient(
         ellipse 90% 70% at 50% 100%,
-        color-mix(in oklch, var(--primary) 5%, transparent) 0%,
+        var(--marketing-hero-glow-soft) 0%,
         transparent 65%
       ),
       linear-gradient(155deg, color-mix(in oklch, var(--muted) 55%, var(--background)) 0%, var(--background) 72%);
     transform: translate3d(
-      calc((var(--hero-fx, 0.5) - 0.5) * 8px * var(--hero-boost, 0)),
-      calc((var(--hero-fy, 0.5) - 0.5) * 6px * var(--hero-boost, 0)),
+      calc((var(--hero-fx, 0.5) - 0.5) * 8px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 6px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
-    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .marketing-hero-art-accent {
     background-image: radial-gradient(
       ellipse 55% 45% at 12% 62%,
-      color-mix(in oklch, var(--primary) 9%, transparent) 0%,
+      var(--marketing-hero-glow-soft) 0%,
       transparent 72%
     );
     transform: translate3d(
-      calc((var(--hero-fx, 0.5) - 0.5) * -10px * var(--hero-boost, 0)),
-      calc((var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-boost, 0)),
+      calc((var(--hero-fx, 0.5) - 0.5) * -10px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
-    transition: transform 750ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .marketing-hero-canvas {
     isolation: isolate;
@@ -317,22 +343,21 @@
     background-image:
       radial-gradient(
         ellipse 130% 100% at 62% 42%,
-        color-mix(in oklch, var(--primary) 18%, transparent) 0%,
-        color-mix(in oklch, var(--primary) 10%, transparent) 35%,
-        color-mix(in oklch, var(--primary) 4%, transparent) 58%,
+        var(--marketing-hero-glow-strong) 0%,
+        var(--marketing-hero-glow-mid) 38%,
         transparent 100%
       ),
       radial-gradient(
         ellipse 80% 60% at 88% 30%,
-        color-mix(in oklch, var(--primary) 12%, transparent) 0%,
+        var(--marketing-hero-glow-mid) 0%,
         transparent 70%
       ),
       radial-gradient(
         ellipse 50% 40% at 22% 68%,
-        color-mix(in oklch, var(--primary) 6%, transparent) 0%,
+        var(--marketing-hero-glow-soft) 0%,
         transparent 75%
       );
-    opacity: 0.9;
+    opacity: 0.92;
     mask-image: linear-gradient(
       to right,
       transparent 0%,
@@ -355,33 +380,33 @@
     opacity: 0.98;
   }
   .marketing-hero-stop-primary {
-    stop-color: var(--primary);
+    stop-color: var(--marketing-hero-line);
   }
   stop.marketing-hero-stop-primary {
-    stop-color: var(--primary);
+    stop-color: var(--marketing-hero-line);
   }
   .marketing-hero-stroke {
-    stroke: var(--primary);
-    color: var(--primary);
+    stroke: var(--marketing-hero-line-soft);
+    color: var(--marketing-hero-line-soft);
   }
   .marketing-hero-stroke-primary {
-    stroke: var(--primary);
+    stroke: var(--marketing-hero-line);
   }
   .marketing-hero-stroke-muted {
-    stroke: var(--foreground);
+    stroke: var(--marketing-hero-wireframe-border);
   }
   .marketing-hero-fill-primary {
-    fill: var(--primary);
+    fill: var(--marketing-hero-node);
   }
   .marketing-hero-fill-soft {
-    fill: color-mix(in oklch, var(--primary) 22%, transparent);
+    fill: color-mix(in oklch, var(--marketing-hero-line) 18%, transparent);
   }
   .marketing-hero-fill-card {
-    fill: color-mix(in oklch, var(--card) 85%, var(--primary));
-    stroke: var(--foreground);
+    fill: var(--marketing-hero-wireframe-fill);
+    stroke: var(--marketing-hero-wireframe-border);
   }
   .marketing-hero-grid {
-    stroke: var(--border);
+    stroke: var(--marketing-hero-grid-line);
   }
   .marketing-hero-text-fade {
     background-image: linear-gradient(
@@ -398,49 +423,45 @@
     background-image:
       radial-gradient(
         ellipse 90% 70% at 70% 28%,
-        color-mix(in oklch, var(--primary) calc(9% + 4% * var(--hero-boost, 0)), transparent) 0%,
+        color-mix(in oklch, var(--marketing-hero-glow-mid) calc(70% + 30% * var(--hero-boost, 0)), transparent) 0%,
         transparent 80%
       ),
       radial-gradient(
         ellipse 45% 38% at 20% 60%,
-        color-mix(in oklch, var(--primary) calc(4% + 2% * var(--hero-boost, 0)), transparent) 0%,
+        color-mix(in oklch, var(--marketing-hero-glow-soft) calc(80% + 20% * var(--hero-boost, 0)), transparent) 0%,
         transparent 75%
       );
-    opacity: calc(0.45 + 0.14 * var(--hero-boost, 0));
+    opacity: calc(0.38 + 0.12 * var(--hero-boost, 0));
     transition: opacity 500ms ease;
   }
   .marketing-hero-art-panel-shift {
     transform: translate3d(
-        calc((var(--hero-fx, 0.5) - 0.5) * 20px * var(--hero-boost, 0)),
-        calc((var(--hero-fy, 0.5) - 0.5) * 16px * var(--hero-boost, 0)),
+        calc((var(--hero-fx, 0.5) - 0.5) * 20px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+        calc((var(--hero-fy, 0.5) - 0.5) * 16px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
         0
       )
-      rotateY(calc((var(--hero-fx, 0.5) - 0.5) * 3deg * var(--hero-boost, 0)));
-    transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+      rotateY(calc((var(--hero-fx, 0.5) - 0.5) * 3deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)));
   }
   .marketing-hero-parallax-deep {
     transform: translate3d(
-      calc((var(--hero-fx, 0.5) - 0.5) * 10px * var(--hero-boost, 0)),
-      calc((var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-boost, 0)),
+      calc((var(--hero-fx, 0.5) - 0.5) * 10px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
-    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .marketing-hero-parallax-mid {
     transform: translate3d(
-      calc((var(--hero-fx, 0.5) - 0.5) * 16px * var(--hero-boost, 0)),
-      calc((var(--hero-fy, 0.5) - 0.5) * 12px * var(--hero-boost, 0)),
+      calc((var(--hero-fx, 0.5) - 0.5) * 16px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 12px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
-    transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .marketing-hero-parallax-light {
     transform: translate3d(
-      calc((0.5 - var(--hero-fx, 0.5)) * 6px * var(--hero-boost, 0)),
-      calc((0.5 - var(--hero-fy, 0.5)) * 5px * var(--hero-boost, 0)),
+      calc((0.5 - var(--hero-fx, 0.5)) * 6px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+      calc((0.5 - var(--hero-fy, 0.5)) * 5px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
-    transition: transform 750ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .marketing-hero-grid-group {
     opacity: calc(0.3 - 0.08 * var(--hero-boost, 0));
@@ -460,26 +481,24 @@
     top: 18%;
     width: min(28vw, 280px);
     height: min(28vw, 280px);
-    background: color-mix(in oklch, var(--primary) 22%, transparent);
+    background: var(--marketing-hero-orb);
     transform: translate3d(
-      calc((var(--hero-fx, 0.5) - 0.5) * 24px * var(--hero-boost, 0)),
-      calc((var(--hero-fy, 0.5) - 0.5) * 18px * var(--hero-boost, 0)),
+      calc((var(--hero-fx, 0.5) - 0.5) * 24px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 18px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
-    transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .marketing-hero-orb-secondary {
     left: 8%;
     bottom: 22%;
     width: min(22vw, 200px);
     height: min(22vw, 200px);
-    background: color-mix(in oklch, var(--primary) 10%, transparent);
+    background: var(--marketing-hero-orb-soft);
     transform: translate3d(
-      calc((var(--hero-fx, 0.5) - 0.5) * -14px * var(--hero-boost, 0)),
-      calc((var(--hero-fy, 0.5) - 0.5) * 12px * var(--hero-boost, 0)),
+      calc((var(--hero-fx, 0.5) - 0.5) * -14px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 12px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
-    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .marketing-hero-wireframe-stack {
     position: absolute;
@@ -491,11 +510,10 @@
     transform-style: preserve-3d;
     pointer-events: none;
     transform: translate3d(
-      calc((var(--hero-fx, 0.5) - 0.5) * 22px * var(--hero-boost, 0)),
-      calc((var(--hero-fy, 0.5) - 0.5) * 16px * var(--hero-boost, 0)),
+      calc((var(--hero-fx, 0.5) - 0.5) * 22px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 16px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
-    transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .marketing-hero-wireframe-card {
     position: absolute;
@@ -504,27 +522,26 @@
     width: 72%;
     height: 52%;
     border-radius: 14px;
-    border: 1px solid color-mix(in oklch, var(--foreground) 35%, transparent);
-    background: color-mix(in oklch, var(--card) 80%, var(--primary));
-    box-shadow: 0 0 24px color-mix(in oklch, var(--primary) 10%, transparent);
-    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+    border: 1px solid var(--marketing-hero-wireframe-border);
+    background: var(--marketing-hero-wireframe-fill);
+    box-shadow: 0 0 24px color-mix(in oklch, var(--marketing-hero-line) 12%, transparent);
   }
   .marketing-hero-wireframe-card-back {
     opacity: 0.35;
-    transform: rotateX(calc(-8deg + (var(--hero-fy, 0.5) - 0.5) * -4deg * var(--hero-boost, 0)))
-      rotateY(calc(8deg + (var(--hero-fx, 0.5) - 0.5) * 6deg * var(--hero-boost, 0)))
+    transform: rotateX(calc(-8deg + (var(--hero-fy, 0.5) - 0.5) * -4deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)))
+      rotateY(calc(8deg + (var(--hero-fx, 0.5) - 0.5) * 6deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)))
       translate3d(0, 0, -28px);
   }
   .marketing-hero-wireframe-card-mid {
     opacity: 0.55;
-    transform: rotateX(calc(-6deg + (var(--hero-fy, 0.5) - 0.5) * -5deg * var(--hero-boost, 0)))
-      rotateY(calc(10deg + (var(--hero-fx, 0.5) - 0.5) * 8deg * var(--hero-boost, 0)))
+    transform: rotateX(calc(-6deg + (var(--hero-fy, 0.5) - 0.5) * -5deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)))
+      rotateY(calc(10deg + (var(--hero-fx, 0.5) - 0.5) * 8deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)))
       translate3d(18%, 14%, -12px);
   }
   .marketing-hero-wireframe-card-front {
     opacity: 0.9;
-    transform: rotateX(calc(-4deg + (var(--hero-fy, 0.5) - 0.5) * -6deg * var(--hero-boost, 0)))
-      rotateY(calc(14deg + (var(--hero-fx, 0.5) - 0.5) * 10deg * var(--hero-boost, 0)))
+    transform: rotateX(calc(-4deg + (var(--hero-fy, 0.5) - 0.5) * -6deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)))
+      rotateY(calc(14deg + (var(--hero-fx, 0.5) - 0.5) * 10deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)))
       translate3d(36%, 28%, 16px);
   }
   @media (max-width: 767px) {
@@ -572,10 +589,12 @@
   }
   @keyframes marketing-hero-drift {
     0% {
-      transform: translate3d(0, 0, 0) scale(1);
+      transform: translate3d(0, 0, 0);
+      opacity: 0.9;
     }
     100% {
-      transform: translate3d(-14px, 10px, 0) scale(1.02);
+      transform: translate3d(-10px, 8px, 0);
+      opacity: 1;
     }
   }
   @keyframes marketing-hero-orb-drift {
