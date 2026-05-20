@@ -3,8 +3,18 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ChevronLeft, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   GUIDED_DIAGNOSTIC_EMPTY,
   applyGuidedGoBack,
@@ -225,6 +235,9 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   const sessionReadOnlyRef = useRef<boolean>(false);
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const hasHydratedRef = useRef<boolean>(false);
   const lastSessionInitKeyRef = useRef<string | null>(null);
   const skipNextSessionHydrationRef = useRef<boolean>(false);
@@ -440,6 +453,41 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     guided.completedBundles.length > 0 ||
     guided.activeRound !== null ||
     guided.initialPrompt.trim().length > 0;
+  const deleteSituationPreview = useMemo((): string | null => {
+    const trimmed = guided.initialPrompt.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }, [guided.initialPrompt]);
+  const executeDeleteDiagnostic = useCallback(async (): Promise<void> => {
+    setDeleteError(null);
+    setIsDeleting(true);
+    try {
+      const url =
+        sessionTargetId !== null
+          ? `${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(sessionTargetId)}`
+          : QUIZ_SESSION_API_URL;
+      const response = await fetch(url, { method: 'DELETE', credentials: 'include' });
+      const payload: unknown = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message =
+          typeof payload === 'object' && payload !== null && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
+            ? (payload as { error: string }).error
+            : 'Delete failed.';
+        setDeleteError(message);
+        return;
+      }
+      setIsDeleteDialogOpen(false);
+      if (sessionTargetId !== null) {
+        router.push('/account/diagnostics');
+        return;
+      }
+      setGuided(GUIDED_DIAGNOSTIC_EMPTY);
+      hasHydratedRef.current = true;
+      skipNextSessionHydrationRef.current = true;
+      router.replace('/diagnostic');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [router, sessionTargetId]);
   const executeGoBack = (): void => {
     setGuided((previous) =>
       sessionReadOnlyRef.current ? applyGuidedGoBackReadOnly(previous) : applyGuidedGoBack(previous),
@@ -519,6 +567,49 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   }
   return (
     <div className="mx-auto px-4 py-6 sm:px-5 md:px-6 md:py-10 lg:py-12">
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setIsDeleteDialogOpen(false);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this diagnostic?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the diagnostic snapshot and cannot be undone. Scheduled bookings stay on file
+              and are not deleted.
+              {deleteSituationPreview !== null ? (
+                <span className="mt-2 block rounded-md border border-border bg-muted/40 px-3 py-2 text-foreground">
+                  {deleteSituationPreview}
+                </span>
+              ) : null}
+              {deleteError !== null ? (
+                <span className="mt-2 block text-destructive" role="alert">
+                  {deleteError}
+                </span>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants(), 'bg-destructive text-white hover:bg-destructive/90')}
+              disabled={isDeleting}
+              onClick={(event) => {
+                event.preventDefault();
+                void executeDeleteDiagnostic();
+              }}
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {isDeleting ? 'Deleting…' : 'Delete diagnostic'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {targetSessionError !== null ? (
         <div
           className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -685,13 +776,23 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           </Button>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {showRetakeLink && !sessionReadOnly ? (
-              <Button type="button" variant="outline" asChild>
-                <Link
-                  href={buildMarketingQuizRetakePath(sessionTargetId)}
+              <>
+                <Button type="button" variant="outline" asChild>
+                  <Link href={buildMarketingQuizRetakePath(sessionTargetId)}>Retake diagnostic</Link>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteDialogOpen(true);
+                  }}
                 >
-                  Retake diagnostic
-                </Link>
-              </Button>
+                  <Trash2 className="size-4" aria-hidden />
+                  Delete diagnostic
+                </Button>
+              </>
             ) : null}
             {canGoBack && guided.activeRound === null ? (
               <Button type="button" variant="outline" onClick={executeGoBack}>

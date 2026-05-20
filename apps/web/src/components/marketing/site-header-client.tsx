@@ -64,7 +64,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 border-b border-border/80 bg-background/95 backdrop-blur-md supports-backdrop-filter:bg-background/75',
+        'sticky top-0 z-50 border-b border-border/60 bg-background/90 shadow-sm backdrop-blur-lg supports-backdrop-filter:bg-background/70',
         props.className,
       )}
     >

@@ -219,19 +219,156 @@
 }
 
 /**
- * Marketing landing: layered hero backdrop using design tokens (light/dark + accent themes).
+ * Marketing landing: Resonance-inspired depth (layers, bands, elevation) via design tokens.
  */
 @layer components {
-  .marketing-hero-sheen {
-    background-image:
-      radial-gradient(ellipse 90% 55% at 50% -30%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 55%),
-      radial-gradient(ellipse 55% 45% at 100% 0%, color-mix(in oklch, var(--primary) 12%, transparent), transparent 50%),
-      linear-gradient(to bottom, color-mix(in oklch, var(--muted) 85%, transparent), var(--background));
+  :root {
+    --marketing-band-bg: oklch(0.17 0.025 264);
+    --marketing-band-fg: oklch(0.98 0 0);
+    --marketing-band-muted: oklch(0.78 0.02 264);
+    --marketing-elevation-sm: 0 1px 2px oklch(0 0 0 / 0.04), 0 4px 12px oklch(0 0 0 / 0.06);
+    --marketing-elevation-md: 0 2px 4px oklch(0 0 0 / 0.04), 0 12px 28px oklch(0 0 0 / 0.1);
+    --marketing-elevation-lg: 0 4px 8px oklch(0 0 0 / 0.05), 0 24px 48px oklch(0 0 0 / 0.12);
   }
-  .marketing-dot-fade {
-    background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
-    background-size: 28px 28px;
-    mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  .dark {
+    --marketing-band-bg: oklch(0.12 0.02 264);
+    --marketing-band-fg: oklch(0.97 0 0);
+    --marketing-band-muted: oklch(0.72 0.02 264);
+    --marketing-elevation-sm: 0 1px 2px oklch(0 0 0 / 0.35), 0 6px 16px oklch(0 0 0 / 0.4);
+    --marketing-elevation-md: 0 2px 6px oklch(0 0 0 / 0.4), 0 16px 36px oklch(0 0 0 / 0.45);
+    --marketing-elevation-lg: 0 8px 24px oklch(0 0 0 / 0.5), 0 32px 64px oklch(0 0 0 / 0.55);
+  }
+  .marketing-section-eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.22em] text-primary;
+  }
+  .marketing-band-dark {
+    background-color: var(--marketing-band-bg);
+    color: var(--marketing-band-fg);
+  }
+  .marketing-band-dark .text-muted-foreground,
+  .marketing-band-dark .marketing-band-muted {
+    color: var(--marketing-band-muted);
+  }
+  .marketing-hero-base-wash {
+    background-image:
+      radial-gradient(ellipse 85% 70% at 88% 12%, color-mix(in oklch, var(--primary) 28%, transparent), transparent 62%),
+      radial-gradient(ellipse 60% 50% at 72% 55%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 58%),
+      linear-gradient(155deg, color-mix(in oklch, var(--muted) 55%, var(--background)) 0%, var(--background) 70%);
+  }
+  .marketing-hero-art-panel {
+    border-radius: 48% 0 0 48%;
+    background: radial-gradient(
+      ellipse 75% 65% at 58% 42%,
+      color-mix(in oklch, var(--primary) 18%, var(--card)),
+      color-mix(in oklch, var(--primary) 6%, transparent) 72%
+    );
+    box-shadow: inset 0 0 80px color-mix(in oklch, var(--primary) 12%, transparent);
+  }
+  .marketing-hero-stop-primary {
+    stop-color: var(--primary);
+  }
+  stop.marketing-hero-stop-primary {
+    stop-color: var(--primary);
+  }
+  .marketing-hero-stroke {
+    stroke: var(--primary);
+    color: var(--primary);
+  }
+  .marketing-hero-stroke-primary {
+    stroke: var(--primary);
+  }
+  .marketing-hero-stroke-muted {
+    stroke: var(--foreground);
+  }
+  .marketing-hero-fill-primary {
+    fill: var(--primary);
+  }
+  .marketing-hero-fill-soft {
+    fill: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+  .marketing-hero-fill-card {
+    fill: color-mix(in oklch, var(--card) 85%, var(--primary));
+    stroke: var(--foreground);
+  }
+  .marketing-hero-grid {
+    stroke: var(--border);
+  }
+  .marketing-hero-text-fade {
+    background-image: linear-gradient(
+      to right,
+      var(--background) 0%,
+      color-mix(in oklch, var(--background) 94%, transparent) 32%,
+      color-mix(in oklch, var(--background) 55%, transparent) 48%,
+      transparent 68%
+    );
+  }
+  .marketing-hero-highlight {
+    background-image: radial-gradient(
+      ellipse 55% 45% at 80% 22%,
+      color-mix(in oklch, var(--primary) 22%, transparent),
+      transparent 70%
+    );
+    opacity: 0.85;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .marketing-hero-art-drift {
+      animation: marketing-hero-drift 28s ease-in-out infinite alternate;
+    }
+  }
+  @keyframes marketing-hero-drift {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    100% {
+      transform: translate3d(-14px, 10px, 0) scale(1.02);
+    }
+  }
+  .marketing-grain {
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+  .dark .marketing-grain {
+    opacity: 0.2;
+    mix-blend-mode: soft-light;
+  }
+  .marketing-card-elevated {
+    box-shadow: var(--marketing-elevation-md);
+    @apply bg-card/95 backdrop-blur-sm;
+  }
+  .marketing-card-elevated:hover {
+    box-shadow: var(--marketing-elevation-lg);
+  }
+  .marketing-stat-value {
+    @apply text-4xl font-semibold tracking-tight tabular-nums text-foreground md:text-5xl lg:text-6xl;
+  }
+  .marketing-service-tab-active {
+    box-shadow: var(--marketing-elevation-sm);
+  }
+  .marketing-service-panel-glow {
+    background: radial-gradient(ellipse 80% 60% at 100% 0%, color-mix(in oklch, var(--primary) 16%, transparent), transparent 65%);
+  }
+  .marketing-scroll-cue {
+    @apply inline-flex w-10 flex-col items-center gap-2.5 text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground;
+  }
+  .marketing-scroll-cue-line {
+    @apply block h-10 w-px shrink-0 origin-center rounded-full bg-linear-to-b from-primary/70 to-transparent;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .marketing-scroll-cue-line {
+      animation: marketing-scroll-pulse 2s ease-in-out infinite;
+    }
+  }
+  @keyframes marketing-scroll-pulse {
+    0%,
+    100% {
+      opacity: 0.45;
+      transform: scaleY(0.85);
+    }
+    50% {
+      opacity: 1;
+      transform: scaleY(1);
+    }
   }
 }
 

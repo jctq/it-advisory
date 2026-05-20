@@ -102,10 +102,14 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
       ? undefined
       : `translate3d(0, ${backgroundOffset}px, 0)`;
   return (
-    <section ref={sectionRef} className={cn('relative', props.className)} id={props.id}>
+    <section
+      ref={sectionRef}
+      className={cn('relative', hasBackground && 'isolate', props.className)}
+      id={props.id}
+    >
       {hasBackground ? (
         <div
-          className="pointer-events-none absolute inset-0 -z-10 min-h-[118%] overflow-hidden"
+          className="pointer-events-none absolute inset-0 z-0 min-h-full overflow-hidden"
           style={{
             transform: backgroundTransform,
             willChange: backgroundTransform === undefined ? undefined : 'transform',
@@ -116,7 +120,7 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
         </div>
       ) : null}
       <div
-        className={cn(props.contentClassName)}
+        className={cn('relative z-10', props.contentClassName)}
         style={{
           transform: contentTransform,
           willChange: contentTransform === undefined ? undefined : 'transform',
