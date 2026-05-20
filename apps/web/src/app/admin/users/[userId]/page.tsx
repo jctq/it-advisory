@@ -139,7 +139,7 @@ export default async function AdminMarketingUserDetailPage(props: AdminMarketing
                     </td>
                     <td className="px-4 py-3">
                       <Link
-                        href={`/admin/quiz-sessions/${row.id}`}
+                        href={`/admin/sessions/${row.id}`}
                         className="font-medium text-primary underline-offset-4 hover:underline"
                       >
                         Open

@@ -67,8 +67,8 @@ function resolveAdminTitle(pathname: string): string {
   if (pathname.startsWith('/admin/diagnostic-templates')) {
     return 'Templates';
   }
-  if (pathname.startsWith('/admin/quiz-sessions')) {
-    return 'Quiz sessions';
+  if (pathname.startsWith('/admin/sessions')) {
+    return 'Sessions';
   }
   if (pathname.startsWith('/admin/leads')) {
     return 'Leads';
@@ -162,7 +162,7 @@ export function AdminShell(props: AdminShellProps) {
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
           <div className="sticky top-0 z-20 border-b border-border/80 bg-background/90 shadow-[0_1px_0_0_rgb(0_0_0/0.03)] backdrop-blur-md dark:shadow-[0_1px_0_0_rgb(255_255_255/0.04)]">
             <div className="mx-auto flex min-h-16 w-full flex-col gap-4 px-4 py-3 sm:px-6 lg:px-8">
-              <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <Button
                     type="button"
@@ -184,6 +184,7 @@ export function AdminShell(props: AdminShellProps) {
                   </div>
                 </div>
                 <AdminAppearanceControls
+                  variant="toolbar"
                   mode={colorMode}
                   theme={colorTheme}
                   onModeChange={executeChangeColorMode}

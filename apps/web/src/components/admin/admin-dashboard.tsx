@@ -70,8 +70,8 @@ const FEATURE_LINKS: readonly FeatureLinkConfig[] = [
     icon: FileStack,
   },
   {
-    href: '/admin/quiz-sessions',
-    label: 'Quiz sessions',
+    href: '/admin/sessions',
+    label: 'Sessions',
     description: 'Visitor diagnostics, completion state, and booking links.',
     icon: ClipboardList,
   },
@@ -172,10 +172,10 @@ function buildStatCards(
       href: '/admin/bookings',
     },
     {
-      label: 'Quiz sessions',
+      label: 'Sessions',
       value: stats.quizSessionsTotal,
       detail: `${stats.quizSessionsCompleted} completed`,
-      href: '/admin/quiz-sessions',
+      href: '/admin/sessions',
     },
     {
       label: 'Marketing users',

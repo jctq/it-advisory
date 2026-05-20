@@ -135,7 +135,7 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
       <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
         <h2 className="text-lg font-semibold text-foreground">Guided diagnostic</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Full question blocks and option lists as saved from the quiz session at booking time.
+          Full question blocks and option lists as saved from the session at booking time.
         </p>
         <div className="mt-6">
           <BookingDiagnosticReadonly guidedDiagnosticRaw={booking.guidedDiagnosticSnapshot} />

@@ -17,7 +17,7 @@ type AdminQuizSessionDetailPageProps = {
 };
 
 export const metadata = {
-  title: 'Quiz session — TechMD Admin',
+  title: 'Session — TechMD Admin',
 };
 
 export const dynamic = 'force-dynamic';
@@ -43,12 +43,12 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
     <section className="mx-auto space-y-8">
       <AdminPageHeader
         eyebrow="Intake"
-        title="Quiz session"
-        description="Visitor quiz snapshot from database. Booked = a booking row points at this session id. Table: diagnostic thread, guided diagnostic tabs, save history."
+        title="Session"
+        description="Visitor diagnostic snapshot from database. Booked = a booking row points at this session id. Table: diagnostic thread, guided diagnostic tabs, save history."
       />
       <div className="flex flex-wrap gap-3 text-sm">
-        <Link href="/admin/quiz-sessions" className="font-medium text-primary underline-offset-4 hover:underline">
-          ← All quiz sessions
+        <Link href="/admin/sessions" className="font-medium text-primary underline-offset-4 hover:underline">
+          ← All sessions
         </Link>
       </div>
       <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
@@ -89,7 +89,7 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Booked</dt>
             <dd className="mt-1 text-sm text-foreground">
               {session.linkedBookings.length === 0 ? (
-                'No — no booking references this quiz session id yet.'
+                'No — no booking references this session id yet.'
               ) : (
                 <span>
                   Yes — {session.linkedBookings.length} booking
@@ -108,7 +108,7 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
         <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
           <h2 className="text-lg font-semibold text-foreground">Linked bookings</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Web bookings that stored this quiz session id (`bookings.quizSessionId`).
+            Web bookings that stored this session id (`bookings.quizSessionId`).
           </p>
           <ul className="mt-4 space-y-3">
             {session.linkedBookings.map((booking) => {
@@ -120,7 +120,7 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
                 booking.status === 'confirmed'
                   ? buildBookingCalendarLinkBundle({
                       title: `${formatServiceKeyLabel(booking.serviceKey)} — ${bookingReference}`,
-                      description: `Booking reference ${bookingReference}. Quiz session ${session.id}.`,
+                      description: `Booking reference ${bookingReference}. Session ${session.id}.`,
                       location: meetingUrl,
                       startsAtUtc: startsAt,
                       durationMinutes: BOOKING_SESSION_CALENDAR_DURATION_MINUTES,

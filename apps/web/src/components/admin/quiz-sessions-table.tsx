@@ -86,7 +86,7 @@ export function QuizSessionsTable(props: QuizSessionsTableProps): ReactElement {
         header: 'Details',
         cell: (info) => (
           <Link
-            href={`/admin/quiz-sessions/${info.row.original.id}`}
+            href={`/admin/sessions/${info.row.original.id}`}
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
             View
@@ -100,7 +100,7 @@ export function QuizSessionsTable(props: QuizSessionsTableProps): ReactElement {
     <DataTable
       columns={columns}
       data={props.initialData.slice()}
-      emptyMessage="No quiz sessions in MongoDB yet (or MONGODB_URI is unset)."
+      emptyMessage="No sessions in MongoDB yet (or MONGODB_URI is unset)."
     />
   );
 }

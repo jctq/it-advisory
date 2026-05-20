@@ -51,11 +51,11 @@ export function MarketingHeaderAppearanceMenu(props: MarketingHeaderAppearanceMe
           Display & accent
         </p>
         <AdminAppearanceControls
+          variant="panel"
           mode={props.colorMode}
           theme={props.colorTheme}
           onModeChange={props.onModeChange}
           onThemeChange={props.onThemeChange}
-          className="flex-col items-stretch gap-3 [&_.appearance-dropdown-trigger]:w-full"
         />
       </DropdownMenuContent>
     </DropdownMenu>

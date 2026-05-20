@@ -51,8 +51,8 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     icon: FileStack,
   },
   {
-    href: '/admin/quiz-sessions',
-    label: 'Quiz sessions',
+    href: '/admin/sessions',
+    label: 'Sessions',
     icon: ClipboardList,
   },
   {
@@ -173,7 +173,7 @@ export function AdminSidebar(props: AdminSidebarProps) {
               <div className="rounded-2xl border border-sidebar-border/80 bg-sidebar-accent/70 px-3 py-3">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/60">Workspace</p>
                 <p className="mt-1 text-sm font-semibold text-sidebar-foreground">Customer operations</p>
-                <p className="mt-1 text-xs text-sidebar-foreground/68">Templates, quiz sessions, leads, marketing users, bookings, advisor, and settings.</p>
+                <p className="mt-1 text-xs text-sidebar-foreground/68">Templates, sessions, leads, marketing users, bookings, advisor, and settings.</p>
               </div>
             ) : null}
           </div>

@@ -24,7 +24,7 @@ export function BookingsTable({ initialData }: BookingsTableProps) {
       columnHelper.accessor('status', { header: 'Status' }),
       columnHelper.accessor('visitorId', { header: 'Visitor' }),
       columnHelper.accessor('quizSessionId', {
-        header: 'Quiz session',
+        header: 'Session',
         cell: (info) => {
           const id = info.getValue();
           if (id === null || id.length === 0) {
@@ -32,7 +32,7 @@ export function BookingsTable({ initialData }: BookingsTableProps) {
           }
           return (
             <Link
-              href={`/admin/quiz-sessions/${id}`}
+              href={`/admin/sessions/${id}`}
               className="font-medium text-primary underline-offset-4 hover:underline"
             >
               View
