@@ -122,6 +122,7 @@ type DiagnosticRoundPayload =
 
 type DiagnosticConfigPayload = {
   readonly diagnosticAiEnabled: boolean;
+  readonly diagnosticManageBookingEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;

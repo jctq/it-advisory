@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createPaymentCheckoutForAccountBooking } from '@/lib/payments/payment-checkout-resume';
 import { accountBookingManageCheckoutSchema } from '@/lib/marketing/guest-booking-manage-schema';
+import { assertManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { resolveCheckoutAppBaseUrl } from '@/lib/server/resolve-checkout-app-base-url';
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const disabledResponse = await assertManageBookingEnabled();
+  if (disabledResponse !== null) {
+    return disabledResponse;
+  }
   const user = await getAuthenticatedMarketingUser(request);
   if (user === null) {
     return NextResponse.json({ error: 'Sign in required', code: 'auth_required' }, { status: 401 });

@@ -14,6 +14,7 @@ export const APP_SETTINGS_DOCUMENT_ID = 'app';
 
 export type AppSettingsValues = {
   readonly diagnosticAiEnabled: boolean;
+  readonly diagnosticManageBookingEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;
@@ -34,6 +35,7 @@ function clampInt(value: number, min: number, max: number, fallback: number): nu
 function defaultSettings(): AppSettingsValues {
   return {
     diagnosticAiEnabled: false,
+    diagnosticManageBookingEnabled: false,
     diagnosticMaxRounds: 4,
     diagnosticQuestionsPerRound: 5,
     diagnosticOptionsPerQuestion: 4,
@@ -49,6 +51,10 @@ function mergeDocument(doc: AppSettingsDocument | null): AppSettingsValues {
   return {
     diagnosticAiEnabled:
       typeof doc.diagnosticAiEnabled === 'boolean' ? doc.diagnosticAiEnabled : base.diagnosticAiEnabled,
+    diagnosticManageBookingEnabled:
+      typeof doc.diagnosticManageBookingEnabled === 'boolean'
+        ? doc.diagnosticManageBookingEnabled
+        : base.diagnosticManageBookingEnabled,
     diagnosticMaxRounds: clampInt(
       doc.diagnosticMaxRounds,
       DIAGNOSTIC_MAX_ROUNDS_MIN,
@@ -90,6 +96,10 @@ export async function updateAppSettings(patch: Partial<AppSettingsValues>): Prom
   const next: AppSettingsValues = {
     diagnosticAiEnabled:
       patch.diagnosticAiEnabled !== undefined ? patch.diagnosticAiEnabled : current.diagnosticAiEnabled,
+    diagnosticManageBookingEnabled:
+      patch.diagnosticManageBookingEnabled !== undefined
+        ? patch.diagnosticManageBookingEnabled
+        : current.diagnosticManageBookingEnabled,
     diagnosticMaxRounds:
       patch.diagnosticMaxRounds !== undefined
         ? clampInt(

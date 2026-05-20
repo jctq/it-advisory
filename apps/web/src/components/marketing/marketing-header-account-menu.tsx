@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 
 type MarketingHeaderAccountMenuProps = {
   readonly user: AuthenticatedMarketingUser;
+  readonly manageBookingEnabled: boolean;
   readonly onSignOut: () => void;
   readonly className?: string;
 };
@@ -116,15 +117,17 @@ export function MarketingHeaderAccountMenu(props: MarketingHeaderAccountMenuProp
             <LayoutList className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             My diagnostics
           </Link>
-          <Link
-            href="/book/manage"
-            role="menuitem"
-            className="flex items-center gap-2 px-3 py-2.5 text-sm text-popover-foreground hover:bg-accent"
-            onClick={() => setOpen(false)}
-          >
-            <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            Manage booking
-          </Link>
+          {props.manageBookingEnabled ? (
+            <Link
+              href="/book/manage"
+              role="menuitem"
+              className="flex items-center gap-2 px-3 py-2.5 text-sm text-popover-foreground hover:bg-accent"
+              onClick={() => setOpen(false)}
+            >
+              <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              Manage booking
+            </Link>
+          ) : null}
           <button
             type="button"
             role="menuitem"

@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AccountDiagnosticsPanel } from '@/components/marketing/account-diagnostics-panel';
+import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 
 export const metadata = {
@@ -11,7 +12,10 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
-  const user = await getAuthenticatedMarketingUser();
+  const [user, manageBookingEnabled] = await Promise.all([
+    getAuthenticatedMarketingUser(),
+    readManageBookingEnabled(),
+  ]);
   if (user === null) {
     redirect('/login?next=%2Faccount%2Fdiagnostics');
   }
@@ -26,7 +30,7 @@ export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
           </p>
         </div>
       </div>
-      <AccountDiagnosticsPanel />
+      <AccountDiagnosticsPanel manageBookingEnabled={manageBookingEnabled} />
     </main>
   );
 }

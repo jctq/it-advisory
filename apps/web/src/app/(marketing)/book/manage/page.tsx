@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Suspense } from 'react';
 import { GuestBookingManageFlow } from '@/components/marketing/guest-booking-manage-flow';
+import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { BookRouteLoadingFallback } from '../book-route-loading-fallback';
 
 export const metadata: Metadata = {
@@ -9,7 +11,10 @@ export const metadata: Metadata = {
   description: 'Look up your booking reference to check status or complete payment.',
 };
 
-export default function BookManagePage(): ReactNode {
+export default async function BookManagePage(): Promise<ReactNode> {
+  if (!(await readManageBookingEnabled())) {
+    notFound();
+  }
   return (
     <main className="mx-auto max-w-6xl px-6 py-12 md:py-16">
       <div className="mx-auto max-w-lg text-center">

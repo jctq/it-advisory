@@ -131,6 +131,7 @@ function buildBookManageHref(bookingId: string | null): string {
 function SessionActions(props: {
   readonly row: VisitorQuizSessionSummary;
   readonly deletingId: string | null;
+  readonly manageBookingEnabled: boolean;
   readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
 }): ReactElement {
   return (
@@ -140,9 +141,11 @@ function SessionActions(props: {
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
           </Button>
-          <Button type="button" variant="secondary" size="sm" asChild>
-            <Link href={buildBookManageHref(props.row.bookingId)}>Manage</Link>
-          </Button>
+          {props.manageBookingEnabled ? (
+            <Button type="button" variant="secondary" size="sm" asChild>
+              <Link href={buildBookManageHref(props.row.bookingId)}>Manage</Link>
+            </Button>
+          ) : null}
         </>
       ) : (
         <Button type="button" size="sm" asChild>
@@ -173,7 +176,12 @@ type DeleteTarget = {
 /**
  * Signed-in user UI: API-paginated, searchable diagnostics list.
  */
-export function AccountDiagnosticsPanel(): ReactElement {
+export type AccountDiagnosticsPanelProps = {
+  readonly manageBookingEnabled?: boolean;
+};
+
+export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}): ReactElement {
+  const manageBookingEnabled = props.manageBookingEnabled ?? false;
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -381,11 +389,16 @@ export function AccountDiagnosticsPanel(): ReactElement {
         id: 'actions',
         header: () => <span className="sr-only">Actions</span>,
         cell: (info) => (
-          <SessionActions row={info.row.original} deletingId={deletingId} onRequestDelete={handleRequestDelete} />
+          <SessionActions
+            row={info.row.original}
+            deletingId={deletingId}
+            manageBookingEnabled={manageBookingEnabled}
+            onRequestDelete={handleRequestDelete}
+          />
         ),
       }),
     ],
-    [deletingId, handleRequestDelete],
+    [deletingId, handleRequestDelete, manageBookingEnabled],
   );
   // TanStack Table returns unstable function references; React Compiler intentionally skips memoizing here.
   // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable is documented as incompatible with compiler memoization

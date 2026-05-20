@@ -1,6 +1,6 @@
 'use client';
 
-import { BrainCircuit, Bug, LayoutTemplate } from 'lucide-react';
+import { BrainCircuit, Bug, CalendarDays, LayoutTemplate } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -28,6 +28,7 @@ const ADMIN_SETTINGS_API_URL: string = buildApiUrl('/api/admin/settings');
 
 type SettingsPayload = {
   readonly diagnosticAiEnabled: boolean;
+  readonly diagnosticManageBookingEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;
@@ -53,6 +54,7 @@ type AdminSettingsFormProps = {
 function areSettingsEqual(left: SettingsPayload, right: SettingsPayload): boolean {
   return (
     left.diagnosticAiEnabled === right.diagnosticAiEnabled &&
+    left.diagnosticManageBookingEnabled === right.diagnosticManageBookingEnabled &&
     left.diagnosticMaxRounds === right.diagnosticMaxRounds &&
     left.diagnosticQuestionsPerRound === right.diagnosticQuestionsPerRound &&
     left.diagnosticOptionsPerQuestion === right.diagnosticOptionsPerQuestion &&
@@ -85,6 +87,7 @@ function SettingsCard(props: {
 
 export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
+  const [diagnosticManageBookingEnabled, setDiagnosticManageBookingEnabled] = useState<boolean>(false);
   const [diagnosticMaxRounds, setDiagnosticMaxRounds] = useState<number>(4);
   const [diagnosticQuestionsPerRound, setDiagnosticQuestionsPerRound] = useState<number>(5);
   const [diagnosticOptionsPerQuestion, setDiagnosticOptionsPerQuestion] = useState<number>(4);
@@ -99,6 +102,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   const currentPayload: SettingsPayload = useMemo(
     () => ({
       diagnosticAiEnabled,
+      diagnosticManageBookingEnabled,
       diagnosticMaxRounds,
       diagnosticQuestionsPerRound,
       diagnosticOptionsPerQuestion,
@@ -106,6 +110,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     }),
     [
       diagnosticAiEnabled,
+      diagnosticManageBookingEnabled,
       diagnosticCacheDebugEnabled,
       diagnosticMaxRounds,
       diagnosticOptionsPerQuestion,
@@ -127,6 +132,8 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         if (!cancelled) {
           const snapshot: SettingsPayload = {
             diagnosticAiEnabled: typeof data.diagnosticAiEnabled === 'boolean' ? data.diagnosticAiEnabled : false,
+            diagnosticManageBookingEnabled:
+              typeof data.diagnosticManageBookingEnabled === 'boolean' ? data.diagnosticManageBookingEnabled : false,
             diagnosticMaxRounds: data.diagnosticMaxRounds,
             diagnosticQuestionsPerRound: data.diagnosticQuestionsPerRound,
             diagnosticOptionsPerQuestion:
@@ -134,6 +141,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
             diagnosticCacheDebugEnabled: data.diagnosticCacheDebugEnabled,
           };
           setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
+          setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
           setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
           setDiagnosticQuestionsPerRound(snapshot.diagnosticQuestionsPerRound);
           setDiagnosticOptionsPerQuestion(snapshot.diagnosticOptionsPerQuestion);
@@ -169,12 +177,14 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       }
       const snapshot: SettingsPayload = {
         diagnosticAiEnabled: data.diagnosticAiEnabled,
+        diagnosticManageBookingEnabled: data.diagnosticManageBookingEnabled,
         diagnosticMaxRounds: data.diagnosticMaxRounds,
         diagnosticQuestionsPerRound: data.diagnosticQuestionsPerRound,
         diagnosticOptionsPerQuestion: data.diagnosticOptionsPerQuestion,
         diagnosticCacheDebugEnabled: data.diagnosticCacheDebugEnabled,
       };
       setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
+      setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
       setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
       setDiagnosticQuestionsPerRound(snapshot.diagnosticQuestionsPerRound);
       setDiagnosticOptionsPerQuestion(snapshot.diagnosticOptionsPerQuestion);
@@ -192,6 +202,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       return;
     }
     setDiagnosticAiEnabled(savedSnapshot.diagnosticAiEnabled);
+    setDiagnosticManageBookingEnabled(savedSnapshot.diagnosticManageBookingEnabled);
     setDiagnosticMaxRounds(savedSnapshot.diagnosticMaxRounds);
     setDiagnosticQuestionsPerRound(savedSnapshot.diagnosticQuestionsPerRound);
     setDiagnosticOptionsPerQuestion(savedSnapshot.diagnosticOptionsPerQuestion);
@@ -240,6 +251,32 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               When enabled, the quiz generates question blocks with AI. When disabled, customers use the active
               diagnostic template from Templates.
+            </p>
+          </div>
+        </div>
+      </SettingsCard>
+      <SettingsCard
+        icon={<CalendarDays className="size-5" aria-hidden />}
+        title="Manage booking"
+        description="Control whether guests can open the manage-booking page, look up reservations, and pay outstanding balances."
+      >
+        <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
+          <input
+            id="diagnosticManageBookingEnabled"
+            type="checkbox"
+            checked={diagnosticManageBookingEnabled}
+            onChange={(event) => {
+              setDiagnosticManageBookingEnabled(event.target.checked);
+            }}
+            className="mt-1 size-4 rounded border-input"
+          />
+          <div>
+            <label htmlFor="diagnosticManageBookingEnabled" className="text-sm font-medium text-foreground">
+              Enable manage booking
+            </label>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              When disabled, the manage-booking page returns 404, navigation links are hidden, and manage-booking APIs
+              reject requests.
             </p>
           </div>
         </div>

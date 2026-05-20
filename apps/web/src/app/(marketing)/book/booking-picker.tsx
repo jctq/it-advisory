@@ -220,13 +220,15 @@ function BookingStepper(props: { readonly activePhase: BookingSlotPhase }): Reac
 export type BookingPickerProps = {
   /** When set (from `/book/[sessionRef]`), attaches checkout to that diagnostic row; legacy `?sessionId=` on `/book` redirects here. */
   readonly pathSessionRef?: string | null;
+  /** When false, manage-booking links are hidden (admin diagnostic setting). */
+  readonly manageBookingEnabled?: boolean;
 };
 
 /**
  * Multi-step marketing checkout: slot selection, contact capture, mock payment choice, then booking persistence.
  */
 export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
-  const { pathSessionRef } = props;
+  const { pathSessionRef, manageBookingEnabled = false } = props;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -914,10 +916,15 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               <p className="text-xs font-medium text-muted-foreground">Booking reference</p>
               <p className="mt-1 font-mono text-sm font-semibold tracking-wider text-foreground">{confirmedBookingReference}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Save this reference to check status or pay later.{' '}
-                <Link href="/book/manage" className="font-medium text-primary underline-offset-4 hover:underline">
-                  Manage booking
-                </Link>
+                Save this reference to check status or pay later.
+                {manageBookingEnabled ? (
+                  <>
+                    {' '}
+                    <Link href="/book/manage" className="font-medium text-primary underline-offset-4 hover:underline">
+                      Manage booking
+                    </Link>
+                  </>
+                ) : null}
               </p>
             </div>
           ) : null}
@@ -969,7 +976,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             'We use this information only to confirm your reservation and to send your calendar invite and meeting link.'}
           {phase === 'payment' && 'Choose a payment method to secure your booking.'}
         </p>
-        {phase === 'date' ? (
+        {phase === 'date' && manageBookingEnabled ? (
           <p className="mt-2 text-sm text-muted-foreground">
             <Link href="/book/manage" className="font-medium text-primary underline-offset-4 hover:underline">
               Already booked? Manage your booking

@@ -12,6 +12,7 @@ import { getAppSettings, updateAppSettings } from '@/lib/data/app-settings';
 
 const patchSchema = z.object({
   diagnosticAiEnabled: z.boolean().optional(),
+  diagnosticManageBookingEnabled: z.boolean().optional(),
   diagnosticMaxRounds: z.number().int().min(DIAGNOSTIC_MAX_ROUNDS_MIN).max(DIAGNOSTIC_MAX_ROUNDS_MAX).optional(),
   diagnosticQuestionsPerRound: z
     .number()
@@ -52,6 +53,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   const body = parsed.data;
   if (
     body.diagnosticAiEnabled === undefined &&
+    body.diagnosticManageBookingEnabled === undefined &&
     body.diagnosticMaxRounds === undefined &&
     body.diagnosticQuestionsPerRound === undefined &&
     body.diagnosticOptionsPerQuestion === undefined &&

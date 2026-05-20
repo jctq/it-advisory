@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Suspense } from 'react';
+import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { BookingPicker } from '../booking-picker';
 import { BookRouteLoadingFallback } from '../book-route-loading-fallback';
 
@@ -14,12 +15,15 @@ type BookSessionRefPageProps = {
 };
 
 export default async function BookSessionRefPage(props: BookSessionRefPageProps): Promise<ReactNode> {
-  const { sessionRef } = await props.params;
+  const [{ sessionRef }, manageBookingEnabled] = await Promise.all([
+    props.params,
+    readManageBookingEnabled(),
+  ]);
   const decoded = decodeURIComponent(sessionRef.trim());
   return (
     <main>
       <Suspense fallback={<BookRouteLoadingFallback />}>
-        <BookingPicker pathSessionRef={decoded} />
+        <BookingPicker pathSessionRef={decoded} manageBookingEnabled={manageBookingEnabled} />
       </Suspense>
     </main>
   );

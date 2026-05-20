@@ -320,6 +320,8 @@ export type AppSettingsDocument = {
   _id: string;
   /** Added after initial deploy; defaults to true when omitted. */
   diagnosticAiEnabled?: boolean;
+  /** When false, hides `/book/manage` and disables guest manage-booking APIs. Defaults to false when omitted. */
+  diagnosticManageBookingEnabled?: boolean;
   diagnosticMaxRounds: number;
   diagnosticQuestionsPerRound: number;
   /** Added after initial deploy; omitted on older rows. */

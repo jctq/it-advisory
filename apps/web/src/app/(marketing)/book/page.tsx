@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Suspense } from 'react';
+import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { BookingPicker } from './booking-picker';
 import { BookRouteLoadingFallback } from './book-route-loading-fallback';
 
@@ -9,11 +10,12 @@ export const metadata: Metadata = {
   description: 'Choose a Philippine-time slot for your consultation.',
 };
 
-export default function BookPage(): ReactNode {
+export default async function BookPage(): Promise<ReactNode> {
+  const manageBookingEnabled = await readManageBookingEnabled();
   return (
     <main>
       <Suspense fallback={<BookRouteLoadingFallback />}>
-        <BookingPicker />
+        <BookingPicker manageBookingEnabled={manageBookingEnabled} />
       </Suspense>
     </main>
   );

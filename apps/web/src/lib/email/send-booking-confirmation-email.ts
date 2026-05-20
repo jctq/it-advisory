@@ -6,6 +6,7 @@ import { findLeadById } from '@/lib/data/leads';
 import { findPaymentTransactionById, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
 import { getDb } from '@/lib/mongodb';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
+import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { formatInTimeZone } from 'date-fns-tz';
 import { executeDispatchTransactionalEmail } from '@/lib/email/send-transactional-email';
 import {
@@ -326,7 +327,9 @@ async function runSendBookingConfirmationEmail(input: {
   const timeLabel = formatInTimeZone(startsAt, booking.timezone, 'h:mm a');
   const bookingReference = formatBookingReferenceId(booking.id);
   const siteOrigin = resolveAbsoluteSiteOrigin();
-  const manageUrl = siteOrigin.length > 0 ? `${siteOrigin}/book/manage` : '';
+  const manageBookingEnabled = await readManageBookingEnabled();
+  const manageUrl =
+    manageBookingEnabled && siteOrigin.length > 0 ? `${siteOrigin}/book/manage` : '';
   const meetingUrl =
     booking.meetingUrl !== undefined && typeof booking.meetingUrl === 'string' && booking.meetingUrl.trim().length > 0
       ? booking.meetingUrl.trim()

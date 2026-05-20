@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import { findGuestBookingManageViewForAccountVisitor } from '@/lib/data/booking-guest-manage';
 import { accountBookingManageLookupSchema } from '@/lib/marketing/guest-booking-manage-schema';
+import { assertManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 
 /**
  * Loads manage view for a booking that belongs to the signed-in marketing account (no email/phone lookup).
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const disabledResponse = await assertManageBookingEnabled();
+  if (disabledResponse !== null) {
+    return disabledResponse;
+  }
   const user = await getAuthenticatedMarketingUser(request);
   if (user === null) {
     return NextResponse.json({ error: 'Sign in required', code: 'auth_required' }, { status: 401 });
