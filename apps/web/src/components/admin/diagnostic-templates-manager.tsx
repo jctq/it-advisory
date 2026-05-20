@@ -14,12 +14,42 @@ import {
 import { AlertTriangle, CheckCircle2, GripVertical, PencilLine, Plus, Save, Search, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type ReactNode, useCallback, useMemo, useState, type ReactElement } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  buildAvailableOptionVisibilitySources,
+  buildAvailableVisibilitySourceQuestions,
+  buildDefaultVisibilityRuleForSource,
+  buildOptionVisibilityRuleSummary,
+  buildTemplatePatchBody,
+  buildTemplateSectionId,
+  buildVisibilityRuleForMatchMode,
+  buildVisibilityRuleSummary,
+  countTemplateQuestions,
+  createDraftChildOption,
+  createDraftChildQuestion,
+  createDraftOption,
+  createDraftQuestion,
+  createDraftRound,
+  DIAGNOSTIC_TEMPLATES_API_URL,
+  formatTemplateOutlineQuestionLabel,
+  formatTemplateOutlineRoundLabel,
+  moveArrayItem,
+  QUESTION_TYPE_OPTIONS,
+  reindexTemplate,
+  SAME_QUESTION_PATH_SOURCE_LABEL,
+  SELECTION_MODE_OPTIONS,
+  type DiagnosticTemplateChildOptionValue,
+  type DiagnosticTemplateChildQuestionValue,
+  type DiagnosticTemplateOptionValue,
+  type DiagnosticTemplateQuestionValue,
+  type DiagnosticTemplateRoundValue,
+  type TemplateSectionKind,
+} from '@/components/admin/diagnostic-template-editor/diagnostic-template-editor-utils';
 import type {
   DiagnosticTemplateQuestionType,
   DiagnosticTemplateSelectionMode,
@@ -27,7 +57,6 @@ import type {
   DiagnosticTemplateVisibilityRule,
   DiagnosticTemplateValue,
 } from '@/lib/diagnostic-template-types';
-import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 
@@ -35,25 +64,9 @@ type DiagnosticTemplatesManagerProps = {
   readonly initialTemplates: readonly DiagnosticTemplateValue[];
   readonly displayMode?: 'workspace' | 'editor';
   readonly listHref?: string;
-};
-
-type DiagnosticTemplateQuestionValue = DiagnosticTemplateValue['rounds'][number]['questions'][number];
-
-type DiagnosticTemplateOptionValue = DiagnosticTemplateQuestionValue['options'][number];
-
-type DiagnosticTemplateRoundValue = DiagnosticTemplateValue['rounds'][number];
-
-type DiagnosticTemplateChildQuestionValue = NonNullable<DiagnosticTemplateOptionValue['childQuestion']>;
-
-type DiagnosticTemplateChildOptionValue = DiagnosticTemplateChildQuestionValue['options'][number];
-
-type TemplateQuestionReference = {
-  readonly optionChoices: readonly {
-    readonly id: string;
-    readonly label: string;
-  }[];
-  readonly questionIndex: number;
-  readonly roundIndex: number;
+  readonly controlledTemplate?: DiagnosticTemplateValue;
+  readonly onControlledTemplateChange?: (template: DiagnosticTemplateValue) => void;
+  readonly hideEditorChrome?: boolean;
 };
 
 type TemplateApiResponse = {
@@ -73,7 +86,6 @@ type DiagnosticTemplateTableRow = {
   readonly updatedAtIso: string;
 };
 
-const DIAGNOSTIC_TEMPLATES_API_URL = buildApiUrl('/api/admin/diagnostic-templates');
 const TEMPLATE_TABLE_PAGE_SIZE = 7;
 const TEMPLATE_TABLE_COLUMN_HELPER = createColumnHelper<DiagnosticTemplateTableRow>();
 const TEMPLATE_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
@@ -81,160 +93,12 @@ const TEMPLATE_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
   timeStyle: 'short',
   timeZone: 'Asia/Manila',
 });
-const ROUND_SECTION_ID_PREFIX = 'diagnostic-template-round';
-const QUESTION_SECTION_ID_PREFIX = 'diagnostic-template-question';
-const OPTION_SECTION_ID_PREFIX = 'diagnostic-template-option';
-const SAME_QUESTION_PATH_SOURCE_LABEL = 'This question path';
 const ROW_INTERACTIVE_ELEMENT_SELECTOR =
   'button, a, input, textarea, select, [role="button"], [data-row-interactive="true"]';
-
-const SELECTION_MODE_OPTIONS = [
-  { value: 'single', label: 'Single select' },
-  { value: 'multiple', label: 'Multi select' },
-] as const satisfies readonly { value: DiagnosticTemplateSelectionMode; label: string }[];
-
-const QUESTION_TYPE_OPTIONS = [
-  { value: 'multiple-choice', label: 'Multiple choice' },
-  { value: 'nested-options', label: 'Nested options' },
-  { value: 'ranked-options', label: 'Ranked options' },
-] as const satisfies readonly { value: DiagnosticTemplateQuestionType; label: string }[];
-
-type TemplateSectionKind = 'round' | 'question' | 'option';
 
 type UpdateSelectedTemplateOptions = {
   readonly shouldReindex?: boolean;
 };
-
-function buildTemplateSectionId(params: { readonly entityId: string; readonly kind: TemplateSectionKind }): string {
-  const prefix =
-    params.kind === 'round'
-      ? ROUND_SECTION_ID_PREFIX
-      : params.kind === 'question'
-        ? QUESTION_SECTION_ID_PREFIX
-        : OPTION_SECTION_ID_PREFIX;
-  return `${prefix}-${params.entityId}`;
-}
-
-function formatTemplateOutlineRoundLabel(params: {
-  readonly round: DiagnosticTemplateValue['rounds'][number];
-  readonly roundIndex: number;
-}): string {
-  return `R${params.roundIndex + 1} · ${params.round.title}`;
-}
-
-function formatTemplateOutlineQuestionLabel(params: {
-  readonly question: DiagnosticTemplateQuestionValue;
-  readonly questionIndex: number;
-}): string {
-  const trimmedPrompt = params.question.prompt.trim();
-  if (trimmedPrompt.length === 0) {
-    return `Q${params.questionIndex + 1}`;
-  }
-  return `Q${params.questionIndex + 1} · ${trimmedPrompt}`;
-}
-
-function createDraftRound(roundIndex: number): DiagnosticTemplateValue['rounds'][number] {
-  return {
-    id: crypto.randomUUID(),
-    title: `Round ${roundIndex + 1}`,
-    guidance: '',
-    order: roundIndex,
-    showWhen: null,
-    questions: [],
-  };
-}
-
-function createDraftQuestion(questionIndex: number): DiagnosticTemplateValue['rounds'][number]['questions'][number] {
-  return {
-    id: crypto.randomUUID(),
-    prompt: '',
-    description: null,
-    order: questionIndex,
-    showWhen: null,
-    type: 'multiple-choice',
-    rankedOptionLimit: null,
-    selectionMode: 'multiple',
-    options: [
-      createDraftOption(0),
-      createDraftOption(1),
-    ],
-  };
-}
-
-function createDraftChildOption(optionIndex: number): DiagnosticTemplateChildOptionValue {
-  return {
-    id: crypto.randomUUID(),
-    label: '',
-    description: null,
-    order: optionIndex,
-  };
-}
-
-function createDraftChildQuestion(): DiagnosticTemplateChildQuestionValue {
-  return {
-    id: crypto.randomUUID(),
-    prompt: '',
-    description: null,
-    selectionMode: 'single',
-    options: [
-      createDraftChildOption(0),
-      createDraftChildOption(1),
-    ],
-  };
-}
-
-function createDraftOption(
-  optionIndex: number,
-): DiagnosticTemplateValue['rounds'][number]['questions'][number]['options'][number] {
-  return {
-    id: crypto.randomUUID(),
-    label: '',
-    description: null,
-    showWhen: null,
-    requestDetailNoteWhenSelected: false,
-    presentation: {
-      icon: null,
-      badgeText: null,
-      eyebrow: null,
-      title: null,
-      supportingText: null,
-      exampleBullets: [],
-      panelTitle: null,
-    },
-    order: optionIndex,
-    childQuestion: null,
-  };
-}
-
-function moveArrayItem<T>(items: readonly T[], fromIndex: number, toIndex: number): readonly T[] {
-  if (toIndex < 0 || toIndex >= items.length) {
-    return items;
-  }
-  const next = [...items];
-  const [item] = next.splice(fromIndex, 1);
-  if (item === undefined) {
-    return items;
-  }
-  next.splice(toIndex, 0, item);
-  return next;
-}
-
-function normalizeSingleRequestDetailNoteTriggerForQuestionOptions<T extends { requestDetailNoteWhenSelected: boolean }>(
-  options: readonly T[],
-): T[] {
-  const firstIndex = options.findIndex((option) => option.requestDetailNoteWhenSelected);
-  if (firstIndex === -1) {
-    return options.map((option) => ({ ...option, requestDetailNoteWhenSelected: false }));
-  }
-  return options.map((option, index) => ({
-    ...option,
-    requestDetailNoteWhenSelected: index === firstIndex,
-  }));
-}
-
-function countTemplateQuestions(template: DiagnosticTemplateValue): number {
-  return template.rounds.reduce((total, round) => total + round.questions.length, 0);
-}
 
 function formatTemplateDateTime(isoTimestamp: string): string {
   return TEMPLATE_DATE_TIME_FORMATTER.format(new Date(isoTimestamp));
@@ -253,437 +117,6 @@ function parseExampleBulletsInput(input: string): readonly string[] {
 
 function normalizeExampleBullets(exampleBullets: readonly string[]): readonly string[] {
   return exampleBullets.map((exampleBullet) => exampleBullet.trim()).filter((exampleBullet) => exampleBullet.length > 0);
-}
-
-function normalizeVisibilityRuleValue(rule: DiagnosticTemplateVisibilityRule): DiagnosticTemplateVisibilityRule {
-  if (rule === null) {
-    return null;
-  }
-  const sourceQuestionId = rule.sourceQuestionId.trim();
-  const optionIds = rule.optionIds
-    .map((optionId) => optionId.trim())
-    .filter((optionId, index, optionIds) => optionId.length > 0 && optionIds.indexOf(optionId) === index);
-  if (sourceQuestionId.length === 0 || optionIds.length === 0) {
-    return null;
-  }
-  return {
-    sourceQuestionId,
-    optionIds,
-    match: rule.match === 'all' ? 'all' : 'any',
-  };
-}
-
-function buildTemplateQuestionReferenceMap(template: DiagnosticTemplateValue): Map<string, TemplateQuestionReference> {
-  return new Map(
-    template.rounds.flatMap((round, roundIndex) =>
-      round.questions.map((question, questionIndex) => [
-        question.id,
-        {
-          roundIndex,
-          questionIndex,
-          optionChoices: question.options.map((option) => ({
-            id: option.id,
-            label: option.label,
-          })),
-        },
-      ] as const),
-    ),
-  );
-}
-
-function sanitizeVisibilityRule(params: {
-  readonly questionReferences: Map<string, TemplateQuestionReference>;
-  readonly rule: DiagnosticTemplateVisibilityRule;
-  readonly targetQuestionIndex?: number;
-  readonly targetRoundIndex: number;
-}): DiagnosticTemplateVisibilityRule {
-  const normalizedRule = normalizeVisibilityRuleValue(params.rule);
-  if (normalizedRule === null) {
-    return null;
-  }
-  const sourceQuestion = params.questionReferences.get(normalizedRule.sourceQuestionId);
-  if (sourceQuestion === undefined) {
-    return null;
-  }
-  const isEarlierQuestion =
-    params.targetQuestionIndex === undefined
-      ? sourceQuestion.roundIndex < params.targetRoundIndex
-      : sourceQuestion.roundIndex < params.targetRoundIndex ||
-        (sourceQuestion.roundIndex === params.targetRoundIndex &&
-          sourceQuestion.questionIndex < params.targetQuestionIndex);
-  if (!isEarlierQuestion) {
-    return null;
-  }
-  const validOptionIds =
-    normalizedRule.match === 'any'
-      ? sourceQuestion.optionChoices.map((optionChoice) => optionChoice.id)
-      : normalizedRule.optionIds.filter((optionId) =>
-          sourceQuestion.optionChoices.some((optionChoice) => optionChoice.id === optionId),
-        );
-  if (validOptionIds.length === 0) {
-    return null;
-  }
-  return {
-    sourceQuestionId: normalizedRule.sourceQuestionId,
-    optionIds: validOptionIds,
-    match: normalizedRule.match,
-  };
-}
-
-function sanitizeOptionVisibilityRule(params: {
-  readonly questionReferences: Map<string, TemplateQuestionReference>;
-  readonly roundIndex: number;
-  readonly questionIndex: number;
-  readonly optionIds: readonly string[];
-  readonly optionIndex: number;
-  readonly questionId: string;
-  readonly rule: DiagnosticTemplateVisibilityRule;
-}): DiagnosticTemplateVisibilityRule {
-  const normalizedRule = normalizeVisibilityRuleValue(params.rule);
-  if (normalizedRule === null) {
-    return null;
-  }
-  if (normalizedRule.sourceQuestionId !== params.questionId) {
-    return sanitizeVisibilityRule({
-      questionReferences: params.questionReferences,
-      rule: normalizedRule,
-      targetRoundIndex: params.roundIndex,
-      targetQuestionIndex: params.questionIndex,
-    });
-  }
-  const availableOptionIds = new Set(params.optionIds.slice(0, params.optionIndex));
-  const validOptionIds = normalizedRule.optionIds.filter((optionId) => availableOptionIds.has(optionId));
-  if (validOptionIds.length === 0) {
-    return null;
-  }
-  return {
-    sourceQuestionId: params.questionId,
-    optionIds: validOptionIds,
-    match: normalizedRule.match,
-  };
-}
-
-function buildAvailableVisibilitySourceQuestions(params: {
-  readonly roundId: string;
-  readonly targetQuestionId?: string;
-  readonly template: DiagnosticTemplateValue;
-}): readonly {
-  readonly id: string;
-  readonly label: string;
-  readonly optionChoices: readonly {
-    readonly id: string;
-    readonly label: string;
-  }[];
-}[] {
-  const availableQuestions: {
-    id: string;
-    label: string;
-    optionChoices: readonly {
-      id: string;
-      label: string;
-    }[];
-  }[] = [];
-  for (const [roundIndex, round] of params.template.rounds.entries()) {
-    if (round.id === params.roundId && params.targetQuestionId === undefined) {
-      break;
-    }
-    for (const [questionIndex, question] of round.questions.entries()) {
-      if (round.id === params.roundId && question.id === params.targetQuestionId) {
-        return availableQuestions;
-      }
-      availableQuestions.push({
-        id: question.id,
-        label: `R${roundIndex + 1} · Q${questionIndex + 1} · ${question.prompt.trim() || 'Untitled question'}`,
-        optionChoices: question.options.map((option) => ({
-          id: option.id,
-          label: option.label.trim() || 'Untitled option',
-        })),
-      });
-    }
-  }
-  return availableQuestions;
-}
-
-function buildAvailableOptionVisibilityChoices(params: {
-  readonly optionId: string;
-  readonly question: DiagnosticTemplateQuestionValue;
-}): readonly {
-  readonly id: string;
-  readonly label: string;
-}[] {
-  const optionChoices: {
-    id: string;
-    label: string;
-  }[] = [];
-  for (const option of params.question.options) {
-    if (option.id === params.optionId) {
-      return optionChoices;
-    }
-    optionChoices.push({
-      id: option.id,
-      label: option.label.trim() || 'Untitled option',
-    });
-  }
-  return optionChoices;
-}
-
-function buildAvailableOptionVisibilitySources(params: {
-  readonly optionId: string;
-  readonly question: DiagnosticTemplateQuestionValue;
-  readonly roundId: string;
-  readonly template: DiagnosticTemplateValue;
-}): readonly {
-  readonly id: string;
-  readonly label: string;
-  readonly optionChoices: readonly {
-    readonly id: string;
-    readonly label: string;
-  }[];
-}[] {
-  const sameQuestionChoices = buildAvailableOptionVisibilityChoices({
-    question: params.question,
-    optionId: params.optionId,
-  });
-  const earlierQuestionChoices = buildAvailableVisibilitySourceQuestions({
-    template: params.template,
-    roundId: params.roundId,
-    targetQuestionId: params.question.id,
-  });
-  return [
-    ...(sameQuestionChoices.length === 0
-      ? []
-      : [
-          {
-            id: params.question.id,
-            label: SAME_QUESTION_PATH_SOURCE_LABEL,
-            optionChoices: sameQuestionChoices,
-          },
-        ]),
-    ...earlierQuestionChoices,
-  ];
-}
-
-function buildVisibilityRuleSummary(params: {
-  readonly availableQuestions: ReturnType<typeof buildAvailableVisibilitySourceQuestions>;
-  readonly rule: DiagnosticTemplateVisibilityRule;
-}): string {
-  const rule = params.rule;
-  if (rule === null) {
-    return 'Always visible';
-  }
-  const sourceQuestion = params.availableQuestions.find((question) => question.id === rule.sourceQuestionId);
-  if (sourceQuestion === undefined) {
-    return 'Visible when the selected source question matches the configured options.';
-  }
-  const optionLabels = rule.optionIds
-    .map((optionId) => sourceQuestion.optionChoices.find((optionChoice) => optionChoice.id === optionId)?.label ?? optionId)
-    .join(rule.match === 'all' ? ' + ' : ' or ');
-  return `Visible when ${sourceQuestion.label} includes ${optionLabels}.`;
-}
-
-function buildOptionVisibilityRuleSummary(params: {
-  readonly availableSources: readonly {
-    readonly id: string;
-    readonly label: string;
-    readonly optionChoices: readonly {
-      readonly id: string;
-      readonly label: string;
-    }[];
-  }[];
-  readonly rule: DiagnosticTemplateVisibilityRule;
-}): string {
-  const rule = params.rule;
-  if (rule === null) {
-    return 'Always visible';
-  }
-  const source = params.availableSources.find((source) => source.id === rule.sourceQuestionId);
-  if (source === undefined) {
-    return 'Visible when the selected source question matches the configured options.';
-  }
-  const optionLabels = rule.optionIds
-    .map((optionId) => source.optionChoices.find((optionChoice) => optionChoice.id === optionId)?.label ?? optionId)
-    .join(rule.match === 'all' ? ' + ' : ' or ');
-  if (source.id === rule.sourceQuestionId && source.label === SAME_QUESTION_PATH_SOURCE_LABEL) {
-    return `Visible when this question path already includes ${optionLabels}.`;
-  }
-  return `Visible when ${source.label} includes ${optionLabels}.`;
-}
-
-function buildDefaultVisibilityRuleForSource(params: {
-  readonly sourceId: string;
-  readonly optionChoices: readonly {
-    readonly id: string;
-    readonly label: string;
-  }[];
-}): DiagnosticTemplateVisibilityRule {
-  const optionIds = params.optionChoices.map((optionChoice) => optionChoice.id);
-  if (optionIds.length === 0) {
-    return null;
-  }
-  return {
-    sourceQuestionId: params.sourceId,
-    optionIds,
-    match: 'any',
-  };
-}
-
-function buildVisibilityRuleForMatchMode(params: {
-  readonly matchMode: DiagnosticTemplateVisibilityMatchMode;
-  readonly optionChoices: readonly {
-    readonly id: string;
-    readonly label: string;
-  }[];
-  readonly rule: DiagnosticTemplateVisibilityRule;
-}): DiagnosticTemplateVisibilityRule {
-  if (params.rule === null) {
-    return null;
-  }
-  const optionIds =
-    params.matchMode === 'any'
-      ? params.optionChoices.map((optionChoice) => optionChoice.id)
-      : params.rule.optionIds;
-  if (optionIds.length === 0) {
-    return null;
-  }
-  return {
-    ...params.rule,
-    optionIds,
-    match: params.matchMode,
-  };
-}
-
-function reindexTemplate(template: DiagnosticTemplateValue): DiagnosticTemplateValue {
-  const templateQuestionReferences = buildTemplateQuestionReferenceMap(template);
-  const reindexedTemplate: DiagnosticTemplateValue = {
-    ...template,
-    rounds: template.rounds.map((round, roundIndex) => ({
-      ...round,
-      order: roundIndex,
-      title: round.title.trim().length > 0 ? round.title : `Round ${roundIndex + 1}`,
-      questions: round.questions.map((question, questionIndex) => ({
-        ...question,
-        order: questionIndex,
-        type: QUESTION_TYPE_OPTIONS.some((option) => option.value === question.type) ? question.type : 'multiple-choice',
-        rankedOptionLimit:
-          question.type === 'ranked-options' &&
-          typeof question.rankedOptionLimit === 'number' &&
-          question.rankedOptionLimit >= 2
-            ? question.rankedOptionLimit
-            : question.type === 'ranked-options'
-              ? 3
-              : null,
-        selectionMode: question.selectionMode === 'single' ? 'single' : 'multiple',
-        options: normalizeSingleRequestDetailNoteTriggerForQuestionOptions(
-          question.options.map((option, optionIndex) => ({
-            ...option,
-            order: optionIndex,
-            requestDetailNoteWhenSelected: option.requestDetailNoteWhenSelected === true,
-            showWhen: sanitizeOptionVisibilityRule({
-              questionReferences: templateQuestionReferences,
-              roundIndex,
-              questionIndex,
-              questionId: question.id,
-              optionIds: question.options.map((candidateOption) => candidateOption.id),
-              optionIndex,
-              rule: option.showWhen,
-            }),
-            presentation: {
-              icon: option.presentation.icon?.trim() ?? null,
-              badgeText: option.presentation.badgeText?.trim() ?? null,
-              eyebrow: option.presentation.eyebrow?.trim() ?? null,
-              title: option.presentation.title?.trim() ?? null,
-              supportingText: option.presentation.supportingText?.trim() ?? null,
-              exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
-              panelTitle: option.presentation.panelTitle?.trim() ?? null,
-            },
-            childQuestion:
-              option.childQuestion === null
-                ? null
-                : {
-                    ...option.childQuestion,
-                    selectionMode: option.childQuestion.selectionMode === 'multiple' ? 'multiple' : 'single',
-                    options: option.childQuestion.options.map((childOption, childOptionIndex) => ({
-                      ...childOption,
-                      order: childOptionIndex,
-                    })),
-                  },
-          })),
-        ),
-      })),
-    })),
-  };
-  const questionReferences = buildTemplateQuestionReferenceMap(reindexedTemplate);
-  return {
-    ...reindexedTemplate,
-    rounds: reindexedTemplate.rounds.map((round, roundIndex) => ({
-      ...round,
-      showWhen: sanitizeVisibilityRule({
-        questionReferences,
-        rule: round.showWhen,
-        targetRoundIndex: roundIndex,
-      }),
-      questions: round.questions.map((question, questionIndex) => ({
-        ...question,
-        showWhen: sanitizeVisibilityRule({
-          questionReferences,
-          rule: question.showWhen,
-          targetRoundIndex: roundIndex,
-          targetQuestionIndex: questionIndex,
-        }),
-      })),
-    })),
-  };
-}
-
-function buildTemplatePatchBody(template: DiagnosticTemplateValue): string {
-  return JSON.stringify({
-    name: template.name,
-    rounds: template.rounds.map((round) => ({
-      id: round.id,
-      title: round.title,
-      guidance: round.guidance,
-      showWhen: round.showWhen,
-      questions: round.questions.map((question) => ({
-        id: question.id,
-        prompt: question.prompt,
-        description: question.description,
-        showWhen: question.showWhen,
-        type: question.type,
-        rankedOptionLimit: question.rankedOptionLimit,
-        selectionMode: question.selectionMode,
-        options: question.options.map((option) => ({
-          id: option.id,
-          label: option.label,
-          description: option.description,
-          showWhen: option.showWhen,
-          requestDetailNoteWhenSelected: option.requestDetailNoteWhenSelected === true,
-          presentation: {
-            icon: option.presentation.icon,
-            badgeText: option.presentation.badgeText,
-            eyebrow: option.presentation.eyebrow,
-            title: option.presentation.title,
-            supportingText: option.presentation.supportingText,
-            exampleBullets: normalizeExampleBullets(option.presentation.exampleBullets),
-            panelTitle: option.presentation.panelTitle,
-          },
-          childQuestion:
-            option.childQuestion === null
-              ? null
-              : {
-                  id: option.childQuestion.id,
-                  prompt: option.childQuestion.prompt,
-                  description: option.childQuestion.description,
-                  selectionMode: option.childQuestion.selectionMode,
-                  options: option.childQuestion.options.map((childOption) => ({
-                    id: childOption.id,
-                    label: childOption.label,
-                    description: childOption.description,
-                  })),
-                },
-        })),
-      })),
-    })),
-  });
 }
 
 type SortableOptionRowProps = {
@@ -772,8 +205,22 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
   const displayMode = props.displayMode ?? 'workspace';
   const isEditorMode = displayMode === 'editor';
   const listHref = props.listHref ?? '/admin/diagnostic-templates';
-  const [templates, setTemplates] = useState<readonly DiagnosticTemplateValue[]>(props.initialTemplates);
+  const hideEditorChrome = props.hideEditorChrome === true;
+  const isControlled =
+    props.controlledTemplate !== undefined && props.onControlledTemplateChange !== undefined;
+  const [internalTemplates, setInternalTemplates] = useState<readonly DiagnosticTemplateValue[]>(props.initialTemplates);
+  const templates = useMemo((): readonly DiagnosticTemplateValue[] => {
+    if (isControlled && props.controlledTemplate !== undefined) {
+      return [props.controlledTemplate];
+    }
+    return internalTemplates;
+  }, [internalTemplates, isControlled, props.controlledTemplate]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(props.initialTemplates[0]?.id ?? null);
+  useEffect(() => {
+    if (isControlled && props.controlledTemplate !== undefined) {
+      setSelectedTemplateId(props.controlledTemplate.id);
+    }
+  }, [isControlled, props.controlledTemplate?.id]);
   const [savedTemplatePatchById, setSavedTemplatePatchById] = useState<Readonly<Record<string, string>>>(() => {
     const initial: Record<string, string> = {};
     for (const template of props.initialTemplates) {
@@ -830,7 +277,13 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
   const templateTableData = useMemo<DiagnosticTemplateTableRow[]>(() => templateTableRows.slice(), [templateTableRows]);
 
   function replaceTemplateInState(nextTemplate: DiagnosticTemplateValue): void {
-    setTemplates((previous) => previous.map((template) => (template.id === nextTemplate.id ? nextTemplate : template)));
+    if (isControlled) {
+      props.onControlledTemplateChange?.(nextTemplate);
+      return;
+    }
+    setInternalTemplates((previous) =>
+      previous.map((template) => (template.id === nextTemplate.id ? nextTemplate : template)),
+    );
   }
 
   const executeSelectTemplate = useCallback((templateId: string): void => {
@@ -968,7 +421,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       if (!response.ok || data.template === undefined) {
         throw new Error(data.details ?? data.error ?? 'Failed to create diagnostic template.');
       }
-      setTemplates((previous) => [data.template!, ...previous]);
+      setInternalTemplates((previous) => [data.template!, ...previous]);
       setSelectedTemplateId(data.template.id);
       setSavedTemplatePatchById((previous) => ({
         ...previous,
@@ -1024,7 +477,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
       if (!response.ok || data.template === undefined) {
         throw new Error(data.details ?? data.error ?? 'Failed to activate diagnostic template.');
       }
-      setTemplates((previous) =>
+      setInternalTemplates((previous) =>
         previous.map((template) =>
           template.id === data.template!.id
             ? data.template!
@@ -1061,7 +514,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
         throw new Error(data.details ?? data.error ?? 'Failed to delete diagnostic template.');
       }
       const remainingTemplates = templates.filter((template) => template.id !== templateId);
-      setTemplates(remainingTemplates);
+      setInternalTemplates(remainingTemplates);
       setSavedTemplatePatchById((previous) => {
         const { [templateId]: _removed, ...rest } = previous;
         return rest;
@@ -2075,28 +1528,30 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
   }
 
   return (
-    <div className="space-y-8">
-      <AdminPageHeader
-        eyebrow="Customer diagnostic"
-        title={isEditorMode ? 'Edit diagnostic template' : 'Diagnostic templates'}
-        description={
-          isEditorMode
-            ? 'Refine the customer-facing fallback flow on its own page, then save when you are ready to publish updates.'
-            : 'Build the structured question flow customers will see when AI Diagnostic is off. Keep one template active at a time.'
-        }
-        actions={
-          isEditorMode ? (
-            <Button asChild type="button" variant="outline">
-              <Link href={listHref}>Back to templates</Link>
-            </Button>
-          ) : (
-            <Button type="button" onClick={() => void executeCreateTemplate()} disabled={isCreating}>
-              <Plus className="size-4" aria-hidden />
-              {isCreating ? 'Creating…' : 'Create template'}
-            </Button>
-          )
-        }
-      />
+    <div className={cn('space-y-8', hideEditorChrome && 'space-y-4')}>
+      {!hideEditorChrome ? (
+        <AdminPageHeader
+          eyebrow="Customer diagnostic"
+          title={isEditorMode ? 'Edit diagnostic template' : 'Diagnostic templates'}
+          description={
+            isEditorMode
+              ? 'Refine the customer-facing fallback flow on its own page, then save when you are ready to publish updates.'
+              : 'Build the structured question flow customers will see when AI Diagnostic is off. Keep one template active at a time.'
+          }
+          actions={
+            isEditorMode ? (
+              <Button asChild type="button" variant="outline">
+                <Link href={listHref}>Back to templates</Link>
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => void executeCreateTemplate()} disabled={isCreating}>
+                <Plus className="size-4" aria-hidden />
+                {isCreating ? 'Creating…' : 'Create template'}
+              </Button>
+            )
+          }
+        />
+      ) : null}
       <div className={cn('grid gap-6', isEditorMode ? 'grid-cols-1' : 'xl:grid-cols-[320px_minmax(0,1fr)]')}>
         {!isEditorMode ? (
           <section className="rounded-3xl border border-border bg-card p-4 shadow-xs">
@@ -3217,14 +2672,16 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
               <Trash2 className="size-4" aria-hidden />
               {deletingTemplateId === selectedTemplate.id ? 'Deleting…' : 'Delete'}
             </Button>
-            <Button
-              type="button"
-              onClick={() => void executeSaveSelectedTemplate()}
-              disabled={!hasUnsavedPatchChangesForSelectedTemplate || isSaving}
-            >
-              <Save className="size-4" aria-hidden />
-              {isSaving ? 'Saving…' : 'Save template'}
-            </Button>
+            {!hideEditorChrome ? (
+              <Button
+                type="button"
+                onClick={() => void executeSaveSelectedTemplate()}
+                disabled={!hasUnsavedPatchChangesForSelectedTemplate || isSaving}
+              >
+                <Save className="size-4" aria-hidden />
+                {isSaving ? 'Saving…' : 'Save template'}
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}

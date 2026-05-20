@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { DiagnosticTemplatesManager } from '@/components/admin/diagnostic-templates-manager';
+import { DiagnosticTemplateEditorShell } from '@/components/admin/diagnostic-template-editor/editor-shell';
 import { getDiagnosticTemplateById } from '@/lib/data/diagnostic-templates';
 
 type AdminDiagnosticTemplateDetailPageProps = {
@@ -23,9 +23,8 @@ export default async function AdminDiagnosticTemplateDetailPage(
     notFound();
   }
   return (
-    <DiagnosticTemplatesManager
-      initialTemplates={[template]}
-      displayMode="editor"
+    <DiagnosticTemplateEditorShell
+      initialTemplate={template}
       listHref="/admin/diagnostic-templates"
     />
   );
