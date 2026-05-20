@@ -944,12 +944,36 @@ function RankedOptionsRoundRenderer(props: {
               const isAtLimit = selectedOptionIds.length >= props.rankedOptionLimit;
               const isDisabled = sessionReadOnly || (isSelected === false && isAtLimit);
               return (
-              <button
+              <div
                 key={option.id}
-                type="button"
-                onClick={() => (isSelected ? executeRemoveOption(option.id) : executeAddOption(option.id))}
-                disabled={isDisabled}
+                role="button"
+                tabIndex={isDisabled ? -1 : 0}
                 aria-pressed={isSelected}
+                aria-disabled={isDisabled}
+                onClick={() => {
+                  if (isDisabled) {
+                    return;
+                  }
+                  if (isSelected) {
+                    executeRemoveOption(option.id);
+                  } else {
+                    executeAddOption(option.id);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (isDisabled) {
+                    return;
+                  }
+                  if (event.key !== 'Enter' && event.key !== ' ') {
+                    return;
+                  }
+                  event.preventDefault();
+                  if (isSelected) {
+                    executeRemoveOption(option.id);
+                  } else {
+                    executeAddOption(option.id);
+                  }
+                }}
                 className={cn(
                   'relative flex w-full items-start gap-2.5 rounded-xl border bg-background px-3 py-3 text-left transition-all md:gap-4 md:rounded-2xl md:px-4 md:py-4',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
@@ -1035,7 +1059,7 @@ function RankedOptionsRoundRenderer(props: {
                     ) : null}
                   </div>
                 </div>
-              </button>
+              </div>
               );
             })}
           </div>
