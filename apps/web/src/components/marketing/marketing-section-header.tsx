@@ -24,14 +24,7 @@ export function MarketingSectionHeader(props: MarketingSectionHeaderProps): Reac
         props.className,
       )}
     >
-      <p
-        className={cn(
-          'marketing-section-eyebrow',
-          props.inverted && 'text-primary-foreground/70',
-        )}
-      >
-        {props.eyebrow}
-      </p>
+      <p className="marketing-section-eyebrow">{props.eyebrow}</p>
       <div
         className={cn(
           'flex w-full flex-col gap-4',
@@ -42,7 +35,7 @@ export function MarketingSectionHeader(props: MarketingSectionHeaderProps): Reac
           <h2
             className={cn(
               'text-balance text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl lg:leading-[1.08]',
-              props.inverted ? 'text-primary-foreground' : 'text-foreground',
+              props.inverted ? 'text-marketing-band-fg' : 'text-foreground',
             )}
           >
             {props.title}
@@ -51,7 +44,7 @@ export function MarketingSectionHeader(props: MarketingSectionHeaderProps): Reac
             <p
               className={cn(
                 'max-w-2xl text-pretty text-base leading-relaxed md:text-lg',
-                props.inverted ? 'text-primary-foreground/75' : 'text-muted-foreground',
+                props.inverted ? 'marketing-band-muted' : 'text-muted-foreground',
                 align === 'center' && 'mx-auto',
               )}
             >

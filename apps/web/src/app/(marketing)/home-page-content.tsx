@@ -20,6 +20,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { MarketingHeroBackground } from '@/components/marketing/marketing-hero-background';
+import { useMarketingHeroInteraction } from '@/components/marketing/use-marketing-hero-interaction';
 import { MarketingParallaxSection } from '@/components/marketing/marketing-parallax-section';
 import { MarketingSectionHeader } from '@/components/marketing/marketing-section-header';
 import { MarketingServiceTabs } from '@/components/marketing/marketing-service-tabs';
@@ -113,7 +114,7 @@ const STATS: readonly { readonly value: string; readonly label: string; readonly
   { value: '< 2', label: 'Minutes', detail: 'Guided diagnostic — minimal typing, pain-first routing.' },
   { value: '3', label: 'Steps', detail: 'Diagnose, see your recommendation, book when ready.' },
   { value: '100%', label: 'Neutral', detail: 'Independent guidance — not tied to vendor quotas.' },
-  { value: 'PH', label: 'Manila time', detail: 'Slots aligned to Asia/Manila for your team.' },
+  { value: 'No', label: 'retainer', detail: 'On-demand sessions when you need judgment — extend only when the program requires it.' },
 ] as const;
 
 const SPOTLIGHT_ITEMS: readonly { readonly title: string; readonly subtitle: string }[] = [
@@ -187,6 +188,7 @@ type HomePageContentProps = {
 
 export function HomePageContent(props: HomePageContentProps): ReactElement {
   const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(props.isAuthenticated);
+  const heroInteraction = useMarketingHeroInteraction();
   const problemCardClassName = cn(
     'group flex h-full w-full flex-col rounded-2xl border border-border/80 bg-card p-5 text-left',
     'marketing-card-elevated transition-[border-color,transform] duration-200 motion-safe:hover:-translate-y-0.5',
@@ -196,10 +198,11 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
   return (
     <main className="relative">
       <MarketingParallaxSection
+        ref={heroInteraction.sectionRef}
         className="relative flex min-h-[88dvh] flex-col justify-end overflow-hidden border-b border-border px-6 pb-14 pt-28 md:min-h-[92dvh] md:pb-20 md:pt-32"
         speed={0.11}
         backgroundSpeed={0.22}
-        background={<MarketingHeroBackground />}
+        background={<MarketingHeroBackground interaction={heroInteraction} />}
       >
         <div className="mx-auto w-full max-w-6xl">
           <p className="marketing-section-eyebrow">TechMD · IT advisory</p>
@@ -271,7 +274,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           <MarketingSectionHeader
             eyebrow="At a glance"
             title="Built for decisions, not decks."
-            description="Pragmatic metrics from how teams use TechMD — fast routing, neutral advice, and Manila-time booking."
+            description="Pragmatic metrics from how teams use TechMD — fast routing, neutral advice, and focused on-demand sessions."
             align="center"
           />
           <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -290,27 +293,27 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           </ul>
         </div>
       </MarketingParallaxSection>
-      <section className="marketing-band-dark scroll-mt-24 border-y border-border/40 px-6 py-16 md:py-24">
+      <section className="marketing-band-dark scroll-mt-24 border-y border-marketing-band-border px-6 py-16 md:py-24">
         <div className="mx-auto max-w-6xl">
           <MarketingSectionHeader
             eyebrow="Why teams start here"
             title="Clarity before commitment."
             inverted
           />
-          <ul className="mt-12 divide-y divide-primary-foreground/15">
+          <ul className="mt-12 divide-y divide-marketing-band-border">
             {SPOTLIGHT_ITEMS.map((item, index) => (
               <li key={item.title}>
                 <div className="flex flex-col gap-3 py-9 first:pt-4 last:pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
                   <div className="min-w-0 space-y-2">
-                    <p className="text-xs font-semibold tabular-nums text-primary-foreground/50">
+                    <p className="text-xs font-semibold tabular-nums text-marketing-band-subtle">
                       {String(index + 1).padStart(2, '0')}
                     </p>
-                    <p className="text-2xl font-semibold tracking-tight text-primary-foreground md:text-3xl lg:text-4xl">
+                    <p className="text-2xl font-semibold tracking-tight text-marketing-band-fg md:text-3xl lg:text-4xl">
                       {item.title}
                     </p>
                     <p className="max-w-xl text-sm leading-relaxed marketing-band-muted md:text-base">{item.subtitle}</p>
                   </div>
-                  <ArrowRight className="size-7 shrink-0 text-primary-foreground/70 sm:mb-1" aria-hidden />
+                  <ArrowRight className="size-7 shrink-0 text-marketing-band-muted sm:mb-1" aria-hidden />
                 </div>
               </li>
             ))}
@@ -452,14 +455,14 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             {TESTIMONIALS.map((item) => (
               <li
                 key={item.quote}
-                className="rounded-2xl border border-primary-foreground/12 bg-primary-foreground/4 p-6 backdrop-blur-sm md:p-8"
+                className="marketing-band-card rounded-2xl p-6 backdrop-blur-sm md:p-8"
               >
-                <Quote className="size-8 text-primary-foreground/40" aria-hidden />
-                <blockquote className="mt-4 text-pretty text-base leading-relaxed text-primary-foreground/90">
+                <Quote className="size-8 text-marketing-band-subtle" aria-hidden />
+                <blockquote className="mt-4 text-pretty text-base leading-relaxed text-marketing-band-fg/90">
                   {item.quote}
                 </blockquote>
-                <footer className="mt-6 border-t border-primary-foreground/10 pt-4">
-                  <p className="font-semibold text-primary-foreground">{item.name}</p>
+                <footer className="mt-6 border-t border-marketing-band-border pt-4">
+                  <p className="font-semibold text-marketing-band-fg">{item.name}</p>
                   <p className="mt-1 text-sm marketing-band-muted">{item.role}</p>
                 </footer>
               </li>
@@ -529,8 +532,8 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             />
             <div className="relative flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
               <div className="max-w-xl space-y-3">
-                <p className="marketing-section-eyebrow text-primary-foreground/70">Start a project</p>
-                <h2 className="text-balance text-3xl font-semibold tracking-tight text-primary-foreground md:text-4xl md:leading-tight">
+                <p className="marketing-section-eyebrow">Start a project</p>
+                <h2 className="text-balance text-3xl font-semibold tracking-tight text-marketing-band-fg md:text-4xl md:leading-tight">
                   Let&apos;s start productive work.
                 </h2>
                 <p className="text-base leading-relaxed marketing-band-muted md:text-lg">
@@ -540,8 +543,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               <Button
                 type="button"
                 size="lg"
-                variant="secondary"
-                className="min-h-11 w-full shrink-0 md:w-auto"
+                className="min-h-11 w-full shrink-0 shadow-md md:w-auto"
                 disabled={isNavigating}
                 onClick={() => void navigateToNewQuiz()}
               >

@@ -1,35 +1,24 @@
 'use client';
 
-import {
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode, type Ref } from 'react';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { cn } from '@/lib/utils';
 
 const MAX_CONTENT_OFFSET_PX = 52;
 const MAX_BACKGROUND_OFFSET_PX = 72;
 
-function subscribeReducedMotion(onStoreChange: () => void): () => void {
-  const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const executeHandleChange = (): void => {
-    onStoreChange();
+function mergeRefs<T>(...refs: readonly (Ref<T> | undefined)[]): (node: T | null) => void {
+  return (node: T | null): void => {
+    refs.forEach((ref) => {
+      if (typeof ref === 'function') {
+        ref(node);
+        return;
+      }
+      if (ref !== undefined && ref !== null) {
+        ref.current = node;
+      }
+    });
   };
-  mediaQuery.addEventListener('change', executeHandleChange);
-  return () => {
-    mediaQuery.removeEventListener('change', executeHandleChange);
-  };
-}
-
-function resolveClientReducedMotion(): boolean {
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function resolveServerReducedMotion(): boolean {
-  return true;
 }
 
 function clampOffset(value: number, max: number): number {
@@ -41,6 +30,7 @@ export type MarketingParallaxSectionProps = {
   readonly className?: string;
   readonly contentClassName?: string;
   readonly id?: string;
+  readonly ref?: Ref<HTMLElement>;
   readonly speed?: number;
   readonly background?: ReactNode;
   readonly backgroundSpeed?: number;
@@ -54,19 +44,16 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
   const speed = props.speed ?? 0.12;
   const backgroundSpeed = props.backgroundSpeed ?? speed * 1.7;
   const hasBackground = props.background !== undefined;
-  const sectionRef = useRef<HTMLElement>(null);
+  const internalSectionRef = useRef<HTMLElement>(null);
+  const sectionRef = mergeRefs(props.ref, internalSectionRef);
   const [contentOffset, setContentOffset] = useState(0);
   const [backgroundOffset, setBackgroundOffset] = useState(0);
-  const prefersReducedMotion = useSyncExternalStore(
-    subscribeReducedMotion,
-    resolveClientReducedMotion,
-    resolveServerReducedMotion,
-  );
+  const prefersReducedMotion = usePrefersReducedMotion();
   useEffect(() => {
     if (prefersReducedMotion) {
       return;
     }
-    const section = sectionRef.current;
+    const section = internalSectionRef.current;
     if (section === null) {
       return;
     }
@@ -103,7 +90,7 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
       : `translate3d(0, ${backgroundOffset}px, 0)`;
   return (
     <section
-      ref={sectionRef}
+      ref={sectionRef as Ref<HTMLElement>}
       className={cn('relative', hasBackground && 'isolate', props.className)}
       id={props.id}
     >

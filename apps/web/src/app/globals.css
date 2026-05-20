@@ -39,6 +39,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-marketing-band-fg: var(--marketing-band-fg);
+  --color-marketing-band-muted: var(--marketing-band-muted);
+  --color-marketing-band-subtle: var(--marketing-band-subtle);
+  --color-marketing-band-border: var(--marketing-band-border);
+  --color-marketing-band-surface: var(--marketing-band-surface);
+  --color-marketing-band-eyebrow: var(--marketing-band-eyebrow);
 }
 
 :root {
@@ -225,15 +231,23 @@
   :root {
     --marketing-band-bg: oklch(0.17 0.025 264);
     --marketing-band-fg: oklch(0.98 0 0);
-    --marketing-band-muted: oklch(0.78 0.02 264);
+    --marketing-band-muted: oklch(0.8 0.02 264);
+    --marketing-band-subtle: oklch(0.68 0.02 264);
+    --marketing-band-border: oklch(0.98 0 0 / 0.14);
+    --marketing-band-surface: oklch(0.98 0 0 / 0.07);
+    --marketing-band-eyebrow: oklch(0.76 0.05 264);
     --marketing-elevation-sm: 0 1px 2px oklch(0 0 0 / 0.04), 0 4px 12px oklch(0 0 0 / 0.06);
     --marketing-elevation-md: 0 2px 4px oklch(0 0 0 / 0.04), 0 12px 28px oklch(0 0 0 / 0.1);
     --marketing-elevation-lg: 0 4px 8px oklch(0 0 0 / 0.05), 0 24px 48px oklch(0 0 0 / 0.12);
   }
   .dark {
-    --marketing-band-bg: oklch(0.12 0.02 264);
-    --marketing-band-fg: oklch(0.97 0 0);
-    --marketing-band-muted: oklch(0.72 0.02 264);
+    --marketing-band-bg: oklch(0.14 0.02 264);
+    --marketing-band-fg: oklch(0.98 0 0);
+    --marketing-band-muted: oklch(0.8 0.02 264);
+    --marketing-band-subtle: oklch(0.66 0.02 264);
+    --marketing-band-border: oklch(0.98 0 0 / 0.16);
+    --marketing-band-surface: oklch(0.98 0 0 / 0.08);
+    --marketing-band-eyebrow: oklch(0.82 0.04 264);
     --marketing-elevation-sm: 0 1px 2px oklch(0 0 0 / 0.35), 0 6px 16px oklch(0 0 0 / 0.4);
     --marketing-elevation-md: 0 2px 6px oklch(0 0 0 / 0.4), 0 16px 36px oklch(0 0 0 / 0.45);
     --marketing-elevation-lg: 0 8px 24px oklch(0 0 0 / 0.5), 0 32px 64px oklch(0 0 0 / 0.55);
@@ -249,20 +263,96 @@
   .marketing-band-dark .marketing-band-muted {
     color: var(--marketing-band-muted);
   }
+  .marketing-band-dark .marketing-section-eyebrow,
+  .marketing-band-eyebrow {
+    color: var(--marketing-band-eyebrow);
+  }
+  .marketing-band-card {
+    border: 1px solid var(--marketing-band-border);
+    background-color: var(--marketing-band-surface);
+  }
   .marketing-hero-base-wash {
     background-image:
-      radial-gradient(ellipse 85% 70% at 88% 12%, color-mix(in oklch, var(--primary) 28%, transparent), transparent 62%),
-      radial-gradient(ellipse 60% 50% at 72% 55%, color-mix(in oklch, var(--primary) 14%, transparent), transparent 58%),
-      linear-gradient(155deg, color-mix(in oklch, var(--muted) 55%, var(--background)) 0%, var(--background) 70%);
-  }
-  .marketing-hero-art-panel {
-    border-radius: 48% 0 0 48%;
-    background: radial-gradient(
-      ellipse 75% 65% at 58% 42%,
-      color-mix(in oklch, var(--primary) 18%, var(--card)),
-      color-mix(in oklch, var(--primary) 6%, transparent) 72%
+      radial-gradient(
+        ellipse 120% 90% at 72% 20%,
+        color-mix(in oklch, var(--primary) 14%, transparent) 0%,
+        color-mix(in oklch, var(--primary) 6%, transparent) 45%,
+        transparent 80%
+      ),
+      radial-gradient(
+        ellipse 70% 55% at 18% 55%,
+        color-mix(in oklch, var(--primary) 8%, transparent) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 90% 70% at 50% 100%,
+        color-mix(in oklch, var(--primary) 5%, transparent) 0%,
+        transparent 65%
+      ),
+      linear-gradient(155deg, color-mix(in oklch, var(--muted) 55%, var(--background)) 0%, var(--background) 72%);
+    transform: translate3d(
+      calc((var(--hero-fx, 0.5) - 0.5) * 8px * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 6px * var(--hero-boost, 0)),
+      0
     );
-    box-shadow: inset 0 0 80px color-mix(in oklch, var(--primary) 12%, transparent);
+    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-art-accent {
+    background-image: radial-gradient(
+      ellipse 55% 45% at 12% 62%,
+      color-mix(in oklch, var(--primary) 9%, transparent) 0%,
+      transparent 72%
+    );
+    transform: translate3d(
+      calc((var(--hero-fx, 0.5) - 0.5) * -10px * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-boost, 0)),
+      0
+    );
+    transition: transform 750ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-canvas {
+    isolation: isolate;
+  }
+  .marketing-hero-art-glow {
+    background-image:
+      radial-gradient(
+        ellipse 130% 100% at 62% 42%,
+        color-mix(in oklch, var(--primary) 18%, transparent) 0%,
+        color-mix(in oklch, var(--primary) 10%, transparent) 35%,
+        color-mix(in oklch, var(--primary) 4%, transparent) 58%,
+        transparent 100%
+      ),
+      radial-gradient(
+        ellipse 80% 60% at 88% 30%,
+        color-mix(in oklch, var(--primary) 12%, transparent) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 50% 40% at 22% 68%,
+        color-mix(in oklch, var(--primary) 6%, transparent) 0%,
+        transparent 75%
+      );
+    opacity: 0.9;
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      rgb(0 0 0 / 0.25) 18%,
+      rgb(0 0 0 / 0.7) 42%,
+      #000 58%,
+      #000 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      rgb(0 0 0 / 0.25) 18%,
+      rgb(0 0 0 / 0.7) 42%,
+      #000 58%,
+      #000 100%
+    );
+    transition: opacity 500ms ease;
+  }
+  .marketing-hero-interactive[data-hero-boosted] .marketing-hero-art-glow {
+    opacity: 0.98;
   }
   .marketing-hero-stop-primary {
     stop-color: var(--primary);
@@ -297,22 +387,187 @@
     background-image: linear-gradient(
       to right,
       var(--background) 0%,
-      color-mix(in oklch, var(--background) 94%, transparent) 32%,
-      color-mix(in oklch, var(--background) 55%, transparent) 48%,
-      transparent 68%
+      color-mix(in oklch, var(--background) 98%, transparent) 22%,
+      color-mix(in oklch, var(--background) 88%, transparent) 34%,
+      color-mix(in oklch, var(--background) 62%, transparent) 46%,
+      color-mix(in oklch, var(--background) 28%, transparent) 58%,
+      transparent 82%
     );
   }
   .marketing-hero-highlight {
-    background-image: radial-gradient(
-      ellipse 55% 45% at 80% 22%,
-      color-mix(in oklch, var(--primary) 22%, transparent),
-      transparent 70%
+    background-image:
+      radial-gradient(
+        ellipse 90% 70% at 70% 28%,
+        color-mix(in oklch, var(--primary) calc(9% + 4% * var(--hero-boost, 0)), transparent) 0%,
+        transparent 80%
+      ),
+      radial-gradient(
+        ellipse 45% 38% at 20% 60%,
+        color-mix(in oklch, var(--primary) calc(4% + 2% * var(--hero-boost, 0)), transparent) 0%,
+        transparent 75%
+      );
+    opacity: calc(0.45 + 0.14 * var(--hero-boost, 0));
+    transition: opacity 500ms ease;
+  }
+  .marketing-hero-art-panel-shift {
+    transform: translate3d(
+        calc((var(--hero-fx, 0.5) - 0.5) * 20px * var(--hero-boost, 0)),
+        calc((var(--hero-fy, 0.5) - 0.5) * 16px * var(--hero-boost, 0)),
+        0
+      )
+      rotateY(calc((var(--hero-fx, 0.5) - 0.5) * 3deg * var(--hero-boost, 0)));
+    transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-parallax-deep {
+    transform: translate3d(
+      calc((var(--hero-fx, 0.5) - 0.5) * 10px * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-boost, 0)),
+      0
     );
-    opacity: 0.85;
+    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-parallax-mid {
+    transform: translate3d(
+      calc((var(--hero-fx, 0.5) - 0.5) * 16px * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 12px * var(--hero-boost, 0)),
+      0
+    );
+    transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-parallax-light {
+    transform: translate3d(
+      calc((0.5 - var(--hero-fx, 0.5)) * 6px * var(--hero-boost, 0)),
+      calc((0.5 - var(--hero-fy, 0.5)) * 5px * var(--hero-boost, 0)),
+      0
+    );
+    transition: transform 750ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-grid-group {
+    opacity: calc(0.3 - 0.08 * var(--hero-boost, 0));
+    transition: opacity 500ms ease;
+  }
+  .marketing-hero-left-node {
+    opacity: 0.7;
+  }
+  .marketing-hero-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(40px);
+  }
+  .marketing-hero-orb-primary {
+    right: 18%;
+    top: 18%;
+    width: min(28vw, 280px);
+    height: min(28vw, 280px);
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
+    transform: translate3d(
+      calc((var(--hero-fx, 0.5) - 0.5) * 24px * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 18px * var(--hero-boost, 0)),
+      0
+    );
+    transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-orb-secondary {
+    left: 8%;
+    bottom: 22%;
+    width: min(22vw, 200px);
+    height: min(22vw, 200px);
+    background: color-mix(in oklch, var(--primary) 10%, transparent);
+    transform: translate3d(
+      calc((var(--hero-fx, 0.5) - 0.5) * -14px * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 12px * var(--hero-boost, 0)),
+      0
+    );
+    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-wireframe-stack {
+    position: absolute;
+    right: 6%;
+    top: 10%;
+    width: min(26vw, 240px);
+    height: min(30vw, 210px);
+    perspective: 920px;
+    transform-style: preserve-3d;
+    pointer-events: none;
+    transform: translate3d(
+      calc((var(--hero-fx, 0.5) - 0.5) * 22px * var(--hero-boost, 0)),
+      calc((var(--hero-fy, 0.5) - 0.5) * 16px * var(--hero-boost, 0)),
+      0
+    );
+    transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-wireframe-card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 72%;
+    height: 52%;
+    border-radius: 14px;
+    border: 1px solid color-mix(in oklch, var(--foreground) 35%, transparent);
+    background: color-mix(in oklch, var(--card) 80%, var(--primary));
+    box-shadow: 0 0 24px color-mix(in oklch, var(--primary) 10%, transparent);
+    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .marketing-hero-wireframe-card-back {
+    opacity: 0.35;
+    transform: rotateX(calc(-8deg + (var(--hero-fy, 0.5) - 0.5) * -4deg * var(--hero-boost, 0)))
+      rotateY(calc(8deg + (var(--hero-fx, 0.5) - 0.5) * 6deg * var(--hero-boost, 0)))
+      translate3d(0, 0, -28px);
+  }
+  .marketing-hero-wireframe-card-mid {
+    opacity: 0.55;
+    transform: rotateX(calc(-6deg + (var(--hero-fy, 0.5) - 0.5) * -5deg * var(--hero-boost, 0)))
+      rotateY(calc(10deg + (var(--hero-fx, 0.5) - 0.5) * 8deg * var(--hero-boost, 0)))
+      translate3d(18%, 14%, -12px);
+  }
+  .marketing-hero-wireframe-card-front {
+    opacity: 0.9;
+    transform: rotateX(calc(-4deg + (var(--hero-fy, 0.5) - 0.5) * -6deg * var(--hero-boost, 0)))
+      rotateY(calc(14deg + (var(--hero-fx, 0.5) - 0.5) * 10deg * var(--hero-boost, 0)))
+      translate3d(36%, 28%, 16px);
+  }
+  @media (max-width: 767px) {
+    .marketing-hero-art-accent {
+      opacity: 0.65;
+    }
+    .marketing-hero-left-node {
+      opacity: 0.45;
+    }
+    .marketing-hero-grid-group {
+      opacity: 0.2;
+    }
+    .marketing-hero-wireframe-stack {
+      right: 2%;
+      top: 8%;
+      width: min(36vw, 160px);
+      height: min(40vw, 150px);
+    }
+    .marketing-hero-orb-primary {
+      right: 8%;
+      width: min(40vw, 180px);
+      height: min(40vw, 180px);
+      opacity: 0.7;
+    }
+    .marketing-hero-orb-secondary {
+      left: 4%;
+      width: min(32vw, 140px);
+      height: min(32vw, 140px);
+      opacity: 0.5;
+    }
   }
   @media (prefers-reduced-motion: no-preference) {
     .marketing-hero-art-drift {
-      animation: marketing-hero-drift 28s ease-in-out infinite alternate;
+      animation: marketing-hero-drift var(--hero-drift-duration, 28s) ease-in-out infinite alternate;
+    }
+    .marketing-hero-interactive .marketing-hero-art-drift {
+      --hero-drift-duration: calc(28s - 12s * var(--hero-boost, 0));
+    }
+    .marketing-hero-orb-primary {
+      animation: marketing-hero-orb-drift 18s ease-in-out infinite alternate;
+    }
+    .marketing-hero-orb-secondary {
+      animation: marketing-hero-orb-drift 22s ease-in-out infinite alternate-reverse;
     }
   }
   @keyframes marketing-hero-drift {
@@ -321,6 +576,14 @@
     }
     100% {
       transform: translate3d(-14px, 10px, 0) scale(1.02);
+    }
+  }
+  @keyframes marketing-hero-orb-drift {
+    0% {
+      opacity: 0.7;
+    }
+    100% {
+      opacity: 1;
     }
   }
   .marketing-grain {
