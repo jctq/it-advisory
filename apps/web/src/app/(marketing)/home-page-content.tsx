@@ -297,7 +297,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           <ul className="mt-10 flex max-w-3xl flex-wrap gap-2" aria-label="Focus areas">
             {CAPABILITY_CHIPS.map((chip) => (
               <li key={chip}>
-                <span className="inline-flex items-center rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs font-medium text-foreground/90 shadow-xs backdrop-blur-sm dark:bg-card/50">
+                <span className="inline-flex items-center rounded-full border border-primary/15 bg-primary/6 px-3 py-1.5 text-xs font-medium text-foreground/90 shadow-xs backdrop-blur-sm dark:border-border/70 dark:bg-card/50">
                   {chip}
                 </span>
               </li>
@@ -306,7 +306,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           <div className="mt-10 flex flex-wrap gap-3">
             <Button
               size="lg"
-              className="group min-h-11 gap-2 shadow-md"
+              className="marketing-hero-cta group min-h-11 gap-2 bg-transparent hover:bg-transparent dark:bg-primary dark:hover:bg-primary/90"
               disabled={isNavigating}
               onClick={() => void navigateToNewQuiz()}
             >

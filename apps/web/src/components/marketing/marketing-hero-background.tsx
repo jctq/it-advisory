@@ -44,9 +44,13 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
           aria-hidden
         />
         <div className="marketing-hero-art-panel-shift absolute inset-0">
+          <div className="marketing-hero-orb-layer" aria-hidden>
+            <div className="marketing-hero-orb marketing-hero-orb-primary" />
+            <div className="marketing-hero-orb marketing-hero-orb-secondary" />
+          </div>
           <svg
             ref={svgRef}
-            className="h-full w-full"
+            className="marketing-hero-art-svg h-full w-full"
             viewBox={`0 0 ${HERO_VIEW_WIDTH} ${HERO_VIEW_HEIGHT}`}
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -134,7 +138,7 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
                 cx="980"
                 cy="280"
                 r="28"
-                className="marketing-hero-stroke-primary"
+                className="marketing-hero-stroke-primary marketing-hero-hub-ring"
                 fill="none"
                 strokeWidth="1.5"
               />
@@ -234,13 +238,11 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
             <div className="marketing-hero-wireframe-card marketing-hero-wireframe-card-mid" />
             <div className="marketing-hero-wireframe-card marketing-hero-wireframe-card-front" />
           </div>
-          <div className="marketing-hero-orb marketing-hero-orb-primary" aria-hidden />
-          <div className="marketing-hero-orb marketing-hero-orb-secondary" aria-hidden />
         </div>
       </div>
       <div className="absolute inset-0 marketing-hero-text-fade" />
       <div className="absolute inset-0 marketing-hero-highlight" />
-      <div className="absolute inset-0 marketing-grain opacity-25 dark:opacity-15" />
+      <div className="absolute inset-0 marketing-grain opacity-20 dark:opacity-15" />
     </motion.div>
   );
 }

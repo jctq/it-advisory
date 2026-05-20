@@ -1,13 +1,21 @@
 'use client';
 
-import { LaptopMinimal, MoonStar, Palette, SunMedium } from 'lucide-react';
+import { type ReactNode } from 'react';
+import { ChevronDown, LaptopMinimal, MoonStar, Palette, SunMedium } from 'lucide-react';
 import {
   ADMIN_COLOR_MODE_OPTIONS,
   ADMIN_COLOR_THEME_OPTIONS,
   type AdminColorMode,
   type AdminColorTheme,
 } from '@/lib/admin/admin-appearance';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 type AdminAppearanceControlsProps = {
@@ -20,66 +28,79 @@ type AdminAppearanceControlsProps = {
 
 function renderModeIcon(mode: AdminColorMode) {
   if (mode === 'light') {
-    return (
-      <SunMedium
-        className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground"
-        aria-hidden
-      />
-    );
+    return <SunMedium className="size-4 shrink-0 text-muted-foreground" aria-hidden />;
   }
   if (mode === 'dark') {
-    return (
-      <MoonStar
-        className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground"
-        aria-hidden
-      />
-    );
+    return <MoonStar className="size-4 shrink-0 text-muted-foreground" aria-hidden />;
   }
+  return <LaptopMinimal className="size-4 shrink-0 text-muted-foreground" aria-hidden />;
+}
+
+type AppearanceDropdownProps<T extends string> = {
+  readonly ariaLabel: string;
+  readonly value: T;
+  readonly options: readonly { readonly value: T; readonly label: string }[];
+  readonly onValueChange: (value: T) => void;
+  readonly renderIcon: () => ReactNode;
+  readonly triggerClassName?: string;
+};
+
+function AppearanceDropdown<T extends string>(props: AppearanceDropdownProps<T>) {
+  const selectedLabel = props.options.find((option) => option.value === props.value)?.label ?? props.value;
   return (
-    <LaptopMinimal
-      className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground"
-      aria-hidden
-    />
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          aria-label={props.ariaLabel}
+          className={cn(
+            'appearance-dropdown-trigger min-h-11 w-full min-w-[128px] justify-between gap-2 px-3 font-normal shadow-xs',
+            props.triggerClassName,
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {props.renderIcon()}
+            <span className="truncate text-sm">{selectedLabel}</span>
+          </span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-(--radix-dropdown-menu-trigger-width)">
+        <DropdownMenuRadioGroup
+          value={props.value}
+          onValueChange={(nextValue) => props.onValueChange(nextValue as T)}
+        >
+          {props.options.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value} className="cursor-pointer">
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 export function AdminAppearanceControls(props: AdminAppearanceControlsProps) {
   return (
     <div className={cn('flex flex-wrap items-center justify-end gap-2 sm:gap-3', props.className)}>
-      <label className="min-w-[140px] space-y-1">
-        <div className="relative">
-          {renderModeIcon(props.mode)}
-          <NativeSelect
-            aria-label="Color mode"
-            value={props.mode}
-            onChange={(event) => props.onModeChange(event.target.value as AdminColorMode)}
-            className="min-h-11 min-w-[128px] pl-9 text-sm"
-          >
-            {ADMIN_COLOR_MODE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-      </label>
-      <label className="min-w-[160px] space-y-1">
-        <div className="relative">
-          <Palette className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <NativeSelect
-            aria-label="Color theme"
-            value={props.theme}
-            onChange={(event) => props.onThemeChange(event.target.value as AdminColorTheme)}
-            className="min-h-11 min-w-[132px] pl-9 text-sm"
-          >
-            {ADMIN_COLOR_THEME_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-      </label>
+      <AppearanceDropdown
+        ariaLabel="Color mode"
+        value={props.mode}
+        options={ADMIN_COLOR_MODE_OPTIONS}
+        onValueChange={props.onModeChange}
+        renderIcon={() => renderModeIcon(props.mode)}
+        triggerClassName="min-w-[128px]"
+      />
+      <AppearanceDropdown
+        ariaLabel="Color theme"
+        value={props.theme}
+        options={ADMIN_COLOR_THEME_OPTIONS}
+        onValueChange={props.onThemeChange}
+        renderIcon={() => <Palette className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
+        triggerClassName="min-w-[132px]"
+      />
     </div>
   );
 }

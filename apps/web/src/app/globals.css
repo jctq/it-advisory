@@ -71,17 +71,21 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --marketing-hero-glow-strong: color-mix(in oklch, var(--primary) 14%, transparent);
-  --marketing-hero-glow-mid: color-mix(in oklch, var(--primary) 8%, transparent);
-  --marketing-hero-glow-soft: color-mix(in oklch, var(--primary) 4%, transparent);
-  --marketing-hero-line: color-mix(in oklch, var(--primary) 88%, var(--foreground));
-  --marketing-hero-line-soft: color-mix(in oklch, var(--primary) 58%, transparent);
-  --marketing-hero-node: var(--primary);
-  --marketing-hero-grid-line: color-mix(in oklch, var(--border) 82%, var(--primary));
-  --marketing-hero-orb: color-mix(in oklch, var(--primary) 16%, transparent);
-  --marketing-hero-orb-soft: color-mix(in oklch, var(--primary) 8%, transparent);
-  --marketing-hero-wireframe-border: color-mix(in oklch, var(--primary) 28%, var(--border));
-  --marketing-hero-wireframe-fill: color-mix(in oklch, var(--card) 92%, var(--primary));
+  --marketing-hero-sky: oklch(0.97 0.025 250);
+  --marketing-hero-sky-mid: oklch(0.93 0.06 250);
+  --marketing-hero-glow-strong: color-mix(in oklch, var(--primary) 26%, var(--marketing-hero-sky-mid));
+  --marketing-hero-glow-mid: color-mix(in oklch, var(--primary) 16%, var(--marketing-hero-sky));
+  --marketing-hero-glow-soft: color-mix(in oklch, var(--primary) 10%, var(--marketing-hero-sky));
+  --marketing-hero-line: color-mix(in oklch, var(--primary) 82%, oklch(0.46 0.13 264));
+  --marketing-hero-line-soft: color-mix(in oklch, var(--primary) 68%, oklch(0.58 0.1 264));
+  --marketing-hero-node: color-mix(in oklch, var(--primary) 90%, oklch(0.4 0.14 264));
+  --marketing-hero-grid-line: color-mix(in oklch, var(--primary) 42%, oklch(0.78 0.06 264));
+  --marketing-hero-orb: color-mix(in oklch, var(--primary) 30%, var(--marketing-hero-sky-mid));
+  --marketing-hero-orb-soft: color-mix(in oklch, var(--primary) 16%, var(--marketing-hero-sky));
+  --marketing-hero-wireframe-border: color-mix(in oklch, var(--primary) 52%, oklch(0.72 0.08 264));
+  --marketing-hero-wireframe-fill: color-mix(in oklch, var(--card) 72%, var(--marketing-hero-sky));
+  --marketing-hero-cta-from: color-mix(in oklch, var(--primary) 55%, oklch(0.52 0.14 264));
+  --marketing-hero-cta-to: var(--primary);
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.35 0.12 264);
@@ -300,7 +304,26 @@
   .marketing-hero-interactive {
     --hero-parallax-strength: 5;
   }
-  .marketing-hero-base-wash {
+  :root:not(.dark) .marketing-hero-base-wash {
+    background-image:
+      radial-gradient(
+        ellipse 125% 95% at 68% 14%,
+        var(--marketing-hero-glow-mid) 0%,
+        transparent 72%
+      ),
+      radial-gradient(
+        ellipse 75% 58% at 14% 52%,
+        var(--marketing-hero-glow-soft) 0%,
+        transparent 68%
+      ),
+      radial-gradient(
+        ellipse 60% 48% at 92% 72%,
+        color-mix(in oklch, var(--marketing-hero-glow-soft) 70%, oklch(0.94 0.07 280)) 0%,
+        transparent 70%
+      ),
+      linear-gradient(148deg, var(--marketing-hero-sky) 0%, var(--background) 62%);
+  }
+  .dark .marketing-hero-base-wash {
     background-image:
       radial-gradient(
         ellipse 120% 90% at 72% 20%,
@@ -318,18 +341,29 @@
         transparent 65%
       ),
       linear-gradient(155deg, color-mix(in oklch, var(--muted) 55%, var(--background)) 0%, var(--background) 72%);
+  }
+  .marketing-hero-base-wash {
     transform: translate3d(
       calc((var(--hero-fx, 0.5) - 0.5) * 8px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       calc((var(--hero-fy, 0.5) - 0.5) * 6px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
   }
-  .marketing-hero-art-accent {
+  :root:not(.dark) .marketing-hero-art-accent {
+    background-image: radial-gradient(
+      ellipse 62% 52% at 10% 58%,
+      var(--marketing-hero-glow-mid) 0%,
+      transparent 68%
+    );
+  }
+  .dark .marketing-hero-art-accent {
     background-image: radial-gradient(
       ellipse 55% 45% at 12% 62%,
       var(--marketing-hero-glow-soft) 0%,
       transparent 72%
     );
+  }
+  .marketing-hero-art-accent {
     transform: translate3d(
       calc((var(--hero-fx, 0.5) - 0.5) * -10px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       calc((var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
@@ -434,6 +468,59 @@
     opacity: calc(0.38 + 0.12 * var(--hero-boost, 0));
     transition: opacity 500ms ease;
   }
+  :root:not(.dark) .marketing-hero-highlight {
+    opacity: calc(0.52 + 0.14 * var(--hero-boost, 0));
+  }
+  :root:not(.dark) .marketing-hero-interactive .marketing-grain {
+    opacity: 0.1;
+  }
+  :root:not(.dark) .marketing-hero-grid-group {
+    opacity: calc(0.3 - 0.06 * var(--hero-boost, 0));
+  }
+  :root:not(.dark) .marketing-hero-interactive svg .marketing-hero-parallax-deep.marketing-hero-stroke {
+    opacity: 0.58;
+  }
+  :root:not(.dark) .marketing-hero-interactive svg .marketing-hero-parallax-mid.marketing-hero-stroke {
+    opacity: 0.62;
+  }
+  :root:not(.dark) .marketing-hero-interactive svg .marketing-hero-network {
+    opacity: 1;
+  }
+  :root:not(.dark) .marketing-hero-interactive svg .marketing-hero-parallax-mid.marketing-hero-stroke-primary {
+    opacity: 0.55;
+  }
+  :root:not(.dark) .marketing-hero-fill-soft {
+    fill: color-mix(in oklch, var(--marketing-hero-line) 34%, transparent);
+  }
+  :root:not(.dark) .marketing-hero-interactive svg .marketing-hero-stroke-primary.marketing-hero-hub-ring {
+    stroke-width: 1.75;
+    opacity: 0.85;
+  }
+  :root:not(.dark) .marketing-hero-left-node {
+    opacity: 0.9;
+  }
+  :root:not(.dark) .marketing-hero-interactive svg .marketing-hero-stroke-primary {
+    stroke-width: 1.35;
+  }
+  :root:not(.dark) .marketing-hero-interactive svg .marketing-hero-fill-primary.marketing-hero-hub-node {
+    filter: drop-shadow(0 0 6px color-mix(in oklch, var(--marketing-hero-node) 45%, transparent));
+  }
+  :root:not(.dark) .marketing-hero-art-glow {
+    opacity: 1;
+  }
+  :root:not(.dark) .marketing-hero-cta {
+    border: 0;
+    background-color: transparent;
+    background-image: linear-gradient(135deg, var(--marketing-hero-cta-from) 0%, var(--marketing-hero-cta-to) 100%);
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 0.06),
+      0 8px 24px color-mix(in oklch, var(--primary) 28%, transparent);
+  }
+  :root:not(.dark) .marketing-hero-cta:hover {
+    background-color: transparent;
+    background-image: linear-gradient(135deg, var(--marketing-hero-cta-from) 0%, var(--marketing-hero-cta-to) 100%);
+    filter: brightness(1.06);
+  }
   .marketing-hero-art-panel-shift {
     transform: translate3d(
         calc((var(--hero-fx, 0.5) - 0.5) * 20px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
@@ -470,6 +557,17 @@
   .marketing-hero-left-node {
     opacity: 0.7;
   }
+  .marketing-hero-orb-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .marketing-hero-art-svg,
+  .marketing-hero-wireframe-stack {
+    position: relative;
+    z-index: 1;
+  }
   .marketing-hero-orb {
     position: absolute;
     border-radius: 50%;
@@ -477,11 +575,12 @@
     filter: blur(40px);
   }
   .marketing-hero-orb-primary {
-    right: 18%;
-    top: 18%;
-    width: min(28vw, 280px);
-    height: min(28vw, 280px);
+    right: 14%;
+    top: 22%;
+    width: min(24vw, 240px);
+    height: min(24vw, 240px);
     background: var(--marketing-hero-orb);
+    opacity: 0.55;
     transform: translate3d(
       calc((var(--hero-fx, 0.5) - 0.5) * 24px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       calc((var(--hero-fy, 0.5) - 0.5) * 18px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
@@ -561,10 +660,11 @@
       height: min(40vw, 150px);
     }
     .marketing-hero-orb-primary {
-      right: 8%;
-      width: min(40vw, 180px);
-      height: min(40vw, 180px);
-      opacity: 0.7;
+      right: 6%;
+      top: 24%;
+      width: min(34vw, 160px);
+      height: min(34vw, 160px);
+      opacity: 0.45;
     }
     .marketing-hero-orb-secondary {
       left: 4%;
@@ -583,9 +683,15 @@
     .marketing-hero-orb-primary {
       animation: marketing-hero-orb-drift 18s ease-in-out infinite alternate;
     }
-    .marketing-hero-orb-secondary {
-      animation: marketing-hero-orb-drift 22s ease-in-out infinite alternate-reverse;
+    .dark .marketing-hero-orb-primary {
+      animation: marketing-hero-orb-drift-dark 18s ease-in-out infinite alternate;
     }
+    .marketing-hero-orb-secondary {
+      animation: marketing-hero-orb-drift-secondary 22s ease-in-out infinite alternate-reverse;
+    }
+  }
+  .dark .marketing-hero-orb-primary {
+    opacity: 0.7;
   }
   @keyframes marketing-hero-drift {
     0% {
@@ -599,10 +705,26 @@
   }
   @keyframes marketing-hero-orb-drift {
     0% {
-      opacity: 0.7;
+      opacity: 0.45;
     }
     100% {
-      opacity: 1;
+      opacity: 0.65;
+    }
+  }
+  @keyframes marketing-hero-orb-drift-dark {
+    0% {
+      opacity: 0.6;
+    }
+    100% {
+      opacity: 0.85;
+    }
+  }
+  @keyframes marketing-hero-orb-drift-secondary {
+    0% {
+      opacity: 0.55;
+    }
+    100% {
+      opacity: 0.75;
     }
   }
   .marketing-grain {
