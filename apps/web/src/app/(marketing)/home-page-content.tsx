@@ -4,12 +4,16 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BadgeCheck,
+  BookOpen,
   Briefcase,
   ChevronDown,
+  ClipboardList,
   Clock,
   Compass,
+  FileText,
   HelpCircle,
   Layers,
+  ListChecks,
   Quote,
   Scale,
   ShoppingCart,
@@ -180,6 +184,80 @@ const CAPABILITY_CHIPS: readonly string[] = [
   'Vendors & contracts',
   'Automation & AI',
   'Delivery risk',
+] as const;
+
+type ResourceCategory = 'Guide' | 'Checklist' | 'Playbook';
+
+const RESOURCE_PREP_ITEMS: readonly { readonly title: string; readonly body: string }[] = [
+  {
+    title: 'Name the decision',
+    body: 'What must be true in 90 days — go-live, vendor pick, or stabilization — so the session stays scoped.',
+  },
+  {
+    title: 'Bring the artifacts',
+    body: 'Proposals, timelines, org chart, or a one-page problem statement. Redacted excerpts are enough.',
+  },
+  {
+    title: 'List the constraints',
+    body: 'Budget band, must-have integrations, regulatory needs, and who can say yes on the call.',
+  },
+] as const;
+
+const RESOURCE_ITEMS: readonly {
+  readonly title: string;
+  readonly description: string;
+  readonly category: ResourceCategory;
+  readonly readLabel: string;
+  readonly icon: LucideIcon;
+}[] = [
+  {
+    title: 'Buying enterprise software without regrets',
+    description:
+      'How to shortlist vendors, score fit beyond demos, and avoid locking scope before you understand operations.',
+    category: 'Guide',
+    readLabel: '12 min read',
+    icon: BookOpen,
+  },
+  {
+    title: 'Red flags in ERP proposals — a pragmatic checklist',
+    description:
+      'Commercial, technical, and delivery signals to catch before signatures — written for finance and ops reviewers.',
+    category: 'Checklist',
+    readLabel: '8 min read',
+    icon: ClipboardList,
+  },
+  {
+    title: 'Automation patterns that fail (and what works instead)',
+    description:
+      'Where teams over-invest in AI, when RPA still wins, and how to sequence workflows your staff will adopt.',
+    category: 'Guide',
+    readLabel: '10 min read',
+    icon: FileText,
+  },
+  {
+    title: 'Vendor demos that reveal real fit',
+    description:
+      'A structured demo script and scorecard so sales theater does not replace proof on your data and processes.',
+    category: 'Playbook',
+    readLabel: '6 min read',
+    icon: ListChecks,
+  },
+  {
+    title: 'Questions before you sign a SaaS contract',
+    description:
+      'Data ownership, exit terms, SLA credits, implementation assumptions, and who pays for change requests.',
+    category: 'Checklist',
+    readLabel: '7 min read',
+    icon: ClipboardList,
+  },
+  {
+    title: 'Project rescue: the first 48 hours',
+    description:
+      'Triage order for slipping programs — stakeholders, scope truth, critical path, and what to pause immediately.',
+    category: 'Playbook',
+    readLabel: '9 min read',
+    icon: Zap,
+  },
 ] as const;
 
 type HomePageContentProps = {
@@ -524,7 +602,12 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         className="scroll-mt-24 px-6 py-20 md:py-28"
         speed={-0.09}
       >
-        <div className="mx-auto max-w-6xl space-y-14">
+        <div className="mx-auto max-w-6xl space-y-16">
+          <MarketingSectionHeader
+            eyebrow="Resources"
+            title="Practical references for technology decisions."
+            description="Guides, checklists, and playbooks you can forward to finance, ops, or IT — written for growing teams making vendor, delivery, and automation calls."
+          />
           <div className="marketing-band-dark relative overflow-hidden rounded-3xl px-8 py-12 shadow-lg md:px-14 md:py-16">
             <div
               className="pointer-events-none absolute inset-0 opacity-40 marketing-service-panel-glow"
@@ -537,7 +620,8 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                   Let&apos;s start productive work.
                 </h2>
                 <p className="text-base leading-relaxed marketing-band-muted md:text-lg">
-                  Run the diagnostic, see what fits, then book — no sprawling intake forms.
+                  Run the diagnostic, see what fits, then book — no sprawling intake forms. Use the library below to
+                  align stakeholders before or after your session.
                 </p>
               </div>
               <Button
@@ -552,27 +636,95 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               </Button>
             </div>
           </div>
+          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+            <div className="marketing-card-elevated rounded-3xl border border-border/80 p-8 md:p-10">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Before your session</p>
+              <h3 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">Come prepared, leave with decisions.</h3>
+              <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:text-base">
+                Focused calls work best when the room shares context. These three beats are enough — you do not need a
+                full requirements document.
+              </p>
+              <ol className="mt-8 space-y-6">
+                {RESOURCE_PREP_ITEMS.map((item, index) => (
+                  <li key={item.title} className="flex gap-4">
+                    <span
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-sm font-semibold tabular-nums text-primary"
+                      aria-hidden
+                    >
+                      {index + 1}
+                    </span>
+                    <div>
+                      <p className="font-semibold text-foreground">{item.title}</p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-border/70 bg-muted/30 p-6 dark:bg-muted/15 md:p-8">
+                <h3 className="text-lg font-semibold text-foreground">What the library covers</h3>
+                <ul className="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
+                  <li>
+                    <span className="font-medium text-foreground">Vendor selection</span> — demos, proposals, and
+                    contract questions before you commit.
+                  </li>
+                  <li>
+                    <span className="font-medium text-foreground">Delivery risk</span> — rescue triage when timelines
+                    slip or ownership is unclear.
+                  </li>
+                  <li>
+                    <span className="font-medium text-foreground">Automation & AI</span> — practical sequencing, not
+                    hype-first roadmaps.
+                  </li>
+                </ul>
+                <p className="mt-5 text-xs text-muted-foreground">
+                  Full articles publish on a rolling basis. Start with the diagnostic for a recommendation matched to
+                  your situation.
+                </p>
+              </div>
+              <ul className="flex flex-wrap gap-2" aria-label="Resource formats">
+                {(['Guide', 'Checklist', 'Playbook'] as const).map((format) => (
+                  <li key={format}>
+                    <span className="inline-flex items-center rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                      {format}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
           <div className="space-y-8">
             <MarketingSectionHeader
               eyebrow="Library"
-              title="The latest references"
-              description="Articles you can share internally — more ship after launch."
+              title="References you can share internally"
+              description="Each piece is vendor-neutral and written for operators — use them in steering committees, vendor reviews, or pre-reads before booking."
             />
-            <ul className="grid gap-5 md:grid-cols-3">
-              {[
-                'Buying enterprise software without regrets',
-                'Red flags in ERP proposals — a pragmatic checklist',
-                'Automation patterns that fail (and what works instead)',
-              ].map((title) => (
-                <li
-                  key={title}
-                  className="marketing-card-elevated group rounded-2xl border border-border/80 p-6 transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
-                >
-                  <Zap className="mb-4 size-5 text-primary" aria-hidden />
-                  <p className="font-semibold text-foreground">{title}</p>
-                  <span className="mt-3 block text-xs text-muted-foreground">Coming soon</span>
-                </li>
-              ))}
+            <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {RESOURCE_ITEMS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li
+                    key={item.title}
+                    className="marketing-card-elevated group flex h-full flex-col rounded-2xl border border-border/80 p-6 transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Icon className="size-5" aria-hidden />
+                      </span>
+                      <span className="rounded-full border border-border/70 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {item.category}
+                      </span>
+                    </div>
+                    <h3 className="mt-4 font-semibold leading-snug text-foreground">{item.title}</h3>
+                    <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+                      <span className="text-xs text-muted-foreground">{item.readLabel}</span>
+                      <span className="text-xs font-medium text-primary">Coming soon</span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
