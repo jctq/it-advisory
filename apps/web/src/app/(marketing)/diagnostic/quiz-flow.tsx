@@ -185,7 +185,7 @@ function normalizeGuidedDiagnosticRaw(raw: unknown): string | undefined {
 }
 
 export type QuizFlowProps = {
-  /** When set (from `/quiz/[sessionRef]`), targets that persisted session; legacy `?sessionId=` on `/quiz` is redirected here. */
+  /** When set (from `/diagnostic/[sessionRef]`), targets that persisted session; legacy `?sessionId=` on `/diagnostic` is redirected here. */
   readonly pathSessionRef?: string | null;
 };
 
@@ -200,7 +200,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     if (hasPathRef) {
       return;
     }
-    if (pathname !== '/quiz') {
+    if (pathname !== '/diagnostic') {
       return;
     }
     const fromQuery = searchParams.get('sessionId')?.trim() ?? '';
@@ -227,6 +227,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
   const hasHydratedRef = useRef<boolean>(false);
   const lastSessionInitKeyRef = useRef<string | null>(null);
+  const skipNextSessionHydrationRef = useRef<boolean>(false);
   const isRetakeQuery = searchParams.get('retake') === '1';
   const sessionInitKey = `${sessionTargetId ?? 'guest'}:${isRetakeQuery ? 'retake' : 'load'}`;
   const persistGuided = useCallback(
@@ -262,16 +263,22 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       sessionReadOnlyRef.current = false;
       setSessionReadOnly(false);
       if (isRetakeQuery) {
+        setIsSessionReady(false);
         await persistGuided(GUIDED_DIAGNOSTIC_EMPTY, false);
         if (cancelled) {
           return;
         }
         setGuided(GUIDED_DIAGNOSTIC_EMPTY);
         hasHydratedRef.current = true;
+        skipNextSessionHydrationRef.current = true;
         setIsSessionReady(true);
         const nextPath =
-          sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/quiz';
+          sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/diagnostic';
         router.replace(nextPath);
+        return;
+      }
+      if (skipNextSessionHydrationRef.current) {
+        skipNextSessionHydrationRef.current = false;
         return;
       }
       try {
@@ -522,8 +529,8 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
             <Link href="/account/diagnostics" className="font-medium underline underline-offset-2">
               My diagnostics
             </Link>
-            <Link href="/quiz" className="font-medium underline underline-offset-2">
-              Open latest quiz
+            <Link href="/diagnostic" className="font-medium underline underline-offset-2">
+              Open latest diagnostic
             </Link>
           </p>
         </div>
@@ -664,7 +671,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
             sessionTargetId !== null ? buildMarketingBookSessionPath(sessionTargetId) : '/book'
           }
           reviewDiagnosticHref={
-            sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/quiz'
+            sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/diagnostic'
           }
           onGoBack={executeGoBack}
           onGuidedChange={setGuided}

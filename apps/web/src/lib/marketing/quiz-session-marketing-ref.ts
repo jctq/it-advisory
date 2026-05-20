@@ -1,5 +1,5 @@
 /**
- * Client-safe helpers for marketing quiz session refs in URLs (`/quiz/[sessionRef]`, `/book/[sessionRef]`, and legacy `?sessionId=`).
+ * Client-safe helpers for marketing quiz session refs in URLs (`/diagnostic/[sessionRef]`, `/book/[sessionRef]`, and legacy `?sessionId=`).
  * Opaque refs use {@link MARKETING_QUIZ_SESSION_REF_PREFIX}; legacy URLs may still use a raw Mongo ObjectId hex string.
  */
 export const MARKETING_QUIZ_SESSION_REF_PREFIX = 'qs1.' as const;
@@ -26,7 +26,7 @@ export function isPlausibleMarketingQuizSessionRef(value: string): boolean {
  * Path for a targeted marketing quiz session (opaque token or legacy ObjectId hex).
  */
 export function buildMarketingQuizSessionPath(sessionRef: string): string {
-  return `/quiz/${encodeURIComponent(sessionRef.trim())}`;
+  return `/diagnostic/${encodeURIComponent(sessionRef.trim())}`;
 }
 
 /**
@@ -34,7 +34,7 @@ export function buildMarketingQuizSessionPath(sessionRef: string): string {
  */
 export function buildMarketingQuizRetakePath(sessionRef: string | null): string {
   if (sessionRef === null) {
-    return '/quiz?retake=1';
+    return '/diagnostic?retake=1';
   }
   return `${buildMarketingQuizSessionPath(sessionRef)}?retake=1`;
 }

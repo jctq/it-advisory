@@ -584,7 +584,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const confirmedTimeLabel = confirmedSlotDisplay?.timeLabel ?? displayTimeLabel;
   const activeDiagnosticHref = hasValidQuizSessionParam
     ? buildMarketingQuizSessionPath(quizSessionRef)
-    : '/quiz';
+    : '/diagnostic';
 
   const executeContinueFromDate = (): void => {
     if (!selectedDate || !selectedTime) {

@@ -77,7 +77,7 @@ type QuizSessionPayload = {
     readonly answers: QuizAnswers;
     readonly currentStep: number;
   } | null;
-  /** Encoded ref for `/quiz/[sessionRef]` and scoped template loads; omitted when no row or legacy response. */
+  /** Encoded ref for `/diagnostic/[sessionRef]` and scoped template loads; omitted when no row or legacy response. */
   readonly sessionId?: string | null;
   readonly readOnly?: boolean;
   readonly linkedBookingSlot?: QuizSessionLinkedBookingSlot | null;

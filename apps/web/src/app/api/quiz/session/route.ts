@@ -193,7 +193,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     if (bookedCount > 0) {
       /**
        * Latest row is the diagnostic captured at checkout — it must stay in Mongo for CRM. Point the visitor at a
-       * new blank session so guests (and signed-in users) can start another diagnostic from home or `/quiz` after
+       * new blank session so guests (and signed-in users) can start another diagnostic from home or `/diagnostic` after
        * booking without reusing the read-only snapshot.
        */
       const newSessionHex = await insertBlankQuizSessionForVisitor(visitorId);

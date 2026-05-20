@@ -315,7 +315,7 @@ export async function findLatestQuizSession(visitorId: string): Promise<QuizSess
 }
 
 /**
- * Session to attach at booking time: prefers `visitor_sessions.latestSessionId` (matches `/quiz/[sessionRef]` saves)
+ * Session to attach at booking time: prefers `visitor_sessions.latestSessionId` (matches `/diagnostic/[sessionRef]` saves)
  * over a raw `updatedAt` sort, which can pick a different row if multiple sessions exist.
  */
 export async function findQuizSessionForBookingSnapshot(visitorId: string): Promise<QuizSessionDocument | null> {
@@ -351,7 +351,7 @@ export type PaginatedVisitorQuizSessionsResult = {
 
 export type VisitorQuizSessionSummary = {
   readonly id: string;
-  /** Value for `/quiz/[sessionRef]` links and quiz session API calls (opaque when `QUIZ_SESSION_URL_SECRET` is set). */
+  /** Value for `/diagnostic/[sessionRef]` links and quiz session API calls (opaque when `QUIZ_SESSION_URL_SECRET` is set). */
   readonly marketingSessionRef: string;
   readonly currentStep: number;
   readonly updatedAtIso: string;

@@ -9,7 +9,7 @@ const QUIZ_SESSION_API_URL = '/api/quiz/session';
 
 /**
  * When the visitor's latest quiz row is read-only (linked to a booking), `DELETE /api/quiz/session` forks a new
- * blank row. Call this before navigating to `/quiz` for an explicit “new diagnostic” so guests do not reopen the
+ * blank row. Call this before navigating to `/diagnostic` for an explicit “new diagnostic” so guests do not reopen the
  * booked snapshot as an editable session.
  */
 export async function ensureGuestQuizFreshStart(): Promise<void> {
@@ -59,8 +59,8 @@ type UseMarketingNewQuizNavigationResult = {
 };
 
 /**
- * For signed-in users, starts a fresh diagnostic row and navigates to `/quiz/[sessionRef]`.
- * Guests go to `/quiz` (visitor latest-session behavior).
+ * For signed-in users, starts a fresh diagnostic row and navigates to `/diagnostic/[sessionRef]`.
+ * Guests go to `/diagnostic` (visitor latest-session behavior).
  * @param onNavigateError Optional handler instead of `window.alert` on failure (e.g. inline form error).
  */
 export function useMarketingNewQuizNavigation(
@@ -74,7 +74,7 @@ export function useMarketingNewQuizNavigation(
       setIsNavigating(true);
       try {
         await ensureGuestQuizFreshStart();
-        router.push('/quiz');
+        router.push('/diagnostic');
       } finally {
         setIsNavigating(false);
       }
@@ -104,7 +104,7 @@ type UseMarketingActiveQuizNavigationResult = {
 };
 
 /**
- * Opens the visitor's latest diagnostic row when no session ref is known, or `/quiz/[sessionRef]` when the API returns one.
+ * Opens the visitor's latest diagnostic row when no session ref is known, or `/diagnostic/[sessionRef]` when the API returns one.
  */
 export function useMarketingActiveQuizNavigation(
   onNavigateError?: (message: string) => void,
@@ -131,7 +131,7 @@ export function useMarketingActiveQuizNavigation(
         router.push(buildMarketingQuizSessionPath(sessionId));
         return;
       }
-      router.push('/quiz');
+      router.push('/diagnostic');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not open your diagnostic.';
       if (onNavigateError !== undefined) {

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 
 /**
- * Shared Suspense fallback for marketing quiz routes (`/quiz`, `/quiz/[sessionRef]`).
+ * Shared Suspense fallback for marketing diagnostic routes (`/diagnostic`, `/diagnostic/[sessionRef]`).
  */
 export function QuizRouteLoadingFallback(): ReactElement {
   return (

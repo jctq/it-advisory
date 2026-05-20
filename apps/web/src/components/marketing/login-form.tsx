@@ -97,7 +97,7 @@ export function LoginForm(props: LoginFormProps): ReactElement {
           Create one
         </Link>
         {' · '}
-        <Link href="/quiz" className="font-medium text-primary underline-offset-4 hover:underline">
+        <Link href="/diagnostic" className="font-medium text-primary underline-offset-4 hover:underline">
           Continue as guest
         </Link>
       </p>

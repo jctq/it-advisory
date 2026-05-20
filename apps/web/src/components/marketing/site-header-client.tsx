@@ -11,6 +11,14 @@ import { useMarketingAppearance } from '@/components/marketing/marketing-appeara
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { AuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { cn } from '@/lib/utils';
 
@@ -110,93 +118,78 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
             </Button>
           ) : (
             <Button asChild className="hidden h-10 xl:inline-flex">
-              <Link href="/quiz">Get Started</Link>
+              <Link href="/diagnostic">Get Started</Link>
             </Button>
           )}
-          <details className="relative xl:hidden">
-            <summary
-              className="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-md border border-border bg-background p-2 shadow-xs [&::-webkit-details-marker]:hidden"
-              aria-label="Open menu"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-11 shrink-0 xl:hidden"
+                aria-label="Open menu"
+              >
+                <Menu className="size-5" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-[min(100vw-2rem,19rem)] rounded-xl p-2"
             >
-              <Menu className="size-5" aria-hidden />
-            </summary>
-            <div className="absolute right-0 z-50 mt-2 w-[min(100vw-2rem,19rem)] rounded-xl border border-border bg-popover p-2 shadow-lg">
-              <ul className="flex flex-col gap-0.5">
-                {NAV_LINKS.map((link) => (
-                  <li key={link.href}>
-                    <a
-                      href={link.href}
-                      className="block rounded-lg px-3 py-2.5 text-sm font-medium text-popover-foreground hover:bg-accent"
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-                {user === null ? (
-                  <li className="border-t border-border pt-2">
-                    <div className="flex flex-col gap-1">
-                      <Link
-                        href="/login"
-                        className="rounded-lg px-3 py-2 text-sm font-medium text-popover-foreground hover:bg-accent"
-                      >
-                        Sign in
-                      </Link>
-                      <Link
-                        href="/register"
-                        className="rounded-lg px-3 py-2 text-sm font-medium text-popover-foreground hover:bg-accent"
-                      >
-                        Register
-                      </Link>
-                    </div>
-                  </li>
-                ) : (
-                  <li className="border-t border-border pt-2">
-                    <div className="space-y-1 px-1">
-                      <p className="break-all px-2 py-1 text-xs text-muted-foreground">{user.email}</p>
-                      <Link
-                        href="/account/diagnostics"
-                        className="block rounded-lg px-3 py-2 text-sm font-medium text-popover-foreground hover:bg-accent"
-                      >
-                        My diagnostics
-                      </Link>
-                      <Link
-                        href="/book/manage"
-                        className="block rounded-lg px-3 py-2 text-sm font-medium text-popover-foreground hover:bg-accent"
-                      >
-                        Manage booking
-                      </Link>
-                      <button
-                        type="button"
-                        className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-popover-foreground hover:bg-accent"
-                        onClick={() => void executeSignOut()}
-                      >
-                        Sign out
-                      </button>
-                    </div>
-                  </li>
-                )}
-                <li className="border-t border-border pt-2">
-                  {isAuthenticated ? (
-                    <button
-                      type="button"
-                      disabled={isNavigating}
-                      className="w-full rounded-lg bg-primary px-3 py-2.5 text-center text-sm font-medium text-primary-foreground disabled:opacity-60"
-                      onClick={() => void navigateToNewQuiz()}
-                    >
-                      {isNavigating ? 'Starting…' : 'Get Started'}
-                    </button>
-                  ) : (
-                    <Link
-                      href="/quiz"
-                      className="block rounded-lg bg-primary px-3 py-2.5 text-center text-sm font-medium text-primary-foreground"
-                    >
-                      Get Started
-                    </Link>
-                  )}
-                </li>
-              </ul>
-            </div>
-          </details>
+              {NAV_LINKS.map((link) => (
+                <DropdownMenuItem key={link.href} asChild className="cursor-pointer rounded-lg px-3 py-2.5 font-medium">
+                  <a href={link.href}>{link.label}</a>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator className="my-2" />
+              {user === null ? (
+                <>
+                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2 font-medium">
+                    <Link href="/login">Sign in</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2 font-medium">
+                    <Link href="/register">Register</Link>
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <>
+                  <DropdownMenuLabel className="break-all px-2 py-1 text-xs font-normal text-muted-foreground">
+                    {user.email}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2 font-medium">
+                    <Link href="/account/diagnostics">My diagnostics</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2 font-medium">
+                    <Link href="/book/manage">Manage booking</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer rounded-lg px-3 py-2 font-medium"
+                    onClick={() => void executeSignOut()}
+                  >
+                    Sign out
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuSeparator className="my-2" />
+              {isAuthenticated ? (
+                <DropdownMenuItem
+                  disabled={isNavigating}
+                  className="cursor-pointer justify-center rounded-lg bg-primary px-3 py-2.5 font-medium text-primary-foreground focus:bg-primary focus:text-primary-foreground disabled:opacity-60"
+                  onClick={() => void navigateToNewQuiz()}
+                >
+                  {isNavigating ? 'Starting…' : 'Get Started'}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  asChild
+                  className="cursor-pointer justify-center rounded-lg bg-primary px-3 py-2.5 font-medium text-primary-foreground focus:bg-primary focus:text-primary-foreground"
+                >
+                  <Link href="/diagnostic">Get Started</Link>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

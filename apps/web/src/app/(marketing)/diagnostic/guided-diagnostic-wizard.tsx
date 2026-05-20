@@ -1084,7 +1084,7 @@ export type GuidedDiagnosticWizardProps = {
   readonly canGoBack: boolean;
   readonly guided: GuidedDiagnosticV1;
   /**
-   * When true, do not inject the first template round into an empty guided state. Use for `/quiz/[sessionRef]` so a
+   * When true, do not inject the first template round into an empty guided state. Use for `/diagnostic/[sessionRef]` so a
    * brief empty render (or Strict Mode fetch abort) is never overwritten before session hydration applies.
    */
   readonly suppressEmptyTemplateBootstrap?: boolean;
@@ -1092,7 +1092,7 @@ export type GuidedDiagnosticWizardProps = {
   readonly sessionReadOnly?: boolean;
   /** Destination for “Book this session” from the outcome panel (`/book/[sessionRef]` when the quiz URL targets a row). */
   readonly marketingBookHref?: string;
-  /** Destination for “Review diagnostic” (use `/quiz/[sessionRef]` when the quiz URL targets a persisted row). */
+  /** Destination for “Review diagnostic” (use `/diagnostic/[sessionRef]` when the diagnostic URL targets a persisted row). */
   readonly reviewDiagnosticHref?: string;
   /**
    * When set, `/api/quiz/diagnostic-template` is scoped to this session so the pinned template is used on revisit
@@ -1222,7 +1222,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     suppressEmptyTemplateBootstrap = false,
     sessionReadOnly = false,
     marketingBookHref = '/book',
-    reviewDiagnosticHref = '/quiz',
+    reviewDiagnosticHref = '/diagnostic',
     templateSessionMarketingRef = null,
   } = props;
   const executeGoBackWithScroll = useCallback((): void => {
@@ -1293,6 +1293,11 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   useEffect(() => {
     hasAppliedTemplateBootstrapRef.current = false;
   }, [templateSessionMarketingRef]);
+  useEffect(() => {
+    if (isGuidedStateEmptyForTemplateBootstrap(guided)) {
+      hasAppliedTemplateBootstrapRef.current = false;
+    }
+  }, [guided]);
   useEffect(() => {
     if (suppressEmptyTemplateBootstrap) {
       return;
