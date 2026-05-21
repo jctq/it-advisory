@@ -38,7 +38,7 @@ export function PaymentReturnClient(): ReactElement {
   const retryPolling = useCallback((): void => {
     setStatus('loading');
     setPollGeneration((current) => current + 1);
-  }, []);
+  }, [setStatus]);
   const displayStatus: ReturnStatus = transactionId.length === 0 ? 'failed' : status;
   const bookCheckoutHref = hasValidSessionRef
     ? buildMarketingBookSessionPath(sessionRef)

@@ -105,22 +105,28 @@ export function AdminBlogImageDialog(): ReactElement | null {
 
   useEffect(() => {
     if (!isOpen) {
-      executeResetForm();
+      queueMicrotask(() => {
+        executeResetForm();
+      });
       return;
     }
     if (dialogState.type === 'editing') {
       const initial = dialogState.initialValues;
-      setForm({
-        src: initial.src ?? '',
-        altText: initial.altText ?? '',
-        title: initial.title ?? '',
+      queueMicrotask(() => {
+        setForm({
+          src: initial.src ?? '',
+          altText: initial.altText ?? '',
+          title: initial.title ?? '',
+        });
+        setPreviewUrl(initial.src ?? null);
+        setSelectedFile(null);
+        setErrorMessage(null);
       });
-      setPreviewUrl(initial.src ?? null);
-      setSelectedFile(null);
-      setErrorMessage(null);
       return;
     }
-    executeResetForm();
+    queueMicrotask(() => {
+      executeResetForm();
+    });
   }, [dialogState, executeResetForm, isOpen]);
 
   const executeApplyFile = useCallback((file: File): void => {

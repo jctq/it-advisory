@@ -68,16 +68,22 @@ export function BlogPostEditHistoryDialog(props: BlogPostEditHistoryDialogProps)
 
   useEffect(() => {
     if (!props.open) {
-      setSelectedRevisionId(null);
-      setRevisionDetail(null);
+      queueMicrotask(() => {
+        setSelectedRevisionId(null);
+        setRevisionDetail(null);
+      });
       return;
     }
-    void executeLoadList();
+    queueMicrotask(() => {
+      void executeLoadList();
+    });
   }, [executeLoadList, props.open, props.refreshKey]);
 
   useEffect(() => {
     if (selectedRevisionId === null) {
-      setRevisionDetail(null);
+      queueMicrotask(() => {
+        setRevisionDetail(null);
+      });
       return;
     }
     let isCancelled = false;

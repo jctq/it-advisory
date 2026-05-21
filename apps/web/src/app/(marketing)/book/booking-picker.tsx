@@ -305,19 +305,27 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   useEffect(() => {
     if (pathname === '/book' && !hasPathSegment) {
       if (isPlausibleMarketingQuizSessionRef(querySessionId)) {
-        setSessionGateStatus('loading');
+        queueMicrotask(() => {
+          setSessionGateStatus('loading');
+        });
         return;
       }
-      setSessionGateStatus('missing');
+      queueMicrotask(() => {
+        setSessionGateStatus('missing');
+      });
       return;
     }
     const ref = hasPathSegment ? pathRefTrimmed : querySessionId;
     if (!isPlausibleMarketingQuizSessionRef(ref)) {
-      setSessionGateStatus('invalid_format');
+      queueMicrotask(() => {
+        setSessionGateStatus('invalid_format');
+      });
       return;
     }
     let cancelled = false;
-    setSessionGateStatus('loading');
+    queueMicrotask(() => {
+      setSessionGateStatus('loading');
+    });
     const sessionUrl = `${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(ref)}`;
     void fetch(sessionUrl, { credentials: 'include' })
       .then(async (response) => {
@@ -366,8 +374,10 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (paymentResult !== 'cancelled') {
       return;
     }
-    setPaymentCancelledNotice(true);
-    setPhase('payment');
+    queueMicrotask(() => {
+      setPaymentCancelledNotice(true);
+      setPhase('payment');
+    });
     router.replace(buildMarketingBookSessionPath(quizSessionRef));
   }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams, sessionGateStatus]);
   useEffect(() => {
