@@ -1,12 +1,13 @@
 'use client';
 
-import Link from 'next/link';
-import { useCallback, useState, type ReactElement } from 'react';
+import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
 import { MarketingLegalDialog } from '@/components/marketing/legal/marketing-legal-dialog';
 import type { LegalDocumentId } from '@/lib/marketing/legal-document-id';
 
 type MarketingAuthLegalNoticeProps = {
   readonly variant: 'login' | 'register';
+  readonly privacyPolicyContent: ReactNode;
+  readonly termsOfUseContent: ReactNode;
 };
 
 function LegalDocumentButton(props: {
@@ -50,7 +51,12 @@ export function MarketingAuthLegalNotice(props: MarketingAuthLegalNoticeProps): 
         <LegalDocumentButton documentId="terms-of-use" label="Terms of Use" onOpen={openLegalDocument} /> and{' '}
         <LegalDocumentButton documentId="privacy-policy" label="Privacy Policy" onOpen={openLegalDocument} />.
       </p>
-      <MarketingLegalDialog documentId={openDocumentId} onOpenChange={handleDialogOpenChange} />
+      <MarketingLegalDialog
+        documentId={openDocumentId}
+        onOpenChange={handleDialogOpenChange}
+        privacyPolicyContent={props.privacyPolicyContent}
+        termsOfUseContent={props.termsOfUseContent}
+      />
     </>
   );
 }

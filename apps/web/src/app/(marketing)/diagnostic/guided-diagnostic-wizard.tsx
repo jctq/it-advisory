@@ -1249,7 +1249,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     onGuidedChange,
     suppressEmptyTemplateBootstrap = false,
     sessionReadOnly = false,
-    marketingBookHref = '/book',
+    marketingBookHref,
     reviewDiagnosticHref = '/diagnostic',
     templateSessionMarketingRef = null,
   } = props;
@@ -2008,14 +2008,14 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             <p className="mt-2 text-sm text-muted-foreground">{PROJECT_RESCUE_BOOKING_FOOTNOTE}</p>
             {sessionReadOnly ? (
               <p className="mt-8 text-sm text-muted-foreground">This intake is already linked to a booking.</p>
-            ) : (
+            ) : marketingBookHref !== undefined && marketingBookHref.trim().length > 0 ? (
               <Button asChild className="mt-8 w-full" size="lg">
                 <Link href={marketingBookHref}>
                   Book this session
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
               </Button>
-            )}
+            ) : null}
             <Button asChild variant="outline" className="mt-3 w-full">
               <Link href={reviewDiagnosticHref}>Review diagnostic</Link>
             </Button>

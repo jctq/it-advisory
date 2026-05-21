@@ -32,7 +32,7 @@ export type CreatePaymentCheckoutSessionParams = {
   readonly customerEmail: string;
   readonly customerCompany?: string;
   readonly customerPhone: string;
-  readonly quizSessionId?: string;
+  readonly quizSessionId: string;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
   /**
@@ -110,9 +110,7 @@ export async function createPaymentCheckoutSession(
   if (params.customerCompany !== undefined && params.customerCompany.trim().length > 0) {
     body.customerCompany = params.customerCompany.trim();
   }
-  if (params.quizSessionId !== undefined && params.quizSessionId.length > 0) {
-    body.quizSessionId = params.quizSessionId;
-  }
+  body.quizSessionId = params.quizSessionId;
   body.paymentMethodId = params.paymentMethodId;
   if (params.paymentMethodLabel !== undefined) {
     body.paymentMethodLabel = params.paymentMethodLabel;

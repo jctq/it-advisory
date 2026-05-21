@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
 import { MarketingAuthLegalNotice } from '@/components/marketing/legal/marketing-auth-legal-notice';
+import { PrivacyPolicyContent } from '@/components/marketing/legal/privacy-policy-content';
+import { TermsOfUseContent } from '@/components/marketing/legal/terms-of-use-content';
 import { LoginForm } from '@/components/marketing/login-form';
 import { resolveSafeInternalNextPath } from '@/lib/marketing/safe-internal-path';
 
@@ -23,7 +25,11 @@ export default async function LoginPage(props: LoginPageProps): Promise<ReactEle
         <LoginForm nextPath={nextPath} />
       </div>
       <div className="mx-auto mt-8">
-        <MarketingAuthLegalNotice variant="login" />
+        <MarketingAuthLegalNotice
+          variant="login"
+          privacyPolicyContent={<PrivacyPolicyContent />}
+          termsOfUseContent={<TermsOfUseContent />}
+        />
       </div>
     </main>
   );

@@ -28,4 +28,10 @@ export const COLLECTIONS = {
   paymentTransactions: 'payment_transactions',
   /** Singleton `{ _id: 'default' }` — video meeting providers (Zoom, etc.) for booking links (admin). */
   meetingSettings: 'meeting_settings',
+  /** Admin-managed blog posts (markdown CMS for marketing site). */
+  blogPosts: 'blog_posts',
+  /** Append-only save history for blog post edits (field snapshots for diffs). */
+  blogPostRevisions: 'blog_post_revisions',
+  /** Uploaded images for blog post markdown (paste / insert in admin editor). */
+  blogImages: 'blog_images',
 } as const;

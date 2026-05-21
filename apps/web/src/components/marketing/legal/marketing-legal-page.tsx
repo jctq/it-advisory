@@ -1,11 +1,16 @@
 import type { ReactElement } from 'react';
 import Link from 'next/link';
 import { MarketingLegalDocument } from '@/components/marketing/legal/marketing-legal-document';
+import { findBlogPostById } from '@/lib/data/blog-posts';
 import {
   LEGAL_DOCUMENT_PATHS,
   LEGAL_DOCUMENT_TITLES,
   type LegalDocumentId,
 } from '@/lib/marketing/legal-document-id';
+import { getLegalDocumentBlogPostIdFromEnv } from '@/lib/marketing/legal-blog-embed-config';
+
+const DEFAULT_LEGAL_PAGE_SUBTITLE =
+  'Independent technology guidance for growing teams in the Philippines.';
 
 type MarketingLegalPageProps = {
   readonly documentId: LegalDocumentId;
@@ -15,8 +20,22 @@ type MarketingLegalPageProps = {
 /**
  * Full-page layout for standalone privacy policy and terms routes.
  */
-export function MarketingLegalPage(props: MarketingLegalPageProps): ReactElement {
+async function resolveLegalPageSubtitle(documentId: LegalDocumentId): Promise<string> {
+  const embedPostId = getLegalDocumentBlogPostIdFromEnv(documentId);
+  if (embedPostId === null) {
+    return DEFAULT_LEGAL_PAGE_SUBTITLE;
+  }
+  const post = await findBlogPostById(embedPostId);
+  const descriptionText = post?.description?.trim() ?? '';
+  if (post === null || post.status !== 'published' || descriptionText.length === 0) {
+    return DEFAULT_LEGAL_PAGE_SUBTITLE;
+  }
+  return descriptionText;
+}
+
+export async function MarketingLegalPage(props: MarketingLegalPageProps): Promise<ReactElement> {
   const title = LEGAL_DOCUMENT_TITLES[props.documentId];
+  const pageSubtitle = await resolveLegalPageSubtitle(props.documentId);
   const siblingId: LegalDocumentId =
     props.documentId === 'privacy-policy' ? 'terms-of-use' : 'privacy-policy';
   const siblingTitle = LEGAL_DOCUMENT_TITLES[siblingId];
@@ -26,9 +45,7 @@ export function MarketingLegalPage(props: MarketingLegalPageProps): ReactElement
       <div className="mx-auto max-w-3xl">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">{props.eyebrow}</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
-        <p className="mt-3 text-sm text-muted-foreground">
-          Independent technology guidance for growing teams in the Philippines.
-        </p>
+        <p className="mt-3 text-sm text-muted-foreground">{pageSubtitle}</p>
         <div className="mt-10 rounded-xl border border-border bg-card p-6 shadow-sm md:p-8">
           <MarketingLegalDocument documentId={props.documentId} />
         </div>

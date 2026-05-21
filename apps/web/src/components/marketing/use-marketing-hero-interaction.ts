@@ -17,7 +17,7 @@ const HERO_IN_VIEW_THRESHOLD = 0.12;
 const HERO_IDLE_CHECK_MS = 200;
 const HERO_PARALLAX_CENTER = 0.5;
 /** Global mouse-parallax intensity (0 = off, 1 = default, 1.5 = stronger). Scales all hero layer shifts in globals.css. */
-export const HERO_PARALLAX_STRENGTH = 10;
+export const HERO_PARALLAX_STRENGTH = 5;
 const HERO_SPRING_CONFIG = { stiffness: 52, damping: 32, restDelta: 0.0008, restSpeed: 0.008 };
 const HERO_BOOST_SPRING_CONFIG = { stiffness: 120, damping: 34, restDelta: 0.001, restSpeed: 0.01 };
 

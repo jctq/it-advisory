@@ -51,8 +51,11 @@ import {
   buildMarketingQuizSessionPath,
   isPlausibleMarketingQuizSessionRef,
 } from '@/lib/marketing/quiz-session-marketing-ref';
+import { BookSessionGateError } from './book-session-gate-error';
+import { BookRouteLoadingFallback } from './book-route-loading-fallback';
 
 const BOOKINGS_API_URL = '/api/bookings';
+const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const PAYMENT_CONFIG_API_URL = buildApiUrl('/api/checkout/payment-config');
 const AVAILABILITY_API_URL = buildApiUrl('/api/booking/availability');
 const AUTH_ME_API_URL = buildApiUrl('/api/auth/me');
@@ -104,6 +107,13 @@ const DEFAULT_CHECKOUT_AMOUNT_LABEL = '₱6,000.00';
 type BookingSlotPhase = 'date' | 'details' | 'payment';
 
 type BookingPhase = BookingSlotPhase | 'processing' | 'success' | 'error';
+
+type BookSessionGateStatus = 'loading' | 'missing' | 'invalid_format' | 'not_found' | 'already_booked' | 'ready';
+
+type QuizSessionGateApiPayload = {
+  readonly session?: unknown;
+  readonly readOnly?: boolean;
+};
 
 type PaymentMethodId = 'card' | 'gcash' | 'maya' | 'bank_transfer' | 'paypal';
 
@@ -255,6 +265,12 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return searchParams.get('sessionId')?.trim() ?? '';
   }, [pathSessionRef, searchParams]);
   const hasValidQuizSessionParam = isPlausibleMarketingQuizSessionRef(quizSessionRef);
+  const pathRefTrimmed =
+    pathSessionRef !== undefined && pathSessionRef !== null ? pathSessionRef.trim() : '';
+  const querySessionId = searchParams.get('sessionId')?.trim() ?? '';
+  const hasPathSegment = pathRefTrimmed.length > 0;
+  const [sessionGateStatus, setSessionGateStatus] = useState<BookSessionGateStatus>('loading');
+  const [paymentCancelledNotice, setPaymentCancelledNotice] = useState<boolean>(false);
   const hasUserNavigatedVisibleMonthRef = useRef<boolean>(false);
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null);
   const [phase, setPhase] = useState<BookingPhase>('date');
@@ -286,6 +302,74 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [successBookingStatus, setSuccessBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled' | null>(null);
 
   const checkoutAmountLabel = paymentConfig?.checkoutAmountLabel ?? DEFAULT_CHECKOUT_AMOUNT_LABEL;
+  useEffect(() => {
+    if (pathname === '/book' && !hasPathSegment) {
+      if (isPlausibleMarketingQuizSessionRef(querySessionId)) {
+        setSessionGateStatus('loading');
+        return;
+      }
+      setSessionGateStatus('missing');
+      return;
+    }
+    const ref = hasPathSegment ? pathRefTrimmed : querySessionId;
+    if (!isPlausibleMarketingQuizSessionRef(ref)) {
+      setSessionGateStatus('invalid_format');
+      return;
+    }
+    let cancelled = false;
+    setSessionGateStatus('loading');
+    const sessionUrl = `${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(ref)}`;
+    void fetch(sessionUrl, { credentials: 'include' })
+      .then(async (response) => {
+        if (cancelled) {
+          return;
+        }
+        if (response.status === 404) {
+          setSessionGateStatus('not_found');
+          return;
+        }
+        if (!response.ok) {
+          setSessionGateStatus('not_found');
+          return;
+        }
+        const data = (await response.json()) as QuizSessionGateApiPayload;
+        if (cancelled) {
+          return;
+        }
+        if (data.session === null || data.session === undefined) {
+          setSessionGateStatus('not_found');
+          return;
+        }
+        const paymentResult = searchParams.get('payment')?.trim() ?? '';
+        const returnTransactionId = searchParams.get('transactionId')?.trim() ?? '';
+        const isPaymentSuccessReturn = paymentResult === 'success' && returnTransactionId.length > 0;
+        if (data.readOnly === true && !isPaymentSuccessReturn) {
+          setSessionGateStatus('already_booked');
+          return;
+        }
+        setSessionGateStatus('ready');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSessionGateStatus('not_found');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasPathSegment, pathRefTrimmed, pathname, querySessionId, searchParams]);
+  useEffect(() => {
+    if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
+      return;
+    }
+    const paymentResult = searchParams.get('payment')?.trim() ?? '';
+    if (paymentResult !== 'cancelled') {
+      return;
+    }
+    setPaymentCancelledNotice(true);
+    setPhase('payment');
+    router.replace(buildMarketingBookSessionPath(quizSessionRef));
+  }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams, sessionGateStatus]);
   useEffect(() => {
     const controller = new AbortController();
     void fetchPaymentConfigPublic({ apiBaseUrl: MARKETING_CLIENT_API_BASE_URL, signal: controller.signal })
@@ -346,6 +430,9 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (paymentResult !== 'success' || returnTransactionId.length === 0) {
       return;
     }
+    if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
+      return;
+    }
     const controller = new AbortController();
     queueMicrotask(() => {
       setPhase('processing');
@@ -382,11 +469,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           setConfirmedBookingReference(formatBookingReferenceId(result.bookingId));
         }
         setPhase('success');
-        const cleanPath =
-          pathname.startsWith('/book/') && hasValidQuizSessionParam
-            ? buildMarketingBookSessionPath(quizSessionRef)
-            : '/book';
-        router.replace(cleanPath);
+        router.replace(buildMarketingBookSessionPath(quizSessionRef));
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
@@ -402,7 +485,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [hasValidQuizSessionParam, pathname, quizSessionRef, router, searchParams]);
+  }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams, sessionGateStatus]);
   const selectedGateway = useMemo(() => {
     if (paymentConfig === null || selectedGatewayId === null) {
       return null;
@@ -619,6 +702,9 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   };
 
   const executePay = async (): Promise<void> => {
+    if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
+      return;
+    }
     if (!selectedDate || !selectedTime) {
       return;
     }
@@ -645,7 +731,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           customerEmail: email.trim(),
           customerPhone: phone.trim(),
           customerCompany: company.trim().length > 0 ? company.trim() : undefined,
-          quizSessionId: hasValidQuizSessionParam && quizSessionRef.length > 0 ? quizSessionRef : undefined,
+          quizSessionId: quizSessionRef,
           paymentMethodLabel: resolvedPaymentLabel,
         });
         if (session.manualConfirm || session.redirectUrl === null) {
@@ -700,9 +786,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (trimmedCompany.length > 0) {
       body.customerCompany = trimmedCompany;
     }
-    if (hasValidQuizSessionParam && quizSessionRef.length > 0) {
-      body.quizSessionId = quizSessionRef;
-    }
+    body.quizSessionId = quizSessionRef;
     try {
       const response = await fetch(BOOKINGS_API_URL, {
         method: 'POST',
@@ -795,6 +879,34 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     setPhase('payment');
     setErrorMessage(null);
   };
+
+  const showSessionGateBlock =
+    sessionGateStatus !== 'ready' &&
+    phase !== 'processing' &&
+    phase !== 'success' &&
+    phase !== 'error';
+
+  if (showSessionGateBlock) {
+    if (sessionGateStatus === 'loading') {
+      return <BookRouteLoadingFallback />;
+    }
+    if (sessionGateStatus === 'missing') {
+      return <BookSessionGateError reason="missing" />;
+    }
+    if (sessionGateStatus === 'invalid_format') {
+      return <BookSessionGateError reason="invalid_format" sessionRef={pathRefTrimmed.length > 0 ? pathRefTrimmed : null} />;
+    }
+    if (sessionGateStatus === 'already_booked') {
+      return (
+        <BookSessionGateError
+          reason="already_booked"
+          sessionRef={quizSessionRef}
+          manageBookingEnabled={manageBookingEnabled}
+        />
+      );
+    }
+    return <BookSessionGateError reason="not_found" sessionRef={quizSessionRef} />;
+  }
 
   if (phase === 'processing') {
     return (
@@ -976,6 +1088,15 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             'We use this information only to confirm your reservation and to send your calendar invite and meeting link.'}
           {phase === 'payment' && 'Choose a payment method to secure your booking.'}
         </p>
+        {paymentCancelledNotice && phase === 'payment' ? (
+          <div
+            className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground"
+            role="status"
+          >
+            <p className="font-medium">Payment cancelled</p>
+            <p className="mt-1 text-muted-foreground">Choose a payment method below to try again.</p>
+          </div>
+        ) : null}
         {phase === 'date' && manageBookingEnabled ? (
           <p className="mt-2 text-sm text-muted-foreground">
             <Link href="/book/manage" className="font-medium text-primary underline-offset-4 hover:underline">

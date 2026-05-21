@@ -10,7 +10,7 @@ type MarketingLegalDocumentProps = {
 /**
  * Renders the body of a legal document by identifier.
  */
-export function MarketingLegalDocument(props: MarketingLegalDocumentProps): ReactElement {
+export async function MarketingLegalDocument(props: MarketingLegalDocumentProps): Promise<ReactElement> {
   if (props.documentId === 'privacy-policy') {
     return <PrivacyPolicyContent />;
   }

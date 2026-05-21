@@ -7,6 +7,6 @@ export const metadata: Metadata = {
   description: 'How TechMD collects, uses, and protects your information.',
 };
 
-export default function PrivacyPolicyPage(): ReactElement {
+export default async function PrivacyPolicyPage(): Promise<ReactElement> {
   return <MarketingLegalPage documentId="privacy-policy" eyebrow="Legal" />;
 }

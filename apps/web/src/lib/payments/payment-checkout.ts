@@ -13,7 +13,11 @@ import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentTransactionDocument } from '@/domain/payment-types';
 import { getDb } from '@/lib/mongodb';
+import { countBookingsByQuizSessionId } from '@/lib/data/bookings';
+import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
+import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
 export type CreateCheckoutSessionParams = {
   readonly gatewayId: PaymentGatewayId;
@@ -25,7 +29,8 @@ export type CreateCheckoutSessionParams = {
   readonly customerEmail: string;
   readonly customerCompany?: string;
   readonly customerPhone: string;
-  readonly quizSessionId?: string;
+  /** Opaque marketing ref or legacy ObjectId hex; required for marketing checkout. */
+  readonly quizSessionId: string;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
@@ -113,6 +118,28 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   if (!slotOk) {
     return { ok: false, code: 'booking_slot_unavailable', error: 'This time is no longer available.' };
   }
+  const resolvedQuizSessionHex = resolveQuizSessionObjectIdHexFromMarketingRef(params.quizSessionId);
+  if (resolvedQuizSessionHex === null) {
+    return { ok: false, code: 'quiz_session_invalid_id', error: 'Invalid quiz session reference.' };
+  }
+  const ownedQuizSession = await findQuizSessionForVisitor(params.visitorId, resolvedQuizSessionHex);
+  if (ownedQuizSession === null) {
+    return {
+      ok: false,
+      code: 'quiz_session_not_found',
+      error: 'This diagnostic was not found or you no longer have access to it.',
+    };
+  }
+  if (ownedQuizSession._id !== undefined) {
+    const existingBookingCount = await countBookingsByQuizSessionId(ownedQuizSession._id);
+    if (existingBookingCount > 0) {
+      return {
+        ok: false,
+        code: 'quiz_session_already_booked',
+        error: 'This diagnostic is already linked to a booking.',
+      };
+    }
+  }
   const contact: MarketingBookingLeadContact = {
     name: params.customerName.trim(),
     email: params.customerEmail.trim(),
@@ -144,7 +171,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     customerEmail: contact.email,
     customerCompany: contact.company,
     customerPhone: contact.phone,
-    quizSessionIdHex: params.quizSessionId ?? null,
+    quizSessionIdHex: resolvedQuizSessionHex,
     paymentMethodLabel: resolvedPaymentMethodLabel,
     redirectUrl: null,
     metadata: { bookingDraftId },
@@ -175,11 +202,13 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   }
   const credentials = await getGatewayCredentials(params.gatewayId);
   const useMock = credentials === null && process.env.NODE_ENV === 'development';
+  const sessionMarketingRef = params.quizSessionId.trim();
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: params.appBaseUrl,
     transactionId,
     nativeInAppPaymentReturn: params.nativeInAppPaymentReturn === true,
-    cancelRelativeUrl: '/book?payment=cancelled',
+    cancelRelativeUrl: `${buildMarketingBookSessionPath(sessionMarketingRef)}?payment=cancelled`,
+    sessionMarketingRef,
   });
   const adapter =
     useMock

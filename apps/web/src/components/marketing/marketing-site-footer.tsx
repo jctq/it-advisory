@@ -2,35 +2,41 @@ import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
 import { LEGAL_DOCUMENT_PATHS } from '@/lib/marketing/legal-document-id';
+import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 
-const FOOTER_LINK_GROUPS: readonly {
-  readonly title: string;
-  readonly links: readonly { readonly href: string; readonly label: string }[];
-}[] = [
-  {
-    title: 'Explore',
-    links: [
-      { href: '/#how-it-works', label: 'How it works' },
-      { href: '/#services', label: 'Services' },
-      { href: '/#about', label: 'About' },
-      { href: '/#resources', label: 'Resources' },
-    ],
-  },
-  {
-    title: 'Get started',
-    links: [
-      { href: '/diagnostic', label: 'Guided diagnostic' },
-      { href: '/book', label: 'Book a session' },
-      { href: '/book/manage', label: 'Manage booking' },
-      { href: '/login', label: 'Sign in' },
-    ],
-  },
+type FooterLink = { readonly href: string; readonly label: string };
+
+const EXPLORE_FOOTER_LINKS: readonly FooterLink[] = [
+  { href: '/#how-it-works', label: 'How it works' },
+  { href: '/#services', label: 'Services' },
+  { href: '/#about', label: 'About' },
+  { href: '/#resources', label: 'Resources' },
+  { href: '/blog', label: 'Blog' },
 ] as const;
+
+const MANAGE_BOOKING_FOOTER_LINK: FooterLink = { href: '/book/manage', label: 'Manage booking' };
+
+function buildGetStartedFooterLinks(manageBookingEnabled: boolean): readonly FooterLink[] {
+  const links: FooterLink[] = [
+    { href: '/diagnostic', label: 'Guided diagnostic' },
+    { href: '/book', label: 'Book a session' },
+  ];
+  if (manageBookingEnabled) {
+    links.push(MANAGE_BOOKING_FOOTER_LINK);
+  }
+  links.push({ href: '/login', label: 'Sign in' });
+  return links;
+}
 
 /**
  * Multi-column marketing footer inspired by premium agency one-page layouts.
  */
-export function MarketingSiteFooter(): ReactElement {
+export async function MarketingSiteFooter(): Promise<ReactElement> {
+  const manageBookingEnabled = await readManageBookingEnabled();
+  const footerLinkGroups: readonly { readonly title: string; readonly links: readonly FooterLink[] }[] = [
+    { title: 'Explore', links: EXPLORE_FOOTER_LINKS },
+    { title: 'Get started', links: buildGetStartedFooterLinks(manageBookingEnabled) },
+  ];
   return (
     <footer className="border-t border-border bg-muted/30">
       <div className="mx-auto max-w-6xl px-6 py-14 md:py-16">
@@ -47,7 +53,7 @@ export function MarketingSiteFooter(): ReactElement {
               decision you can ship.
             </p>
           </div>
-          {FOOTER_LINK_GROUPS.map((group) => (
+          {footerLinkGroups.map((group) => (
             <div key={group.title}>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">{group.title}</p>
               <ul className="mt-4 space-y-2.5">

@@ -5,6 +5,9 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./blog-post-types": "./src/blog-post-types.ts",
+    "./blog-post-revision-types": "./src/blog-post-revision-types.ts",
+    "./blog-image-types": "./src/blog-image-types.ts",
     "./booking-calendar-links": "./src/booking-calendar-links.ts",
     "./booking-schedule": "./src/booking-schedule.ts",
     "./collections": "./src/collections.ts",

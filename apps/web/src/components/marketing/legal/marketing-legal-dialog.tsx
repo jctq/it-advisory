@@ -1,7 +1,6 @@
 'use client';
 
-import type { ReactElement } from 'react';
-import { MarketingLegalDocument } from '@/components/marketing/legal/marketing-legal-document';
+import type { ReactElement, ReactNode } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +13,8 @@ import { LEGAL_DOCUMENT_TITLES, type LegalDocumentId } from '@/lib/marketing/leg
 type MarketingLegalDialogProps = {
   readonly documentId: LegalDocumentId | null;
   readonly onOpenChange: (open: boolean) => void;
+  readonly privacyPolicyContent: ReactNode;
+  readonly termsOfUseContent: ReactNode;
 };
 
 /**
@@ -21,6 +22,12 @@ type MarketingLegalDialogProps = {
  */
 export function MarketingLegalDialog(props: MarketingLegalDialogProps): ReactElement {
   const title = props.documentId !== null ? LEGAL_DOCUMENT_TITLES[props.documentId] : '';
+  const bodyContent =
+    props.documentId === 'privacy-policy'
+      ? props.privacyPolicyContent
+      : props.documentId === 'terms-of-use'
+        ? props.termsOfUseContent
+        : null;
   return (
     <Dialog open={props.documentId !== null} onOpenChange={props.onOpenChange}>
       <DialogContent className="flex max-h-[min(85vh,720px)] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
@@ -30,9 +37,7 @@ export function MarketingLegalDialog(props: MarketingLegalDialogProps): ReactEle
             {props.documentId !== null ? `${title} for TechMD` : ''}
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          {props.documentId !== null ? <MarketingLegalDocument documentId={props.documentId} /> : null}
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{bodyContent}</div>
       </DialogContent>
     </Dialog>
   );

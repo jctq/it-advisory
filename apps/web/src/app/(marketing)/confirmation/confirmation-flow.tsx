@@ -9,7 +9,10 @@ import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-but
 import { Button } from '@/components/ui/button';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
-import { isPlausibleMarketingQuizSessionRef } from '@/lib/marketing/quiz-session-marketing-ref';
+import {
+  buildMarketingBookSessionPath,
+  isPlausibleMarketingQuizSessionRef,
+} from '@/lib/marketing/quiz-session-marketing-ref';
 import { notifyError } from '@/lib/notify';
 
 const BOOKINGS_API_URL = '/api/bookings';
@@ -54,7 +57,12 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
     }
     const trimmedDate = props.dateRaw.trim();
     const trimmedTime = props.timeRaw.trim();
-    if (trimmedDate.length === 0 || trimmedTime.length === 0) {
+    const trimmedQuizSessionId = props.quizSessionIdRaw?.trim() ?? '';
+    if (
+      trimmedDate.length === 0 ||
+      trimmedTime.length === 0 ||
+      !isPlausibleMarketingQuizSessionRef(trimmedQuizSessionId)
+    ) {
       queueMicrotask(() => {
         setStatus('invalid');
       });
@@ -63,15 +71,12 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
     hasRunRef.current = true;
     void (async (): Promise<void> => {
       try {
-        const trimmedQuizSessionId = props.quizSessionIdRaw?.trim() ?? '';
         const body: Record<string, string> = {
           date: trimmedDate,
           time: trimmedTime,
           serviceKey: 'project-rescue',
+          quizSessionId: trimmedQuizSessionId,
         };
-        if (isPlausibleMarketingQuizSessionRef(trimmedQuizSessionId)) {
-          body.quizSessionId = trimmedQuizSessionId;
-        }
         const response = await fetch(BOOKINGS_API_URL, {
           method: 'POST',
           credentials: 'include',
@@ -102,13 +107,19 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
       }
     })();
   }, [props.dateRaw, props.timeRaw, props.quizSessionIdRaw, router]);
+  const bookHref =
+    props.quizSessionIdRaw !== undefined && isPlausibleMarketingQuizSessionRef(props.quizSessionIdRaw.trim())
+      ? buildMarketingBookSessionPath(props.quizSessionIdRaw.trim())
+      : '/diagnostic';
   if (status === 'invalid') {
     return (
       <div className="mx-auto max-w-xl px-6 py-20 text-center md:py-28">
         <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground">Missing booking details</h1>
-        <p className="mt-3 text-muted-foreground">Open this page from the booking flow with a date and time selected.</p>
+        <p className="mt-3 text-muted-foreground">
+          Open this page from the booking flow with a date, time, and diagnostic session.
+        </p>
         <Button asChild className="mt-8" size="lg">
-          <Link href="/book">Go to booking</Link>
+          <Link href={bookHref}>Go to booking</Link>
         </Button>
       </div>
     );
@@ -129,7 +140,7 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
         <p className="mt-3 text-muted-foreground">{errorMessage ?? 'Something went wrong.'}</p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           <Button asChild size="lg">
-            <Link href="/book">Try again</Link>
+            <Link href={bookHref}>Try again</Link>
           </Button>
           <Button asChild size="lg" variant="outline">
             <Link href="/">Home</Link>

@@ -759,7 +759,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           suppressEmptyTemplateBootstrap={sessionTargetId !== null && !isSessionReady}
           sessionReadOnly={sessionReadOnly}
           marketingBookHref={
-            sessionTargetId !== null ? buildMarketingBookSessionPath(sessionTargetId) : '/book'
+            sessionTargetId !== null ? buildMarketingBookSessionPath(sessionTargetId) : undefined
           }
           reviewDiagnosticHref={
             sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/diagnostic'

@@ -824,16 +824,25 @@
    * Admin bookings calendar (FullCalendar): month / week / day / list with status-colored events.
    */
   .fc-admin-bookings {
+    --booking-confirmed-bg: var(--primary);
+    --booking-confirmed-fg: var(--primary-foreground);
+    --booking-confirmed-border: color-mix(in oklch, var(--primary) 35%, transparent);
+    --booking-confirmed-hover-bg: color-mix(in oklch, var(--primary) 88%, var(--card));
+    --booking-confirmed-hover-fg: var(--primary-foreground);
     --booking-pending-bg: var(--warning-soft);
     --booking-pending-fg: var(--warning-foreground);
     --booking-pending-border: color-mix(in oklch, var(--warning) 32%, transparent);
     --booking-pending-hover-bg: color-mix(in oklch, var(--warning) 18%, var(--warning-soft));
+    --booking-cancelled-hover-bg: color-mix(in oklch, var(--foreground) 8%, var(--muted));
+    --booking-cancelled-hover-fg: var(--muted-foreground);
   }
   .dark .fc-admin-bookings {
+    --booking-confirmed-hover-bg: color-mix(in oklch, var(--primary) 76%, var(--card));
     --booking-pending-bg: color-mix(in oklch, var(--warning) 16%, var(--card));
     --booking-pending-fg: oklch(0.93 0.04 85);
     --booking-pending-border: color-mix(in oklch, var(--warning) 38%, var(--border));
     --booking-pending-hover-bg: color-mix(in oklch, var(--warning) 28%, var(--card));
+    --booking-cancelled-hover-bg: color-mix(in oklch, var(--foreground) 10%, var(--card));
   }
   .fc-admin-bookings .fc {
     --fc-list-event-hover-bg-color: color-mix(in oklch, var(--foreground) 5%, var(--muted));
@@ -885,7 +894,39 @@
     @apply cursor-pointer rounded px-1 py-0.5 text-xs font-medium;
   }
   .fc-admin-bookings .fc-booking-status-confirmed {
-    @apply border-primary/30 bg-primary text-primary-foreground;
+    --fc-event-bg-color: var(--booking-confirmed-bg);
+    --fc-event-border-color: var(--booking-confirmed-border);
+    --fc-event-text-color: var(--booking-confirmed-fg);
+    background-color: var(--booking-confirmed-bg);
+    border-color: var(--booking-confirmed-border);
+    color: var(--booking-confirmed-fg);
+  }
+  .fc-admin-bookings .fc-booking-status-confirmed .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-confirmed .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-confirmed .fc-event-time,
+  .fc-admin-bookings .fc-booking-status-confirmed .fc-list-event-title a,
+  .fc-admin-bookings .fc-booking-status-confirmed .fc-list-event-time {
+    color: var(--booking-confirmed-fg);
+  }
+  /* FullCalendar’s default hover darkens events and washes out status-colored text. */
+  .fc-admin-bookings .fc-booking-status-confirmed:hover,
+  .fc-admin-bookings .fc-booking-status-confirmed.fc-event-selected {
+    --fc-event-bg-color: var(--booking-confirmed-hover-bg);
+    --fc-event-text-color: var(--booking-confirmed-hover-fg);
+    background-color: var(--booking-confirmed-hover-bg) !important;
+    border-color: var(--booking-confirmed-border) !important;
+    color: var(--booking-confirmed-hover-fg) !important;
+    filter: none !important;
+  }
+  .fc-admin-bookings .fc-booking-status-confirmed:hover .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-confirmed:hover .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-confirmed:hover .fc-event-time,
+  .fc-admin-bookings .fc-booking-status-confirmed:hover .fc-list-event-title a,
+  .fc-admin-bookings .fc-booking-status-confirmed:hover .fc-list-event-time,
+  .fc-admin-bookings .fc-booking-status-confirmed.fc-event-selected .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-confirmed.fc-event-selected .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-confirmed.fc-event-selected .fc-event-time {
+    color: var(--booking-confirmed-hover-fg) !important;
   }
   .fc-admin-bookings .fc-booking-status-pending {
     --fc-event-bg-color: var(--booking-pending-bg);
@@ -902,40 +943,104 @@
   .fc-admin-bookings .fc-booking-status-pending .fc-list-event-time {
     color: var(--booking-pending-fg);
   }
-  .fc-admin-bookings tr.fc-list-event:has(.fc-booking-status-pending) td {
-    background-color: var(--booking-pending-bg);
-    color: var(--booking-pending-fg);
-  }
-  .fc-admin-bookings tr.fc-list-event:has(.fc-booking-status-pending) .fc-list-event-title a {
-    color: var(--booking-pending-fg);
-  }
   .fc-admin-bookings .fc-booking-status-cancelled {
     @apply border-border bg-muted text-muted-foreground line-through opacity-80;
   }
-  /* Beat FullCalendar’s default list hover (#f5f5f5) which washes out dark-mode text. */
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-confirmed):hover td {
-    background-color: color-mix(in oklch, var(--primary) 72%, var(--card)) !important;
-    color: var(--primary-foreground) !important;
+  .fc-admin-bookings .fc-booking-status-cancelled:hover,
+  .fc-admin-bookings .fc-booking-status-cancelled.fc-event-selected {
+    background-color: var(--booking-cancelled-hover-bg) !important;
+    color: var(--booking-cancelled-hover-fg) !important;
+    filter: none !important;
   }
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-confirmed):hover .fc-list-event-title a,
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-confirmed):hover .fc-list-event-time {
-    color: var(--primary-foreground) !important;
+  .fc-admin-bookings .fc-booking-status-cancelled:hover .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-cancelled:hover .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-cancelled:hover .fc-event-time {
+    color: var(--booking-cancelled-hover-fg) !important;
   }
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-pending):hover td {
+  .fc-admin-bookings .fc-booking-status-pending:hover,
+  .fc-admin-bookings .fc-booking-status-pending.fc-event-selected {
+    background-color: var(--booking-pending-hover-bg) !important;
+    border-color: var(--booking-pending-border) !important;
+    color: var(--booking-pending-fg) !important;
+    filter: none !important;
+  }
+  .fc-admin-bookings .fc-booking-status-pending:hover .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-pending:hover .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-pending:hover .fc-event-time {
+    color: var(--booking-pending-fg) !important;
+  }
+  /**
+   * List view: status classes live on `tr.fc-list-event` (not a child), so use row selectors
+   * — `:has()` alone misses. Override FC’s `.fc-list-event:hover td { background: #f5f5f5 }`.
+   */
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-confirmed td,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-confirmed) td {
+    background-color: var(--booking-confirmed-bg) !important;
+    color: var(--booking-confirmed-fg) !important;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-confirmed .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-confirmed .fc-list-event-time,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-confirmed) .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-confirmed) .fc-list-event-time {
+    color: var(--booking-confirmed-fg) !important;
+    text-decoration: none;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-confirmed:hover td,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-confirmed):hover td {
+    background-color: var(--booking-confirmed-hover-bg) !important;
+    color: var(--booking-confirmed-hover-fg) !important;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-confirmed:hover .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-confirmed:hover .fc-list-event-time,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-confirmed):hover .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-confirmed):hover .fc-list-event-time {
+    color: var(--booking-confirmed-hover-fg) !important;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-pending td,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-pending) td {
+    background-color: var(--booking-pending-bg) !important;
+    color: var(--booking-pending-fg) !important;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-pending .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-pending .fc-list-event-time,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-pending) .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-pending) .fc-list-event-time {
+    color: var(--booking-pending-fg) !important;
+    text-decoration: none;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-pending:hover td,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-pending):hover td {
     background-color: var(--booking-pending-hover-bg) !important;
     color: var(--booking-pending-fg) !important;
   }
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-pending):hover .fc-list-event-title a,
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-pending):hover .fc-list-event-time {
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-pending:hover .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-pending:hover .fc-list-event-time,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-pending):hover .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-pending):hover .fc-list-event-time {
     color: var(--booking-pending-fg) !important;
   }
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-cancelled):hover td {
-    background-color: color-mix(in oklch, var(--foreground) 8%, var(--muted)) !important;
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-cancelled td,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-cancelled) td {
+    background-color: var(--muted) !important;
     color: var(--muted-foreground) !important;
   }
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-cancelled):hover .fc-list-event-title a,
-  .fc-admin-bookings .fc .fc-list-event:has(.fc-booking-status-cancelled):hover .fc-list-event-time {
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-cancelled .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-cancelled .fc-list-event-time,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-cancelled) .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-cancelled) .fc-list-event-time {
     color: var(--muted-foreground) !important;
+    text-decoration: line-through;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-cancelled:hover td,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-cancelled):hover td {
+    background-color: var(--booking-cancelled-hover-bg) !important;
+    color: var(--booking-cancelled-hover-fg) !important;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-cancelled:hover .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-cancelled:hover .fc-list-event-time,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-cancelled):hover .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-cancelled):hover .fc-list-event-time {
+    color: var(--booking-cancelled-hover-fg) !important;
   }
 }
 
@@ -1007,4 +1112,207 @@
 .booking-month-fc .fc .fc-daygrid-day.booking-month-day-pending .fc-daygrid-day-number {
   color: var(--foreground) !important;
   font-weight: 500;
+}
+
+/* Admin blog — MDXEditor theme (editor shell + portaled popups/tooltips) */
+.admin-blog-mdx-editor-overlay,
+.admin-blog-mdx-editor,
+.admin-blog-mdx-editor.mdxeditor,
+.mdxeditor-popup-container.admin-blog-mdx-editor,
+.admin-blog-mdx-editor-overlay .mdxeditor-popup-container {
+  --basePageBg: var(--popover);
+  --baseBase: var(--background);
+  --baseBgSubtle: var(--muted);
+  --baseBg: color-mix(in srgb, var(--muted) 50%, var(--card));
+  --baseBgHover: var(--secondary);
+  --baseBgActive: var(--secondary);
+  --baseLine: var(--border);
+  --baseBorder: var(--border);
+  --baseBorderHover: var(--muted-foreground);
+  --baseSolid: var(--muted-foreground);
+  --baseSolidHover: var(--foreground);
+  --baseText: var(--muted-foreground);
+  --baseTextContrast: var(--foreground);
+  --accentText: var(--primary);
+  --accentSolid: var(--primary);
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+.admin-blog-mdx-editor.mdxeditor {
+  background-color: var(--card);
+}
+
+.admin-blog-mdx-editor .mdxeditor-root-contenteditable [class*='contentEditable'] {
+  color: var(--foreground) !important;
+  background-color: transparent;
+}
+
+.admin-blog-mdx-editor .mdxeditor-root-contenteditable [class*='placeholder'] {
+  color: var(--muted-foreground) !important;
+}
+
+.admin-blog-mdx-editor [class*='toolbarRoot'] {
+  background-color: color-mix(in srgb, var(--muted) 55%, var(--card)) !important;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-blog-mdx-editor [class*='toolbarRoot'] svg {
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor [class*='toolbarToggleItem']:hover,
+.admin-blog-mdx-editor [class*='toolbarButton']:hover {
+  background-color: var(--secondary) !important;
+}
+
+.admin-blog-mdx-editor [class*='toolbarToggleItem'][data-state='on'],
+.admin-blog-mdx-editor [class*='toolbarButton'][data-state='on'] {
+  background-color: var(--secondary) !important;
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor [class*='toolbarNodeKindSelectTrigger'],
+.admin-blog-mdx-editor [class*='toolbarButtonSelectTrigger'],
+.admin-blog-mdx-editor [class*='selectTrigger'] {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor [class*='selectTrigger'][data-placeholder] > span:first-child {
+  color: var(--muted-foreground) !important;
+}
+
+/* Block type + toolbar dropdown menus (portaled to body) */
+.admin-blog-mdx-editor [class*='selectContainer'],
+.admin-blog-mdx-editor [class*='toolbarButtonDropdownContainer'],
+.admin-blog-mdx-editor [class*='toolbarCodeBlockLanguageSelectContent'] {
+  background-color: var(--popover) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.admin-blog-mdx-editor [class*='selectItem'],
+.admin-blog-mdx-editor [class*='toolbarNodeKindSelectItem'] {
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor [class*='selectItem'][data-highlighted],
+.admin-blog-mdx-editor [class*='toolbarNodeKindSelectItem'][data-highlighted] {
+  background-color: var(--muted) !important;
+  color: var(--foreground) !important;
+  outline: none;
+}
+
+.admin-blog-mdx-editor [class*='selectItem'][data-state='checked'],
+.admin-blog-mdx-editor [class*='toolbarNodeKindSelectItem'][data-state='checked'] {
+  background-color: color-mix(in srgb, var(--primary) 22%, var(--popover)) !important;
+  color: var(--foreground) !important;
+}
+
+/* Toolbar tooltips ("Select block type", etc.) */
+.admin-blog-mdx-editor [class*='tooltipContent'] {
+  background-color: var(--foreground) !important;
+  color: var(--background) !important;
+  border: 1px solid var(--border);
+}
+
+.admin-blog-mdx-editor [class*='tooltipContent'] svg {
+  fill: var(--foreground) !important;
+}
+
+/* Link dialog + other popovers */
+.admin-blog-mdx-editor [class*='linkDialogPopoverContent'],
+.admin-blog-mdx-editor [class*='dialogContent'],
+.admin-blog-mdx-editor [class*='popoverContent'] {
+  background-color: var(--popover) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+.admin-blog-mdx-editor [class*='linkDialogInput'],
+.admin-blog-mdx-editor [class*='dialogInput'] {
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor [class*='linkDialogInput']::placeholder,
+.admin-blog-mdx-editor [class*='dialogInput']::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+/* Dropdowns/tooltips portaled inside overlay host */
+.admin-blog-mdx-editor-overlay [class*='selectContainer'],
+.admin-blog-mdx-editor-overlay [class*='toolbarButtonDropdownContainer'],
+.admin-blog-mdx-editor-overlay [class*='toolbarCodeBlockLanguageSelectContent'],
+.admin-blog-mdx-editor-overlay [class*='selectItem'],
+.admin-blog-mdx-editor-overlay [class*='toolbarNodeKindSelectItem'],
+.admin-blog-mdx-editor-overlay [class*='tooltipContent'] {
+  --basePageBg: var(--popover);
+  --baseTextContrast: var(--foreground);
+  --baseText: var(--muted-foreground);
+  --baseBg: var(--muted);
+  --baseBase: var(--background);
+}
+
+.admin-blog-mdx-editor-overlay [class*='selectContainer'],
+.admin-blog-mdx-editor-overlay [class*='toolbarButtonDropdownContainer'],
+.admin-blog-mdx-editor-overlay [class*='toolbarCodeBlockLanguageSelectContent'] {
+  background-color: var(--popover) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.admin-blog-mdx-editor-overlay [class*='selectItem'],
+.admin-blog-mdx-editor-overlay [class*='toolbarNodeKindSelectItem'] {
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor-overlay [class*='selectItem'][data-highlighted],
+.admin-blog-mdx-editor-overlay [class*='toolbarNodeKindSelectItem'][data-highlighted] {
+  background-color: var(--muted) !important;
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor-overlay [class*='selectItem'][data-state='checked'],
+.admin-blog-mdx-editor-overlay [class*='toolbarNodeKindSelectItem'][data-state='checked'] {
+  background-color: color-mix(in srgb, var(--primary) 22%, var(--popover)) !important;
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor-overlay [class*='tooltipContent'] {
+  background-color: var(--foreground) !important;
+  color: var(--background) !important;
+}
+
+/* Fallback when Radix portals dropdowns to document.body (blog editor open) */
+html:has(.admin-blog-mdx-editor-overlay) [class*='selectContainer'],
+html:has(.admin-blog-mdx-editor-overlay) [class*='toolbarButtonDropdownContainer'],
+html:has(.admin-blog-mdx-editor-overlay) [class*='toolbarCodeBlockLanguageSelectContent'] {
+  background-color: var(--popover) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+html:has(.admin-blog-mdx-editor-overlay) [class*='selectItem'],
+html:has(.admin-blog-mdx-editor-overlay) [class*='toolbarNodeKindSelectItem'] {
+  color: var(--foreground) !important;
+}
+
+html:has(.admin-blog-mdx-editor-overlay) [class*='selectItem'][data-highlighted],
+html:has(.admin-blog-mdx-editor-overlay) [class*='toolbarNodeKindSelectItem'][data-highlighted] {
+  background-color: var(--muted) !important;
+  color: var(--foreground) !important;
+}
+
+html:has(.admin-blog-mdx-editor-overlay) [class*='selectItem'][data-state='checked'],
+html:has(.admin-blog-mdx-editor-overlay) [class*='toolbarNodeKindSelectItem'][data-state='checked'] {
+  background-color: color-mix(in srgb, var(--primary) 22%, var(--popover)) !important;
+  color: var(--foreground) !important;
+}
+
+html:has(.admin-blog-mdx-editor-overlay) [class*='tooltipContent'] {
+  background-color: var(--foreground) !important;
+  color: var(--background) !important;
 }

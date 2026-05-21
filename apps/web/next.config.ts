@@ -2,7 +2,12 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@techmd/diagnostic-core', '@techmd/domain', '@techmd/payments'],
+  transpilePackages: [
+    '@mdxeditor/editor',
+    '@techmd/diagnostic-core',
+    '@techmd/domain',
+    '@techmd/payments',
+  ],
   images: {
     localPatterns: [
       {

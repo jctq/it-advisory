@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  countBookingsByQuizSessionId,
   createBookingWithLatestQuizSnapshot,
   findBookingById,
   findBookingByVisitorSlot,
   linkQuizSessionToVisitorBooking,
-  syncBookingQuizSessionIfPointerChanged,
 } from '@/lib/data/bookings';
 import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
@@ -13,6 +13,7 @@ import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
 import { getPaymentSettings } from '@/lib/data/payment-settings';
+import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
 const PAYMENT_METHOD_IDS = ['card', 'gcash', 'maya', 'bank_transfer', 'paypal'] as const;
@@ -40,7 +41,7 @@ const postBodySchema = z
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     time: z.string().min(1).max(48),
     serviceKey: z.string().min(1).max(120).default('project-rescue'),
-    quizSessionId: z.string().min(1).max(512).optional(),
+    quizSessionId: z.string().min(1).max(512),
     customerName: z.string().min(1).max(200).optional(),
     customerEmail: z.string().email().max(320).optional(),
     customerCompany: z.string().max(200).optional(),
@@ -84,15 +85,34 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
-  let quizSessionIdHex: string | undefined;
-  if (parsed.data.quizSessionId !== undefined) {
-    const resolved = resolveQuizSessionObjectIdHexFromMarketingRef(parsed.data.quizSessionId);
-    if (resolved === null) {
-      return NextResponse.json({ error: 'Invalid quiz session reference', code: 'quiz_session_invalid_id' }, { status: 400 });
-    }
-    quizSessionIdHex = resolved;
+  const resolvedQuizSession = resolveQuizSessionObjectIdHexFromMarketingRef(parsed.data.quizSessionId);
+  if (resolvedQuizSession === null) {
+    return NextResponse.json({ error: 'Invalid quiz session reference', code: 'quiz_session_invalid_id' }, { status: 400 });
   }
+  const quizSessionIdHex = resolvedQuizSession;
   const visitorId = await resolveMarketingVisitorId(request);
+  const ownedQuizSession = await findQuizSessionForVisitor(visitorId, quizSessionIdHex);
+  if (ownedQuizSession === null) {
+    return NextResponse.json(
+      {
+        error: 'This diagnostic was not found or you no longer have access to it.',
+        code: 'quiz_session_not_found',
+      },
+      { status: 404 },
+    );
+  }
+  if (ownedQuizSession._id !== undefined) {
+    const existingBookingCount = await countBookingsByQuizSessionId(ownedQuizSession._id);
+    if (existingBookingCount > 0) {
+      return NextResponse.json(
+        {
+          error: 'This diagnostic is already linked to a booking.',
+          code: 'quiz_session_already_booked',
+        },
+        { status: 409 },
+      );
+    }
+  }
   let startsAt: Date;
   try {
     startsAt = parseBookingSlotToUtc(parsed.data.date, parsed.data.time);
@@ -130,33 +150,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     parsed.data.paymentMethod !== undefined ? resolvePaymentMethodLabel(parsed.data.paymentMethod) : null;
   const existingId = await findBookingByVisitorSlot({ visitorId, serviceKey, startsAt });
   if (existingId !== null) {
-    if (quizSessionIdHex !== undefined) {
-      const linked = await linkQuizSessionToVisitorBooking({
-        bookingId: existingId,
-        visitorId,
-        quizSessionIdHex,
-      });
-      if (!linked) {
-        return NextResponse.json(
-          { error: 'Could not link this diagnostic to the existing reservation.', code: 'quiz_link_failed' },
-          { status: 400 },
-        );
-      }
-      return NextResponse.json({
-        ok: true as const,
-        bookingId: existingId.toString(),
-        deduped: true as const,
-        quizSessionLinked: true as const,
-        startsAtIso: startsAt.toISOString(),
-        timezone: PRIMARY_TIMEZONE,
-        bookingStatus: await resolveBookingStatusForId(existingId.toString()),
-      });
+    const linked = await linkQuizSessionToVisitorBooking({
+      bookingId: existingId,
+      visitorId,
+      quizSessionIdHex,
+    });
+    if (!linked) {
+      return NextResponse.json(
+        { error: 'Could not link this diagnostic to the existing reservation.', code: 'quiz_link_failed' },
+        { status: 400 },
+      );
     }
-    await syncBookingQuizSessionIfPointerChanged({ bookingId: existingId, visitorId });
     return NextResponse.json({
       ok: true as const,
       bookingId: existingId.toString(),
       deduped: true as const,
+      quizSessionLinked: true as const,
       startsAtIso: startsAt.toISOString(),
       timezone: PRIMARY_TIMEZONE,
       bookingStatus: await resolveBookingStatusForId(existingId.toString()),
@@ -185,6 +194,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     preferredQuizSessionId: quizSessionIdHex,
     paymentMethodLabel,
   });
+  if (created === 'quiz_session_not_accessible') {
+    return NextResponse.json(
+      {
+        error: 'This diagnostic was not found or you no longer have access to it.',
+        code: 'quiz_session_not_found',
+      },
+      { status: 404 },
+    );
+  }
   if (created === 'duplicate_key') {
     return NextResponse.json(
       { error: 'This time is no longer available.', code: 'booking_slot_unavailable' },

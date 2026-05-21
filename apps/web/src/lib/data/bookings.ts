@@ -4,10 +4,11 @@
  */
 import { MongoServerError, ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
-import type { BookingDocument } from '@/domain/types';
+import type { BookingDocument, LeadDocument, UserAccountDocument } from '@/domain/types';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { getDb } from '@/lib/mongodb';
 import { findQuizSessionForBookingSnapshot, findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 
 export type BookingRow = {
   id: string;
@@ -26,6 +27,16 @@ export type BookingRow = {
   hasDiagnosticSnapshot: boolean;
   /** Quiz session document id captured at booking time, when Mongo had a session row. */
   quizSessionId: string | null;
+};
+
+/** Admin calendar row with lead contact and guest/account context for hover previews. */
+export type AdminBookingCalendarRow = BookingRow & {
+  readonly contactName: string;
+  readonly contactEmail: string | null;
+  readonly contactCompany: string | null;
+  readonly contactPhone: string | null;
+  readonly isGuestBooking: boolean;
+  readonly accountEmail: string | null;
 };
 
 function mapBooking(
@@ -75,6 +86,124 @@ export async function listBookings(limit = 10_000): Promise<BookingRow[]> {
       },
     ),
   );
+}
+
+function formatLeadContactField(value: string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed === '—') {
+    return null;
+  }
+  return trimmed;
+}
+
+function mapLeadContactFields(lead: LeadDocument): {
+  readonly contactName: string;
+  readonly contactEmail: string | null;
+  readonly contactCompany: string | null;
+  readonly contactPhone: string | null;
+} {
+  const contactNameRaw = typeof lead.name === 'string' ? lead.name.trim() : '';
+  const contactName = contactNameRaw.length > 0 ? contactNameRaw : 'Customer';
+  return {
+    contactName,
+    contactEmail: formatLeadContactField(lead.email),
+    contactCompany: formatLeadContactField(lead.company),
+    contactPhone: formatLeadContactField(lead.phone),
+  };
+}
+
+function resolveIsGuestBooking(visitorId: string, accountVisitorIds: ReadonlySet<string>): boolean {
+  return !accountVisitorIds.has(visitorId);
+}
+
+async function loadAccountVisitorContext(): Promise<{
+  readonly accountVisitorIds: ReadonlySet<string>;
+  readonly accountEmailByVisitorId: ReadonlyMap<string, string>;
+}> {
+  const db = await getDb();
+  const userDocs = await db
+    .collection<UserAccountDocument>(COLLECTIONS.users)
+    .find({}, { projection: { emailNormalized: 1 } })
+    .toArray();
+  const accountVisitorIds = new Set<string>();
+  const accountEmailByVisitorId = new Map<string, string>();
+  for (const userDoc of userDocs) {
+    if (userDoc._id === undefined) {
+      continue;
+    }
+    const visitorId = buildAccountVisitorId(userDoc._id.toHexString());
+    accountVisitorIds.add(visitorId);
+    accountEmailByVisitorId.set(visitorId, userDoc.emailNormalized);
+  }
+  return { accountVisitorIds, accountEmailByVisitorId };
+}
+
+/**
+ * Admin calendar list: bookings with lead contact fields and guest vs signed-in account context.
+ */
+export async function listBookingsForAdminCalendar(limit = 10_000): Promise<AdminBookingCalendarRow[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const db = await getDb();
+  const [bookingDocs, accountContext] = await Promise.all([
+    db
+      .collection<BookingDocument>(COLLECTIONS.bookings)
+      .find()
+      .sort({ startsAt: -1 })
+      .limit(limit)
+      .toArray(),
+    loadAccountVisitorContext(),
+  ]);
+  const leadIds = [
+    ...new Set(
+      bookingDocs
+        .map((doc) => doc.leadId)
+        .filter((leadId): leadId is ObjectId => leadId !== undefined),
+    ),
+  ];
+  const leadDocs =
+    leadIds.length === 0
+      ? []
+      : await db
+          .collection<LeadDocument>(COLLECTIONS.leads)
+          .find({ _id: { $in: leadIds } })
+          .toArray();
+  const leadById = new Map<string, LeadDocument>();
+  for (const leadDoc of leadDocs) {
+    if (leadDoc._id === undefined) {
+      continue;
+    }
+    leadById.set(leadDoc._id.toHexString(), leadDoc);
+  }
+  return bookingDocs.map((doc) => {
+    const base = mapBooking(
+      doc as BookingDocument & {
+        _id: { toString: () => string };
+        leadId: { toString: () => string };
+      },
+    );
+    const lead = leadById.get(base.leadId);
+    const contact =
+      lead !== undefined
+        ? mapLeadContactFields(lead)
+        : {
+            contactName: 'Unknown lead',
+            contactEmail: null,
+            contactCompany: null,
+            contactPhone: null,
+          };
+    const accountEmail = accountContext.accountEmailByVisitorId.get(base.visitorId) ?? null;
+    return {
+      ...base,
+      ...contact,
+      isGuestBooking: resolveIsGuestBooking(base.visitorId, accountContext.accountVisitorIds),
+      accountEmail,
+    };
+  });
 }
 
 export type BookingDetailRow = BookingRow & {
@@ -176,7 +305,12 @@ export async function createBookingWithLatestQuizSnapshot(input: {
   readonly leadId: ObjectId;
   readonly preferredQuizSessionId?: string | null;
   readonly paymentMethodLabel?: string | null;
-}): Promise<{ readonly bookingId: ObjectId; readonly quizSessionId: ObjectId | null } | 'duplicate_key' | null> {
+}): Promise<
+  | { readonly bookingId: ObjectId; readonly quizSessionId: ObjectId | null }
+  | 'duplicate_key'
+  | 'quiz_session_not_accessible'
+  | null
+> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
@@ -185,6 +319,9 @@ export async function createBookingWithLatestQuizSnapshot(input: {
     preferredRaw.length > 0 && /^[a-f\d]{24}$/i.test(preferredRaw)
       ? await findQuizSessionForVisitor(input.visitorId, preferredRaw)
       : null;
+  if (preferredRaw.length > 0 && session === null) {
+    return 'quiz_session_not_accessible';
+  }
   if (session === null) {
     session = await findQuizSessionForBookingSnapshot(input.visitorId);
   }

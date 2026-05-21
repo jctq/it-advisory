@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
 import { MarketingAuthLegalNotice } from '@/components/marketing/legal/marketing-auth-legal-notice';
+import { PrivacyPolicyContent } from '@/components/marketing/legal/privacy-policy-content';
+import { TermsOfUseContent } from '@/components/marketing/legal/terms-of-use-content';
 import { RegisterForm } from '@/components/marketing/register-form';
 import { resolveSafeInternalNextPath } from '@/lib/marketing/safe-internal-path';
 
@@ -23,7 +25,11 @@ export default async function RegisterPage(props: RegisterPageProps): Promise<Re
         <RegisterForm nextPath={nextPath} />
       </div>
       <div className="mx-auto mt-8">
-        <MarketingAuthLegalNotice variant="register" />
+        <MarketingAuthLegalNotice
+          variant="register"
+          privacyPolicyContent={<PrivacyPolicyContent />}
+          termsOfUseContent={<TermsOfUseContent />}
+        />
       </div>
     </main>
   );

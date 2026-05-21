@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { MarketingRouteScroll } from '@/components/marketing/marketing-route-scroll';
 import { MarketingSmoothScroll } from '@/components/marketing/marketing-smooth-scroll';
 import { MarketingAppearanceProvider } from '@/components/marketing/marketing-appearance-provider';
 import { MarketingSiteFooter } from '@/components/marketing/marketing-site-footer';
@@ -9,6 +10,7 @@ export default function MarketingLayout({ children }: { readonly children: React
     <MarketingAppearanceProvider>
       <div className="flex min-h-dvh flex-col">
         <MarketingSmoothScroll />
+        <MarketingRouteScroll />
         <SiteHeader />
         <div className="flex-1">{children}</div>
         <MarketingSiteFooter />

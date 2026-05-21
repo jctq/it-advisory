@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Script from 'next/script';
 import { Roboto, Roboto_Mono } from 'next/font/google';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { Toaster } from '@/components/ui/sonner';
@@ -60,12 +59,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-PH" suppressHydrationWarning>
+      <head>
+        {/* Native script avoids React 19 warning from next/script on client-heavy pages (e.g. blog). */}
+        <script src="/scripts/techmd-appearance-bootstrap.js" />
+      </head>
       <body className={`${sans.className} ${mono.variable} min-h-dvh antialiased`}>
-        <Script
-          id="techmd-appearance-bootstrap"
-          src="/scripts/techmd-appearance-bootstrap.js"
-          strategy="beforeInteractive"
-        />
         <QueryProvider>
           {children}
           <Toaster closeButton position="top-right" richColors />

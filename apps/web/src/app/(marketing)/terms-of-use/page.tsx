@@ -7,6 +7,6 @@ export const metadata: Metadata = {
   description: 'Terms governing use of the TechMD website and services.',
 };
 
-export default function TermsOfUsePage(): ReactElement {
+export default async function TermsOfUsePage(): Promise<ReactElement> {
   return <MarketingLegalPage documentId="terms-of-use" eyebrow="Legal" />;
 }

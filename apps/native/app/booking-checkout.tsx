@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { DiagnosticApiClient } from '@techmd/api-client/diagnostic-api-client';
 import {
   createPaymentCheckoutSession,
   fetchPaymentConfigPublic,
@@ -128,6 +129,16 @@ export default function BookingCheckoutScreen() {
     setIsPaying(true);
     setLoadError(null);
     try {
+      const diagnosticClient = new DiagnosticApiClient({
+        apiBaseUrl,
+        deviceId,
+        marketingSessionToken: sessionToken,
+      });
+      const quizPayload = await diagnosticClient.fetchQuizSession();
+      const quizSessionId = quizPayload.sessionId?.trim() ?? '';
+      if (quizSessionId.length === 0) {
+        throw new Error('Complete your diagnostic before booking.');
+      }
       const session = await createPaymentCheckoutSession({
         apiBaseUrl,
         appBaseUrl: apiBaseUrl,
@@ -143,6 +154,7 @@ export default function BookingCheckoutScreen() {
         customerEmail,
         customerPhone,
         customerCompany: customerCompany.length > 0 ? customerCompany : undefined,
+        quizSessionId,
         paymentMethodLabel: methodOption?.label,
       });
       if (session.manualConfirm || session.redirectUrl === null) {

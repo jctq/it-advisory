@@ -174,6 +174,9 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
     preferredQuizSessionId: transaction.quizSessionIdHex,
     paymentMethodLabel: transaction.paymentMethodLabel,
   });
+  if (created === 'quiz_session_not_accessible') {
+    return null;
+  }
   if (created === null || created === 'duplicate_key') {
     const retry = await findBookingByVisitorSlot({
       visitorId: transaction.visitorId,

@@ -7,6 +7,10 @@ import { CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { fetchPaymentTransactionStatus } from '@techmd/api-client/marketing-payment-api-client';
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import {
+  buildMarketingBookSessionPath,
+  isPlausibleMarketingQuizSessionRef,
+} from '@/lib/marketing/quiz-session-marketing-ref';
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLLS = 30;
@@ -25,7 +29,9 @@ export function PaymentReturnClient(): ReactElement {
   const searchParams = useSearchParams();
   const router = useRouter();
   const transactionId = searchParams.get('transactionId')?.trim() ?? '';
+  const sessionRef = searchParams.get('sessionRef')?.trim() ?? '';
   const isMock = searchParams.get('mock') === '1';
+  const hasValidSessionRef = isPlausibleMarketingQuizSessionRef(sessionRef);
   const [status, setStatus] = useState<ReturnStatus>('loading');
   const [paymentLabel, setPaymentLabel] = useState<string>('');
   const [pollGeneration, setPollGeneration] = useState(0);
@@ -34,6 +40,12 @@ export function PaymentReturnClient(): ReactElement {
     setPollGeneration((current) => current + 1);
   }, []);
   const displayStatus: ReturnStatus = transactionId.length === 0 ? 'failed' : status;
+  const bookCheckoutHref = hasValidSessionRef
+    ? buildMarketingBookSessionPath(sessionRef)
+    : '/book/manage';
+  const paidRedirectPath = hasValidSessionRef
+    ? `${buildMarketingBookSessionPath(sessionRef)}?payment=success&transactionId=${encodeURIComponent(transactionId)}`
+    : `/book/manage?payment=success&transactionId=${encodeURIComponent(transactionId)}`;
   useEffect(() => {
     if (transactionId.length === 0) {
       return;
@@ -55,7 +67,7 @@ export function PaymentReturnClient(): ReactElement {
         setPaymentLabel(result.paymentMethodLabel ?? result.gatewayId);
         if (result.status === 'paid' && result.bookingId !== null) {
           setStatus('paid');
-          router.replace(`/book?payment=success&transactionId=${encodeURIComponent(transactionId)}`);
+          router.replace(paidRedirectPath);
           return;
         }
         if (result.status === 'failed' || result.status === 'expired') {
@@ -79,7 +91,7 @@ export function PaymentReturnClient(): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [isMock, pollGeneration, router, transactionId]);
+  }, [isMock, paidRedirectPath, pollGeneration, router, transactionId]);
   if (displayStatus === 'loading') {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 text-center">
@@ -103,7 +115,7 @@ export function PaymentReturnClient(): ReactElement {
             Check again
           </Button>
           <Button asChild variant="outline">
-            <Link href="/book">Back to booking</Link>
+            <Link href={bookCheckoutHref}>Back to booking</Link>
           </Button>
         </div>
       </div>
@@ -118,7 +130,7 @@ export function PaymentReturnClient(): ReactElement {
           Your payment was not confirmed. You can return to checkout and try again.
         </p>
         <Button asChild className="mt-8">
-          <Link href="/book">Back to booking</Link>
+          <Link href={bookCheckoutHref}>Back to booking</Link>
         </Button>
       </div>
     );
@@ -131,7 +143,7 @@ export function PaymentReturnClient(): ReactElement {
         <p className="mt-2 text-sm text-muted-foreground">Paid via {paymentLabel}</p>
       ) : null}
       <Button asChild className="mt-8">
-        <Link href="/book">Continue</Link>
+        <Link href={bookCheckoutHref}>Continue</Link>
       </Button>
     </div>
   );

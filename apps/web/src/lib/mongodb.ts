@@ -1,13 +1,15 @@
 import { MongoClient, type Db } from 'mongodb';
 
-const uri = process.env.MONGODB_URI ?? '';
-
 const globalForMongo = globalThis as unknown as {
   _mongoClientPromise?: Promise<MongoClient>;
 };
 
+function getMongoUri(): string {
+  return process.env.MONGODB_URI?.trim() ?? '';
+}
+
 function createClientPromise(): Promise<MongoClient> {
-  const client = new MongoClient(uri, {
+  const client = new MongoClient(getMongoUri(), {
     maxPoolSize: Number(process.env.MONGODB_MAX_POOL_SIZE ?? 50),
     minPoolSize: Number(process.env.MONGODB_MIN_POOL_SIZE ?? 5),
     maxIdleTimeMS: Number(process.env.MONGODB_MAX_IDLE_TIME_MS ?? 60_000),
@@ -20,7 +22,7 @@ function createClientPromise(): Promise<MongoClient> {
  * Reuses one MongoClient per server process (Railway Node). Caches on globalThis in dev for HMR.
  */
 export function getMongoClientPromise(): Promise<MongoClient> {
-  if (!uri) {
+  if (getMongoUri().length === 0) {
     throw new Error('Missing MONGODB_URI');
   }
   if (!globalForMongo._mongoClientPromise) {

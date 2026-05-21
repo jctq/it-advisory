@@ -11,6 +11,7 @@ import {
   CircleUser,
   ClipboardList,
   FileStack,
+  FileText,
   LayoutDashboard,
   LifeBuoy,
   Settings,
@@ -49,6 +50,11 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     href: '/admin/diagnostic-templates',
     label: 'Templates',
     icon: FileStack,
+  },
+  {
+    href: '/admin/blog-posts',
+    label: 'Blog',
+    icon: FileText,
   },
   {
     href: '/admin/sessions',
