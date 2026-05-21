@@ -37,13 +37,14 @@ type AdminBlogMdxEditorInnerProps = {
 };
 
 export function AdminBlogMdxEditorInner(props: AdminBlogMdxEditorInnerProps): ReactElement {
+  const { markdown, onMarkdownChange } = props;
   const overlayHostRef = useRef<HTMLDivElement | null>(null);
   const [overlayHost, setOverlayHost] = useState<HTMLDivElement | null>(null);
   const executeMarkdownChange = useCallback(
-    (markdown: string): void => {
-      props.onMarkdownChange(normalizeBlogContentMarkdown(markdown));
+    (nextMarkdown: string): void => {
+      onMarkdownChange(normalizeBlogContentMarkdown(nextMarkdown));
     },
-    [props.onMarkdownChange],
+    [onMarkdownChange],
   );
   const executeImageUpload = useCallback(async (file: File): Promise<string> => {
     try {
@@ -72,7 +73,7 @@ export function AdminBlogMdxEditorInner(props: AdminBlogMdxEditorInnerProps): Re
         <MDXEditor
           className="admin-blog-mdx-editor dark-theme flex size-full min-h-0 flex-col overflow-hidden"
           overlayContainer={overlayHost}
-          markdown={normalizeBlogContentMarkdown(props.markdown)}
+          markdown={normalizeBlogContentMarkdown(markdown)}
           onChange={executeMarkdownChange}
           toMarkdownOptions={blogPostEditorToMarkdownOptions}
           contentEditableClassName="admin-blog-mdx-editor-content min-h-0 flex-1 px-4 py-3 text-foreground focus:outline-none [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:text-foreground [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-foreground [&_li]:text-foreground [&_p]:my-2 [&_p]:text-foreground [&_p+p]:mt-4 [&_a]:text-primary [&_strong]:text-foreground"
