@@ -84,6 +84,9 @@ function mergeDocument(doc: AppSettingsDocument | null): AppSettingsValues {
  * Loads persisted admin settings or defaults (including dev-only cache-debug default when no row exists).
  */
 export async function getAppSettings(): Promise<AppSettingsValues> {
+  if (!process.env.MONGODB_URI) {
+    return defaultSettings();
+  }
   const db = await getDb();
   const doc = await db
     .collection<AppSettingsDocument>(COLLECTIONS.appSettings)
@@ -92,6 +95,9 @@ export async function getAppSettings(): Promise<AppSettingsValues> {
 }
 
 export async function updateAppSettings(patch: Partial<AppSettingsValues>): Promise<AppSettingsValues> {
+  if (!process.env.MONGODB_URI) {
+    throw new Error('MongoDB is not configured. Set MONGODB_URI to save app settings.');
+  }
   const current = await getAppSettings();
   const next: AppSettingsValues = {
     diagnosticAiEnabled:
