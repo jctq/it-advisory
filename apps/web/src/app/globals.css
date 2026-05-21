@@ -752,6 +752,24 @@
   .marketing-service-panel-glow {
     background: radial-gradient(ellipse 80% 60% at 100% 0%, color-mix(in oklch, var(--primary) 16%, transparent), transparent 65%);
   }
+  .marketing-section-art-layer {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0.5;
+    mask-image: linear-gradient(105deg, transparent 8%, black 42%, black 88%, transparent 100%);
+  }
+  .marketing-band-dark .marketing-section-art-layer {
+    opacity: 0.38;
+    mask-image: linear-gradient(115deg, transparent 5%, black 38%, black 92%, transparent 100%);
+  }
+  .marketing-section-art-fade-bottom {
+    mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 100%);
+  }
+  .marketing-section-art .marketing-section-art-grid {
+    stroke: var(--marketing-hero-grid-line);
+  }
   .marketing-scroll-cue {
     @apply inline-flex w-10 flex-col items-center gap-2.5 text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground;
   }

@@ -3,8 +3,18 @@
 import { ArrowRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState, type ReactElement } from 'react';
+import {
+  MarketingSectionArt,
+  type MarketingSectionArtVariant,
+} from '@/components/marketing/marketing-section-art';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+const SERVICE_ART_BY_ID: Readonly<Record<string, MarketingSectionArtVariant>> = {
+  rescue: 'services-rescue',
+  vendor: 'services-vendor',
+  automation: 'services-automation',
+};
 
 export type MarketingServiceTabItem = {
   readonly id: string;
@@ -78,6 +88,12 @@ export function MarketingServiceTabs(props: MarketingServiceTabsProps): ReactEle
         className="marketing-card-elevated relative overflow-hidden rounded-3xl border border-border/70 p-8 md:p-10"
       >
         <div className="marketing-service-panel-glow pointer-events-none absolute inset-0" aria-hidden />
+        <div className="marketing-section-art-layer" aria-hidden>
+          <MarketingSectionArt
+            variant={SERVICE_ART_BY_ID[activeItem.id] ?? 'services-rescue'}
+            className="absolute -right-4 top-0 h-[min(100%,22rem)] w-[min(85%,20rem)] translate-y-2"
+          />
+        </div>
         <div className="relative space-y-6">
           <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <ActiveIcon className="size-7" aria-hidden />

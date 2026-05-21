@@ -24,6 +24,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { MarketingHeroBackground } from '@/components/marketing/marketing-hero-background';
+import { MarketingSectionArt } from '@/components/marketing/marketing-section-art';
 import { useMarketingHeroInteraction } from '@/components/marketing/use-marketing-hero-interaction';
 import { MarketingParallaxSection } from '@/components/marketing/marketing-parallax-section';
 import { MarketingSectionHeader } from '@/components/marketing/marketing-section-header';
@@ -348,14 +349,20 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         className="scroll-mt-24 border-b border-border/80 px-6 py-16 md:py-20"
         speed={0.07}
       >
-        <div className="mx-auto max-w-6xl">
+        <div className="relative mx-auto max-w-6xl overflow-hidden">
+          <div
+            className="marketing-section-art-layer pointer-events-none absolute -right-8 top-8 hidden h-56 w-72 md:block lg:h-64 lg:w-80"
+            aria-hidden
+          >
+            <MarketingSectionArt variant="metrics" />
+          </div>
           <MarketingSectionHeader
             eyebrow="At a glance"
             title="Built for decisions, not decks."
             description="Pragmatic metrics from how teams use TechMD — fast routing, neutral advice, and focused on-demand sessions."
             align="center"
           />
-          <ul className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="relative mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {STATS.map((stat) => (
               <li
                 key={stat.label}
@@ -371,8 +378,14 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           </ul>
         </div>
       </MarketingParallaxSection>
-      <section className="marketing-band-dark scroll-mt-24 border-y border-marketing-band-border px-6 py-16 md:py-24">
-        <div className="mx-auto max-w-6xl">
+      <section className="marketing-band-dark relative scroll-mt-24 overflow-hidden border-y border-marketing-band-border px-6 py-16 md:py-24">
+        <div
+          className="marketing-section-art-layer pointer-events-none absolute -left-6 bottom-0 hidden h-48 w-64 md:block lg:h-56 lg:w-72"
+          aria-hidden
+        >
+          <MarketingSectionArt variant="spotlight" />
+        </div>
+        <div className="relative mx-auto max-w-6xl">
           <MarketingSectionHeader
             eyebrow="Why teams start here"
             title="Clarity before commitment."
@@ -405,7 +418,13 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             title="How we work"
             description="Pain-first, guided, fast — three beats: diagnose your situation, see a tailored recommendation, book a focused consultation."
           />
-          <ol className="grid gap-5 md:grid-cols-3 md:gap-6">
+          <ol className="relative grid gap-5 md:grid-cols-3 md:gap-6">
+            <div
+              className="marketing-section-art-layer marketing-section-art-fade-bottom pointer-events-none absolute inset-x-0 -top-4 hidden h-40 md:block"
+              aria-hidden
+            >
+              <MarketingSectionArt variant="process" className="mx-auto max-w-3xl opacity-80" />
+            </div>
             {[
               { step: '01', title: 'Answer focused prompts', body: 'Tap options that match reality — minimal typing.' },
               { step: '02', title: 'See your recommendation', body: 'Know which session fits before you invest time.' },
@@ -413,7 +432,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             ].map((item) => (
               <li
                 key={item.step}
-                className="marketing-card-elevated relative overflow-hidden rounded-2xl border border-border/80 p-6 md:p-8"
+                className="marketing-card-elevated relative z-1 overflow-hidden rounded-2xl border border-border/80 p-6 md:p-8"
               >
                 <p
                   className="pointer-events-none absolute -right-2 -top-4 select-none text-[5.5rem] font-semibold leading-none tracking-tighter text-primary/10 md:text-[6.5rem]"
@@ -481,17 +500,26 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             onStartDiagnostic={() => void navigateToNewQuiz()}
           />
           <div className="grid gap-6 lg:grid-cols-2">
-            {ENGAGEMENT_MODELS.map((model) => (
+            {ENGAGEMENT_MODELS.map((model, index) => (
               <div
                 key={model.title}
-                className="marketing-card-elevated flex flex-col rounded-3xl border border-border/70 p-8 md:p-10"
+                className="marketing-card-elevated relative flex flex-col overflow-hidden rounded-3xl border border-border/70 p-8 md:p-10"
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{model.eyebrow}</p>
-                <h3 className="mt-3 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">{model.title}</h3>
-                <p className="mt-4 flex-1 text-sm leading-relaxed text-muted-foreground md:text-base">{model.body}</p>
+                <div className="marketing-section-art-layer" aria-hidden>
+                  <MarketingSectionArt
+                    variant="engagement"
+                    className={cn(
+                      'absolute h-44 w-56',
+                      index === 0 ? '-right-6 top-0' : '-left-4 bottom-0 rotate-180',
+                    )}
+                  />
+                </div>
+                <p className="relative text-xs font-semibold uppercase tracking-[0.2em] text-primary">{model.eyebrow}</p>
+                <h3 className="relative mt-3 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">{model.title}</h3>
+                <p className="relative mt-4 flex-1 text-sm leading-relaxed text-muted-foreground md:text-base">{model.body}</p>
                 <Button
                   type="button"
-                  className="mt-8 w-fit min-h-11 gap-2"
+                  className="relative mt-8 w-fit min-h-11 gap-2"
                   disabled={isNavigating}
                   onClick={() => void navigateToNewQuiz()}
                 >
@@ -566,7 +594,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               </Button>
             </div>
             <div className="marketing-card-elevated relative overflow-hidden rounded-3xl border border-border/80 p-8 md:p-10">
-              <div className="absolute -right-8 -top-8 size-40 rounded-full bg-primary/10 blur-2xl" aria-hidden />
+              <div className="marketing-section-art-layer" aria-hidden>
+                <MarketingSectionArt variant="story" className="absolute -right-6 -top-4 h-52 w-72 md:h-60 md:w-80" />
+              </div>
               <div className="relative flex items-start gap-4">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <Compass className="size-6" aria-hidden />
@@ -613,6 +643,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               className="pointer-events-none absolute inset-0 opacity-40 marketing-service-panel-glow"
               aria-hidden
             />
+            <div className="marketing-section-art-layer" aria-hidden>
+              <MarketingSectionArt variant="resources" className="absolute -right-4 top-2 h-48 w-64 md:h-56 md:w-72" />
+            </div>
             <div className="relative flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
               <div className="max-w-xl space-y-3">
                 <p className="marketing-section-eyebrow">Start a project</p>
@@ -637,14 +670,20 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             </div>
           </div>
           <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-            <div className="marketing-card-elevated rounded-3xl border border-border/80 p-8 md:p-10">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Before your session</p>
-              <h3 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">Come prepared, leave with decisions.</h3>
-              <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:text-base">
+            <div className="marketing-card-elevated relative overflow-hidden rounded-3xl border border-border/80 p-8 md:p-10">
+              <div
+                className="marketing-section-art-layer pointer-events-none absolute -right-4 bottom-0 hidden h-40 w-56 sm:block"
+                aria-hidden
+              >
+                <MarketingSectionArt variant="resources" />
+              </div>
+              <p className="relative text-xs font-semibold uppercase tracking-[0.2em] text-primary">Before your session</p>
+              <h3 className="relative mt-3 text-2xl font-semibold tracking-tight text-foreground">Come prepared, leave with decisions.</h3>
+              <p className="relative mt-4 text-sm leading-relaxed text-muted-foreground md:text-base">
                 Focused calls work best when the room shares context. These three beats are enough — you do not need a
                 full requirements document.
               </p>
-              <ol className="mt-8 space-y-6">
+              <ol className="relative mt-8 space-y-6">
                 {RESOURCE_PREP_ITEMS.map((item, index) => (
                   <li key={item.title} className="flex gap-4">
                     <span
