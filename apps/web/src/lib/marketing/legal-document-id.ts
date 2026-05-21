@@ -10,4 +10,4 @@ export const LEGAL_DOCUMENT_PATHS: Readonly<Record<LegalDocumentId, string>> = {
   'terms-of-use': '/terms-of-use',
 } as const;
 
-export const LEGAL_LAST_UPDATED = 'May 21, 2026';
+export const LEGAL_LAST_UPDATED = 'May 22, 2026';

@@ -64,6 +64,32 @@ export function DefaultPrivacyPolicyContent(): ReactElement {
         </p>
       </section>
       <section className="space-y-3">
+        <h2>Cookies and similar technologies</h2>
+        <p>
+          We use cookies and browser storage to operate TechMD. When you first visit, you can choose required cookies
+          only or also allow analytics. You can change your choice anytime using <strong className="text-foreground">Cookie preferences</strong> in
+          the site footer.
+        </p>
+        <ul>
+          <li>
+            <strong className="text-foreground">Required</strong> — HTTP-only cookies such as{' '}
+            <code className="rounded bg-muted px-1 font-mono text-xs">it_visitor_id</code> (anonymous diagnostic
+            progress) and <code className="rounded bg-muted px-1 font-mono text-xs">it_auth_session</code> (signed-in
+            accounts), plus local storage for appearance preferences. These are needed for core functionality.
+          </li>
+          <li>
+            <strong className="text-foreground">Analytics (optional)</strong> — If you opt in, Google Analytics (Google
+            LLC) receives usage data such as pages viewed and general traffic patterns. We configure analytics with IP
+            anonymization and without ad personalization signals from TechMD. Analytics cookies are not set until you
+            accept them.
+          </li>
+          <li>
+            <strong className="text-foreground">Payment pages</strong> — When you pay online, our payment partners may
+            set their own cookies on their domains subject to their policies.
+          </li>
+        </ul>
+      </section>
+      <section className="space-y-3">
         <h2>Sharing and processors</h2>
         <p>
           We do not sell your personal information. We share data only with service providers that help us operate the

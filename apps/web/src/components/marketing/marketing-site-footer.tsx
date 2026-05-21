@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactElement } from 'react';
+import { MarketingCookiePreferencesLink } from '@/components/marketing/cookie-consent/marketing-cookie-preferences-link';
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
 import { LEGAL_DOCUMENT_PATHS } from '@/lib/marketing/legal-document-id';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
@@ -87,6 +88,7 @@ export async function MarketingSiteFooter(): Promise<ReactElement> {
               >
                 Terms of Use
               </Link>
+              <MarketingCookiePreferencesLink className="text-muted-foreground transition-colors hover:text-foreground" />
             </nav>
             <p className="text-muted-foreground/90">
               Pain-first guidance · Guided steps · Vendor-neutral recommendations
