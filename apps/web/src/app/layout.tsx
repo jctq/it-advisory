@@ -4,7 +4,7 @@ import { Roboto, Roboto_Mono } from 'next/font/google';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { brandAssetUrl } from '@/lib/brand/brand-assets';
-import { resolveConfiguredAppOrigin } from '@/lib/config/app-origin';
+import { buildRootLayoutMetadata, resolveMetadataBase } from '@/lib/seo/site-seo';
 import './globals.css';
 
 const sans = Roboto({
@@ -20,19 +20,9 @@ const mono = Roboto_Mono({
   display: 'swap',
 });
 
-function resolveMetadataBase(): URL | undefined {
-  const configuredOrigin = resolveConfiguredAppOrigin();
-  if (configuredOrigin === null) {
-    return undefined;
-  }
-  return new URL(configuredOrigin);
-}
-
 export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
-  title: 'TechMD — Technology Consultation',
-  description:
-    'Technology consultation. Better decisions. Stronger business. Guided diagnostics and expert sessions.',
+  ...buildRootLayoutMetadata(),
   icons: {
     icon: [
       {

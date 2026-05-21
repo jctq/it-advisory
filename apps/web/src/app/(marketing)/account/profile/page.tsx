@@ -5,10 +5,12 @@ import { AccountProfileForm } from '@/components/marketing/account-profile-form'
 import { findUserById } from '@/lib/data/users';
 import { parseNationalDigitsFromStoredPhone } from '@/lib/marketing/philippine-profile-phone';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
+import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
-export const metadata = {
+export const metadata = buildNoIndexMetadata({
   title: 'Profile — TechMD',
-};
+  description: 'Manage your TechMD account profile.',
+});
 
 export const dynamic = 'force-dynamic';
 

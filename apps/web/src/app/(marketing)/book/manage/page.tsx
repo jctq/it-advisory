@@ -1,15 +1,15 @@
-import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Suspense } from 'react';
 import { GuestBookingManageFlow } from '@/components/marketing/guest-booking-manage-flow';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { BookRouteLoadingFallback } from '../book-route-loading-fallback';
+import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
-export const metadata: Metadata = {
+export const metadata = buildNoIndexMetadata({
   title: 'Manage your booking · TechMD',
   description: 'Look up your booking reference to check status or complete payment.',
-};
+});
 
 export default async function BookManagePage(): Promise<ReactNode> {
   if (!(await readManageBookingEnabled())) {

@@ -1,10 +1,10 @@
-import type { Metadata } from 'next';
 import { ConfirmationFlow } from './confirmation-flow';
+import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
-export const metadata: Metadata = {
+export const metadata = buildNoIndexMetadata({
   title: 'Booking confirmed · TechMD',
   description: 'Your consultation slot is reserved.',
-};
+});
 
 type ConfirmationPageProps = {
   readonly searchParams?: Promise<{ readonly date?: string; readonly time?: string; readonly sessionId?: string }>;

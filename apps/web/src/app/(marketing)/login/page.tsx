@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { MarketingAuthLegalNotice } from '@/components/marketing/legal/marketing-auth-legal-notice';
+import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 import { PrivacyPolicyContent } from '@/components/marketing/legal/privacy-policy-content';
 import { TermsOfUseContent } from '@/components/marketing/legal/terms-of-use-content';
 import { LoginForm } from '@/components/marketing/login-form';
@@ -8,6 +9,11 @@ import { resolveSafeInternalNextPath } from '@/lib/marketing/safe-internal-path'
 type LoginPageProps = {
   readonly searchParams: Promise<{ readonly next?: string }>;
 };
+
+export const metadata = buildNoIndexMetadata({
+  title: 'Sign in · TechMD',
+  description: 'Sign in to save diagnostic progress across browsers.',
+});
 
 export default async function LoginPage(props: LoginPageProps): Promise<ReactElement> {
   const searchParams = await props.searchParams;

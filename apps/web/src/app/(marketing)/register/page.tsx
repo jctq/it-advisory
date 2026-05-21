@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { MarketingAuthLegalNotice } from '@/components/marketing/legal/marketing-auth-legal-notice';
+import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 import { PrivacyPolicyContent } from '@/components/marketing/legal/privacy-policy-content';
 import { TermsOfUseContent } from '@/components/marketing/legal/terms-of-use-content';
 import { RegisterForm } from '@/components/marketing/register-form';
@@ -8,6 +9,11 @@ import { resolveSafeInternalNextPath } from '@/lib/marketing/safe-internal-path'
 type RegisterPageProps = {
   readonly searchParams: Promise<{ readonly next?: string }>;
 };
+
+export const metadata = buildNoIndexMetadata({
+  title: 'Create an account · TechMD',
+  description: 'Register to tie your diagnostic history to your email.',
+});
 
 export default async function RegisterPage(props: RegisterPageProps): Promise<ReactElement> {
   const searchParams = await props.searchParams;

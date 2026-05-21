@@ -4,10 +4,12 @@ import { redirect } from 'next/navigation';
 import { AccountDiagnosticsPanel } from '@/components/marketing/account-diagnostics-panel';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
+import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
-export const metadata = {
+export const metadata = buildNoIndexMetadata({
   title: 'My diagnostics — TechMD',
-};
+  description: 'View your saved TechMD diagnostic sessions.',
+});
 
 export const dynamic = 'force-dynamic';
 

@@ -1,11 +1,12 @@
 import { format } from 'date-fns';
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { MarketingBlogProse } from '@/components/marketing/blog/marketing-blog-prose';
+import { extractBlogPostCoverImageUrl } from '@/lib/blog-post-cover-image';
 import { getBlogPostDisplayTitle, getBlogPostSummary } from '@/lib/blog-post-types';
 import { findPublishedBlogPostBySlug } from '@/lib/data/blog-posts';
+import { buildMarketingMetadata } from '@/lib/seo/site-seo';
 import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -14,17 +15,24 @@ type BlogArticlePageProps = {
   readonly params: Promise<{ readonly slug: string }>;
 };
 
-export async function generateMetadata(props: BlogArticlePageProps): Promise<Metadata> {
+export async function generateMetadata(props: BlogArticlePageProps) {
   const { slug } = await props.params;
   const post = await findPublishedBlogPostBySlug(slug);
   if (post === null) {
-    return { title: 'Article not found — TechMD' };
+    return buildMarketingMetadata({
+      title: 'Article not found — TechMD',
+      description: 'This article could not be found.',
+      pathname: `/blog/${slug}`,
+    });
   }
   const title = getBlogPostDisplayTitle(post);
-  return {
+  return buildMarketingMetadata({
     title: `${title} — TechMD Blog`,
     description: getBlogPostSummary(post),
-  };
+    pathname: `/blog/${slug}`,
+    openGraphType: 'article',
+    openGraphImageUrl: extractBlogPostCoverImageUrl(post.contentMarkdown),
+  });
 }
 
 export default async function BlogArticlePage(props: BlogArticlePageProps): Promise<ReactElement> {

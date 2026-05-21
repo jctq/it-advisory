@@ -1,13 +1,13 @@
-import type { Metadata } from 'next';
 import { Suspense, type ReactElement } from 'react';
 import { QuizFlow } from '../quiz-flow';
 import { QuizRouteLoadingFallback } from '../quiz-route-loading-fallback';
+import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
-export const metadata: Metadata = {
+export const metadata = buildNoIndexMetadata({
   title: 'Guided diagnostic · TechMD',
   description:
     'Describe your situation, answer short guided intake questions, then finish the diagnostic for a tailored recommendation.',
-};
+});
 
 type QuizSessionRefPageProps = {
   readonly params: Promise<{ readonly sessionRef: string }>;

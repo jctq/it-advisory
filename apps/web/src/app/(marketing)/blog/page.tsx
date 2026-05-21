@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { MarketingBlogIndex } from '@/components/marketing/blog/marketing-blog-index';
@@ -8,6 +7,7 @@ import {
   buildBlogListPageHref,
   parseBlogListPageParam,
 } from '@/lib/marketing/blog-list-pagination';
+import { buildMarketingMetadata } from '@/lib/seo/site-seo';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,19 +15,18 @@ type BlogIndexPageProps = {
   readonly searchParams: Promise<{ readonly page?: string | string[] }>;
 };
 
-export async function generateMetadata(props: BlogIndexPageProps): Promise<Metadata> {
+const BLOG_INDEX_DESCRIPTION = 'Technology guidance articles for growing teams in the Philippines.';
+
+export async function generateMetadata(props: BlogIndexPageProps) {
   const { page: pageParam } = await props.searchParams;
   const page = parseBlogListPageParam(pageParam);
-  if (page <= 1) {
-    return {
-      title: 'Blog — TechMD',
-      description: 'Technology guidance articles for growing teams in the Philippines.',
-    };
-  }
-  return {
-    title: `Blog — Page ${page} — TechMD`,
-    description: 'Technology guidance articles for growing teams in the Philippines.',
-  };
+  const pathname = page <= 1 ? '/blog' : buildBlogListPageHref(page);
+  const title = page <= 1 ? 'Blog — TechMD' : `Blog — Page ${page} — TechMD`;
+  return buildMarketingMetadata({
+    title,
+    description: BLOG_INDEX_DESCRIPTION,
+    pathname,
+  });
 }
 
 export default async function BlogIndexPage(props: BlogIndexPageProps): Promise<ReactElement> {
