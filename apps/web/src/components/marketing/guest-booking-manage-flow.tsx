@@ -97,8 +97,10 @@ export function GuestBookingManageFlow(): ReactElement {
     }
     const fromQuery = searchParams.get('bookingReference')?.trim();
     if (fromQuery !== undefined && fromQuery.length > 0) {
-      setBookingReference(fromQuery);
       hasAppliedBookingReferenceQueryRef.current = true;
+      queueMicrotask(() => {
+        setBookingReference(fromQuery);
+      });
     }
   }, [searchParams]);
   useEffect(() => {
@@ -110,7 +112,9 @@ export function GuestBookingManageFlow(): ReactElement {
       return;
     }
     hasAttemptedAccountBookingBootstrapRef.current = true;
-    setIsAccountBootstrapLoading(true);
+    queueMicrotask(() => {
+      setIsAccountBootstrapLoading(true);
+    });
     void lookupAccountManagedBooking({
       apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
       bookingId: bookingIdFromQuery,

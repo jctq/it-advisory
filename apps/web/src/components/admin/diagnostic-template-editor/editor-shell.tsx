@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useState, type ReactElement } from 'react';
+import { useCallback, useState, type ReactElement } from 'react';
 import { DiagnosticTemplatesManager } from '@/components/admin/diagnostic-templates-manager';
 import { TemplateWorkspace } from '@/components/admin/diagnostic-template-editor/template-workspace';
 import {
@@ -40,17 +40,13 @@ function EditorShellContent(props: EditorShellContentProps): ReactElement {
   const { isFullscreen, exitFullscreen } = useWorkspaceFullscreen();
   useTemplateEditorKeyboard();
   useWorkspaceFullscreenEscape();
-  const [editorView, setEditorView] = useState<DiagnosticTemplateEditorView>(props.initialEditorView);
-  useLayoutEffect(() => {
+  const [editorView, setEditorView] = useState<DiagnosticTemplateEditorView>(() => {
     const storedView = readPersistedEditorView();
-    setEditorView((current) => {
-      if (current === storedView) {
-        return current;
-      }
+    if (storedView !== props.initialEditorView) {
       writePersistedEditorView(storedView);
-      return storedView;
-    });
-  }, []);
+    }
+    return storedView;
+  });
   const executeSetView = useCallback((view: DiagnosticTemplateEditorView): void => {
     if (view === 'classic') {
       exitFullscreen();

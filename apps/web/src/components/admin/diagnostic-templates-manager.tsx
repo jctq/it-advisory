@@ -220,7 +220,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
     if (isControlled && props.controlledTemplate !== undefined) {
       setSelectedTemplateId(props.controlledTemplate.id);
     }
-  }, [isControlled, props.controlledTemplate?.id]);
+  }, [isControlled, props.controlledTemplate]);
   const [savedTemplatePatchById, setSavedTemplatePatchById] = useState<Readonly<Record<string, string>>>(() => {
     const initial: Record<string, string> = {};
     for (const template of props.initialTemplates) {

@@ -25,10 +25,13 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-export type MarketingHeroInteraction = {
+export type MarketingHeroInteractionState = {
   readonly isBoosted: boolean;
   readonly isInView: boolean;
   readonly rootStyle: CSSProperties;
+};
+
+export type MarketingHeroInteraction = MarketingHeroInteractionState & {
   readonly sectionRef: (node: HTMLElement | null) => void;
 };
 
@@ -93,8 +96,10 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   }, [pointerX, pointerY, executeDecayBoost]);
   useEffect(() => {
     if (!isParallaxEnabled) {
-      executeResetParallax();
-      setIsInView(false);
+      queueMicrotask(() => {
+        executeResetParallax();
+        setIsInView(false);
+      });
       return;
     }
     if (sectionElement === null) {
@@ -113,7 +118,9 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   }, [isParallaxEnabled, sectionElement, executeResetParallax]);
   useEffect(() => {
     if (!isParallaxEnabled || !isInView) {
-      executeResetParallax();
+      queueMicrotask(() => {
+        executeResetParallax();
+      });
       return;
     }
     const executeOnPointerMove = (event: PointerEvent): void => {

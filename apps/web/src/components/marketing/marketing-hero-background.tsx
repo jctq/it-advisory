@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useRef, type ReactElement } from 'react';
-import type { MarketingHeroInteraction } from '@/components/marketing/use-marketing-hero-interaction';
+import type { MarketingHeroInteractionState } from '@/components/marketing/use-marketing-hero-interaction';
 import { useHeroSvgFlow } from '@/components/marketing/use-hero-svg-flow';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,7 @@ const HERO_GRID_HORIZONTAL_YS = [140, 200, 260, 320, 380, 440, 500, 560, 620] as
 const HERO_GRID_VERTICAL_XS = [80, 160, 240, 320, 400, 480, 560, 640, 720, 800, 880, 960, 1040, 1120, 1200, 1280, 1360] as const;
 
 type MarketingHeroBackgroundProps = {
-  readonly interaction: MarketingHeroInteraction;
+  readonly interaction: MarketingHeroInteractionState;
 };
 
 /**

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
+import { LEGAL_DOCUMENT_PATHS } from '@/lib/marketing/legal-document-id';
 
 const FOOTER_LINK_GROUPS: readonly {
   readonly title: string;
@@ -64,11 +65,27 @@ export function MarketingSiteFooter(): ReactElement {
             </div>
           ))}
         </div>
-        <div className="mt-12 flex flex-col gap-2 border-t border-border/80 pt-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 flex flex-col gap-3 border-t border-border/80 pt-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} TechMD. Philippines · Asia/Manila.</p>
-          <p className="text-muted-foreground/90">
-            Pain-first guidance · Guided steps · Vendor-neutral recommendations
-          </p>
+          <div className="flex flex-col gap-2 sm:items-end">
+            <nav aria-label="Legal" className="flex flex-wrap gap-x-4 gap-y-1">
+              <Link
+                href={LEGAL_DOCUMENT_PATHS['privacy-policy']}
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                href={LEGAL_DOCUMENT_PATHS['terms-of-use']}
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Terms of Use
+              </Link>
+            </nav>
+            <p className="text-muted-foreground/90">
+              Pain-first guidance · Guided steps · Vendor-neutral recommendations
+            </p>
+          </div>
         </div>
       </div>
     </footer>

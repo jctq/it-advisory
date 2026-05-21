@@ -41,11 +41,21 @@ export type MarketingParallaxSectionProps = {
  * Optional `background` renders behind content with a stronger shift for depth (hero use).
  */
 export function MarketingParallaxSection(props: MarketingParallaxSectionProps): ReactElement {
-  const speed = props.speed ?? 0.12;
-  const backgroundSpeed = props.backgroundSpeed ?? speed * 1.7;
-  const hasBackground = props.background !== undefined;
+  const {
+    children,
+    className,
+    contentClassName,
+    id,
+    ref: forwardedRef,
+    speed: speedProp,
+    background,
+    backgroundSpeed: backgroundSpeedProp,
+  } = props;
+  const speed = speedProp ?? 0.12;
+  const backgroundSpeed = backgroundSpeedProp ?? speed * 1.7;
+  const hasBackground = background !== undefined;
   const internalSectionRef = useRef<HTMLElement>(null);
-  const sectionRef = mergeRefs(props.ref, internalSectionRef);
+  const sectionRef = mergeRefs(forwardedRef, internalSectionRef);
   const [contentOffset, setContentOffset] = useState(0);
   const [backgroundOffset, setBackgroundOffset] = useState(0);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -91,8 +101,8 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
   return (
     <section
       ref={sectionRef as Ref<HTMLElement>}
-      className={cn('relative', hasBackground && 'isolate', props.className)}
-      id={props.id}
+      className={cn('relative', hasBackground && 'isolate', className)}
+      id={id}
     >
       {hasBackground ? (
         <div
@@ -103,17 +113,17 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
           }}
           aria-hidden
         >
-          {props.background}
+          {background}
         </div>
       ) : null}
       <div
-        className={cn('relative z-10', props.contentClassName)}
+        className={cn('relative z-10', contentClassName)}
         style={{
           transform: contentTransform,
           willChange: contentTransform === undefined ? undefined : 'transform',
         }}
       >
-        {props.children}
+        {children}
       </div>
     </section>
   );

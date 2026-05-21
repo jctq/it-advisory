@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
   buildTemplatePatchBody,
   updateTemplateWithReindex,
@@ -75,11 +75,15 @@ type TemplateEditorProviderProps = {
 export function TemplateEditorProvider(props: TemplateEditorProviderProps): ReactElement {
   const [template, setTemplate] = useState<DiagnosticTemplateValue>(props.initialTemplate);
   const templateRef = useRef<DiagnosticTemplateValue>(template);
-  templateRef.current = template;
   const [savedPatchBody, setSavedPatchBody] = useState<string>(() => buildTemplatePatchBody(props.initialTemplate));
   const [history, setHistory] = useState<TemplateEditorHistoryState>(() => createEmptyTemplateHistoryState());
   const historyRef = useRef<TemplateEditorHistoryState>(history);
-  historyRef.current = history;
+  useEffect(() => {
+    templateRef.current = template;
+  }, [template]);
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
   const [layoutRevision, setLayoutRevision] = useState<number>(0);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [selection, setSelection] = useState<TemplateEditorSelection>(null);

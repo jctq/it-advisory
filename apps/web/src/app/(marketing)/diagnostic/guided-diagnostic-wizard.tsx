@@ -839,11 +839,15 @@ function RankedOptionsRoundRenderer(props: {
   readonly sessionReadOnly?: boolean;
 }): ReactElement {
   const sessionReadOnly = props.sessionReadOnly === true;
-  const visibleOptions = getVisibleQuestionOptions({
-    baseAnswers: props.baseAnswers,
-    question: props.question,
-    selection: props.selection,
-  });
+  const visibleOptions = useMemo(
+    () =>
+      getVisibleQuestionOptions({
+        baseAnswers: props.baseAnswers,
+        question: props.question,
+        selection: props.selection,
+      }),
+    [props.baseAnswers, props.question, props.selection],
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },

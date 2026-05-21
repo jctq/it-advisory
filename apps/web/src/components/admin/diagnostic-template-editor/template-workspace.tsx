@@ -320,7 +320,6 @@ function TemplateWorkspaceCanvas(): ReactElement {
     [
       captureLayoutBeforeInteraction,
       onNodesChange,
-      persistLayout,
       pushEditorHistorySnapshot,
       readCapturedLayoutBeforeInteraction,
       refreshWorkspaceLayout,
@@ -539,7 +538,7 @@ function TemplateWorkspaceCanvas(): ReactElement {
         };
       });
     },
-    [nodes, persistLayout, readCapturedLayoutBeforeInteraction, updateTemplate],
+    [nodes, readCapturedLayoutBeforeInteraction, setNodes, updateTemplate],
   );
   const selectedNodeId = useMemo(
     () => resolveSelectedNodeId(selection, template),
@@ -566,7 +565,10 @@ function TemplateWorkspaceCanvas(): ReactElement {
         setSelection(null);
         return;
       }
-      const primaryNode = selectedNodes[selectedNodes.length - 1];
+      const primaryNode = selectedNodes.at(-1);
+      if (primaryNode === undefined) {
+        return;
+      }
       setSelection(selectionFromNodeId(primaryNode.id, template));
     },
     [setSelection, template],
