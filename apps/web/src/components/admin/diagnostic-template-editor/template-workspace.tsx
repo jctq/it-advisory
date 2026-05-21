@@ -359,6 +359,33 @@ function TemplateWorkspaceCanvas(): ReactElement {
     layoutBeforeInteractionRef.current = null;
     return captured;
   }, []);
+  const resolveSnappedNodePosition = useCallback(
+    (
+      node: Node<WorkspaceNodeData>,
+      position: { readonly x: number; readonly y: number },
+    ): {
+      readonly position: { readonly x: number; readonly y: number };
+      readonly guides: SnapGuideLines | null;
+    } => {
+      if (!snapSettings.gridSnap && !snapSettings.alignmentSnap) {
+        return { position, guides: null };
+      }
+      const snapResult = snapWorkspaceNodePosition({
+        node,
+        position,
+        nodes,
+        enableGridSnap: snapSettings.gridSnap,
+        enableAlignmentSnap: snapSettings.alignmentSnap,
+        gridSize: WORKSPACE_SNAP_GRID_SIZE,
+      });
+      const nextPosition =
+        node.parentId === undefined
+          ? snapResult.position
+          : clampRoundChildPosition(snapResult.position);
+      return { position: nextPosition, guides: snapResult.guides };
+    },
+    [nodes, snapSettings.alignmentSnap, snapSettings.gridSnap],
+  );
   const handleNodesChange = useCallback(
     (changes: NodeChange<Node<WorkspaceNodeData>>[]) => {
       const removalChanges = changes.filter(
@@ -418,7 +445,27 @@ function TemplateWorkspaceCanvas(): ReactElement {
         }
       }
       if (nonRemovalChanges.length > 0) {
-        onNodesChange(nonRemovalChanges);
+        const snappedNonRemovalChanges = nonRemovalChanges.map((change) => {
+          if (change.type !== 'position' || change.position === undefined) {
+            return change;
+          }
+          if (draggingNodeId === null || change.id !== draggingNodeId) {
+            return change;
+          }
+          const existingNode = nodes.find((candidate) => candidate.id === change.id);
+          if (existingNode === undefined) {
+            return change;
+          }
+          const { position: nextPosition, guides } = resolveSnappedNodePosition(
+            existingNode,
+            change.position,
+          );
+          if (guides !== null) {
+            setSnapGuides(guides);
+          }
+          return { ...change, position: nextPosition };
+        });
+        onNodesChange(snappedNonRemovalChanges);
       }
       const hasResizeStart = nonRemovalChanges.some(
         (change) => change.type === 'dimensions' && change.resizing === true,
@@ -447,10 +494,13 @@ function TemplateWorkspaceCanvas(): ReactElement {
     },
     [
       captureLayoutBeforeInteraction,
+      draggingNodeId,
+      nodes,
       onNodesChange,
       pushEditorHistorySnapshot,
       readCapturedLayoutBeforeInteraction,
       refreshWorkspaceLayout,
+      resolveSnappedNodePosition,
       selection,
       setSelection,
       template,
@@ -637,40 +687,17 @@ function TemplateWorkspaceCanvas(): ReactElement {
   );
   const handleNodeDrag = useCallback(
     (event: React.MouseEvent, node: Node<WorkspaceNodeData>) => {
-      if (node.data.kind === 'question' && node.data.roundId !== undefined) {
-        const roundNodes = nodes.filter((candidate) => candidate.data.kind === 'round');
-        const dropPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-        const hoveredRoundId = resolveRoundIdAtFlowPosition({ flowPosition: dropPosition, roundNodes });
-        setDropTargetRoundId(
-          hoveredRoundId !== null && hoveredRoundId !== node.data.roundId ? hoveredRoundId : null,
-        );
-      }
-      if (!snapSettings.gridSnap && !snapSettings.alignmentSnap) {
-        setSnapGuides(null);
+      if (node.data.kind !== 'question' || node.data.roundId === undefined) {
         return;
       }
-      const snapResult = snapWorkspaceNodePosition({
-        node,
-        position: node.position,
-        nodes,
-        enableGridSnap: snapSettings.gridSnap,
-        enableAlignmentSnap: snapSettings.alignmentSnap,
-        gridSize: WORKSPACE_SNAP_GRID_SIZE,
-      });
-      setSnapGuides(snapResult.guides);
-      const nextPosition =
-        node.parentId === undefined
-          ? snapResult.position
-          : clampRoundChildPosition(snapResult.position);
-      setNodes((currentNodes) =>
-        currentNodes.map((candidate) =>
-          candidate.id === node.id
-            ? elevateNodeForDrag({ ...candidate, position: nextPosition })
-            : candidate,
-        ),
+      const roundNodes = nodes.filter((candidate) => candidate.data.kind === 'round');
+      const dropPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      const hoveredRoundId = resolveRoundIdAtFlowPosition({ flowPosition: dropPosition, roundNodes });
+      setDropTargetRoundId(
+        hoveredRoundId !== null && hoveredRoundId !== node.data.roundId ? hoveredRoundId : null,
       );
     },
-    [nodes, screenToFlowPosition, setNodes, snapSettings.alignmentSnap, snapSettings.gridSnap],
+    [nodes, screenToFlowPosition],
   );
   const executeToggleGridSnap = useCallback((): void => {
     setSnapSettings((previous) => {
@@ -734,23 +761,25 @@ function TemplateWorkspaceCanvas(): ReactElement {
       setDropTargetRoundId(null);
       setDraggingNodeId(null);
       isQuestionCrossRoundDragRef.current = false;
+      const { position: snappedPosition } = resolveSnappedNodePosition(node, node.position);
+      const snappedNode: Node<WorkspaceNodeData> = { ...node, position: snappedPosition };
       const dropPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       const roundNodes = nodes.filter((candidate) => candidate.data.kind === 'round');
-      if (node.data.kind === 'question' && node.data.questionId !== undefined) {
+      if (snappedNode.data.kind === 'question' && snappedNode.data.questionId !== undefined) {
         const targetRoundId = resolveRoundIdAtFlowPosition({ flowPosition: dropPosition, roundNodes });
         const targetRoundNode =
           targetRoundId === null
             ? undefined
             : roundNodes.find((candidate) => candidate.data.roundId === targetRoundId);
-        if (targetRoundId !== null && targetRoundId !== node.data.roundId && targetRoundNode !== undefined) {
-          const questionId = node.data.questionId;
+        if (targetRoundId !== null && targetRoundId !== snappedNode.data.roundId && targetRoundNode !== undefined) {
+          const questionId = snappedNode.data.questionId;
           const nextTemplate = moveQuestionToRound({ template, questionId, targetRoundId });
           const nextLayout = applyQuestionDropLayout({
             template: nextTemplate,
             layout: readWorkspaceLayout(template.id),
             roundId: targetRoundId,
             questionId,
-            dropFlowPosition: node.position,
+            dropFlowPosition: snappedNode.position,
             roundNode: targetRoundNode,
           });
           commitWorkspaceLayout(nextLayout, { recordHistory: false });
@@ -760,17 +789,17 @@ function TemplateWorkspaceCanvas(): ReactElement {
         }
       }
       const previousLayout = readCapturedLayoutBeforeInteraction();
-      let settledNode = node;
+      let settledNode = snappedNode;
       let onlyPersistNodeIds: ReadonlySet<string> | undefined;
-      if (node.data.kind === 'round') {
-        onlyPersistNodeIds = new Set([node.id]);
+      if (snappedNode.data.kind === 'round') {
+        onlyPersistNodeIds = new Set([snappedNode.id]);
       }
-      if (node.data.kind === 'question' && node.parentId === undefined && node.data.roundId !== undefined) {
-        const roundNode = nodes.find((candidate) => candidate.id === buildRoundNodeId(node.data.roundId));
-        if (roundNode !== undefined && node.data.questionId !== undefined) {
+      if (snappedNode.data.kind === 'question' && snappedNode.parentId === undefined && snappedNode.data.roundId !== undefined) {
+        const roundNode = nodes.find((candidate) => candidate.id === buildRoundNodeId(snappedNode.data.roundId));
+        if (roundNode !== undefined && snappedNode.data.questionId !== undefined) {
           const newQuestionRelative = clampRoundChildPosition({
-            x: node.position.x - roundNode.position.x,
-            y: node.position.y - roundNode.position.y,
+            x: snappedNode.position.x - roundNode.position.x,
+            y: snappedNode.position.y - roundNode.position.y,
           });
           const layoutBeforeDrag =
             previousLayout ?? readWorkspaceLayout(template.id) ?? { nodes: {} };
@@ -778,36 +807,36 @@ function TemplateWorkspaceCanvas(): ReactElement {
             template,
             layout: readWorkspaceLayout(template.id),
             previousLayout: layoutBeforeDrag,
-            roundId: node.data.roundId,
-            questionId: node.data.questionId,
+            roundId: snappedNode.data.roundId,
+            questionId: snappedNode.data.questionId,
             newQuestionRelative,
           });
           commitWorkspaceLayout(nextLayout, { recordHistory: false });
           settledNode = reattachQuestionNodeAtRelativePosition({
-            node,
+            node: snappedNode,
             roundNode,
             relativePosition: newQuestionRelative,
           });
           const movedQuestion = template.rounds
-            .find((round) => round.id === node.data.roundId)
-            ?.questions.find((question) => question.id === node.data.questionId);
+            .find((round) => round.id === snappedNode.data.roundId)
+            ?.questions.find((question) => question.id === snappedNode.data.questionId);
           if (movedQuestion !== undefined) {
             onlyPersistNodeIds = new Set(collectWorkspaceNodeIdsForMovedQuestion(movedQuestion));
           }
         }
-      } else if (node.parentId !== undefined) {
-        settledNode = { ...node, position: clampRoundChildPosition(node.position) };
-        onlyPersistNodeIds = new Set([node.id]);
+      } else if (snappedNode.parentId !== undefined) {
+        settledNode = snappedNode;
+        onlyPersistNodeIds = new Set([snappedNode.id]);
       }
       setNodes((currentNodes) => {
         const withSettledNode = currentNodes.map((candidate) =>
-          candidate.id === node.id ? settledNode : candidate,
+          candidate.id === snappedNode.id ? settledNode : candidate,
         );
         return applyRoundFitDimensionsToNodes(withSettledNode, template);
       });
       pendingLayoutCommitRef.current = { previousLayout, onlyPersistNodeIds };
     },
-    [commitWorkspaceLayout, nodes, readCapturedLayoutBeforeInteraction, screenToFlowPosition, setNodes, template, updateTemplate],
+    [commitWorkspaceLayout, nodes, readCapturedLayoutBeforeInteraction, resolveSnappedNodePosition, screenToFlowPosition, setNodes, template, updateTemplate],
   );
   const selectedNodeId = useMemo(
     () => resolveSelectedNodeId(selection, template),
