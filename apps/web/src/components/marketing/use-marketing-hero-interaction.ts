@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import { useCanUseHeroMouseParallax } from '@/hooks/use-can-use-hero-mouse-parallax';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const HERO_IDLE_DECAY_MS = 1200;
@@ -33,10 +34,13 @@ export type MarketingHeroInteraction = {
 
 /**
  * Page-wide pointer tracking while the hero is in view: mouse parallax on layers + idle decay after last move.
- * Pointer position is preserved across tab blur/focus to avoid spring snap. Disabled when reduced motion is preferred.
+ * Pointer position is preserved across tab blur/focus to avoid spring snap. Disabled when reduced motion is preferred
+ * or on mobile / touch-primary devices (no fine hover pointer).
  */
 export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   const prefersReducedMotion = usePrefersReducedMotion();
+  const canUseMouseParallax = useCanUseHeroMouseParallax();
+  const isParallaxEnabled = !prefersReducedMotion && canUseMouseParallax;
   const [sectionElement, setSectionElement] = useState<HTMLElement | null>(null);
   const [isInView, setIsInView] = useState(false);
   const [isBoosted, setIsBoosted] = useState(false);
@@ -88,7 +92,7 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     executeDecayBoost();
   }, [pointerX, pointerY, executeDecayBoost]);
   useEffect(() => {
-    if (prefersReducedMotion) {
+    if (!isParallaxEnabled) {
       executeResetParallax();
       setIsInView(false);
       return;
@@ -106,9 +110,9 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     return () => {
       observer.disconnect();
     };
-  }, [prefersReducedMotion, sectionElement, executeResetParallax]);
+  }, [isParallaxEnabled, sectionElement, executeResetParallax]);
   useEffect(() => {
-    if (prefersReducedMotion || !isInView) {
+    if (!isParallaxEnabled || !isInView) {
       executeResetParallax();
       return;
     }
@@ -140,7 +144,7 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
       window.clearInterval(idleTimer);
     };
   }, [
-    prefersReducedMotion,
+    isParallaxEnabled,
     isInView,
     executeExtendBoost,
     executeUpdatePointer,
@@ -148,7 +152,7 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     executeResetParallax,
   ]);
   useEffect(() => {
-    if (prefersReducedMotion) {
+    if (!isParallaxEnabled) {
       return;
     }
     if (sectionElement === null) {
@@ -172,12 +176,12 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     return () => {
       sectionElement.removeEventListener('pointerdown', executeOnTap);
     };
-  }, [prefersReducedMotion, executeTapBoost, executeUpdatePointer, sectionElement]);
+  }, [isParallaxEnabled, executeTapBoost, executeUpdatePointer, sectionElement]);
   const rootStyle = {
     '--hero-fx': springX,
     '--hero-fy': springY,
     '--hero-boost': springBoost,
-    '--hero-parallax-strength': HERO_PARALLAX_STRENGTH,
+    '--hero-parallax-strength': isParallaxEnabled ? HERO_PARALLAX_STRENGTH : 0,
   } as CSSProperties;
   return { isBoosted, isInView, rootStyle, sectionRef };
 }

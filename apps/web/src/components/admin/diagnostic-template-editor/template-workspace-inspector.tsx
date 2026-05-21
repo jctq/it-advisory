@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
   buildAvailableOptionVisibilitySources,
@@ -12,9 +13,13 @@ import {
   buildVisibilityRuleSummary,
   buildOptionVisibilityRuleSummary,
   createDraftChildOption,
+  createDraftChildQuestion,
   moveArrayItem,
+  normalizeExampleBulletsValue,
+  parseExampleBulletsInput,
   SELECTION_MODE_OPTIONS,
   QUESTION_TYPE_OPTIONS,
+  type DiagnosticTemplateOptionValue,
 } from '@/components/admin/diagnostic-template-editor/diagnostic-template-editor-utils';
 import {
   findOptionInTemplate,
@@ -49,15 +54,7 @@ type TemplateWorkspaceInspectorProps = {
 export function TemplateWorkspaceInspector(props: TemplateWorkspaceInspectorProps): ReactElement {
   const { template, selection, updateTemplate, setSelection } = useTemplateEditor();
   if (selection === null) {
-    return (
-      <aside className={cn('flex flex-col border-l p-4', WORKSPACE_PANEL_CLASS, props.className)}>
-        <p className="text-sm font-medium text-foreground">Inspector</p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Select a round, question, option, or follow-up on the canvas. Follow-up nested options appear in the inspector when
-          you select a Follow-up node. Round order follows R1 → R2 labels and dashed &quot;next round&quot; arrows.
-        </p>
-      </aside>
-    );
+    return <aside className={cn('border-l', WORKSPACE_PANEL_CLASS, props.className)} aria-hidden />;
   }
   if (selection.kind === 'round') {
     return (
@@ -369,6 +366,37 @@ function QuestionInspector(
   );
 }
 
+function mapQuestionOption(
+  template: InspectorBaseProps['template'],
+  params: {
+    readonly roundId: string;
+    readonly questionId: string;
+    readonly optionId: string;
+    readonly updater: (option: DiagnosticTemplateOptionValue) => DiagnosticTemplateOptionValue;
+  },
+): InspectorBaseProps['template'] {
+  return {
+    ...template,
+    rounds: template.rounds.map((candidateRound) =>
+      candidateRound.id !== params.roundId
+        ? candidateRound
+        : {
+            ...candidateRound,
+            questions: candidateRound.questions.map((candidateQuestion) =>
+              candidateQuestion.id !== params.questionId
+                ? candidateQuestion
+                : {
+                    ...candidateQuestion,
+                    options: candidateQuestion.options.map((candidateOption) =>
+                      candidateOption.id === params.optionId ? params.updater(candidateOption) : candidateOption,
+                    ),
+                  },
+            ),
+          },
+    ),
+  };
+}
+
 function OptionInspector(
   props: InspectorBaseProps & {
     readonly roundId: string;
@@ -388,6 +416,19 @@ function OptionInspector(
     question,
     optionId: option.id,
   });
+  const updateOption = (updater: (candidateOption: DiagnosticTemplateOptionValue) => DiagnosticTemplateOptionValue): void => {
+    props.updateTemplate((current) =>
+      mapQuestionOption(current, {
+        roundId: round.id,
+        questionId: question.id,
+        optionId: option.id,
+        updater,
+      }),
+    );
+  };
+  const exampleBulletsValue = option.presentation.exampleBullets.join('\n');
+  const shouldShowExampleBullets = question.type === 'multiple-choice';
+  const shouldShowPanelTitle = question.type === 'nested-options';
   return (
     <aside className={cn('flex flex-col gap-4 overflow-y-auto border-l p-4', WORKSPACE_PANEL_CLASS, props.className)}>
       <Header
@@ -395,11 +436,11 @@ function OptionInspector(
         onRemove={() => {
           props.updateTemplate((current) => ({
             ...current,
-            rounds: current.rounds.map((candidate) =>
-              candidate.id === round.id
+            rounds: current.rounds.map((candidateRound) =>
+              candidateRound.id === round.id
                 ? {
-                    ...candidate,
-                    questions: candidate.questions.map((candidateQuestion) =>
+                    ...candidateRound,
+                    questions: candidateRound.questions.map((candidateQuestion) =>
                       candidateQuestion.id === question.id
                         ? {
                             ...candidateQuestion,
@@ -408,95 +449,444 @@ function OptionInspector(
                         : candidateQuestion,
                     ),
                   }
-                : candidate,
+                : candidateRound,
             ),
           }));
           props.setSelection({ kind: 'question', roundId: round.id, questionId: question.id });
         }}
       />
-      <Field label="Label">
-        <Input
-          value={option.label}
-          onChange={(event) =>
-            props.updateTemplate((current) => ({
-              ...current,
-              rounds: current.rounds.map((candidate) =>
-                candidate.id === round.id
-                  ? {
-                      ...candidate,
-                      questions: candidate.questions.map((candidateQuestion) =>
-                        candidateQuestion.id === question.id
-                          ? {
-                              ...candidateQuestion,
-                              options: candidateQuestion.options.map((candidateOption) =>
-                                candidateOption.id === option.id ? { ...candidateOption, label: event.target.value } : candidateOption,
+      <Tabs defaultValue="basics" className="w-full">
+        <TabsList
+          aria-label="Option settings"
+          className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg bg-muted/60 p-1"
+        >
+          <TabsTrigger value="basics" className="text-xs">
+            Basics
+          </TabsTrigger>
+          <TabsTrigger value="visibility" className="text-xs">
+            Visibility
+          </TabsTrigger>
+          <TabsTrigger value="card" className="text-xs">
+            Card
+          </TabsTrigger>
+          {question.type === 'nested-options' ? (
+            <TabsTrigger value="followup" className="text-xs">
+              Follow-up
+            </TabsTrigger>
+          ) : null}
+        </TabsList>
+        <TabsContent value="basics" className="mt-3 space-y-3">
+          <Field label="Label">
+            <Input
+              value={option.label}
+              onChange={(event) => updateOption((candidateOption) => ({ ...candidateOption, label: event.target.value }))}
+              placeholder="Short tap label"
+              className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+            />
+          </Field>
+          <Field label="Subtext">
+            <Textarea
+              value={option.description ?? ''}
+              onChange={(event) =>
+                updateOption((candidateOption) => ({
+                  ...candidateOption,
+                  description: event.target.value,
+                }))
+              }
+              placeholder="Optional supporting text below the label"
+              rows={2}
+              className={cn('min-h-18 resize-y', WORKSPACE_INSPECTOR_INPUT_CLASS)}
+            />
+          </Field>
+          {question.selectionMode === 'single' ? (
+            <div className={cn('px-3 py-3', WORKSPACE_INSPECTOR_SURFACE_CLASS)}>
+              <label className="flex cursor-pointer items-start gap-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 shrink-0 rounded border-input"
+                  checked={option.requestDetailNoteWhenSelected}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    props.updateTemplate((current) => ({
+                      ...current,
+                      rounds: current.rounds.map((candidateRound) =>
+                        candidateRound.id !== round.id
+                          ? candidateRound
+                          : {
+                              ...candidateRound,
+                              questions: candidateRound.questions.map((candidateQuestion) =>
+                                candidateQuestion.id !== question.id
+                                  ? candidateQuestion
+                                  : {
+                                      ...candidateQuestion,
+                                      options: candidateQuestion.options.map((candidateOption) => {
+                                        if (candidateOption.id === option.id) {
+                                          return {
+                                            ...candidateOption,
+                                            requestDetailNoteWhenSelected: checked,
+                                          };
+                                        }
+                                        if (checked) {
+                                          return {
+                                            ...candidateOption,
+                                            requestDetailNoteWhenSelected: false,
+                                          };
+                                        }
+                                        return candidateOption;
+                                      }),
+                                    },
                               ),
-                            }
-                          : candidateQuestion,
+                            },
                       ),
-                    }
-                  : candidate,
-              ),
-            }))
+                    }));
+                  }}
+                />
+                <span>
+                  <span className="font-medium">Detail textbox when this option is selected</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                    Single-select only. One option per question. When on, customers see &quot;Your exact answer&quot; only
+                    while this option is selected, and they must fill it before continuing.
+                  </span>
+                </span>
+              </label>
+            </div>
+          ) : null}
+        </TabsContent>
+        <TabsContent value="visibility" className="mt-3">
+          <VisibilityField
+            label="Option visibility"
+            availableSources={availableSources}
+            rule={option.showWhen}
+            onChange={(nextRule) => updateOption((candidateOption) => ({ ...candidateOption, showWhen: nextRule }))}
+            summary={buildOptionVisibilityRuleSummary({ availableSources, rule: option.showWhen })}
+          />
+        </TabsContent>
+        <TabsContent value="card" className="mt-3 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Customer-facing card copy; does not change the saved answer value.
+          </p>
+          <Field label="Icon name">
+            <Input
+              value={option.presentation.icon ?? ''}
+              onChange={(event) =>
+                updateOption((candidateOption) => ({
+                  ...candidateOption,
+                  presentation: { ...candidateOption.presentation, icon: event.target.value },
+                }))
+              }
+              placeholder="Example: TrendingUp"
+              className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+            />
+          </Field>
+          <Field label="Badge text">
+            <Input
+              value={option.presentation.badgeText ?? ''}
+              onChange={(event) =>
+                updateOption((candidateOption) => ({
+                  ...candidateOption,
+                  presentation: { ...candidateOption.presentation, badgeText: event.target.value },
+                }))
+              }
+              placeholder="Optional badge such as NEW"
+              className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+            />
+          </Field>
+          <Field label="Eyebrow">
+            <Input
+              value={option.presentation.eyebrow ?? ''}
+              onChange={(event) =>
+                updateOption((candidateOption) => ({
+                  ...candidateOption,
+                  presentation: { ...candidateOption.presentation, eyebrow: event.target.value },
+                }))
+              }
+              placeholder="Optional small heading above the title"
+              className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+            />
+          </Field>
+          <Field label="Card title override">
+            <Input
+              value={option.presentation.title ?? ''}
+              onChange={(event) =>
+                updateOption((candidateOption) => ({
+                  ...candidateOption,
+                  presentation: { ...candidateOption.presentation, title: event.target.value },
+                }))
+              }
+              placeholder="Shown to customers if different from the answer label"
+              className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+            />
+          </Field>
+          <Field label="Supporting text override">
+            <Textarea
+              value={option.presentation.supportingText ?? ''}
+              onChange={(event) =>
+                updateOption((candidateOption) => ({
+                  ...candidateOption,
+                  presentation: { ...candidateOption.presentation, supportingText: event.target.value },
+                }))
+              }
+              placeholder="Optional card copy shown under the title."
+              rows={3}
+              className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+            />
+          </Field>
+          {shouldShowPanelTitle ? (
+            <Field label="Nested panel title">
+              <Input
+                value={option.presentation.panelTitle ?? ''}
+                onChange={(event) =>
+                  updateOption((candidateOption) => ({
+                    ...candidateOption,
+                    presentation: { ...candidateOption.presentation, panelTitle: event.target.value },
+                  }))
+                }
+                placeholder="Optional title shown in the right-side nested panel"
+                className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+              />
+            </Field>
+          ) : null}
+          {shouldShowExampleBullets ? (
+            <Field label="Example bullets">
+              <Textarea
+                value={exampleBulletsValue}
+                onChange={(event) =>
+                  updateOption((candidateOption) => ({
+                    ...candidateOption,
+                    presentation: {
+                      ...candidateOption.presentation,
+                      exampleBullets: parseExampleBulletsInput(event.target.value),
+                    },
+                  }))
+                }
+                placeholder={'One example per line\nCustomers are leaving\nSales are delayed'}
+                rows={4}
+                className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                {normalizeExampleBulletsValue(option.presentation.exampleBullets).length} bullet
+                {normalizeExampleBulletsValue(option.presentation.exampleBullets).length === 1 ? '' : 's'} after trimming
+                empty lines.
+              </p>
+            </Field>
+          ) : null}
+        </TabsContent>
+        {question.type === 'nested-options' ? (
+          <TabsContent value="followup" className="mt-3">
+            <OptionFollowUpTab
+              option={option}
+              roundId={round.id}
+              questionId={question.id}
+              updateTemplate={props.updateTemplate}
+              setSelection={props.setSelection}
+            />
+          </TabsContent>
+        ) : null}
+      </Tabs>
+    </aside>
+  );
+}
+
+function OptionFollowUpTab(props: {
+  readonly option: DiagnosticTemplateOptionValue;
+  readonly roundId: string;
+  readonly questionId: string;
+  readonly updateTemplate: InspectorBaseProps['updateTemplate'];
+  readonly setSelection: (selection: TemplateEditorSelection) => void;
+}): ReactElement {
+  const setChildQuestion = (childQuestion: DiagnosticTemplateOptionValue['childQuestion']): void => {
+    props.updateTemplate((current) =>
+      mapQuestionOption(current, {
+        roundId: props.roundId,
+        questionId: props.questionId,
+        optionId: props.option.id,
+        updater: (candidateOption) => ({ ...candidateOption, childQuestion }),
+      }),
+    );
+  };
+  const updateChildQuestion = (
+    updater: (
+      childQuestion: NonNullable<DiagnosticTemplateOptionValue['childQuestion']>,
+    ) => NonNullable<DiagnosticTemplateOptionValue['childQuestion']>,
+  ): void => {
+    props.updateTemplate((current) =>
+      mapQuestionOption(current, {
+        roundId: props.roundId,
+        questionId: props.questionId,
+        optionId: props.option.id,
+        updater: (candidateOption) =>
+          candidateOption.childQuestion === null
+            ? candidateOption
+            : { ...candidateOption, childQuestion: updater(candidateOption.childQuestion) },
+      }),
+    );
+  };
+  if (props.option.childQuestion === null) {
+    return (
+      <div className={cn('space-y-3', WORKSPACE_INSPECTOR_SURFACE_CLASS)}>
+        <p className="text-sm text-foreground">No follow-up question for this option yet.</p>
+        <p className="text-xs text-muted-foreground">
+          Add a follow-up to show nested options when customers choose this parent option.
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className={WORKSPACE_INSPECTOR_OUTLINE_BUTTON_CLASS}
+          onClick={() => setChildQuestion(createDraftChildQuestion())}
+        >
+          <Plus className="size-3.5" aria-hidden />
+          Add follow-up question
+        </Button>
+      </div>
+    );
+  }
+  const child = props.option.childQuestion;
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">Shown only when customers choose this option.</p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className={WORKSPACE_INSPECTOR_OUTLINE_BUTTON_CLASS}
+          onClick={() => setChildQuestion(null)}
+        >
+          Remove follow-up
+        </Button>
+      </div>
+      <Field label="Follow-up prompt">
+        <Input
+          value={child.prompt}
+          onChange={(event) =>
+            updateChildQuestion((currentChildQuestion) => ({ ...currentChildQuestion, prompt: event.target.value }))
           }
           className={WORKSPACE_INSPECTOR_INPUT_CLASS}
         />
       </Field>
-      <VisibilityField
-        label="Option visibility"
-        availableSources={availableSources}
-        rule={option.showWhen}
-        onChange={(nextRule) =>
-          props.updateTemplate((current) => ({
-            ...current,
-            rounds: current.rounds.map((candidate) =>
-              candidate.id === round.id
-                ? {
-                    ...candidate,
-                    questions: candidate.questions.map((candidateQuestion) =>
-                      candidateQuestion.id === question.id
-                        ? {
-                            ...candidateQuestion,
-                            options: candidateQuestion.options.map((candidateOption) =>
-                              candidateOption.id === option.id ? { ...candidateOption, showWhen: nextRule } : candidateOption,
-                            ),
-                          }
-                        : candidateQuestion,
-                    ),
-                  }
-                : candidate,
-            ),
-          }))
-        }
-        summary={buildOptionVisibilityRuleSummary({ availableSources, rule: option.showWhen })}
-      />
-      {option.childQuestion !== null ? (
-        <div className={WORKSPACE_INSPECTOR_SURFACE_CLASS}>
-          <p className="text-xs text-muted-foreground">Nested follow-up</p>
-          <p className="mt-1 text-sm text-foreground">{option.childQuestion.prompt.trim() || 'Untitled follow-up'}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {option.childQuestion.options.length} nested option{option.childQuestion.options.length === 1 ? '' : 's'} — select
-            the Follow-up node on the canvas to edit them.
-          </p>
+      <Field label="Follow-up subtext">
+        <Textarea
+          value={child.description ?? ''}
+          onChange={(event) =>
+            updateChildQuestion((currentChildQuestion) => ({
+              ...currentChildQuestion,
+              description: event.target.value,
+            }))
+          }
+          rows={2}
+          className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+        />
+      </Field>
+      <Field label="Follow-up selection mode">
+        <select
+          value={child.selectionMode}
+          onChange={(event) =>
+            updateChildQuestion((currentChildQuestion) => ({
+              ...currentChildQuestion,
+              selectionMode: event.target.value as typeof child.selectionMode,
+            }))
+          }
+          className={WORKSPACE_INSPECTOR_SELECT_CLASS}
+        >
+          {SELECTION_MODE_OPTIONS.map((modeOption) => (
+            <option key={modeOption.value} value={modeOption.value}>
+              {modeOption.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium text-foreground">Follow-up options</p>
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className={cn('mt-2', WORKSPACE_INSPECTOR_OUTLINE_BUTTON_CLASS)}
+            className={WORKSPACE_INSPECTOR_OUTLINE_BUTTON_CLASS}
             onClick={() =>
-              props.setSelection({
-                kind: 'childQuestion',
-                roundId: round.id,
-                questionId: question.id,
-                optionId: option.id,
-              })
+              updateChildQuestion((currentChildQuestion) => ({
+                ...currentChildQuestion,
+                options: [
+                  ...currentChildQuestion.options,
+                  createDraftChildOption(currentChildQuestion.options.length),
+                ],
+              }))
             }
           >
-            Edit follow-up
+            <Plus className="size-3.5" aria-hidden />
+            Add
           </Button>
         </div>
-      ) : null}
-    </aside>
+        {child.options.map((childOption, childOptionIndex) => (
+          <div key={childOption.id} className={cn('space-y-2', WORKSPACE_INSPECTOR_SURFACE_CLASS)}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Option {childOptionIndex + 1}</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground hover:text-red-400"
+                disabled={child.options.length <= 1}
+                onClick={() =>
+                  updateChildQuestion((currentChildQuestion) => ({
+                    ...currentChildQuestion,
+                    options: currentChildQuestion.options.filter((candidate) => candidate.id !== childOption.id),
+                  }))
+                }
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+              </Button>
+            </div>
+            <Field label="Label">
+              <Input
+                value={childOption.label}
+                onChange={(event) =>
+                  updateChildQuestion((currentChildQuestion) => ({
+                    ...currentChildQuestion,
+                    options: currentChildQuestion.options.map((candidate) =>
+                      candidate.id === childOption.id ? { ...candidate, label: event.target.value } : candidate,
+                    ),
+                  }))
+                }
+                className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+              />
+            </Field>
+            <Field label="Subtext">
+              <Textarea
+                value={childOption.description ?? ''}
+                onChange={(event) =>
+                  updateChildQuestion((currentChildQuestion) => ({
+                    ...currentChildQuestion,
+                    options: currentChildQuestion.options.map((candidate) =>
+                      candidate.id === childOption.id ? { ...candidate, description: event.target.value } : candidate,
+                    ),
+                  }))
+                }
+                rows={2}
+                className={WORKSPACE_INSPECTOR_INPUT_CLASS}
+              />
+            </Field>
+          </div>
+        ))}
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className={WORKSPACE_INSPECTOR_OUTLINE_BUTTON_CLASS}
+        onClick={() =>
+          props.setSelection({
+            kind: 'childQuestion',
+            roundId: props.roundId,
+            questionId: props.questionId,
+            optionId: props.option.id,
+          })
+        }
+      >
+        Open on canvas
+      </Button>
+    </div>
   );
 }
 

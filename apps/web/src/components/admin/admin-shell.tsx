@@ -152,7 +152,7 @@ export function AdminShell(props: AdminShellProps) {
       suppressHydrationWarning
       className={cn('min-h-dvh bg-muted/30 scheme-light dark:bg-background dark:scheme-dark')}
     >
-      <div className="flex min-h-dvh [--admin-sticky-top:7rem]">
+      <div className="flex min-h-dvh [--admin-sticky-top:4rem]">
         <AdminSidebar
           collapsed={collapsed}
           mobileOpen={mobileOpen}

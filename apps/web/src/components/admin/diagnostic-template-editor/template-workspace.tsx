@@ -14,10 +14,14 @@ import {
   type Node,
   type NodeChange,
   type OnConnect,
+  type OnSelectionChangeFunc,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import {
+  buildChildQuestionNodeId,
+  buildOptionNodeId,
+  buildRoundNodeId,
   buildWorkspaceGraph,
   collectLayoutFromNodes,
   filterNodesBySearch,
@@ -45,6 +49,8 @@ import {
   selectionFromNodeId,
   TemplateWorkspacePalette,
 } from '@/components/admin/diagnostic-template-editor/template-workspace-palette';
+import type { TemplateEditorSelection } from '@/components/admin/diagnostic-template-editor/template-editor-context';
+import type { DiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
 import { RoundGroupNode, WorkspaceCardNode } from '@/components/admin/diagnostic-template-editor/workspace-nodes';
 import {
   clearWorkspaceLayout,
@@ -52,8 +58,8 @@ import {
   pruneWorkspaceLayoutNodeIds,
   readWorkspaceLayout,
   readWorkspaceSnapSettings,
-  writeWorkspaceLayout,
   writeWorkspaceSnapSettings,
+  type WorkspaceLayoutSnapshot,
   type WorkspaceSnapSettings,
 } from '@/components/admin/diagnostic-template-editor/workspace-layout-storage';
 import { applyWorkspaceNodeRemovals } from '@/components/admin/diagnostic-template-editor/workspace-template-mutations';
@@ -88,14 +94,54 @@ const NODE_TYPES = {
   workspaceCard: WorkspaceCardNode,
 };
 
+function resolveSelectedNodeId(
+  editorSelection: TemplateEditorSelection,
+  template: DiagnosticTemplateValue,
+): string | null {
+  if (editorSelection === null) {
+    return null;
+  }
+  if (editorSelection.kind === 'round') {
+    return buildRoundNodeId(editorSelection.roundId);
+  }
+  if (editorSelection.kind === 'question') {
+    return buildQuestionNodeId(editorSelection.questionId);
+  }
+  if (editorSelection.kind === 'option') {
+    return buildOptionNodeId(editorSelection.optionId);
+  }
+  for (const round of template.rounds) {
+    for (const question of round.questions) {
+      const option = question.options.find((candidate) => candidate.id === editorSelection.optionId);
+      if (option?.childQuestion !== null && option?.childQuestion !== undefined) {
+        return buildChildQuestionNodeId(option.childQuestion.id);
+      }
+    }
+  }
+  return null;
+}
+
 function TemplateWorkspaceCanvas(): ReactElement {
-  const { template, updateTemplate, setSelection, selection } = useTemplateEditor();
+  const {
+    template,
+    layoutRevision,
+    updateTemplate,
+    commitWorkspaceLayout,
+    refreshWorkspaceLayout,
+    pushEditorHistorySnapshot,
+    setSelection,
+    selection,
+  } = useTemplateEditor();
   const { isDark } = useWorkspaceAppearance();
   const { fitView } = useReactFlow();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [snapSettings, setSnapSettings] = useState<WorkspaceSnapSettings>(() => readWorkspaceSnapSettings());
   const [snapGuides, setSnapGuides] = useState<SnapGuideLines | null>(null);
-  const [layoutRevision, setLayoutRevision] = useState<number>(0);
+  const layoutBeforeInteractionRef = useRef<WorkspaceLayoutSnapshot | null>(null);
+  const pendingLayoutCommitRef = useRef<{
+    readonly resizedNodeIds?: ReadonlySet<string>;
+    readonly previousLayout?: WorkspaceLayoutSnapshot | null;
+  } | null>(null);
   const layout = useMemo(() => {
     void layoutRevision;
     return readWorkspaceLayout(template.id);
@@ -141,9 +187,16 @@ function TemplateWorkspaceCanvas(): ReactElement {
   const selectedOptionId =
     selection?.kind === 'option' ? selection.optionId : selection?.kind === 'childQuestion' ? selection.optionId : null;
   const persistLayout = useCallback(
-    (nextNodes: readonly Node<WorkspaceNodeData>[], resizedNodeIds: ReadonlySet<string> = new Set()) => {
+    (
+      nextNodes: readonly Node<WorkspaceNodeData>[],
+      options: {
+        readonly resizedNodeIds?: ReadonlySet<string>;
+        readonly previousLayout?: WorkspaceLayoutSnapshot | null;
+        readonly recordHistory?: boolean;
+      } = {},
+    ): void => {
       const existingLayout = readWorkspaceLayout(template.id);
-      const userSizedNodeIds = new Set<string>(resizedNodeIds);
+      const userSizedNodeIds = new Set<string>(options.resizedNodeIds ?? []);
       if (existingLayout !== null) {
         for (const [nodeId, entry] of Object.entries(existingLayout.nodes)) {
           if (entry.userSized === true) {
@@ -151,11 +204,36 @@ function TemplateWorkspaceCanvas(): ReactElement {
           }
         }
       }
-      writeWorkspaceLayout(template.id, collectLayoutFromNodes(nextNodes, { userSizedNodeIds }));
-      setLayoutRevision((revision) => revision + 1);
+      const nextLayout = collectLayoutFromNodes(nextNodes, { userSizedNodeIds });
+      commitWorkspaceLayout(nextLayout, {
+        previousLayout: options.previousLayout,
+        recordHistory: options.recordHistory,
+      });
     },
-    [template.id],
+    [commitWorkspaceLayout, template.id],
   );
+  useLayoutEffect(() => {
+    const pendingLayoutCommit = pendingLayoutCommitRef.current;
+    if (pendingLayoutCommit === null) {
+      return;
+    }
+    pendingLayoutCommitRef.current = null;
+    persistLayout(nodes, {
+      resizedNodeIds: pendingLayoutCommit.resizedNodeIds,
+      previousLayout: pendingLayoutCommit.previousLayout,
+    });
+  }, [nodes, persistLayout]);
+  const captureLayoutBeforeInteraction = useCallback((): void => {
+    if (layoutBeforeInteractionRef.current !== null) {
+      return;
+    }
+    layoutBeforeInteractionRef.current = readWorkspaceLayout(template.id);
+  }, [template.id]);
+  const readCapturedLayoutBeforeInteraction = useCallback((): WorkspaceLayoutSnapshot | null => {
+    const captured = layoutBeforeInteractionRef.current;
+    layoutBeforeInteractionRef.current = null;
+    return captured;
+  }, []);
   const handleNodesChange = useCallback(
     (changes: NodeChange<Node<WorkspaceNodeData>>[]) => {
       const removalChanges = changes.filter(
@@ -164,13 +242,15 @@ function TemplateWorkspaceCanvas(): ReactElement {
       );
       const nonRemovalChanges = changes.filter((change) => change.type !== 'remove');
       if (removalChanges.length > 0) {
+        const layoutBeforeRemoval = readWorkspaceLayout(template.id);
+        pushEditorHistorySnapshot({ template, layout: layoutBeforeRemoval });
         const { template: nextTemplate, prunedLayoutNodeIds } = applyWorkspaceNodeRemovals({
           template,
           removedNodeIds: removalChanges.map((change) => change.id),
         });
-        updateTemplate(() => nextTemplate, { shouldReindex: false });
+        updateTemplate(() => nextTemplate, { shouldReindex: false, recordHistory: false });
         pruneWorkspaceLayoutNodeIds(template.id, prunedLayoutNodeIds);
-        setLayoutRevision((revision) => revision + 1);
+        refreshWorkspaceLayout();
         const removedQuestionIds = new Set(
           removalChanges
             .filter((change) => change.id.startsWith('question:'))
@@ -215,6 +295,12 @@ function TemplateWorkspaceCanvas(): ReactElement {
       if (nonRemovalChanges.length > 0) {
         onNodesChange(nonRemovalChanges);
       }
+      const hasResizeStart = nonRemovalChanges.some(
+        (change) => change.type === 'dimensions' && change.resizing === true,
+      );
+      if (hasResizeStart) {
+        captureLayoutBeforeInteraction();
+      }
       const hasFinishedResize = nonRemovalChanges.some(
         (change) => change.type === 'dimensions' && change.resizing === false,
       );
@@ -228,14 +314,21 @@ function TemplateWorkspaceCanvas(): ReactElement {
           )
           .map((change) => change.id),
       );
-      window.requestAnimationFrame(() => {
-        setNodes((currentNodes) => {
-          persistLayout(currentNodes, resizedNodeIds);
-          return currentNodes;
-        });
-      });
+      const previousLayout = readCapturedLayoutBeforeInteraction();
+      pendingLayoutCommitRef.current = { resizedNodeIds, previousLayout };
     },
-    [onNodesChange, persistLayout, selection, setLayoutRevision, setNodes, setSelection, template, updateTemplate],
+    [
+      captureLayoutBeforeInteraction,
+      onNodesChange,
+      persistLayout,
+      pushEditorHistorySnapshot,
+      readCapturedLayoutBeforeInteraction,
+      refreshWorkspaceLayout,
+      selection,
+      setSelection,
+      template,
+      updateTemplate,
+    ],
   );
   const handleConnect: OnConnect = useCallback(
     (connection: Connection) => {
@@ -370,25 +463,30 @@ function TemplateWorkspaceCanvas(): ReactElement {
     [],
   );
   const executeResetWorkspace = useCallback((): void => {
+    const layoutBeforeReset = readWorkspaceLayout(template.id);
+    pushEditorHistorySnapshot({ template, layout: layoutBeforeReset });
     clearWorkspaceLayout(template.id);
     writeWorkspaceSnapSettings(DEFAULT_WORKSPACE_SNAP_SETTINGS);
     setSnapSettings(DEFAULT_WORKSPACE_SNAP_SETTINGS);
-    setLayoutRevision((revision) => revision + 1);
+    refreshWorkspaceLayout();
     shouldFitViewAfterResetRef.current = true;
     notifySuccess('Workspace layout and canvas settings reset.');
-  }, [template.id]);
+  }, [pushEditorHistorySnapshot, refreshWorkspaceLayout, template]);
+  const handleNodeDragStart = useCallback((): void => {
+    captureLayoutBeforeInteraction();
+  }, [captureLayoutBeforeInteraction]);
   const handleNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node<WorkspaceNodeData>) => {
       setSnapGuides(null);
+      const previousLayout = readCapturedLayoutBeforeInteraction();
       const clampedNode =
         node.parentId === undefined
           ? node
           : { ...node, position: clampRoundChildPosition(node.position) };
-      setNodes((currentNodes) => {
-        const nextNodes = currentNodes.map((candidate) => (candidate.id === node.id ? clampedNode : candidate));
-        persistLayout(nextNodes);
-        return nextNodes;
-      });
+      setNodes((currentNodes) =>
+        currentNodes.map((candidate) => (candidate.id === node.id ? clampedNode : candidate)),
+      );
+      pendingLayoutCommitRef.current = { previousLayout };
       if (clampedNode.data.kind !== 'question') {
         return;
       }
@@ -441,18 +539,37 @@ function TemplateWorkspaceCanvas(): ReactElement {
         };
       });
     },
-    [nodes, persistLayout, updateTemplate],
+    [nodes, persistLayout, readCapturedLayoutBeforeInteraction, updateTemplate],
+  );
+  const selectedNodeId = useMemo(
+    () => resolveSelectedNodeId(selection, template),
+    [selection, template],
   );
   const decoratedNodes = useMemo(
     () =>
       nodes.map((node) => ({
         ...node,
+        selected: node.id === selectedNodeId,
         style: {
           ...node.style,
           opacity: searchQuery.trim().length > 0 && !matchingNodeIds.includes(node.id) ? 0.35 : 1,
         },
       })),
-    [matchingNodeIds, nodes, searchQuery],
+    [matchingNodeIds, nodes, searchQuery, selectedNodeId],
+  );
+  const handlePaneClick = useCallback((): void => {
+    setSelection(null);
+  }, [setSelection]);
+  const handleSelectionChange: OnSelectionChangeFunc<Node<WorkspaceNodeData>> = useCallback(
+    ({ nodes: selectedNodes }) => {
+      if (selectedNodes.length === 0) {
+        setSelection(null);
+        return;
+      }
+      const primaryNode = selectedNodes[selectedNodes.length - 1];
+      setSelection(selectionFromNodeId(primaryNode.id, template));
+    },
+    [setSelection, template],
   );
   return (
     <TooltipProvider delayDuration={300}>
@@ -467,7 +584,10 @@ function TemplateWorkspaceCanvas(): ReactElement {
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
+          onPaneClick={handlePaneClick}
+          onSelectionChange={handleSelectionChange}
           onNodeClick={(_event, node) => setSelection(selectionFromNodeId(node.id, template))}
+          onNodeDragStart={handleNodeDragStart}
           onNodeDrag={handleNodeDrag}
           onNodeDragStop={handleNodeDragStop}
           nodeTypes={NODE_TYPES}

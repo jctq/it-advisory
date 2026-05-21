@@ -6,6 +6,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { TemplateEditorUndoControls } from '@/components/admin/diagnostic-template-editor/template-editor-undo-controls';
 import { useTemplateEditor } from '@/components/admin/diagnostic-template-editor/template-editor-context';
+import { WorkspaceFullscreenToggle } from '@/components/admin/diagnostic-template-editor/workspace-fullscreen-toggle';
 import type { DiagnosticTemplateEditorView } from '@/components/admin/diagnostic-template-editor/workspace-layout-storage';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';

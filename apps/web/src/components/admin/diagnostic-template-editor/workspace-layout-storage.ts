@@ -117,14 +117,24 @@ export function writeWorkspaceSnapSettings(settings: WorkspaceSnapSettings): voi
 
 export const EDITOR_VIEW_STORAGE_KEY = 'diagnostic-template-editor-view';
 
+const EDITOR_VIEW_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+
 export type DiagnosticTemplateEditorView = 'classic' | 'workspace';
+
+function parseEditorViewValue(value: string | undefined | null): DiagnosticTemplateEditorView {
+  return value === 'workspace' ? 'workspace' : 'classic';
+}
+
+/** Reads the editor view from a request cookie value (server-safe). */
+export function readEditorViewFromCookieValue(cookieValue: string | undefined): DiagnosticTemplateEditorView {
+  return parseEditorViewValue(cookieValue);
+}
 
 export function readPersistedEditorView(): DiagnosticTemplateEditorView {
   if (typeof window === 'undefined') {
     return 'classic';
   }
-  const value = window.localStorage.getItem(EDITOR_VIEW_STORAGE_KEY);
-  return value === 'workspace' ? 'workspace' : 'classic';
+  return parseEditorViewValue(window.localStorage.getItem(EDITOR_VIEW_STORAGE_KEY));
 }
 
 export function writePersistedEditorView(view: DiagnosticTemplateEditorView): void {
@@ -132,4 +142,5 @@ export function writePersistedEditorView(view: DiagnosticTemplateEditorView): vo
     return;
   }
   window.localStorage.setItem(EDITOR_VIEW_STORAGE_KEY, view);
+  document.cookie = `${EDITOR_VIEW_STORAGE_KEY}=${view};path=/;max-age=${EDITOR_VIEW_COOKIE_MAX_AGE_SECONDS};SameSite=Lax`;
 }

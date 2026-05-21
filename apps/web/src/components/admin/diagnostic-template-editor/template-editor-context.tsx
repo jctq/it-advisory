@@ -10,12 +10,20 @@ import {
   type DiagnosticTemplateRoundValue,
 } from '@/components/admin/diagnostic-template-editor/diagnostic-template-editor-utils';
 import {
+  areWorkspaceLayoutsEqual,
   buildRedoHistoryState,
   buildUndoHistoryState,
   createEmptyTemplateHistoryState,
-  pushTemplateHistoryEntry,
+  pushEditorHistoryEntry,
+  type TemplateEditorHistorySnapshot,
   type TemplateEditorHistoryState,
 } from '@/components/admin/diagnostic-template-editor/template-editor-history';
+import {
+  clearWorkspaceLayout,
+  readWorkspaceLayout,
+  writeWorkspaceLayout,
+  type WorkspaceLayoutSnapshot,
+} from '@/components/admin/diagnostic-template-editor/workspace-layout-storage';
 import type { DiagnosticTemplateValue, DiagnosticTemplateVisibilityRule } from '@/lib/diagnostic-template-types';
 import { notifyError, notifySuccess } from '@/lib/notify';
 
@@ -34,6 +42,7 @@ export type TemplateEditorSelection =
 
 type TemplateEditorContextValue = {
   readonly template: DiagnosticTemplateValue;
+  readonly layoutRevision: number;
   readonly hasUnsavedChanges: boolean;
   readonly isSaving: boolean;
   readonly canUndo: boolean;
@@ -42,8 +51,14 @@ type TemplateEditorContextValue = {
   readonly setSelection: (selection: TemplateEditorSelection) => void;
   readonly updateTemplate: (
     updater: (template: DiagnosticTemplateValue) => DiagnosticTemplateValue,
-    options?: { readonly shouldReindex?: boolean },
+    options?: { readonly shouldReindex?: boolean; readonly recordHistory?: boolean },
   ) => void;
+  readonly commitWorkspaceLayout: (
+    nextLayout: WorkspaceLayoutSnapshot,
+    options?: { readonly previousLayout?: WorkspaceLayoutSnapshot | null; readonly recordHistory?: boolean },
+  ) => void;
+  readonly refreshWorkspaceLayout: () => void;
+  readonly pushEditorHistorySnapshot: (previousSnapshot: TemplateEditorHistorySnapshot) => void;
   readonly executeUndo: () => void;
   readonly executeRedo: () => void;
   readonly executeSave: () => Promise<void>;
@@ -59,10 +74,13 @@ type TemplateEditorProviderProps = {
 
 export function TemplateEditorProvider(props: TemplateEditorProviderProps): ReactElement {
   const [template, setTemplate] = useState<DiagnosticTemplateValue>(props.initialTemplate);
+  const templateRef = useRef<DiagnosticTemplateValue>(template);
+  templateRef.current = template;
   const [savedPatchBody, setSavedPatchBody] = useState<string>(() => buildTemplatePatchBody(props.initialTemplate));
   const [history, setHistory] = useState<TemplateEditorHistoryState>(() => createEmptyTemplateHistoryState());
   const historyRef = useRef<TemplateEditorHistoryState>(history);
   historyRef.current = history;
+  const [layoutRevision, setLayoutRevision] = useState<number>(0);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [selection, setSelection] = useState<TemplateEditorSelection>(null);
   const hasUnsavedChanges = useMemo(
@@ -71,47 +89,98 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
   );
   const canUndo = history.past.length > 0;
   const canRedo = history.future.length > 0;
+  const bumpLayoutRevision = useCallback((): void => {
+    setLayoutRevision((revision) => revision + 1);
+  }, []);
+  const readCurrentEditorSnapshot = useCallback((): TemplateEditorHistorySnapshot => {
+    return {
+      template: templateRef.current,
+      layout: readWorkspaceLayout(templateRef.current.id),
+    };
+  }, []);
+  const restoreWorkspaceLayout = useCallback(
+    (layout: WorkspaceLayoutSnapshot | null): void => {
+      const templateId = templateRef.current.id;
+      if (layout === null) {
+        clearWorkspaceLayout(templateId);
+      } else {
+        writeWorkspaceLayout(templateId, layout);
+      }
+      bumpLayoutRevision();
+    },
+    [bumpLayoutRevision],
+  );
+  const refreshWorkspaceLayout = useCallback((): void => {
+    bumpLayoutRevision();
+  }, [bumpLayoutRevision]);
+  const pushEditorHistorySnapshot = useCallback((previousSnapshot: TemplateEditorHistorySnapshot): void => {
+    setHistory((currentHistory) => pushEditorHistoryEntry({ history: currentHistory, previousSnapshot }));
+  }, []);
+  const commitWorkspaceLayout = useCallback(
+    (
+      nextLayout: WorkspaceLayoutSnapshot,
+      options: { readonly previousLayout?: WorkspaceLayoutSnapshot | null; readonly recordHistory?: boolean } = {},
+    ): void => {
+      const recordHistory = options.recordHistory !== false;
+      const previousLayout = options.previousLayout ?? readWorkspaceLayout(templateRef.current.id);
+      if (recordHistory && !areWorkspaceLayoutsEqual(previousLayout, nextLayout)) {
+        pushEditorHistorySnapshot({ template: templateRef.current, layout: previousLayout });
+      }
+      writeWorkspaceLayout(templateRef.current.id, nextLayout);
+      bumpLayoutRevision();
+    },
+    [bumpLayoutRevision, pushEditorHistorySnapshot],
+  );
   const updateTemplate = useCallback(
     (
       updater: (template: DiagnosticTemplateValue) => DiagnosticTemplateValue,
-      options: { readonly shouldReindex?: boolean } = {},
+      options: { readonly shouldReindex?: boolean; readonly recordHistory?: boolean } = {},
     ): void => {
+      const recordHistory = options.recordHistory !== false;
       setTemplate((previous) => {
         const next = updateTemplateWithReindex(previous, updater, options.shouldReindex !== false);
         if (buildTemplatePatchBody(previous) === buildTemplatePatchBody(next)) {
           return previous;
         }
-        setHistory((currentHistory) => pushTemplateHistoryEntry({ history: currentHistory, previousTemplate: previous }));
+        if (recordHistory) {
+          setHistory((currentHistory) =>
+            pushEditorHistoryEntry({
+              history: currentHistory,
+              previousSnapshot: { template: previous, layout: readWorkspaceLayout(previous.id) },
+            }),
+          );
+        }
         return next;
       });
     },
     [],
   );
   const executeUndo = useCallback((): void => {
-    setTemplate((current) => {
-      const undoState = buildUndoHistoryState({ history: historyRef.current, currentTemplate: current });
-      if (undoState === null) {
-        return current;
-      }
-      setHistory(undoState.history);
-      return undoState.template;
-    });
-  }, []);
+    const currentSnapshot = readCurrentEditorSnapshot();
+    const undoState = buildUndoHistoryState({ history: historyRef.current, currentSnapshot });
+    if (undoState === null) {
+      return;
+    }
+    setHistory(undoState.history);
+    setTemplate(undoState.snapshot.template);
+    restoreWorkspaceLayout(undoState.snapshot.layout);
+  }, [readCurrentEditorSnapshot, restoreWorkspaceLayout]);
   const executeRedo = useCallback((): void => {
-    setTemplate((current) => {
-      const redoState = buildRedoHistoryState({ history: historyRef.current, currentTemplate: current });
-      if (redoState === null) {
-        return current;
-      }
-      setHistory(redoState.history);
-      return redoState.template;
-    });
-  }, []);
+    const currentSnapshot = readCurrentEditorSnapshot();
+    const redoState = buildRedoHistoryState({ history: historyRef.current, currentSnapshot });
+    if (redoState === null) {
+      return;
+    }
+    setHistory(redoState.history);
+    setTemplate(redoState.snapshot.template);
+    restoreWorkspaceLayout(redoState.snapshot.layout);
+  }, [readCurrentEditorSnapshot, restoreWorkspaceLayout]);
   const replaceTemplate = useCallback((nextTemplate: DiagnosticTemplateValue): void => {
     setTemplate(nextTemplate);
     setSavedPatchBody(buildTemplatePatchBody(nextTemplate));
     setHistory(createEmptyTemplateHistoryState());
-  }, []);
+    bumpLayoutRevision();
+  }, [bumpLayoutRevision]);
   const executeSave = useCallback(async (): Promise<void> => {
     setIsSaving(true);
     try {
@@ -135,6 +204,7 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
   const value = useMemo<TemplateEditorContextValue>(
     () => ({
       template,
+      layoutRevision,
       hasUnsavedChanges,
       isSaving,
       canUndo,
@@ -142,6 +212,9 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
       selection,
       setSelection,
       updateTemplate,
+      commitWorkspaceLayout,
+      refreshWorkspaceLayout,
+      pushEditorHistorySnapshot,
       executeUndo,
       executeRedo,
       executeSave,
@@ -150,11 +223,15 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
     [
       canRedo,
       canUndo,
+      commitWorkspaceLayout,
       executeRedo,
       executeSave,
       executeUndo,
       hasUnsavedChanges,
       isSaving,
+      layoutRevision,
+      pushEditorHistorySnapshot,
+      refreshWorkspaceLayout,
       replaceTemplate,
       selection,
       template,

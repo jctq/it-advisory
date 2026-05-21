@@ -8,13 +8,24 @@ type TemplateEditorHeaderProps = {
   readonly hasUnsavedChanges: boolean;
   readonly actions: ReactNode;
   readonly className?: string;
+  /** Pin while scrolling (classic editor). Off in workspace — header stays in the flex column. */
+  readonly isSticky?: boolean;
+  /** When true, sticks to the viewport top (workspace fullscreen). */
+  readonly isFullscreen?: boolean;
 };
 
 export function TemplateEditorHeader(props: TemplateEditorHeaderProps): ReactElement {
+  const isSticky = props.isSticky === true;
+  const isFullscreen = props.isFullscreen === true;
   return (
     <header
       className={cn(
-        'flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border pb-3',
+        'flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border py-3',
+        isSticky
+          ? 'sticky z-19 isolate bg-background shadow-sm'
+          : 'bg-background',
+        isSticky && !isFullscreen && 'top-(--admin-sticky-top,4rem)',
+        isSticky && isFullscreen && 'top-0',
         props.className,
       )}
     >

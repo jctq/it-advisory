@@ -181,6 +181,14 @@ function normalizeExampleBullets(exampleBullets: readonly string[]): readonly st
   return exampleBullets.map((exampleBullet) => exampleBullet.trim()).filter((exampleBullet) => exampleBullet.length > 0);
 }
 
+export function parseExampleBulletsInput(input: string): readonly string[] {
+  return input.split('\n');
+}
+
+export function normalizeExampleBulletsValue(exampleBullets: readonly string[]): readonly string[] {
+  return normalizeExampleBullets(exampleBullets);
+}
+
 export function normalizeVisibilityRuleValue(rule: DiagnosticTemplateVisibilityRule): DiagnosticTemplateVisibilityRule {
   if (rule === null) {
     return null;
