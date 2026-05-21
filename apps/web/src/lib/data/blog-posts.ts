@@ -13,6 +13,7 @@ import {
   type UpdateBlogPostInput,
 } from '@/lib/blog-post-types';
 import { buildBlogPostRevisionSnapshot } from '@/lib/blog-post-revision-types';
+import { normalizeBlogContentMarkdown } from '@/lib/blog-markdown-normalize';
 import { recordBlogPostRevision, deleteBlogPostRevisionsForPost } from '@/lib/data/blog-post-revisions';
 import { getDb } from '@/lib/mongodb';
 
@@ -219,7 +220,7 @@ export async function createBlogPost(input: CreateBlogPostInput = {}): Promise<B
     title,
     description: normalizeOptionalDescription(input.description),
     slug,
-    contentMarkdown: input.contentMarkdown ?? '',
+    contentMarkdown: normalizeBlogContentMarkdown(input.contentMarkdown ?? ''),
     status,
     showInBlogList: input.showInBlogList ?? true,
     showTitle: input.showTitle ?? true,
@@ -252,7 +253,10 @@ export async function updateBlogPost(postId: string, input: UpdateBlogPostInput)
   const nextTitle = input.title === undefined ? current.title : normalizeOptionalTitle(input.title);
   const nextDescription =
     input.description === undefined ? (current.description ?? null) : normalizeOptionalDescription(input.description);
-  const nextContentMarkdown = input.contentMarkdown ?? current.contentMarkdown;
+  const nextContentMarkdown =
+    input.contentMarkdown === undefined
+      ? current.contentMarkdown
+      : normalizeBlogContentMarkdown(input.contentMarkdown);
   const nextStatus: BlogPostStatus = input.status ?? current.status;
   const nextShowInBlogList = input.showInBlogList ?? current.showInBlogList !== false;
   const nextShowTitle = input.showTitle ?? current.showTitle !== false;

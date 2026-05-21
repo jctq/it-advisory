@@ -3,6 +3,7 @@
 import { Streamdown } from 'streamdown';
 import { useMemo, type ComponentProps, type ReactElement } from 'react';
 import remarkBreaks from 'remark-breaks';
+import { normalizeBlogContentMarkdown } from '@/lib/blog-markdown-normalize';
 import { cn } from '@/lib/utils';
 
 /** Blocked if raw HTML in CMS markdown slips past sanitization. */
@@ -51,6 +52,10 @@ type MarketingBlogProseProps = {
  */
 export function MarketingBlogProse(props: MarketingBlogProseProps): ReactElement {
   const streamdownComponents = useMemo(() => BLOG_PROSE_STREAMDOWN_COMPONENTS, []);
+  const contentMarkdown = useMemo(
+    () => normalizeBlogContentMarkdown(props.contentMarkdown),
+    [props.contentMarkdown],
+  );
   return (
     <Streamdown
       mode="static"
@@ -82,7 +87,7 @@ export function MarketingBlogProse(props: MarketingBlogProseProps): ReactElement
         props.className,
       )}
     >
-      {props.contentMarkdown}
+      {contentMarkdown}
     </Streamdown>
   );
 }

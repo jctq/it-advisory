@@ -127,7 +127,7 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
       : 'Draft — hidden from the marketing site until published.';
 
   return (
-    <section className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-[90rem] flex-col">
+    <section className="mx-auto flex min-h-0 w-full flex-1 flex-col">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Button type="button" variant="ghost" size="sm" className="gap-2" asChild>
@@ -168,7 +168,7 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
           </div>
         </div>
       </header>
-      <div className="flex flex-1 flex-col gap-6 px-4 py-6 pb-32 lg:flex-row lg:items-start lg:px-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 pb-32 lg:flex-row lg:items-stretch lg:px-6">
         <BlogPostEditorSidebar
           post={post}
           title={title}
@@ -187,32 +187,40 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
           onRegenerateSlug={executeRegenerateSlug}
           onCopyEmbedId={() => void executeCopyEmbedId()}
         />
-        <div className="min-w-0 flex-1">
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-            <Tabs defaultValue="edit" className="flex flex-col">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex min-h-80 min-w-0 flex-1 flex-col lg:min-h-0">
+          <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <Tabs defaultValue="edit" className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)]">
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
                 <TabsList className="h-9">
-                  <TabsTrigger value="edit" className="min-w-[4.5rem]">
+                  <TabsTrigger value="edit" className="min-w-18">
                     Write
                   </TabsTrigger>
-                  <TabsTrigger value="preview" className="min-w-[4.5rem]">
+                  <TabsTrigger value="preview" className="min-w-18">
                     Preview
                   </TabsTrigger>
                 </TabsList>
                 <p className="text-xs text-muted-foreground">
-                  Paste or drop images (JPEG, PNG, GIF, WebP, max 5 MB) · extra blank lines kept on save ·{' '}
-                  <span className="text-foreground/80">Shift+Enter</span> for a line break in a paragraph
+                  <span className="text-foreground/80">Rich text</span> and{' '}
+                  <span className="text-foreground/80">Source</span> stay in sync when you switch. Paste long posts in
+                  Source. Images: JPEG, PNG, GIF, WebP (max 5 MB) · <span className="text-foreground/80">Shift+Enter</span>{' '}
+                  for a line break
                 </p>
               </div>
-              <TabsContent value="edit" className="mt-0 min-h-[min(70dvh,720px)] p-2 focus-visible:outline-none">
+              <TabsContent
+                value="edit"
+                className="mt-0 row-start-2 min-h-0 overflow-hidden focus-visible:outline-none data-[state=inactive]:hidden"
+              >
                 <AdminBlogMarkdownEditor
                   editorKey={editorKey}
                   markdown={contentMarkdown}
                   onMarkdownChange={setContentMarkdown}
                 />
               </TabsContent>
-              <TabsContent value="preview" className="mt-0 focus-visible:outline-none">
-                <div className="min-h-[min(70dvh,720px)] p-6 sm:p-8">
+              <TabsContent
+                value="preview"
+                className="mt-0 row-start-2 min-h-0 overflow-y-auto focus-visible:outline-none data-[state=inactive]:hidden"
+              >
+                <div className="p-6 sm:p-8">
                   {contentMarkdown.trim().length > 0 ? (
                     <article className="mx-auto space-y-4">
                       {showTitle && title.trim().length > 0 ? (
@@ -256,7 +264,6 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
         resetLabel="Discard changes"
         onReset={executeReset}
         isResetDisabled={!isDirty || isSaving}
-        className="max-w-[90rem]"
       />
       <BlogPostEditHistoryDialog
         postId={post.id}

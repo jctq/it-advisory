@@ -1157,8 +1157,84 @@
   color: var(--foreground);
 }
 
+.admin-blog-editor-shell {
+  min-height: 0;
+}
+
+.admin-blog-mdx-editor-overlay {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .admin-blog-mdx-editor.mdxeditor {
   background-color: var(--card);
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-blog-mdx-editor.mdxeditor > .mdxeditor-toolbar,
+.admin-blog-mdx-editor.mdxeditor > [class*='toolbarRoot'],
+.admin-blog-mdx-editor .mdxeditor-toolbar,
+.admin-blog-mdx-editor [class*='toolbarRoot'] {
+  flex-shrink: 0;
+}
+
+.admin-blog-mdx-editor.mdxeditor > .mdxeditor-diff-source-wrapper,
+.admin-blog-mdx-editor .mdxeditor-diff-source-wrapper {
+  display: flex !important;
+  flex: 1 1 0%;
+  flex-direction: column;
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* MDXEditor hides rich text with inline display:none — never override that with flex !important */
+.admin-blog-mdx-editor .mdxeditor-rich-text-editor {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-blog-mdx-editor .mdxeditor-rich-text-editor:not([style*='display: none']):not([style*='display:none']) {
+  display: flex !important;
+  flex-direction: column;
+}
+
+.admin-blog-mdx-editor .mdxeditor-source-editor {
+  display: flex !important;
+  flex: 1 1 0%;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-blog-mdx-editor .mdxeditor-root-contenteditable {
+  display: flex !important;
+  flex: 1 1 0%;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.admin-blog-mdx-editor .mdxeditor-source-editor .cm-editor {
+  flex: 1 1 0%;
+  height: 100% !important;
+  min-height: 0;
+}
+
+.admin-blog-mdx-editor .mdxeditor-source-editor .cm-scroller {
+  flex: 1 1 0%;
+  min-height: 0 !important;
+  overflow: auto !important;
 }
 
 .admin-blog-mdx-editor .mdxeditor-root-contenteditable [class*='contentEditable'] {
@@ -1187,6 +1263,81 @@
 .admin-blog-mdx-editor [class*='toolbarToggleItem'][data-state='on'],
 .admin-blog-mdx-editor [class*='toolbarButton'][data-state='on'] {
   background-color: var(--secondary) !important;
+  color: var(--foreground) !important;
+}
+
+/* Rich text / Source segmented control (toolbar right) */
+.admin-blog-mdx-editor [class*='diffSourceToggleWrapper'] {
+  margin-left: auto;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggleWrapper'] [class*='toolbarGroupOfGroups'] {
+  margin: 0;
+  background: transparent !important;
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggle'] {
+  display: inline-flex !important;
+  gap: 0.25rem;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggle'] [class*='toolbarToggleItem'] {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0 !important;
+  border-radius: calc(var(--radius-md) - 2px) !important;
+  background-color: transparent !important;
+  color: var(--muted-foreground) !important;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggle'] [class*='toolbarToggleItem'] > span {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  line-height: 0;
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggle'] [class*='toolbarToggleItem'] svg {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.72;
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggle'] [class*='toolbarToggleItem'][data-state='on'] {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.22),
+    0 0 0 1px color-mix(in srgb, var(--primary) 28%, var(--border));
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggle'] [class*='toolbarToggleItem'][data-state='on'] svg {
+  opacity: 1;
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggle'] [class*='toolbarToggleItem']:hover:not([data-state='on']) {
+  background-color: color-mix(in srgb, var(--foreground) 7%, transparent) !important;
+  color: var(--foreground) !important;
+}
+
+.admin-blog-mdx-editor [class*='diffSourceToggle'] [class*='toolbarToggleItem'][data-state='on']:hover {
+  background-color: var(--card) !important;
   color: var(--foreground) !important;
 }
 

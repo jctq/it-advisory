@@ -12,7 +12,7 @@ const AdminBlogMdxEditor = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex min-h-[320px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
+      <div className="absolute inset-0 flex items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
         Loading editor…
       </div>
     ),
@@ -28,12 +28,14 @@ type AdminBlogMarkdownEditorProps = {
 
 export function AdminBlogMarkdownEditor(props: AdminBlogMarkdownEditorProps): ReactElement {
   return (
-    <div className={cn('overflow-hidden rounded-lg border border-border bg-card', props.className)}>
-      <AdminBlogMdxEditor
-        key={props.editorKey}
-        markdown={props.markdown}
-        onMarkdownChange={props.onMarkdownChange}
-      />
+    <div className={cn('admin-blog-editor-shell relative min-h-0 size-full', props.className)}>
+      <div className="absolute inset-0 overflow-hidden rounded-lg border border-border bg-card">
+        <AdminBlogMdxEditor
+          key={props.editorKey}
+          markdown={props.markdown}
+          onMarkdownChange={props.onMarkdownChange}
+        />
+      </div>
     </div>
   );
 }

@@ -193,8 +193,8 @@ export function AdminShell(props: AdminShellProps) {
               </div>
             </div>
           </div>
-          <main className={cn('flex-1')}>
-            <div className="bg-background/80 px-3 py-4">
+          <main className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col bg-background/80 px-3 py-4">
               {props.children}
             </div>
           </main>
