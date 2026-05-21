@@ -24,7 +24,7 @@ export function MarketingBlogIndex(props: MarketingBlogIndexProps): ReactElement
   const showFeaturedPost = props.page === 1 && props.posts.length > 0;
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 md:py-16 lg:py-20">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto">
         <MarketingSectionHeader
           eyebrow="Resources"
           title="Blog"

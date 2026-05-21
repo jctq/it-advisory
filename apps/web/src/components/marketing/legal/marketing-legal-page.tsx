@@ -42,7 +42,7 @@ export async function MarketingLegalPage(props: MarketingLegalPageProps): Promis
   const siblingPath = LEGAL_DOCUMENT_PATHS[siblingId];
   return (
     <main className="mx-auto max-w-6xl px-6 py-16">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">{props.eyebrow}</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
         <p className="mt-3 text-sm text-muted-foreground">{pageSubtitle}</p>
