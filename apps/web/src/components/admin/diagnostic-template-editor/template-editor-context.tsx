@@ -292,6 +292,7 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
       refreshWorkspaceLayout,
       replaceTemplate,
       selection,
+      setSelection,
       template,
       updateTemplate,
     ],

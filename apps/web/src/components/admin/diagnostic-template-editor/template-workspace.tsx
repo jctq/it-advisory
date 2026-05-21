@@ -232,10 +232,7 @@ function TemplateWorkspaceCanvas(): ReactElement {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [dropTargetRoundId, setDropTargetRoundId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const [snapSettings, setSnapSettings] = useState<WorkspaceSnapSettings>(DEFAULT_WORKSPACE_SNAP_SETTINGS);
-  useEffect(() => {
-    setSnapSettings(readWorkspaceSnapSettings());
-  }, []);
+  const [snapSettings, setSnapSettings] = useState<WorkspaceSnapSettings>(() => readWorkspaceSnapSettings());
   const [snapGuides, setSnapGuides] = useState<SnapGuideLines | null>(null);
   const layoutBeforeInteractionRef = useRef<WorkspaceLayoutSnapshot | null>(null);
   const pendingLayoutCommitRef = useRef<{
