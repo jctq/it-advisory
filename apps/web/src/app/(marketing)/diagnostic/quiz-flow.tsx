@@ -758,9 +758,6 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           marketingBookHref={
             sessionTargetId !== null ? buildMarketingBookSessionPath(sessionTargetId) : undefined
           }
-          reviewDiagnosticHref={
-            sessionTargetId !== null ? buildMarketingQuizSessionPath(sessionTargetId) : '/diagnostic'
-          }
           onGoBack={executeGoBack}
           onGuidedChange={setGuided}
         />

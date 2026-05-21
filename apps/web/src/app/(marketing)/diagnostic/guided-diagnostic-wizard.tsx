@@ -1120,8 +1120,6 @@ export type GuidedDiagnosticWizardProps = {
   readonly sessionReadOnly?: boolean;
   /** Destination for “Book this session” from the outcome panel (`/book/[sessionRef]` when the quiz URL targets a row). */
   readonly marketingBookHref?: string;
-  /** Destination for “Review diagnostic” (use `/diagnostic/[sessionRef]` when the diagnostic URL targets a persisted row). */
-  readonly reviewDiagnosticHref?: string;
   /**
    * When set, `/api/quiz/diagnostic-template` is scoped to this session so the pinned template is used on revisit
    * even if the admin activated a different template later.
@@ -1250,7 +1248,6 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     suppressEmptyTemplateBootstrap = false,
     sessionReadOnly = false,
     marketingBookHref,
-    reviewDiagnosticHref = '/diagnostic',
     templateSessionMarketingRef = null,
   } = props;
   const executeGoBackWithScroll = useCallback((): void => {
@@ -1948,7 +1945,21 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       setIsAwaitingApi(false);
     }
   }, [activeTemplate, diagnosticAiEnabled, executeFetchRound, executeFetchTemplateSummary, guided, onGuidedChange, sessionReadOnly]);
-  if (guided.outcome !== null && !(sessionReadOnly && guided.activeRound !== null)) {
+  const executeOpenDiagnosticReview = useCallback((): void => {
+    onGuidedChange((previous) => {
+      if (previous.completedBundles.length > 0) {
+        const peeked = applyGuidedPeekCompletedBundleIndex(previous, 0);
+        return peeked ?? previous;
+      }
+      return {
+        ...previous,
+        activeRound: null,
+        outcome: null,
+      };
+    });
+    scheduleScrollQuizWizardToTop();
+  }, [onGuidedChange]);
+  if (guided.outcome !== null && guided.activeRound === null) {
     const { advisorSummary, briefAssessment, sessionTitle, goodFitBullets } = guided.outcome;
     return (
       <div>
@@ -2016,8 +2027,8 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
                 </Link>
               </Button>
             ) : null}
-            <Button asChild variant="outline" className="mt-3 w-full">
-              <Link href={reviewDiagnosticHref}>Review diagnostic</Link>
+            <Button type="button" variant="outline" className="mt-3 w-full" onClick={executeOpenDiagnosticReview}>
+              Review diagnostic
             </Button>
           </aside>
         </div>
