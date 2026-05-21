@@ -480,10 +480,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
         router.push('/account/diagnostics');
         return;
       }
-      setGuided(GUIDED_DIAGNOSTIC_EMPTY);
-      hasHydratedRef.current = true;
-      skipNextSessionHydrationRef.current = true;
-      router.replace('/diagnostic');
+      router.replace('/');
     } finally {
       setIsDeleting(false);
     }

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { countBookingsByQuizSessionId, findPrimaryBookingSlotByQuizSessionId } from '@/lib/data/bookings';
-import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import {
   deleteQuizSessionForVisitor,
   findLatestQuizSession,
@@ -21,13 +20,6 @@ const patchBodySchema = z.object({
   completed: z.boolean().optional(),
   sessionId: z.string().min(1).max(512).optional(),
 });
-
-const RESET_QUIZ_ANSWERS = {
-  guidedDiagnostic: serializeGuidedDiagnostic(GUIDED_DIAGNOSTIC_EMPTY),
-  situation: '',
-  situationAdvisorSummary: '',
-  situationDiagnosticThread: buildDiagnosticThreadJson(GUIDED_DIAGNOSTIC_EMPTY),
-} as const;
 
 type OptionalSessionIdQuery =
   | { readonly status: 'absent' }
@@ -208,16 +200,19 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     }
   }
 
-  const result = await upsertQuizProgress({
-    visitorId,
-    answers: RESET_QUIZ_ANSWERS,
-    currentStep: 0,
-    isComplete: false,
-  });
-
+  if (latestSession._id === undefined) {
+    return NextResponse.json({
+      persisted: false,
+      reset: false,
+      sessionId: null,
+    });
+  }
+  const outcome = await deleteQuizSessionForVisitor(visitorId, latestSession._id.toString());
+  if (outcome.ok === false) {
+    return NextResponse.json({ error: 'Session not found', code: 'quiz_session_not_found' }, { status: 404 });
+  }
   return NextResponse.json({
-    persisted: result.persisted,
-    reset: true,
-    sessionId: result.sessionId !== undefined ? encodeQuizSessionRefForMarketingUrl(result.sessionId) : null,
+    deleted: true as const,
+    sessionId: encodeQuizSessionRefForMarketingUrl(latestSession._id.toString()),
   });
 }
