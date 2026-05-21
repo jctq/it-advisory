@@ -5,15 +5,18 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  PanOnScrollMode,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
   useReactFlow,
   type Connection,
+  type Edge,
   type Node,
   type NodeChange,
   type OnConnect,
+  type OnReconnect,
   type OnSelectionChangeFunc,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -34,10 +37,39 @@ import {
 import {
   WorkspaceCanvasSettingsProvider,
 } from '@/components/admin/diagnostic-template-editor/workspace-canvas-settings-context';
-import type { WorkspaceStructuralConnectionOrientation } from '@/components/admin/diagnostic-template-editor/workspace-connection-orientation';
+import {
+  isChildSourceHandle,
+  isChildTargetHandle,
+  isOwnsSourceHandle,
+  isOwnsTargetHandle,
+  type WorkspaceStructuralConnectionOrientation,
+} from '@/components/admin/diagnostic-template-editor/workspace-connection-orientation';
+import {
+  detachQuestionNodeForDrag,
+  elevateNodeForDrag,
+  reattachQuestionNodeAtRelativePosition,
+  resolveRoundIdAtFlowPosition,
+  WORKSPACE_DRAGGING_Z_INDEX,
+} from '@/components/admin/diagnostic-template-editor/workspace-round-hit-test';
+import {
+  applyQuestionDropLayout,
+  applyQuestionSameRoundMoveLayout,
+} from '@/components/admin/diagnostic-template-editor/workspace-round-placement';
+import { computeRoundFitDimensions } from '@/components/admin/diagnostic-template-editor/workspace-round-bounds';
+import {
+  collectWorkspaceNodeIdsForMovedQuestion,
+  moveChildQuestionToOption,
+  moveOptionToQuestion,
+  moveQuestionAfterPredecessor,
+  moveQuestionToRound,
+  parseChildQuestionIdFromNodeId,
+  parseOptionIdFromNodeId,
+  parseQuestionIdFromNodeId,
+} from '@/components/admin/diagnostic-template-editor/workspace-structural-mutations';
 import { WorkspaceToolbar } from '@/components/admin/diagnostic-template-editor/workspace-toolbar';
 import {
   buildDefaultVisibilityRuleForSource,
+  findOptionById,
   findQuestionById,
 } from '@/components/admin/diagnostic-template-editor/diagnostic-template-editor-utils';
 import {
@@ -94,6 +126,69 @@ const NODE_TYPES = {
   workspaceCard: WorkspaceCardNode,
 };
 
+/** React Flow requires parent nodes before children in the nodes array. */
+function orderNodesForDragRender(
+  nodes: readonly Node<WorkspaceNodeData>[],
+  draggingNodeId: string | null,
+): readonly Node<WorkspaceNodeData>[] {
+  if (draggingNodeId === null) {
+    return nodes;
+  }
+  const draggedNode = nodes.find((node) => node.id === draggingNodeId);
+  if (draggedNode === undefined) {
+    return nodes;
+  }
+  if (draggedNode.data.kind === 'round') {
+    const rest = nodes.filter(
+      (node) => node.id !== draggingNodeId && node.parentId !== draggingNodeId,
+    );
+    const children = nodes.filter((node) => node.parentId === draggingNodeId);
+    return [...rest, draggedNode, ...children];
+  }
+  return [
+    ...nodes.filter((node) => node.id !== draggingNodeId),
+    draggedNode,
+  ];
+}
+
+function applyRoundFitDimensionsToNodes(
+  currentNodes: readonly Node<WorkspaceNodeData>[],
+  template: DiagnosticTemplateValue,
+): Node<WorkspaceNodeData>[] {
+  const layoutFromNodes = collectLayoutFromNodes(currentNodes);
+  return currentNodes.map((node) => {
+    if (node.data.kind !== 'round' || node.data.roundId === undefined) {
+      return node;
+    }
+    const round = template.rounds.find((candidate) => candidate.id === node.data.roundId);
+    if (round === undefined) {
+      return node;
+    }
+    const fitDimensions = computeRoundFitDimensions({ round, layout: layoutFromNodes });
+    const currentWidth =
+      typeof node.style?.width === 'number'
+        ? node.style.width
+        : typeof node.width === 'number'
+          ? node.width
+          : fitDimensions.width;
+    const currentHeight =
+      typeof node.style?.height === 'number'
+        ? node.style.height
+        : typeof node.height === 'number'
+          ? node.height
+          : fitDimensions.height;
+    const nextWidth = Math.max(currentWidth, fitDimensions.width);
+    const nextHeight = Math.max(currentHeight, fitDimensions.height);
+    if (nextWidth === currentWidth && nextHeight === currentHeight) {
+      return node;
+    }
+    return {
+      ...node,
+      style: { ...node.style, width: nextWidth, height: nextHeight },
+    };
+  });
+}
+
 function resolveSelectedNodeId(
   editorSelection: TemplateEditorSelection,
   template: DiagnosticTemplateValue,
@@ -133,14 +228,20 @@ function TemplateWorkspaceCanvas(): ReactElement {
     selection,
   } = useTemplateEditor();
   const { isDark } = useWorkspaceAppearance();
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [snapSettings, setSnapSettings] = useState<WorkspaceSnapSettings>(() => readWorkspaceSnapSettings());
+  const [dropTargetRoundId, setDropTargetRoundId] = useState<string | null>(null);
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [snapSettings, setSnapSettings] = useState<WorkspaceSnapSettings>(DEFAULT_WORKSPACE_SNAP_SETTINGS);
+  useEffect(() => {
+    setSnapSettings(readWorkspaceSnapSettings());
+  }, []);
   const [snapGuides, setSnapGuides] = useState<SnapGuideLines | null>(null);
   const layoutBeforeInteractionRef = useRef<WorkspaceLayoutSnapshot | null>(null);
   const pendingLayoutCommitRef = useRef<{
     readonly resizedNodeIds?: ReadonlySet<string>;
     readonly previousLayout?: WorkspaceLayoutSnapshot | null;
+    readonly onlyPersistNodeIds?: ReadonlySet<string>;
   } | null>(null);
   const layout = useMemo(() => {
     void layoutRevision;
@@ -160,10 +261,14 @@ function TemplateWorkspaceCanvas(): ReactElement {
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);
   const shouldFitViewOnTemplateLoadRef = useRef<boolean>(true);
   const shouldFitViewAfterResetRef = useRef<boolean>(false);
+  const isQuestionCrossRoundDragRef = useRef<boolean>(false);
   useEffect(() => {
     shouldFitViewOnTemplateLoadRef.current = true;
   }, [template.id]);
   useEffect(() => {
+    if (isQuestionCrossRoundDragRef.current) {
+      return;
+    }
     setNodes(graph.nodes);
     setEdges(graph.edges);
     const shouldFitView = shouldFitViewOnTemplateLoadRef.current || shouldFitViewAfterResetRef.current;
@@ -193,6 +298,7 @@ function TemplateWorkspaceCanvas(): ReactElement {
         readonly resizedNodeIds?: ReadonlySet<string>;
         readonly previousLayout?: WorkspaceLayoutSnapshot | null;
         readonly recordHistory?: boolean;
+        readonly onlyPersistNodeIds?: ReadonlySet<string>;
       } = {},
     ): void => {
       const existingLayout = readWorkspaceLayout(template.id);
@@ -204,7 +310,25 @@ function TemplateWorkspaceCanvas(): ReactElement {
           }
         }
       }
-      const nextLayout = collectLayoutFromNodes(nextNodes, { userSizedNodeIds });
+      const rawLayout = collectLayoutFromNodes(nextNodes, { userSizedNodeIds });
+      const persistedEntries = Object.entries(rawLayout.nodes).map(([nodeId, entry]) => {
+        if (userSizedNodeIds.has(nodeId)) {
+          return [nodeId, entry] as const;
+        }
+        return [nodeId, { x: entry.x, y: entry.y }] as const;
+      });
+      const nextLayoutNodes: WorkspaceLayoutSnapshot['nodes'] =
+        options.onlyPersistNodeIds === undefined
+          ? Object.fromEntries(persistedEntries)
+          : {
+              ...(existingLayout?.nodes ?? {}),
+              ...Object.fromEntries(
+                persistedEntries.filter(([nodeId]) => options.onlyPersistNodeIds?.has(nodeId)),
+              ),
+            };
+      const nextLayout: WorkspaceLayoutSnapshot = {
+        nodes: nextLayoutNodes,
+      };
       commitWorkspaceLayout(nextLayout, {
         previousLayout: options.previousLayout,
         recordHistory: options.recordHistory,
@@ -221,6 +345,7 @@ function TemplateWorkspaceCanvas(): ReactElement {
     persistLayout(nodes, {
       resizedNodeIds: pendingLayoutCommit.resizedNodeIds,
       previousLayout: pendingLayoutCommit.previousLayout,
+      onlyPersistNodeIds: pendingLayoutCommit.onlyPersistNodeIds,
     });
   }, [nodes, persistLayout]);
   const captureLayoutBeforeInteraction = useCallback((): void => {
@@ -307,6 +432,9 @@ function TemplateWorkspaceCanvas(): ReactElement {
       if (!hasFinishedResize) {
         return;
       }
+      if (!hasResizeStart && layoutBeforeInteractionRef.current === null) {
+        return;
+      }
       const resizedNodeIds = new Set(
         nonRemovalChanges
           .filter((change): change is NodeChange<Node<WorkspaceNodeData>> & { type: 'dimensions'; id: string; resizing: false } =>
@@ -332,6 +460,41 @@ function TemplateWorkspaceCanvas(): ReactElement {
   const handleConnect: OnConnect = useCallback(
     (connection: Connection) => {
       if (connection.source === null || connection.target === null) {
+        return;
+      }
+      if (isOwnsSourceHandle(connection.sourceHandle) && isOwnsTargetHandle(connection.targetHandle)) {
+        const optionId = parseOptionIdFromNodeId(connection.target);
+        const questionId = parseQuestionIdFromNodeId(connection.source);
+        if (optionId === null || questionId === null) {
+          notifyError('Connect a question handle to an option to assign ownership.');
+          return;
+        }
+        updateTemplate((current) => moveOptionToQuestion({ template: current, optionId, targetQuestionId: questionId }));
+        notifySuccess('Option moved to question.');
+        return;
+      }
+      if (isChildSourceHandle(connection.sourceHandle) && isChildTargetHandle(connection.targetHandle)) {
+        const childQuestionId = parseChildQuestionIdFromNodeId(connection.target);
+        const optionId = parseOptionIdFromNodeId(connection.source);
+        if (childQuestionId === null || optionId === null) {
+          notifyError('Connect an option handle to a follow-up question to reassign it.');
+          return;
+        }
+        const targetOptionMeta = findOptionById(template, optionId);
+        if (targetOptionMeta === null) {
+          return;
+        }
+        if (
+          targetOptionMeta.option.childQuestion !== null &&
+          targetOptionMeta.option.childQuestion.id !== childQuestionId
+        ) {
+          notifyError('That option already has a follow-up question.');
+          return;
+        }
+        updateTemplate((current) =>
+          moveChildQuestionToOption({ template: current, childQuestionId, targetOptionId: optionId }),
+        );
+        notifySuccess('Follow-up question moved to option.');
         return;
       }
       if (
@@ -412,8 +575,76 @@ function TemplateWorkspaceCanvas(): ReactElement {
     },
     [template, updateTemplate],
   );
+  const handleReconnect: OnReconnect<Edge<WorkspaceEdgeData>> = useCallback(
+    (oldEdge, connection) => {
+      if (connection.source === null || connection.target === null) {
+        return;
+      }
+      const edgeKind = oldEdge.data?.kind;
+      if (edgeKind === 'owns') {
+        const optionId = parseOptionIdFromNodeId(connection.target);
+        const questionId = parseQuestionIdFromNodeId(connection.source);
+        if (optionId === null || questionId === null) {
+          notifyError('Reconnect the question handle to an option.');
+          return;
+        }
+        updateTemplate((current) => moveOptionToQuestion({ template: current, optionId, targetQuestionId: questionId }));
+        notifySuccess('Option moved to question.');
+        return;
+      }
+      if (edgeKind === 'sequential' && oldEdge.id.startsWith('seq:')) {
+        const followerQuestionId = parseQuestionIdFromNodeId(connection.target);
+        const predecessorQuestionId = parseQuestionIdFromNodeId(connection.source);
+        if (followerQuestionId === null || predecessorQuestionId === null) {
+          notifyError('Reconnect between two question nodes to change order or round.');
+          return;
+        }
+        updateTemplate((current) =>
+          moveQuestionAfterPredecessor({
+            template: current,
+            questionId: followerQuestionId,
+            predecessorQuestionId,
+          }),
+        );
+        notifySuccess('Question moved.');
+        return;
+      }
+      if (edgeKind === 'child') {
+        const childQuestionId = parseChildQuestionIdFromNodeId(connection.target);
+        const optionId = parseOptionIdFromNodeId(connection.source);
+        if (childQuestionId === null || optionId === null) {
+          notifyError('Reconnect the option handle to a follow-up question.');
+          return;
+        }
+        const targetOptionMeta = findOptionById(template, optionId);
+        if (targetOptionMeta === null) {
+          return;
+        }
+        if (
+          targetOptionMeta.option.childQuestion !== null &&
+          targetOptionMeta.option.childQuestion.id !== childQuestionId
+        ) {
+          notifyError('That option already has a follow-up question.');
+          return;
+        }
+        updateTemplate((current) =>
+          moveChildQuestionToOption({ template: current, childQuestionId, targetOptionId: optionId }),
+        );
+        notifySuccess('Follow-up question moved to option.');
+      }
+    },
+    [template, updateTemplate],
+  );
   const handleNodeDrag = useCallback(
-    (_event: React.MouseEvent, node: Node<WorkspaceNodeData>) => {
+    (event: React.MouseEvent, node: Node<WorkspaceNodeData>) => {
+      if (node.data.kind === 'question' && node.data.roundId !== undefined) {
+        const roundNodes = nodes.filter((candidate) => candidate.data.kind === 'round');
+        const dropPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        const hoveredRoundId = resolveRoundIdAtFlowPosition({ flowPosition: dropPosition, roundNodes });
+        setDropTargetRoundId(
+          hoveredRoundId !== null && hoveredRoundId !== node.data.roundId ? hoveredRoundId : null,
+        );
+      }
       if (!snapSettings.gridSnap && !snapSettings.alignmentSnap) {
         setSnapGuides(null);
         return;
@@ -428,14 +659,18 @@ function TemplateWorkspaceCanvas(): ReactElement {
       });
       setSnapGuides(snapResult.guides);
       const nextPosition =
-        node.parentId === undefined ? snapResult.position : clampRoundChildPosition(snapResult.position);
+        node.parentId === undefined
+          ? snapResult.position
+          : clampRoundChildPosition(snapResult.position);
       setNodes((currentNodes) =>
         currentNodes.map((candidate) =>
-          candidate.id === node.id ? { ...candidate, position: nextPosition } : candidate,
+          candidate.id === node.id
+            ? elevateNodeForDrag({ ...candidate, position: nextPosition })
+            : candidate,
         ),
       );
     },
-    [nodes, setNodes, snapSettings.alignmentSnap, snapSettings.gridSnap],
+    [nodes, screenToFlowPosition, setNodes, snapSettings.alignmentSnap, snapSettings.gridSnap],
   );
   const executeToggleGridSnap = useCallback((): void => {
     setSnapSettings((previous) => {
@@ -471,98 +706,139 @@ function TemplateWorkspaceCanvas(): ReactElement {
     shouldFitViewAfterResetRef.current = true;
     notifySuccess('Workspace layout and canvas settings reset.');
   }, [pushEditorHistorySnapshot, refreshWorkspaceLayout, template]);
-  const handleNodeDragStart = useCallback((): void => {
-    captureLayoutBeforeInteraction();
-  }, [captureLayoutBeforeInteraction]);
-  const handleNodeDragStop = useCallback(
+  const handleNodeDragStart = useCallback(
     (_event: React.MouseEvent, node: Node<WorkspaceNodeData>) => {
-      setSnapGuides(null);
-      const previousLayout = readCapturedLayoutBeforeInteraction();
-      const clampedNode =
-        node.parentId === undefined
-          ? node
-          : { ...node, position: clampRoundChildPosition(node.position) };
-      setNodes((currentNodes) =>
-        currentNodes.map((candidate) => (candidate.id === node.id ? clampedNode : candidate)),
-      );
-      pendingLayoutCommitRef.current = { previousLayout };
-      if (clampedNode.data.kind !== 'question') {
-        return;
-      }
-      const questionId = clampedNode.data.questionId;
-      if (questionId === undefined) {
-        return;
-      }
-      const roundNodes = nodes.filter((candidate) => candidate.data.kind === 'round');
-      const absoluteCenter = {
-        x:
-          (clampedNode.parentId ? nodes.find((parent) => parent.id === clampedNode.parentId)?.position.x ?? 0 : 0) +
-          clampedNode.position.x +
-          80,
-        y:
-          (clampedNode.parentId ? nodes.find((parent) => parent.id === clampedNode.parentId)?.position.y ?? 0 : 0) +
-          clampedNode.position.y +
-          24,
-      };
-      let targetRoundId: string | null = null;
-      for (const roundNode of roundNodes) {
-        const width = typeof roundNode.style?.width === 'number' ? roundNode.style.width : 520;
-        const height = typeof roundNode.style?.height === 'number' ? roundNode.style.height : 220;
-        const withinX = absoluteCenter.x >= roundNode.position.x && absoluteCenter.x <= roundNode.position.x + width;
-        const withinY = absoluteCenter.y >= roundNode.position.y && absoluteCenter.y <= roundNode.position.y + height;
-        if (withinX && withinY) {
-          targetRoundId = roundNode.data.roundId;
-        }
-      }
-      if (targetRoundId === null || targetRoundId === clampedNode.data.roundId) {
-        return;
-      }
-      updateTemplate((current) => {
-        let movedQuestion = null as (typeof current.rounds)[number]['questions'][number] | null;
-        const roundsWithout = current.rounds.map((round) => {
-          const question = round.questions.find((candidate) => candidate.id === questionId);
-          if (question === undefined) {
-            return round;
-          }
-          movedQuestion = question;
-          return { ...round, questions: round.questions.filter((candidate) => candidate.id !== questionId) };
-        });
-        if (movedQuestion === null) {
-          return current;
-        }
-        return {
-          ...current,
-          rounds: roundsWithout.map((round) =>
-            round.id === targetRoundId ? { ...round, questions: [...round.questions, movedQuestion!] } : round,
+      captureLayoutBeforeInteraction();
+      setDropTargetRoundId(null);
+      setDraggingNodeId(node.id);
+      if (node.data.kind === 'question') {
+        isQuestionCrossRoundDragRef.current = true;
+        setNodes((currentNodes) =>
+          currentNodes.map((candidate) =>
+            candidate.id === node.id ? detachQuestionNodeForDrag(candidate, currentNodes) : candidate,
           ),
-        };
-      });
+        );
+        return;
+      }
+      setNodes((currentNodes) =>
+        currentNodes.map((candidate) =>
+          candidate.id === node.id ? elevateNodeForDrag(candidate) : candidate,
+        ),
+      );
     },
-    [nodes, readCapturedLayoutBeforeInteraction, setNodes, updateTemplate],
+    [captureLayoutBeforeInteraction, setNodes],
+  );
+  const handleNodeDragStop = useCallback(
+    (event: React.MouseEvent, node: Node<WorkspaceNodeData>) => {
+      setSnapGuides(null);
+      setDropTargetRoundId(null);
+      setDraggingNodeId(null);
+      isQuestionCrossRoundDragRef.current = false;
+      const dropPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      const roundNodes = nodes.filter((candidate) => candidate.data.kind === 'round');
+      if (node.data.kind === 'question' && node.data.questionId !== undefined) {
+        const targetRoundId = resolveRoundIdAtFlowPosition({ flowPosition: dropPosition, roundNodes });
+        const targetRoundNode =
+          targetRoundId === null
+            ? undefined
+            : roundNodes.find((candidate) => candidate.data.roundId === targetRoundId);
+        if (targetRoundId !== null && targetRoundId !== node.data.roundId && targetRoundNode !== undefined) {
+          const questionId = node.data.questionId;
+          const nextTemplate = moveQuestionToRound({ template, questionId, targetRoundId });
+          const nextLayout = applyQuestionDropLayout({
+            template: nextTemplate,
+            layout: readWorkspaceLayout(template.id),
+            roundId: targetRoundId,
+            questionId,
+            dropFlowPosition: node.position,
+            roundNode: targetRoundNode,
+          });
+          commitWorkspaceLayout(nextLayout, { recordHistory: false });
+          updateTemplate(() => nextTemplate);
+          notifySuccess('Question moved to round.');
+          return;
+        }
+      }
+      const previousLayout = readCapturedLayoutBeforeInteraction();
+      let settledNode = node;
+      let onlyPersistNodeIds: ReadonlySet<string> | undefined;
+      if (node.data.kind === 'round') {
+        onlyPersistNodeIds = new Set([node.id]);
+      }
+      if (node.data.kind === 'question' && node.parentId === undefined && node.data.roundId !== undefined) {
+        const roundNode = nodes.find((candidate) => candidate.id === buildRoundNodeId(node.data.roundId));
+        if (roundNode !== undefined && node.data.questionId !== undefined) {
+          const newQuestionRelative = clampRoundChildPosition({
+            x: node.position.x - roundNode.position.x,
+            y: node.position.y - roundNode.position.y,
+          });
+          const layoutBeforeDrag =
+            previousLayout ?? readWorkspaceLayout(template.id) ?? { nodes: {} };
+          const nextLayout = applyQuestionSameRoundMoveLayout({
+            template,
+            layout: readWorkspaceLayout(template.id),
+            previousLayout: layoutBeforeDrag,
+            roundId: node.data.roundId,
+            questionId: node.data.questionId,
+            newQuestionRelative,
+          });
+          commitWorkspaceLayout(nextLayout, { recordHistory: false });
+          settledNode = reattachQuestionNodeAtRelativePosition({
+            node,
+            roundNode,
+            relativePosition: newQuestionRelative,
+          });
+          const movedQuestion = template.rounds
+            .find((round) => round.id === node.data.roundId)
+            ?.questions.find((question) => question.id === node.data.questionId);
+          if (movedQuestion !== undefined) {
+            onlyPersistNodeIds = new Set(collectWorkspaceNodeIdsForMovedQuestion(movedQuestion));
+          }
+        }
+      } else if (node.parentId !== undefined) {
+        settledNode = { ...node, position: clampRoundChildPosition(node.position) };
+        onlyPersistNodeIds = new Set([node.id]);
+      }
+      setNodes((currentNodes) => {
+        const withSettledNode = currentNodes.map((candidate) =>
+          candidate.id === node.id ? settledNode : candidate,
+        );
+        return applyRoundFitDimensionsToNodes(withSettledNode, template);
+      });
+      pendingLayoutCommitRef.current = { previousLayout, onlyPersistNodeIds };
+    },
+    [commitWorkspaceLayout, nodes, readCapturedLayoutBeforeInteraction, screenToFlowPosition, setNodes, template, updateTemplate],
   );
   const selectedNodeId = useMemo(
     () => resolveSelectedNodeId(selection, template),
     [selection, template],
   );
-  const decoratedNodes = useMemo(
-    () =>
-      nodes.map((node) => ({
+  const decoratedNodes = useMemo(() => {
+    const orderedNodes = orderNodesForDragRender(nodes, draggingNodeId);
+    return orderedNodes.map((node) => {
+      const isDragging = node.id === draggingNodeId;
+      const isDropTarget =
+        node.data.kind === 'round' &&
+        node.data.roundId !== undefined &&
+        node.data.roundId === dropTargetRoundId;
+      return {
         ...node,
         selected: node.id === selectedNodeId,
+        zIndex: isDragging ? WORKSPACE_DRAGGING_Z_INDEX : node.zIndex,
+        className: cn(node.className, isDropTarget && 'ring-2 ring-sky-400 ring-offset-2 ring-offset-background'),
         style: {
           ...node.style,
           opacity: searchQuery.trim().length > 0 && !matchingNodeIds.includes(node.id) ? 0.35 : 1,
         },
-      })),
-    [matchingNodeIds, nodes, searchQuery, selectedNodeId],
-  );
+      };
+    });
+  }, [draggingNodeId, dropTargetRoundId, matchingNodeIds, nodes, searchQuery, selectedNodeId]);
   const handlePaneClick = useCallback((): void => {
     setSelection(null);
   }, [setSelection]);
   const handleSelectionChange: OnSelectionChangeFunc<Node<WorkspaceNodeData>> = useCallback(
     ({ nodes: selectedNodes }) => {
       if (selectedNodes.length === 0) {
-        setSelection(null);
         return;
       }
       const primaryNode = selectedNodes.at(-1);
@@ -586,6 +862,8 @@ function TemplateWorkspaceCanvas(): ReactElement {
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
+          onReconnect={handleReconnect}
+          edgesReconnectable
           onPaneClick={handlePaneClick}
           onSelectionChange={handleSelectionChange}
           onNodeClick={(_event, node) => setSelection(selectionFromNodeId(node.id, template))}
@@ -595,6 +873,10 @@ function TemplateWorkspaceCanvas(): ReactElement {
           nodeTypes={NODE_TYPES}
           minZoom={0.15}
           maxZoom={1.5}
+          panOnScroll
+          panOnScrollMode={PanOnScrollMode.Free}
+          zoomOnScroll={false}
+          zoomActivationKeyCode={['Meta', 'Shift']}
           className={cn('h-full w-full', WORKSPACE_CANVAS_CLASS)}
           proOptions={{ hideAttribution: true }}
         >

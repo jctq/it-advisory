@@ -3,7 +3,6 @@
 import { Redo2, Undo2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTemplateEditor } from '@/components/admin/diagnostic-template-editor/template-editor-context';
-import { WorkspaceTooltip } from '@/components/admin/diagnostic-template-editor/workspace-tooltip';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
@@ -28,34 +27,32 @@ export function TemplateEditorUndoControls(props: TemplateEditorUndoControlsProp
       role="group"
       aria-label="History"
     >
-      <WorkspaceTooltip label="Undo (⌘Z)" tone="workspace">
-        <Button
-          type="button"
-          size={props.size ?? 'sm'}
-          variant="ghost"
-          aria-label="Undo"
-          disabled={!canUndo}
-          className={buttonClass}
-          onClick={executeUndo}
-        >
-          <Undo2 className="size-3.5 shrink-0" aria-hidden />
-          Undo
-        </Button>
-      </WorkspaceTooltip>
-      <WorkspaceTooltip label="Redo (⌘⇧Z)" tone="workspace">
-        <Button
-          type="button"
-          size={props.size ?? 'sm'}
-          variant="ghost"
-          aria-label="Redo"
-          disabled={!canRedo}
-          className={buttonClass}
-          onClick={executeRedo}
-        >
-          <Redo2 className="size-3.5 shrink-0" aria-hidden />
-          Redo
-        </Button>
-      </WorkspaceTooltip>
+      <Button
+        type="button"
+        size={props.size ?? 'sm'}
+        variant="ghost"
+        aria-label="Undo"
+        title="Undo (⌘Z)"
+        disabled={!canUndo}
+        className={buttonClass}
+        onClick={executeUndo}
+      >
+        <Undo2 className="size-3.5 shrink-0" aria-hidden />
+        Undo
+      </Button>
+      <Button
+        type="button"
+        size={props.size ?? 'sm'}
+        variant="ghost"
+        aria-label="Redo"
+        title="Redo (⌘⇧Z)"
+        disabled={!canRedo}
+        className={buttonClass}
+        onClick={executeRedo}
+      >
+        <Redo2 className="size-3.5 shrink-0" aria-hidden />
+        Redo
+      </Button>
     </div>
   );
   if (props.withTooltipProvider === false) {

@@ -1,6 +1,14 @@
 'use client';
 
-import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
+import {
+  Handle,
+  NodeResizeControl,
+  Position,
+  ResizeControlVariant,
+  type ControlLinePosition,
+  type ControlPosition,
+  type NodeProps,
+} from '@xyflow/react';
 import type { ReactElement } from 'react';
 import {
   VISIBILITY_SOURCE_HANDLE_ID,
@@ -37,8 +45,47 @@ import {
 import { WorkspaceTooltip } from '@/components/admin/diagnostic-template-editor/workspace-tooltip';
 import { cn } from '@/lib/utils';
 
-const RESIZER_LINE_CLASS = '!border-sky-500/80';
 const RESIZER_HANDLE_CLASS = '!h-2.5 !w-2.5 !rounded-sm !border !border-sky-300 !bg-sky-400';
+const RESIZER_EDGE_LINE_CLASS = '!border-sky-500/90';
+const RESIZER_EDGE_LINE_TOP_BOTTOM_CLASS = cn(RESIZER_EDGE_LINE_CLASS, '!h-2 !border-t-2');
+const RESIZER_EDGE_LINE_LEFT_RIGHT_CLASS = cn(RESIZER_EDGE_LINE_CLASS, '!w-2 !border-l-2');
+const RESIZER_EDGE_HANDLE_TOP_BOTTOM_CLASS = cn(
+  RESIZER_HANDLE_CLASS,
+  '!h-2 !w-8 !max-h-2 !min-h-2 !rounded-full',
+);
+const RESIZER_EDGE_HANDLE_LEFT_RIGHT_CLASS = cn(
+  RESIZER_HANDLE_CLASS,
+  '!h-8 !w-2 !max-w-2 !min-w-2 !rounded-full',
+);
+
+const EDGE_LINE_CONTROLS: readonly {
+  readonly position: ControlLinePosition;
+  readonly resizeDirection: 'horizontal' | 'vertical';
+  readonly className: string;
+}[] = [
+  { position: 'top', resizeDirection: 'vertical', className: RESIZER_EDGE_LINE_TOP_BOTTOM_CLASS },
+  { position: 'bottom', resizeDirection: 'vertical', className: RESIZER_EDGE_LINE_TOP_BOTTOM_CLASS },
+  { position: 'left', resizeDirection: 'horizontal', className: RESIZER_EDGE_LINE_LEFT_RIGHT_CLASS },
+  { position: 'right', resizeDirection: 'horizontal', className: RESIZER_EDGE_LINE_LEFT_RIGHT_CLASS },
+];
+
+const EDGE_HANDLE_CONTROLS: readonly {
+  readonly position: ControlPosition;
+  readonly resizeDirection: 'horizontal' | 'vertical';
+  readonly className: string;
+}[] = [
+  { position: 'top', resizeDirection: 'vertical', className: RESIZER_EDGE_HANDLE_TOP_BOTTOM_CLASS },
+  { position: 'bottom', resizeDirection: 'vertical', className: RESIZER_EDGE_HANDLE_TOP_BOTTOM_CLASS },
+  { position: 'left', resizeDirection: 'horizontal', className: RESIZER_EDGE_HANDLE_LEFT_RIGHT_CLASS },
+  { position: 'right', resizeDirection: 'horizontal', className: RESIZER_EDGE_HANDLE_LEFT_RIGHT_CLASS },
+];
+
+const CORNER_HANDLE_CONTROLS: readonly ControlPosition[] = [
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+];
 
 const VISIBILITY_HANDLE_CLASS = '!h-2.5 !w-2.5 !border-sky-400 !bg-sky-500';
 const OWNS_HANDLE_CLASS = '!h-3 !w-3 !border-violet-400 !bg-violet-500';
@@ -58,15 +105,45 @@ type WorkspaceNodeResizerProps = {
   readonly minHeight: number;
 };
 
-function WorkspaceNodeResizer(props: WorkspaceNodeResizerProps): ReactElement {
+function WorkspaceNodeResizer(props: WorkspaceNodeResizerProps): ReactElement | null {
+  if (!props.isVisible) {
+    return null;
+  }
   return (
-    <NodeResizer
-      minWidth={props.minWidth}
-      minHeight={props.minHeight}
-      isVisible={props.isVisible}
-      lineClassName={RESIZER_LINE_CLASS}
-      handleClassName={RESIZER_HANDLE_CLASS}
-    />
+    <>
+      {EDGE_LINE_CONTROLS.map((control) => (
+        <NodeResizeControl
+          key={`edge-line-${control.position}`}
+          position={control.position}
+          variant={ResizeControlVariant.Line}
+          resizeDirection={control.resizeDirection}
+          minWidth={props.minWidth}
+          minHeight={props.minHeight}
+          className={control.className}
+        />
+      ))}
+      {EDGE_HANDLE_CONTROLS.map((control) => (
+        <NodeResizeControl
+          key={`edge-handle-${control.position}`}
+          position={control.position}
+          variant={ResizeControlVariant.Handle}
+          resizeDirection={control.resizeDirection}
+          minWidth={props.minWidth}
+          minHeight={props.minHeight}
+          className={control.className}
+        />
+      ))}
+      {CORNER_HANDLE_CONTROLS.map((position) => (
+        <NodeResizeControl
+          key={`corner-${position}`}
+          position={position}
+          variant={ResizeControlVariant.Handle}
+          minWidth={props.minWidth}
+          minHeight={props.minHeight}
+          className={RESIZER_HANDLE_CLASS}
+        />
+      ))}
+    </>
   );
 }
 

@@ -28,7 +28,9 @@ type TemplateWorkspacePaletteProps = {
 };
 
 export function TemplateWorkspacePalette(props: TemplateWorkspacePaletteProps): ReactElement {
-  const { template, updateTemplate, setSelection } = useTemplateEditor();
+  const { template, updateTemplate, setSelection, selection } = useTemplateEditor();
+  const canAddQuestion = selection?.kind === 'round';
+  const canAddOption = selection?.kind === 'question';
   function executeAddRound(): void {
     const nextRound = createDraftRound(template.rounds.length);
     updateTemplate((current) => ({
@@ -38,11 +40,10 @@ export function TemplateWorkspacePalette(props: TemplateWorkspacePaletteProps): 
     setSelection({ kind: 'round', roundId: nextRound.id });
   }
   function executeAddQuestion(): void {
-    const roundId = props.selectedRoundId ?? template.rounds[template.rounds.length - 1]?.id;
-    if (roundId === undefined) {
-      executeAddRound();
+    if (selection?.kind !== 'round') {
       return;
     }
+    const roundId = selection.roundId;
     const targetRound = template.rounds.find((round) => round.id === roundId);
     if (targetRound === undefined) {
       return;
@@ -57,12 +58,10 @@ export function TemplateWorkspacePalette(props: TemplateWorkspacePaletteProps): 
     setSelection({ kind: 'question', roundId, questionId: nextQuestion.id });
   }
   function executeAddOption(): void {
-    const roundId = props.selectedRoundId ?? template.rounds[0]?.id;
-    const questionId = props.selectedQuestionId ?? template.rounds.find((round) => round.id === roundId)?.questions[0]?.id;
-    if (roundId === undefined || questionId === undefined) {
-      executeAddQuestion();
+    if (selection?.kind !== 'question') {
       return;
     }
+    const { roundId, questionId } = selection;
     const targetRound = template.rounds.find((round) => round.id === roundId);
     const targetQuestion = targetRound?.questions.find((question) => question.id === questionId);
     if (targetQuestion === undefined) {
@@ -133,29 +132,35 @@ export function TemplateWorkspacePalette(props: TemplateWorkspacePaletteProps): 
           <Layers className="size-3.5" aria-hidden />
         </Button>
       </WorkspaceTooltip>
-      <WorkspaceTooltip label="Add question">
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          aria-label="Add question"
-          className={iconButtonClass}
-          onClick={executeAddQuestion}
-        >
-          <MessageSquare className="size-3.5" aria-hidden />
-        </Button>
+      <WorkspaceTooltip label={canAddQuestion ? 'Add question' : 'Select a round to add a question'}>
+        <span className="inline-flex">
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            aria-label="Add question"
+            className={iconButtonClass}
+            onClick={executeAddQuestion}
+            disabled={!canAddQuestion}
+          >
+            <MessageSquare className="size-3.5" aria-hidden />
+          </Button>
+        </span>
       </WorkspaceTooltip>
-      <WorkspaceTooltip label="Add option">
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          aria-label="Add option"
-          className={iconButtonClass}
-          onClick={executeAddOption}
-        >
-          <ListChecks className="size-3.5" aria-hidden />
-        </Button>
+      <WorkspaceTooltip label={canAddOption ? 'Add option' : 'Select a question to add an option'}>
+        <span className="inline-flex">
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            aria-label="Add option"
+            className={iconButtonClass}
+            onClick={executeAddOption}
+            disabled={!canAddOption}
+          >
+            <ListChecks className="size-3.5" aria-hidden />
+          </Button>
+        </span>
       </WorkspaceTooltip>
       <WorkspaceTooltip label="Add child question to selected option">
         <span className="inline-flex">

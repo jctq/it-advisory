@@ -51,7 +51,7 @@ export function pushEditorHistoryEntry(params: {
   const snapshot = serializeEditorHistorySnapshot(params.previousSnapshot);
   const lastPastEntry = params.history.past[params.history.past.length - 1];
   if (lastPastEntry === snapshot) {
-    return { past: params.history.past, future: [] };
+    return params.history;
   }
   const nextPast = [...params.history.past, snapshot].slice(-TEMPLATE_EDITOR_HISTORY_LIMIT);
   return { past: nextPast, future: [] };

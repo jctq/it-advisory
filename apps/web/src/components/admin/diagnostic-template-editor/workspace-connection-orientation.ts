@@ -40,6 +40,30 @@ export function resolveStructuralConnectionOrientation(params: {
   return deltaY >= deltaX ? 'vertical' : 'horizontal';
 }
 
+export function isOwnsSourceHandle(handleId: string | null | undefined): boolean {
+  return (
+    handleId === OWNS_SOURCE_VERTICAL_HANDLE_ID || handleId === OWNS_SOURCE_HORIZONTAL_HANDLE_ID
+  );
+}
+
+export function isOwnsTargetHandle(handleId: string | null | undefined): boolean {
+  return (
+    handleId === OWNS_TARGET_VERTICAL_HANDLE_ID || handleId === OWNS_TARGET_HORIZONTAL_HANDLE_ID
+  );
+}
+
+export function isChildSourceHandle(handleId: string | null | undefined): boolean {
+  return (
+    handleId === CHILD_SOURCE_VERTICAL_HANDLE_ID || handleId === CHILD_SOURCE_HORIZONTAL_HANDLE_ID
+  );
+}
+
+export function isChildTargetHandle(handleId: string | null | undefined): boolean {
+  return (
+    handleId === CHILD_TARGET_VERTICAL_HANDLE_ID || handleId === CHILD_TARGET_HORIZONTAL_HANDLE_ID
+  );
+}
+
 export function buildStructuralHandleIds(params: {
   readonly orientation: 'vertical' | 'horizontal';
   readonly kind: 'owns' | 'child';

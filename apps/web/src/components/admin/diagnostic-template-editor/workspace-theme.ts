@@ -190,10 +190,10 @@ export const WORKSPACE_EDGE_LEGEND_ITEMS: readonly {
   readonly label: string;
   readonly dashed: boolean;
 }[] = [
-  { kind: 'owns', label: 'Question → options', dashed: false },
+  { kind: 'owns', label: 'Question → option (drag to reassign)', dashed: false },
   { kind: 'conditional', label: 'Visibility', dashed: false },
-  { kind: 'roundSequential', label: 'Flow order', dashed: true },
-  { kind: 'child', label: 'Follow-up', dashed: false },
+  { kind: 'roundSequential', label: 'Question order (drag to move)', dashed: true },
+  { kind: 'child', label: 'Follow-up (drag to reassign)', dashed: false },
 ];
 
 export function readWorkspaceLegendSwatchColor(

@@ -17,7 +17,7 @@ type WorkspaceTooltipProps = {
 export function WorkspaceTooltip(props: WorkspaceTooltipProps): ReactElement {
   const isWorkspaceTone = props.tone !== 'default';
   return (
-    <Tooltip delayDuration={300}>
+    <Tooltip>
       <TooltipTrigger asChild>{props.children}</TooltipTrigger>
       <TooltipContent
         side={props.side ?? 'bottom'}

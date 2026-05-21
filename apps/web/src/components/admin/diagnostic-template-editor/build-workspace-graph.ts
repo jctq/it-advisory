@@ -3,6 +3,7 @@ import type { DiagnosticTemplateVisibilityRule, DiagnosticTemplateValue } from '
 import { readQuestionTypeLabel } from '@/components/admin/diagnostic-template-editor/diagnostic-template-editor-utils';
 import type { WorkspaceLayoutSnapshot } from '@/components/admin/diagnostic-template-editor/workspace-layout-storage';
 import { buildAutoLayoutForRound } from '@/components/admin/diagnostic-template-editor/workspace-auto-layout';
+import { computeRoundFitDimensions } from '@/components/admin/diagnostic-template-editor/workspace-round-bounds';
 import {
   applyWorkspaceEdgeTheme,
   readWorkspaceEdgeStrokeStyle,
@@ -94,6 +95,26 @@ function resolveNodeDimensions(params: {
   return { width: params.autoWidth, height: params.autoHeight };
 }
 
+function resolveRoundNodeDimensions(params: {
+  readonly roundNodeId: string;
+  readonly autoWidth: number;
+  readonly autoHeight: number;
+  readonly fitWidth: number;
+  readonly fitHeight: number;
+  readonly layout: WorkspaceLayoutSnapshot | null;
+}): { readonly width: number; readonly height: number } {
+  const contentWidth = Math.max(params.autoWidth, params.fitWidth);
+  const contentHeight = Math.max(params.autoHeight, params.fitHeight);
+  const saved = params.layout?.nodes[params.roundNodeId];
+  if (saved?.userSized === true && saved.width !== undefined && saved.height !== undefined) {
+    return {
+      width: Math.max(saved.width, contentWidth),
+      height: Math.max(saved.height, contentHeight),
+    };
+  }
+  return { width: contentWidth, height: contentHeight };
+}
+
 function resolveNodeRect(params: {
   readonly nodeId: string;
   readonly autoPlacement: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
@@ -130,10 +151,16 @@ export function buildWorkspaceGraph(params: {
       optionNodeId: buildOptionNodeId,
       childNodeId: buildChildQuestionNodeId,
     });
-    const roundDimensions = resolveNodeDimensions({
-      nodeId: roundNodeId,
+    const roundFitDimensions = computeRoundFitDimensions({
+      round,
+      layout: params.layout,
+    });
+    const roundDimensions = resolveRoundNodeDimensions({
+      roundNodeId,
       autoWidth: autoLayout.roundWidth,
       autoHeight: autoLayout.roundHeight,
+      fitWidth: roundFitDimensions.width,
+      fitHeight: roundFitDimensions.height,
       layout: params.layout,
     });
     nodes.push({
@@ -196,6 +223,7 @@ export function buildWorkspaceGraph(params: {
               type: 'smoothstep',
               data: { kind: 'sequential' },
               style: readWorkspaceEdgeStrokeStyle('sequential', params.isDark),
+              reconnectable: true,
             });
           }
         }
@@ -266,6 +294,7 @@ export function buildWorkspaceGraph(params: {
               data: { kind: 'owns' },
               style: readWorkspaceEdgeStrokeStyle('owns', params.isDark),
               animated: false,
+              reconnectable: true,
             });
           }
           appendConditionalEdge({
@@ -338,6 +367,7 @@ export function buildWorkspaceGraph(params: {
                 data: { kind: 'child' },
                 style: readWorkspaceEdgeStrokeStyle('child', params.isDark),
                 label: 'follow-up',
+                reconnectable: true,
               });
             }
           }

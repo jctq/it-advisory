@@ -4,6 +4,7 @@ import { Search } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { WorkspaceConnectionControls } from '@/components/admin/diagnostic-template-editor/workspace-connection-controls';
 import { WorkspaceEdgeLegendPopover } from '@/components/admin/diagnostic-template-editor/workspace-edge-legend';
+import { WorkspaceOperationGuideDialog } from '@/components/admin/diagnostic-template-editor/workspace-operation-guide-dialog';
 import { WorkspaceFullscreenToggle } from '@/components/admin/diagnostic-template-editor/workspace-fullscreen-toggle';
 import { WorkspaceResetDialog } from '@/components/admin/diagnostic-template-editor/workspace-reset-dialog';
 import { WorkspaceSnapControls } from '@/components/admin/diagnostic-template-editor/workspace-snap-controls';
@@ -69,6 +70,7 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps): ReactElement {
       />
       <span className={cn('h-4 w-px shrink-0', WORKSPACE_CHROME_DIVIDER_CLASS)} aria-hidden />
       <WorkspaceEdgeLegendPopover />
+      <WorkspaceOperationGuideDialog compact />
       <WorkspaceResetDialog compact onConfirmReset={props.onConfirmReset} />
       <span className={cn('h-4 w-px shrink-0', WORKSPACE_CHROME_DIVIDER_CLASS)} aria-hidden />
       <WorkspaceFullscreenToggle compact />

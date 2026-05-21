@@ -1,5 +1,6 @@
 'use client';
 
+import { flushSync } from 'react-dom';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
   buildTemplatePatchBody,
@@ -39,6 +40,47 @@ export type TemplateEditorSelection =
   | { readonly kind: 'option'; readonly roundId: string; readonly questionId: string; readonly optionId: string }
   | { readonly kind: 'childQuestion'; readonly roundId: string; readonly questionId: string; readonly optionId: string }
   | null;
+
+export function areTemplateEditorSelectionsEqual(
+  left: TemplateEditorSelection,
+  right: TemplateEditorSelection,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left === null || right === null) {
+    return false;
+  }
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  switch (left.kind) {
+    case 'round':
+      return right.kind === 'round' && left.roundId === right.roundId;
+    case 'question':
+      return (
+        right.kind === 'question' &&
+        left.roundId === right.roundId &&
+        left.questionId === right.questionId
+      );
+    case 'option':
+      return (
+        right.kind === 'option' &&
+        left.roundId === right.roundId &&
+        left.questionId === right.questionId &&
+        left.optionId === right.optionId
+      );
+    case 'childQuestion':
+      return (
+        right.kind === 'childQuestion' &&
+        left.roundId === right.roundId &&
+        left.questionId === right.questionId &&
+        left.optionId === right.optionId
+      );
+    default:
+      return false;
+  }
+}
 
 type TemplateEditorContextValue = {
   readonly template: DiagnosticTemplateValue;
@@ -86,7 +128,12 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
   }, [history]);
   const [layoutRevision, setLayoutRevision] = useState<number>(0);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [selection, setSelection] = useState<TemplateEditorSelection>(null);
+  const [selection, setSelectionState] = useState<TemplateEditorSelection>(null);
+  const setSelection = useCallback((nextSelection: TemplateEditorSelection): void => {
+    setSelectionState((currentSelection) =>
+      areTemplateEditorSelectionsEqual(currentSelection, nextSelection) ? currentSelection : nextSelection,
+    );
+  }, []);
   const hasUnsavedChanges = useMemo(
     () => buildTemplatePatchBody(template) !== savedPatchBody,
     [savedPatchBody, template],
@@ -118,7 +165,10 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
     bumpLayoutRevision();
   }, [bumpLayoutRevision]);
   const pushEditorHistorySnapshot = useCallback((previousSnapshot: TemplateEditorHistorySnapshot): void => {
-    setHistory((currentHistory) => pushEditorHistoryEntry({ history: currentHistory, previousSnapshot }));
+    setHistory((currentHistory) => {
+      const nextHistory = pushEditorHistoryEntry({ history: currentHistory, previousSnapshot });
+      return nextHistory === currentHistory ? currentHistory : nextHistory;
+    });
   }, []);
   const commitWorkspaceLayout = useCallback(
     (
@@ -127,7 +177,10 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
     ): void => {
       const recordHistory = options.recordHistory !== false;
       const previousLayout = options.previousLayout ?? readWorkspaceLayout(templateRef.current.id);
-      if (recordHistory && !areWorkspaceLayoutsEqual(previousLayout, nextLayout)) {
+      if (areWorkspaceLayoutsEqual(previousLayout, nextLayout)) {
+        return;
+      }
+      if (recordHistory) {
         pushEditorHistorySnapshot({ template: templateRef.current, layout: previousLayout });
       }
       writeWorkspaceLayout(templateRef.current.id, nextLayout);
@@ -141,23 +194,24 @@ export function TemplateEditorProvider(props: TemplateEditorProviderProps): Reac
       options: { readonly shouldReindex?: boolean; readonly recordHistory?: boolean } = {},
     ): void => {
       const recordHistory = options.recordHistory !== false;
-      setTemplate((previous) => {
-        const next = updateTemplateWithReindex(previous, updater, options.shouldReindex !== false);
-        if (buildTemplatePatchBody(previous) === buildTemplatePatchBody(next)) {
-          return previous;
-        }
-        if (recordHistory) {
-          setHistory((currentHistory) =>
-            pushEditorHistoryEntry({
-              history: currentHistory,
-              previousSnapshot: { template: previous, layout: readWorkspaceLayout(previous.id) },
-            }),
-          );
-        }
-        return next;
+      let historySnapshot: TemplateEditorHistorySnapshot | null = null;
+      flushSync(() => {
+        setTemplate((previous) => {
+          const next = updateTemplateWithReindex(previous, updater, options.shouldReindex !== false);
+          if (buildTemplatePatchBody(previous) === buildTemplatePatchBody(next)) {
+            return previous;
+          }
+          if (recordHistory) {
+            historySnapshot = { template: previous, layout: readWorkspaceLayout(previous.id) };
+          }
+          return next;
+        });
       });
+      if (historySnapshot !== null) {
+        pushEditorHistorySnapshot(historySnapshot);
+      }
     },
-    [],
+    [pushEditorHistorySnapshot],
   );
   const executeUndo = useCallback((): void => {
     const currentSnapshot = readCurrentEditorSnapshot();

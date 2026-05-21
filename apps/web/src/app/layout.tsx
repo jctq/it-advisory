@@ -50,10 +50,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-PH" suppressHydrationWarning>
-      <head>
-        <Script src="/scripts/techmd-appearance-bootstrap.js" strategy="beforeInteractive" />
-      </head>
       <body className={`${sans.className} ${mono.variable} min-h-dvh antialiased`}>
+        <Script src="/scripts/techmd-appearance-bootstrap.js" strategy="beforeInteractive" />
         <QueryProvider>
           {children}
           <Toaster closeButton position="top-right" richColors />
