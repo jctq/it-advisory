@@ -8,6 +8,10 @@ export function resolvePaymongoPaymentMethodTypes(methodId: string): readonly st
       return ['gcash'];
     case 'maya':
       return ['paymaya'];
+    case 'grabpay':
+      return ['grab_pay'];
+    case 'shopeepay':
+      return ['shopee_pay'];
     default:
       return [methodId];
   }
@@ -44,7 +48,13 @@ export function resolveXenditPaymentMethods(methodId: string): readonly string[]
 
 export function isPaymentMethodIdValidForGateway(gatewayId: PaymentGatewayId, methodId: string): boolean {
   const catalog: Record<PaymentGatewayId, readonly { readonly id: string }[]> = {
-    paymongo: [{ id: 'card' }, { id: 'gcash' }, { id: 'maya' }],
+    paymongo: [
+      { id: 'card' },
+      { id: 'gcash' },
+      { id: 'maya' },
+      { id: 'grabpay' },
+      { id: 'shopeepay' },
+    ],
     xendit: [{ id: 'card' }, { id: 'gcash' }, { id: 'maya' }, { id: 'grabpay' }],
     hitpay: [{ id: 'card' }, { id: 'gcash' }, { id: 'paynow_online' }],
     paypal: [{ id: 'paypal' }],

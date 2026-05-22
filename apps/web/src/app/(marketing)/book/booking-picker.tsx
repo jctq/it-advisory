@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { addMonths, parse } from 'date-fns';
@@ -22,12 +22,15 @@ import {
   createPaymentCheckoutSession,
   fetchPaymentConfigPublic,
   fetchPaymentTransactionStatus,
+  isPaymentConfigPromoInvalidError,
+  PaymentConfigFetchError,
   type PaymentConfigPublic,
 } from '@techmd/api-client/marketing-payment-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SESSION_DURATION } from '@techmd/diagnostic-core/project-rescue-service-context';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
+import { BookingConfirmedServiceCard } from '@/components/marketing/booking-confirmed-service-card';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,6 +42,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import type {
+  PublicCatalogFallbackCheckout,
+  PublicCatalogServiceRow,
+  PublicCatalogServicesView,
+} from '@/lib/data/public-catalog-services';
+import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
 import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-slot-times-for-manila-date';
@@ -103,17 +112,161 @@ function resolveMarketingClientApiBaseUrl(): string {
 const MARKETING_CLIENT_API_BASE_URL = resolveMarketingClientApiBaseUrl();
 const DEFAULT_SERVICE_KEY = 'project-rescue' as const;
 
+function resolveBookingServiceKey(searchParams: URLSearchParams, hasEnabledCatalog: boolean | null): string {
+  const fromQuery = searchParams.get('serviceKey')?.trim() ?? '';
+  if (fromQuery.length > 0) {
+    return fromQuery;
+  }
+  if (hasEnabledCatalog === false) {
+    return '';
+  }
+  return DEFAULT_SERVICE_KEY;
+}
+
 const DEFAULT_CHECKOUT_AMOUNT_LABEL = '₱6,000.00';
+const PROMO_CODE_DEBOUNCE_MS = 400;
 type BookingSlotPhase = 'date' | 'details' | 'payment';
 
 type BookingPhase = BookingSlotPhase | 'processing' | 'success' | 'error';
 
 type BookSessionGateStatus = 'loading' | 'missing' | 'invalid_format' | 'not_found' | 'already_booked' | 'ready';
 
+type LinkedBookingSlotSnapshot = {
+  readonly bookingId: string;
+  readonly status: 'pending' | 'confirmed' | 'cancelled';
+  readonly startsAtIso: string;
+  readonly timezone: string;
+  readonly serviceKey: string;
+  readonly meetingUrl: string | null;
+  readonly paymentTransactionId: string | null;
+  readonly paymentMethodLabel: string | null;
+  readonly paymentStatus: string | null;
+  readonly customerName: string | null;
+  readonly customerEmail: string | null;
+  readonly customerCompany: string | null;
+  readonly customerPhone: string | null;
+};
+
+type CheckoutDraftSnapshot = {
+  readonly date: string;
+  readonly time: string;
+  readonly fullName: string;
+  readonly email: string;
+  readonly company: string;
+  readonly phone: string;
+  readonly serviceKey: string;
+};
+
+function buildCheckoutDraftStorageKey(sessionRef: string): string {
+  return `techmd:book-checkout-draft:${sessionRef}`;
+}
+
+function readCheckoutDraftFromSessionStorage(sessionRef: string): CheckoutDraftSnapshot | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = window.sessionStorage.getItem(buildCheckoutDraftStorageKey(sessionRef));
+    if (raw === null || raw.trim().length === 0) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return null;
+    }
+    const row = parsed as Record<string, unknown>;
+    const date = typeof row.date === 'string' ? row.date.trim() : '';
+    const time = typeof row.time === 'string' ? row.time.trim() : '';
+    if (date.length === 0 || time.length === 0) {
+      return null;
+    }
+    return {
+      date,
+      time,
+      fullName: typeof row.fullName === 'string' ? row.fullName.trim() : '',
+      email: typeof row.email === 'string' ? row.email.trim() : '',
+      company: typeof row.company === 'string' ? row.company.trim() : '',
+      phone: typeof row.phone === 'string' ? row.phone.trim() : '',
+      serviceKey: typeof row.serviceKey === 'string' && row.serviceKey.trim().length > 0 ? row.serviceKey.trim() : DEFAULT_SERVICE_KEY,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCheckoutDraftToSessionStorage(sessionRef: string, draft: CheckoutDraftSnapshot): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage.setItem(buildCheckoutDraftStorageKey(sessionRef), JSON.stringify(draft));
+  } catch {
+    /* Session storage may be unavailable in private mode. */
+  }
+}
+
+function clearCheckoutDraftFromSessionStorage(sessionRef: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage.removeItem(buildCheckoutDraftStorageKey(sessionRef));
+  } catch {
+    /* Ignore storage errors. */
+  }
+}
+
+function isLinkedBookingPendingPayment(linked: LinkedBookingSlotSnapshot): boolean {
+  return linked.status === 'pending' && linked.paymentStatus !== 'paid';
+}
+
 type QuizSessionGateApiPayload = {
   readonly session?: unknown;
   readonly readOnly?: boolean;
+  readonly linkedBookingSlot?: LinkedBookingSlotSnapshot | null;
 };
+
+function parseLinkedBookingSlotSnapshot(value: unknown): LinkedBookingSlotSnapshot | null {
+  if (value === null || value === undefined || typeof value !== 'object') {
+    return null;
+  }
+  const row = value as Record<string, unknown>;
+  const bookingId = typeof row.bookingId === 'string' ? row.bookingId.trim() : '';
+  const startsAtIso = typeof row.startsAtIso === 'string' ? row.startsAtIso.trim() : '';
+  if (bookingId.length === 0 || startsAtIso.length === 0) {
+    return null;
+  }
+  const statusRaw = row.status;
+  const status =
+    statusRaw === 'pending' || statusRaw === 'confirmed' || statusRaw === 'cancelled' ? statusRaw : 'confirmed';
+  const timezone = typeof row.timezone === 'string' && row.timezone.trim().length > 0 ? row.timezone.trim() : PRIMARY_TIMEZONE;
+  const serviceKey = typeof row.serviceKey === 'string' && row.serviceKey.trim().length > 0 ? row.serviceKey.trim() : DEFAULT_SERVICE_KEY;
+  const meetingRaw = typeof row.meetingUrl === 'string' ? row.meetingUrl.trim() : '';
+  const paymentTransactionId =
+    typeof row.paymentTransactionId === 'string' && row.paymentTransactionId.trim().length > 0
+      ? row.paymentTransactionId.trim()
+      : null;
+  const paymentMethodRaw = typeof row.paymentMethodLabel === 'string' ? row.paymentMethodLabel.trim() : '';
+  const customerNameRaw = typeof row.customerName === 'string' ? row.customerName.trim() : '';
+  const customerEmailRaw = typeof row.customerEmail === 'string' ? row.customerEmail.trim() : '';
+  const customerCompanyRaw = typeof row.customerCompany === 'string' ? row.customerCompany.trim() : '';
+  const customerPhoneRaw = typeof row.customerPhone === 'string' ? row.customerPhone.trim() : '';
+  return {
+    bookingId,
+    status,
+    startsAtIso,
+    timezone,
+    serviceKey,
+    meetingUrl: meetingRaw.length > 0 ? meetingRaw : null,
+    paymentTransactionId,
+    paymentMethodLabel: paymentMethodRaw.length > 0 ? paymentMethodRaw : null,
+    paymentStatus: typeof row.paymentStatus === 'string' ? row.paymentStatus : null,
+    customerName: customerNameRaw.length > 0 ? customerNameRaw : null,
+    customerEmail: customerEmailRaw.length > 0 ? customerEmailRaw : null,
+    customerCompany: customerCompanyRaw.length > 0 ? customerCompanyRaw : null,
+    customerPhone: customerPhoneRaw.length > 0 ? customerPhoneRaw : null,
+  };
+}
 
 type PaymentMethodId = 'card' | 'gcash' | 'maya' | 'bank_transfer' | 'paypal';
 
@@ -128,6 +281,24 @@ const PAYMENT_METHOD_OPTIONS: readonly {
   { id: 'bank_transfer', label: 'Bank transfer', hint: 'BPI · BDO · UnionBank' },
   { id: 'paypal', label: 'PayPal', hint: 'Pay with PayPal' },
 ];
+
+function resolvePaymentSelectionAfterConfigLoad(
+  config: PaymentConfigPublic,
+  currentGatewayId: PaymentGatewayId | null,
+  currentMethodId: string | null,
+): { readonly gatewayId: PaymentGatewayId | null; readonly methodId: string | null } {
+  if (config.gateways.length === 0) {
+    return { gatewayId: null, methodId: null };
+  }
+  const gatewayStillValid =
+    currentGatewayId !== null && config.gateways.some((gateway) => gateway.id === currentGatewayId);
+  const gatewayId = gatewayStillValid ? currentGatewayId : config.gateways[0]!.id;
+  const gateway = config.gateways.find((entry) => entry.id === gatewayId)!;
+  const methodStillValid =
+    currentMethodId !== null && gateway.methods.some((method) => method.id === currentMethodId);
+  const methodId = methodStillValid ? currentMethodId : (gateway.methods[0]?.id ?? null);
+  return { gatewayId, methodId };
+}
 
 const BOOKING_STEPS: readonly {
   readonly id: BookingSlotPhase;
@@ -288,8 +459,16 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId | null>('card');
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfigPublic | null>(null);
+  const [promoCode, setPromoCode] = useState<string>('');
+  const [debouncedPromoCode, setDebouncedPromoCode] = useState<string>('');
+  const [promoError, setPromoError] = useState<string | null>(null);
   const [selectedGatewayId, setSelectedGatewayId] = useState<PaymentGatewayId | null>(null);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
+  const paymentSelectionRef = useRef<{ readonly gatewayId: PaymentGatewayId | null; readonly methodId: string | null }>({
+    gatewayId: null,
+    methodId: null,
+  });
+  paymentSelectionRef.current = { gatewayId: selectedGatewayId, methodId: selectedPaymentMethodId };
   const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, readonly string[]>>({});
   const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle');
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -300,9 +479,261 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [confirmedSlotDisplay, setConfirmedSlotDisplay] = useState<ConfirmedSlotDisplay | null>(null);
   const [confirmedCalendarSlot, setConfirmedCalendarSlot] = useState<ConfirmedCalendarSlot | null>(null);
   const [successBookingStatus, setSuccessBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled' | null>(null);
+  const [paidAmountLabel, setPaidAmountLabel] = useState<string | null>(null);
+  const [showPaidSummary, setShowPaidSummary] = useState<boolean>(false);
+  const [confirmedServiceKey, setConfirmedServiceKey] = useState<string>(DEFAULT_SERVICE_KEY);
+  const [confirmedCalendarTitle, setConfirmedCalendarTitle] = useState<string>(PROJECT_RESCUE_SERVICE_TITLE);
+  const [confirmedCatalogService, setConfirmedCatalogService] = useState<PublicCatalogServiceRow | null>(null);
+  const paymentReturnHandledRef = useRef<string | null>(null);
+  const linkedConfirmationHandledRef = useRef<string | null>(null);
+  const confirmedCatalogLoadedKeyRef = useRef<string | null>(null);
+  const checkoutCatalogLoadedKeyRef = useRef<string | null>(null);
+  const sessionGateResolvedRef = useRef<string | null>(null);
+  const catalogUrlNormalizedRef = useRef(false);
+  const [hasEnabledCatalog, setHasEnabledCatalog] = useState<boolean | null>(null);
+  const [catalogFallbackCheckout, setCatalogFallbackCheckout] = useState<PublicCatalogFallbackCheckout | null>(null);
+  const [checkoutCatalogService, setCheckoutCatalogService] = useState<PublicCatalogServiceRow | null>(null);
+  const bookingServiceKey = resolveBookingServiceKey(searchParams, hasEnabledCatalog);
+  const checkoutServiceKeyForApi =
+    bookingServiceKey.trim().length > 0 ? bookingServiceKey.trim() : DEFAULT_SERVICE_KEY;
+  const checkoutServiceTitle = useMemo((): string => {
+    if (hasEnabledCatalog === false && catalogFallbackCheckout !== null) {
+      return catalogFallbackCheckout.title;
+    }
+    const catalogTitle = checkoutCatalogService?.title.trim() ?? '';
+    if (catalogTitle.length > 0) {
+      return catalogTitle;
+    }
+    return PROJECT_RESCUE_SERVICE_TITLE;
+  }, [catalogFallbackCheckout, checkoutCatalogService, hasEnabledCatalog]);
+  const checkoutServiceDuration = useMemo((): string => {
+    const catalogDuration = checkoutCatalogService?.durationLabel.trim() ?? '';
+    if (catalogDuration.length > 0) {
+      return catalogDuration;
+    }
+    return PROJECT_RESCUE_SESSION_DURATION;
+  }, [checkoutCatalogService]);
+  const checkoutServiceDescription = useMemo((): string => {
+    const catalogDescription = checkoutCatalogService?.description.trim() ?? '';
+    if (catalogDescription.length > 0) {
+      return catalogDescription;
+    }
+    if (hasEnabledCatalog === false) {
+      return PROJECT_RESCUE_SERVICE_TAGLINE;
+    }
+    return '';
+  }, [checkoutCatalogService, hasEnabledCatalog]);
 
   const checkoutAmountLabel = paymentConfig?.checkoutAmountLabel ?? DEFAULT_CHECKOUT_AMOUNT_LABEL;
+  const successAmountLabel = paidAmountLabel ?? checkoutAmountLabel;
+  const restoreCheckoutDraftFromLinkedBooking = useCallback((linked: LinkedBookingSlotSnapshot): void => {
+    const slotParts = formatBookingSlotPartsFromStartsAt(new Date(linked.startsAtIso), linked.timezone);
+    try {
+      const slotUtc = parseBookingSlotToUtc(slotParts.date, slotParts.time);
+      setSelectedDate(slotUtc);
+      setSelectedTime(slotParts.time);
+      setVisibleManilaYearMonth(formatInTimeZone(slotUtc, PRIMARY_TIMEZONE, 'yyyy-MM'));
+    } catch {
+      /* Slot restore is best-effort when parsing fails. */
+    }
+    if (linked.customerName !== null) {
+      setFullName(linked.customerName);
+    }
+    if (linked.customerEmail !== null) {
+      setEmail(linked.customerEmail);
+    }
+    if (linked.customerCompany !== null) {
+      setCompany(linked.customerCompany);
+    }
+    if (linked.customerPhone !== null) {
+      setPhone(linked.customerPhone);
+    }
+  }, []);
+  const restoreCheckoutDraftFromSnapshot = useCallback((draft: CheckoutDraftSnapshot): void => {
+    try {
+      const slotUtc = parseBookingSlotToUtc(draft.date, draft.time);
+      setSelectedDate(slotUtc);
+      setSelectedTime(draft.time);
+      setVisibleManilaYearMonth(formatInTimeZone(slotUtc, PRIMARY_TIMEZONE, 'yyyy-MM'));
+    } catch {
+      /* Slot restore is best-effort when parsing fails. */
+    }
+    if (draft.fullName.length > 0) {
+      setFullName(draft.fullName);
+    }
+    if (draft.email.length > 0) {
+      setEmail(draft.email);
+    }
+    if (draft.company.length > 0) {
+      setCompany(draft.company);
+    }
+    if (draft.phone.length > 0) {
+      setPhone(draft.phone);
+    }
+  }, []);
+  const hydrateConfirmationFromLinkedBooking = useCallback((linked: LinkedBookingSlotSnapshot): void => {
+    setConfirmedServiceKey(linked.serviceKey);
+    setConfirmedBookingReference(formatBookingReferenceId(linked.bookingId));
+    setSuccessBookingStatus(linked.status);
+    setConfirmedSlotDisplay(formatConfirmedSlotFromStartsAt(linked.startsAtIso, linked.timezone));
+    setConfirmedCalendarSlot({ startsAtIso: linked.startsAtIso, timezone: linked.timezone });
+    setConfirmedMeetingUrl(linked.meetingUrl);
+    if (linked.paymentMethodLabel !== null) {
+      setSuccessPaymentLabel(linked.paymentMethodLabel);
+    }
+    const isPaidOnline = linked.paymentStatus === 'paid';
+    setShowPaidSummary(isPaidOnline);
+    setPhase('success');
+    if (linked.paymentTransactionId !== null) {
+      void fetchPaymentTransactionStatus({
+        apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+        transactionId: linked.paymentTransactionId,
+      })
+        .then((result) => {
+          if (result.amountLabel !== null) {
+            setPaidAmountLabel(result.amountLabel);
+          }
+          if (result.paymentMethodLabel !== null) {
+            setSuccessPaymentLabel(result.paymentMethodLabel);
+          }
+        })
+        .catch(() => {
+          /* Amount label optional when transaction fetch fails. */
+        });
+    } else if (isPaidOnline) {
+      void fetchPaymentConfigPublic({
+        apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+        serviceKey: linked.serviceKey,
+      })
+        .then((config) => {
+          setPaidAmountLabel(config.checkoutAmountLabel);
+        })
+        .catch(() => {
+          /* Fall back to checkoutAmountLabel from payment config effect. */
+        });
+    }
+  }, []);
   useEffect(() => {
+    if (phase !== 'success') {
+      confirmedCatalogLoadedKeyRef.current = null;
+      return;
+    }
+    const trimmedKey = confirmedServiceKey.trim();
+    if (trimmedKey.length === 0 || confirmedCatalogLoadedKeyRef.current === trimmedKey) {
+      return;
+    }
+    confirmedCatalogLoadedKeyRef.current = trimmedKey;
+    const controller = new AbortController();
+    void fetch(`${buildApiUrl('/api/catalog/services')}?serviceKey=${encodeURIComponent(trimmedKey)}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as { service?: PublicCatalogServiceRow | null };
+        if (!response.ok || controller.signal.aborted) {
+          return;
+        }
+        const row = payload.service ?? null;
+        setConfirmedCatalogService(row);
+        const title = row?.title?.trim() ?? '';
+        if (title.length > 0) {
+          setConfirmedCalendarTitle(title);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          confirmedCatalogLoadedKeyRef.current = null;
+        }
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [confirmedServiceKey, phase]);
+  useEffect(() => {
+    sessionGateResolvedRef.current = null;
+    catalogUrlNormalizedRef.current = false;
+    checkoutCatalogLoadedKeyRef.current = null;
+    queueMicrotask(() => {
+      setHasEnabledCatalog(null);
+      setCatalogFallbackCheckout(null);
+      setCheckoutCatalogService(null);
+    });
+  }, [pathRefTrimmed, querySessionId]);
+  useEffect(() => {
+    if (!hasValidQuizSessionParam) {
+      return;
+    }
+    const controller = new AbortController();
+    void fetch(buildApiUrl('/api/catalog/services'), { signal: controller.signal, cache: 'no-store' })
+      .then(async (response) => {
+        const payload = (await response.json()) as PublicCatalogServicesView;
+        if (controller.signal.aborted || !response.ok) {
+          return;
+        }
+        setHasEnabledCatalog(payload.hasEnabledServices);
+        setCatalogFallbackCheckout(payload.fallbackCheckout);
+        if (
+          !payload.hasEnabledServices &&
+          searchParams.has('serviceKey') &&
+          !catalogUrlNormalizedRef.current
+        ) {
+          catalogUrlNormalizedRef.current = true;
+          router.replace(buildMarketingBookSessionPath(quizSessionRef));
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setHasEnabledCatalog(null);
+        }
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams]);
+  useEffect(() => {
+    if (phase === 'success' || phase === 'processing') {
+      return;
+    }
+    if (hasEnabledCatalog === false) {
+      checkoutCatalogLoadedKeyRef.current = null;
+      queueMicrotask(() => {
+        setCheckoutCatalogService(null);
+      });
+      return;
+    }
+    const trimmedKey = checkoutServiceKeyForApi.trim();
+    if (trimmedKey.length === 0 || checkoutCatalogLoadedKeyRef.current === trimmedKey) {
+      return;
+    }
+    checkoutCatalogLoadedKeyRef.current = trimmedKey;
+    const controller = new AbortController();
+    void fetch(`${buildApiUrl('/api/catalog/services')}?serviceKey=${encodeURIComponent(trimmedKey)}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as { service?: PublicCatalogServiceRow | null };
+        if (!response.ok || controller.signal.aborted) {
+          return;
+        }
+        setCheckoutCatalogService(payload.service ?? null);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          checkoutCatalogLoadedKeyRef.current = null;
+        }
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [checkoutServiceKeyForApi, hasEnabledCatalog, phase]);
+  useEffect(() => {
+    if (phase === 'success' || phase === 'processing') {
+      queueMicrotask(() => {
+        setSessionGateStatus('ready');
+      });
+      return;
+    }
     if (pathname === '/book' && !hasPathSegment) {
       if (isPlausibleMarketingQuizSessionRef(querySessionId)) {
         queueMicrotask(() => {
@@ -320,6 +751,9 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       queueMicrotask(() => {
         setSessionGateStatus('invalid_format');
       });
+      return;
+    }
+    if (sessionGateResolvedRef.current === ref) {
       return;
     }
     let cancelled = false;
@@ -351,10 +785,42 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         const paymentResult = searchParams.get('payment')?.trim() ?? '';
         const returnTransactionId = searchParams.get('transactionId')?.trim() ?? '';
         const isPaymentSuccessReturn = paymentResult === 'success' && returnTransactionId.length > 0;
+        const linkedBooking = parseLinkedBookingSlotSnapshot(data.linkedBookingSlot);
+        const paymentCancelledReturn = searchParams.get('payment')?.trim() === 'cancelled';
         if (data.readOnly === true && !isPaymentSuccessReturn) {
+          if (linkedBooking !== null) {
+            if (isLinkedBookingPendingPayment(linkedBooking)) {
+              restoreCheckoutDraftFromLinkedBooking(linkedBooking);
+              setPaymentCancelledNotice(paymentCancelledReturn);
+              setPhase('payment');
+              const currentServiceKey = searchParams.get('serviceKey')?.trim() ?? '';
+              const shouldNormalizeUrl =
+                paymentCancelledReturn ||
+                searchParams.has('transactionId') ||
+                currentServiceKey !== linkedBooking.serviceKey;
+              if (shouldNormalizeUrl) {
+                router.replace(buildMarketingBookSessionPath(ref, linkedBooking.serviceKey));
+              }
+            } else if (linkedConfirmationHandledRef.current !== ref) {
+              linkedConfirmationHandledRef.current = ref;
+              hydrateConfirmationFromLinkedBooking(linkedBooking);
+              const currentServiceKey = searchParams.get('serviceKey')?.trim() ?? '';
+              const shouldNormalizeUrl =
+                searchParams.has('payment') ||
+                searchParams.has('transactionId') ||
+                currentServiceKey !== linkedBooking.serviceKey;
+              if (shouldNormalizeUrl) {
+                router.replace(buildMarketingBookSessionPath(ref, linkedBooking.serviceKey));
+              }
+            }
+            sessionGateResolvedRef.current = ref;
+            setSessionGateStatus('ready');
+            return;
+          }
           setSessionGateStatus('already_booked');
           return;
         }
+        sessionGateResolvedRef.current = ref;
         setSessionGateStatus('ready');
       })
       .catch(() => {
@@ -365,7 +831,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [hasPathSegment, pathRefTrimmed, pathname, querySessionId, searchParams]);
+  }, [
+    hasPathSegment,
+    hydrateConfirmationFromLinkedBooking,
+    pathRefTrimmed,
+    pathname,
+    phase,
+    querySessionId,
+    restoreCheckoutDraftFromLinkedBooking,
+    router,
+    searchParams,
+  ]);
   useEffect(() => {
     if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
       return;
@@ -374,34 +850,68 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (paymentResult !== 'cancelled') {
       return;
     }
+    const storedDraft = readCheckoutDraftFromSessionStorage(quizSessionRef);
     queueMicrotask(() => {
       setPaymentCancelledNotice(true);
       setPhase('payment');
+      if (storedDraft !== null) {
+        restoreCheckoutDraftFromSnapshot(storedDraft);
+      }
     });
-    router.replace(buildMarketingBookSessionPath(quizSessionRef));
-  }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams, sessionGateStatus]);
+    router.replace(buildMarketingBookSessionPath(quizSessionRef, bookingServiceKey.trim().length > 0 ? bookingServiceKey : null));
+  }, [
+    bookingServiceKey,
+    hasValidQuizSessionParam,
+    quizSessionRef,
+    restoreCheckoutDraftFromSnapshot,
+    router,
+    searchParams,
+    sessionGateStatus,
+  ]);
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedPromoCode(promoCode.trim());
+    }, PROMO_CODE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [promoCode]);
+  useEffect(() => {
+    if (phase === 'success' || phase === 'processing') {
+      return;
+    }
     const controller = new AbortController();
-    void fetchPaymentConfigPublic({ apiBaseUrl: MARKETING_CLIENT_API_BASE_URL, signal: controller.signal })
+    void fetchPaymentConfigPublic({
+      apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+      serviceKey: bookingServiceKey.trim().length > 0 ? bookingServiceKey : undefined,
+      promoCode: debouncedPromoCode.length > 0 ? debouncedPromoCode : undefined,
+      signal: controller.signal,
+    })
       .then((config) => {
         if (!controller.signal.aborted) {
           setPaymentConfig(config);
-          if (config.gateways.length > 0) {
-            const firstGateway = config.gateways[0]!;
-            setSelectedGatewayId(firstGateway.id);
-            setSelectedPaymentMethodId(firstGateway.methods[0]?.id ?? null);
-          }
+          setPromoError(null);
+          const selection = resolvePaymentSelectionAfterConfigLoad(
+            config,
+            paymentSelectionRef.current.gatewayId,
+            paymentSelectionRef.current.methodId,
+          );
+          setSelectedGatewayId(selection.gatewayId);
+          setSelectedPaymentMethodId(selection.methodId);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!controller.signal.aborted) {
+          if (error instanceof PaymentConfigFetchError && isPaymentConfigPromoInvalidError(error)) {
+            setPromoError(error.message);
+            return;
+          }
           setPaymentConfig(null);
+          setPromoError(error instanceof Error ? error.message : 'Could not load checkout amount.');
         }
       });
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [bookingServiceKey, phase, debouncedPromoCode]);
   useEffect(() => {
     const controller = new AbortController();
     void fetch(AUTH_ME_API_URL, { credentials: 'include', signal: controller.signal })
@@ -440,9 +950,16 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (paymentResult !== 'success' || returnTransactionId.length === 0) {
       return;
     }
-    if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
+    if (!hasValidQuizSessionParam) {
       return;
     }
+    if (paymentReturnHandledRef.current === returnTransactionId) {
+      return;
+    }
+    if (sessionGateResolvedRef.current !== quizSessionRef) {
+      return;
+    }
+    paymentReturnHandledRef.current = returnTransactionId;
     const controller = new AbortController();
     queueMicrotask(() => {
       setPhase('processing');
@@ -457,11 +974,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           return;
         }
         if (result.status !== 'paid' || result.bookingId === null) {
+          paymentReturnHandledRef.current = null;
           notifyError('Your payment is still processing. If you were charged, check your email shortly.');
           setErrorMessage('Your payment is still processing. If you were charged, check your email shortly.');
           setPhase('error');
           return;
         }
+        linkedConfirmationHandledRef.current = quizSessionRef;
         const meetingTrimmed = result.meetingUrl?.trim() ?? '';
         setConfirmedMeetingUrl(meetingTrimmed.length > 0 ? meetingTrimmed : null);
         setSuccessBookingStatus(result.bookingStatus);
@@ -475,11 +994,22 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           });
         }
         setSuccessPaymentLabel(result.paymentMethodLabel ?? result.gatewayId);
+        setPaidAmountLabel(result.amountLabel);
+        setShowPaidSummary(true);
+        setConfirmedServiceKey(result.serviceKey ?? bookingServiceKey);
         if (result.bookingId !== null) {
           setConfirmedBookingReference(formatBookingReferenceId(result.bookingId));
         }
+        clearCheckoutDraftFromSessionStorage(quizSessionRef);
         setPhase('success');
-        router.replace(buildMarketingBookSessionPath(quizSessionRef));
+        const paidServiceKey = result.serviceKey ?? bookingServiceKey;
+        const shouldNormalizeUrl =
+          searchParams.has('payment') ||
+          searchParams.has('transactionId') ||
+          (searchParams.get('serviceKey')?.trim() ?? '') !== paidServiceKey;
+        if (shouldNormalizeUrl) {
+          router.replace(buildMarketingBookSessionPath(quizSessionRef, paidServiceKey));
+        }
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
@@ -488,6 +1018,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
+        paymentReturnHandledRef.current = null;
         notifyError('Could not load your booking confirmation. Please check your email.');
         setErrorMessage('Could not load your booking confirmation. Please check your email.');
         setPhase('error');
@@ -495,7 +1026,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams, sessionGateStatus]);
+  }, [bookingServiceKey, hasValidQuizSessionParam, quizSessionRef, router, searchParams]);
   const selectedGateway = useMemo(() => {
     if (paymentConfig === null || selectedGatewayId === null) {
       return null;
@@ -603,7 +1134,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       setAvailabilityStatus('loading');
       setAvailabilityError(null);
     });
-    const url = `${AVAILABILITY_API_URL}?serviceKey=${encodeURIComponent(DEFAULT_SERVICE_KEY)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+    const url = `${AVAILABILITY_API_URL}?serviceKey=${encodeURIComponent(checkoutServiceKeyForApi)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
     void fetch(url, { signal: controller.signal })
       .then(async (response) => {
         const payload = (await response.json()) as { slots?: AvailabilityApiSlot[]; error?: string };
@@ -642,7 +1173,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [phase, manilaFetchBounds]);
+  }, [checkoutServiceKeyForApi, phase, manilaFetchBounds]);
 
   useEffect(() => {
     if (phase !== 'date' || selectedDate === null) {
@@ -711,11 +1242,15 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const hasCheckoutSlotSelected = selectedDate !== null && selectedTime !== null;
   const executePay = async (): Promise<void> => {
     if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
       return;
     }
-    if (!selectedDate || !selectedTime) {
+    if (!hasCheckoutSlotSelected) {
+      notifyError('Your booking slot was lost after returning from the payment page. Go back and choose your time again.');
+      setErrorMessage('Your booking slot was lost after returning from the payment page. Go back and choose your time again.');
+      setPhase('date');
       return;
     }
     const paymentsLive = paymentConfig?.paymentsEnabled === true && (paymentConfig.gateways.length ?? 0) > 0;
@@ -736,15 +1271,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           paymentMethodId: selectedPaymentMethodId,
           date: dateParam,
           time: selectedTime,
-          serviceKey: DEFAULT_SERVICE_KEY,
+          serviceKey: checkoutServiceKeyForApi,
           customerName: fullName.trim(),
           customerEmail: email.trim(),
           customerPhone: phone.trim(),
           customerCompany: company.trim().length > 0 ? company.trim() : undefined,
           quizSessionId: quizSessionRef,
           paymentMethodLabel: resolvedPaymentLabel,
+          promoCode: promoCode.trim().length > 0 ? promoCode.trim() : undefined,
         });
         if (session.manualConfirm || session.redirectUrl === null) {
+          clearCheckoutDraftFromSessionStorage(quizSessionRef);
           void router.refresh();
           setSuccessPaymentLabel(resolvedPaymentLabel);
           setSuccessBookingStatus(session.bookingStatus ?? null);
@@ -761,9 +1298,20 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           } catch {
             // Leave labels from the picker when parsing fails unexpectedly.
           }
+          setConfirmedServiceKey(bookingServiceKey);
+          setShowPaidSummary(true);
           setPhase('success');
           return;
         }
+        writeCheckoutDraftToSessionStorage(quizSessionRef, {
+          date: dateParam,
+          time: selectedTime,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          company: company.trim(),
+          phone: phone.trim(),
+          serviceKey: checkoutServiceKeyForApi,
+        });
         window.location.href = session.redirectUrl;
       } catch (error: unknown) {
         notifyError(error instanceof Error ? error.message : 'Could not start payment.');
@@ -786,7 +1334,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     const body: Record<string, string> = {
       date: dateParam,
       time: selectedTime,
-      serviceKey: DEFAULT_SERVICE_KEY,
+      serviceKey: checkoutServiceKeyForApi,
       customerName: fullName.trim(),
       customerEmail: email.trim(),
       customerPhone: phone.trim(),
@@ -866,6 +1414,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       if (bookingId !== null) {
         setConfirmedBookingReference(formatBookingReferenceId(bookingId));
       }
+      setConfirmedServiceKey(bookingServiceKey);
+      setShowPaidSummary(false);
       setPhase('success');
     } catch {
       notifyError('Network error while saving your booking. Check your connection and try again.');
@@ -975,7 +1525,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           <h1 className="mt-8 text-balance text-3xl font-semibold tracking-tight text-foreground">Booking confirmed!</h1>
           <p className="mt-2 text-muted-foreground">Your consultation is all set.</p>
         </div>
-        <div className="mt-10 space-y-4 rounded-2xl border border-border bg-card p-6 text-left shadow-xs">
+        <BookingConfirmedServiceCard
+          className="mt-10"
+          serviceKey={confirmedServiceKey}
+          service={confirmedCatalogService}
+          amountLabelOverride={showPaidSummary ? successAmountLabel : null}
+        />
+        <div className="mt-4 space-y-4 rounded-2xl border border-border bg-card p-6 text-left shadow-xs">
           <div className="flex gap-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10">
               <CalendarClock className="size-5 text-primary" aria-hidden />
@@ -989,7 +1545,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                 <AddToCalendarButtons
                   className="mt-3"
                   startsAtIso={confirmedCalendarSlot.startsAtIso}
-                  title={PROJECT_RESCUE_SERVICE_TITLE}
+                  title={confirmedCalendarTitle}
                   description={
                     confirmedBookingReference !== null
                       ? `Booking reference ${confirmedBookingReference}. ${PROJECT_RESCUE_SERVICE_TAGLINE}`
@@ -1051,22 +1607,24 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             </div>
           ) : null}
         </div>
-        <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-5 py-4">
-          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-            <CheckCircle2 className="size-5 shrink-0" aria-hidden />
-            <p className="text-sm font-semibold">Payment successful</p>
+        {showPaidSummary ? (
+          <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-5 py-4">
+            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="size-5 shrink-0" aria-hidden />
+              <p className="text-sm font-semibold">Payment successful</p>
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Amount paid</dt>
+                <dd className="font-semibold text-foreground">{successAmountLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Payment method</dt>
+                <dd className="font-semibold text-foreground">{successPaymentLabel}</dd>
+              </div>
+            </dl>
           </div>
-          <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt className="text-muted-foreground">Amount paid</dt>
-              <dd className="font-semibold text-foreground">{checkoutAmountLabel}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Payment method</dt>
-              <dd className="font-semibold text-foreground">{successPaymentLabel}</dd>
-            </div>
-          </dl>
-        </div>
+        ) : null}
         <Button asChild className="mt-10 w-full" size="lg">
           <Link href="/account/diagnostics">Go to dashboard</Link>
         </Button>
@@ -1489,7 +2047,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   </div>
                 </fieldset>
               ) : null}
-              {isLivePaymentsCheckout && availablePaymentMethods.length > 0 ? (
+              {isLivePaymentsCheckout && availablePaymentMethods.length > 1 ? (
                 <fieldset>
                   <legend className="text-sm font-semibold text-foreground">Payment method</legend>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -1527,17 +2085,39 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   </div>
                 </fieldset>
               ) : null}
+              <div className="space-y-2">
+                <label htmlFor="promoCode" className="text-sm font-medium text-foreground">
+                  Promo code (optional)
+                </label>
+                <Input
+                  id="promoCode"
+                  value={promoCode}
+                  onChange={(event) => {
+                    setPromoCode(event.target.value);
+                  }}
+                  placeholder="Enter code"
+                  autoComplete="off"
+                />
+                {promoError !== null ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {promoError}
+                  </p>
+                ) : null}
+              </div>
               {paymentConfig?.sandboxMode ? (
                 <p className="text-xs font-medium text-amber-700">Sandbox mode — test payments only.</p>
               ) : null}
             </div>
             <aside className="space-y-4 lg:sticky lg:top-44 lg:z-45">
               <div className="rounded-2xl border border-border bg-muted/30 p-5">
-                <p className="text-sm font-semibold text-foreground">{PROJECT_RESCUE_SERVICE_TITLE}</p>
+                <p className="text-sm font-semibold text-foreground">{checkoutServiceTitle}</p>
+                {checkoutServiceDescription.length > 0 ? (
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{checkoutServiceDescription}</p>
+                ) : null}
                 <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <dt className="text-xs text-muted-foreground">Duration</dt>
-                    <dd className="mt-1 font-semibold text-foreground">{PROJECT_RESCUE_SESSION_DURATION}</dd>
+                    <dd className="mt-1 font-semibold text-foreground">{checkoutServiceDuration}</dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Amount</dt>
@@ -1571,8 +2151,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   size="lg"
                   disabled={
                     paymentConfig?.paymentsEnabled
-                      ? selectedGatewayId === null || selectedPaymentMethodId === null
-                      : paymentMethod === null
+                      ? selectedGatewayId === null || selectedPaymentMethodId === null || !hasCheckoutSlotSelected
+                      : paymentMethod === null || !hasCheckoutSlotSelected
                   }
                   onClick={() => void executePay()}
                 >

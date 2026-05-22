@@ -755,9 +755,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           templateSessionMarketingRef={sessionTargetId}
           suppressEmptyTemplateBootstrap={sessionTargetId !== null && !isSessionReady}
           sessionReadOnly={sessionReadOnly}
-          marketingBookHref={
-            sessionTargetId !== null ? buildMarketingBookSessionPath(sessionTargetId) : undefined
-          }
+          marketingBookSessionRef={sessionTargetId}
           onGoBack={executeGoBack}
           onGuidedChange={setGuided}
         />

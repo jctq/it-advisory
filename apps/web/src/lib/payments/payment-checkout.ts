@@ -14,45 +14,16 @@ import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentTransactionDocument } from '@/domain/payment-types';
 import { getDb } from '@/lib/mongodb';
 import { countBookingsByQuizSessionId } from '@/lib/data/bookings';
+import { findVerifiedQuizSessionPendingBookingForCheckout } from '@/lib/data/booking-guest-manage';
 import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { createPaymentCheckoutForVerifiedBooking } from '@/lib/payments/payment-checkout-resume';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
+import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
-export type CreateCheckoutSessionParams = {
-  readonly gatewayId: PaymentGatewayId;
-  readonly visitorId: string;
-  readonly date: string;
-  readonly time: string;
-  readonly serviceKey: string;
-  readonly customerName: string;
-  readonly customerEmail: string;
-  readonly customerCompany?: string;
-  readonly customerPhone: string;
-  /** Opaque marketing ref or legacy ObjectId hex; required for marketing checkout. */
-  readonly quizSessionId: string;
-  readonly paymentMethodId: string;
-  readonly paymentMethodLabel?: string;
-  readonly appBaseUrl: string;
-  /** When true, PSP success URL targets a minimal HTML route for in-app browser completion. */
-  readonly nativeInAppPaymentReturn?: boolean;
-};
-
-export type CreateCheckoutSessionResult =
-  | {
-      readonly ok: true;
-      readonly transactionId: string;
-      readonly redirectUrl: string | null;
-      readonly bookingId: string | null;
-      readonly manualConfirm: boolean;
-      readonly mock?: boolean;
-      readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null;
-    }
-  | {
-      readonly ok: false;
-      readonly code: string;
-      readonly error: string;
-    };
+export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
 async function updateTransactionProvider(
   transactionId: ObjectId,
@@ -105,20 +76,8 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   }
   const resolvedPaymentMethodLabel = params.paymentMethodLabel ?? methodOption.label;
   const settings = await getPaymentSettings();
-  let startsAt: Date;
-  try {
-    startsAt = parseBookingSlotToUtc(params.date, params.time);
-  } catch {
-    return { ok: false, code: 'invalid_slot', error: 'Invalid date or time.' };
-  }
-  const slotOk = await isMarketingSlotInPublishedAvailability({
-    serviceKey: params.serviceKey,
-    startsAtUtc: startsAt,
-  });
-  if (!slotOk) {
-    return { ok: false, code: 'booking_slot_unavailable', error: 'This time is no longer available.' };
-  }
-  const resolvedQuizSessionHex = resolveQuizSessionObjectIdHexFromMarketingRef(params.quizSessionId);
+  const sessionMarketingRef = params.quizSessionId.trim();
+  const resolvedQuizSessionHex = resolveQuizSessionObjectIdHexFromMarketingRef(sessionMarketingRef);
   if (resolvedQuizSessionHex === null) {
     return { ok: false, code: 'quiz_session_invalid_id', error: 'Invalid quiz session reference.' };
   }
@@ -133,12 +92,40 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   if (ownedQuizSession._id !== undefined) {
     const existingBookingCount = await countBookingsByQuizSessionId(ownedQuizSession._id);
     if (existingBookingCount > 0) {
+      const pendingBooking = await findVerifiedQuizSessionPendingBookingForCheckout(
+        params.visitorId,
+        ownedQuizSession._id,
+      );
+      if (pendingBooking !== null) {
+        return createPaymentCheckoutForVerifiedBooking(pendingBooking, {
+          gatewayId: params.gatewayId,
+          paymentMethodId: params.paymentMethodId,
+          paymentMethodLabel: params.paymentMethodLabel,
+          appBaseUrl: params.appBaseUrl,
+          nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
+          promoCode: params.promoCode,
+          sessionMarketingRef,
+        });
+      }
       return {
         ok: false,
         code: 'quiz_session_already_booked',
         error: 'This diagnostic is already linked to a booking.',
       };
     }
+  }
+  let startsAt: Date;
+  try {
+    startsAt = parseBookingSlotToUtc(params.date, params.time);
+  } catch {
+    return { ok: false, code: 'invalid_slot', error: 'Invalid date or time.' };
+  }
+  const slotOk = await isMarketingSlotInPublishedAvailability({
+    serviceKey: params.serviceKey,
+    startsAtUtc: startsAt,
+  });
+  if (!slotOk) {
+    return { ok: false, code: 'booking_slot_unavailable', error: 'This time is no longer available.' };
   }
   const contact: MarketingBookingLeadContact = {
     name: params.customerName.trim(),
@@ -150,6 +137,19 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   if (leadId === null) {
     return { ok: false, code: 'database_unavailable', error: 'Database unavailable.' };
   }
+  let resolvedPricing;
+  try {
+    resolvedPricing = await resolveCheckoutAmountCentavos({
+      serviceKey: params.serviceKey,
+      promoCode: params.promoCode,
+    });
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      code: 'promo_invalid',
+      error: error instanceof Error ? error.message : 'Invalid promo code.',
+    };
+  }
   const bookingDraftId = randomUUID();
   const expiresAt =
     settings.paymentPolicy === 'pay_after_hold'
@@ -160,7 +160,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     providerRef: bookingDraftId,
     providerSessionId: bookingDraftId,
     paymentPolicy: settings.paymentPolicy,
-    amountCentavos: publicSettings.checkoutAmountCentavos,
+    amountCentavos: resolvedPricing.amountCentavos,
     visitorId: params.visitorId,
     bookingDraftId,
     serviceKey: params.serviceKey,
@@ -174,7 +174,16 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     quizSessionIdHex: resolvedQuizSessionHex,
     paymentMethodLabel: resolvedPaymentMethodLabel,
     redirectUrl: null,
-    metadata: { bookingDraftId },
+    metadata: {
+      bookingDraftId,
+      pricingSource: resolvedPricing.source,
+      ...(resolvedPricing.appliedPromoCode !== undefined
+        ? { promoCode: resolvedPricing.appliedPromoCode }
+        : {}),
+      ...(resolvedPricing.catalogServiceKey !== undefined
+        ? { catalogServiceKey: resolvedPricing.catalogServiceKey }
+        : {}),
+    },
     expiresAt,
   });
   if (insertedId === null) {
@@ -202,7 +211,6 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   }
   const credentials = await getGatewayCredentials(params.gatewayId);
   const useMock = credentials === null && process.env.NODE_ENV === 'development';
-  const sessionMarketingRef = params.quizSessionId.trim();
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: params.appBaseUrl,
     transactionId,
@@ -222,9 +230,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   let providerSession: { readonly providerRef: string; readonly providerSessionId: string; readonly redirectUrl: string };
   try {
     providerSession = await adapter.createCheckoutSession({
-      amountCentavos: publicSettings.checkoutAmountCentavos,
+      amountCentavos: resolvedPricing.amountCentavos,
       currency: 'PHP',
-      description: 'TechMD consultation booking',
+      description: 'TechMD Consultation Booking',
       successUrl,
       cancelUrl,
       referenceId: bookingDraftId,

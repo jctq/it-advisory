@@ -13,6 +13,7 @@ import { findPaymentTransactionById, updatePaymentTransactionStatus, type Paymen
 import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { getDb } from '@/lib/mongodb';
 import { executeSendBookingConfirmationEmail } from '@/lib/email/send-booking-confirmation-email';
+import { incrementPromoRedemptionCount } from '@/lib/data/monetization-settings';
 import { ensureVideoMeetingStoredForBooking } from '@/lib/video-meetings/ensure-video-meeting-for-booking';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
@@ -117,7 +118,29 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
   }).catch((err: unknown) => {
     console.error('[booking-email] fulfillPaidTransaction', err);
   });
+  const promoCode = await loadTransactionPromoCode(transaction.id);
+  if (promoCode !== null) {
+    void incrementPromoRedemptionCount(promoCode).catch((err: unknown) => {
+      console.error('[promo-redemption] fulfillPaidTransaction', err);
+    });
+  }
   return { kind: 'updated', transaction: updated };
+}
+
+async function loadTransactionPromoCode(transactionId: string): Promise<string | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const db = await getDb();
+  const doc = await db.collection(COLLECTIONS.paymentTransactions).findOne(
+    { _id: new ObjectId(transactionId) },
+    { projection: { metadata: 1 } },
+  );
+  if (doc === null || typeof doc.metadata !== 'object' || doc.metadata === null) {
+    return null;
+  }
+  const promoCode = (doc.metadata as Record<string, string>).promoCode;
+  return typeof promoCode === 'string' && promoCode.trim().length > 0 ? promoCode.trim() : null;
 }
 
 async function failTransaction(

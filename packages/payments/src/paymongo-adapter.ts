@@ -10,7 +10,8 @@ import { buildPaymongoBilling } from './customer-prefill';
 import { resolvePaymongoPaymentMethodTypes } from './payment-method-types';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-const PAYMONGO_API_BASE = 'https://api.paymongo.com/v1';
+const PAYMONGO_API_V1 = 'https://api.paymongo.com/v1';
+const PAYMONGO_CHECKOUT_API = 'https://api.paymongo.com/v2';
 
 function resolveSecretKey(credentials: GatewayCredentials, sandboxMode: boolean): string {
   const key = sandboxMode
@@ -27,7 +28,7 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
   return {
     gatewayId: 'paymongo',
     getCapabilities(): readonly string[] {
-      return ['Card', 'GCash', 'Maya'];
+      return ['Card', 'GCash', 'Maya', 'GrabPay', 'ShopeePay'];
     },
     async createCheckoutSession(input: CreateCheckoutSessionInput): Promise<CreateCheckoutSessionResult> {
       const secretKey = resolveSecretKey(credentials, input.sandboxMode);
@@ -36,7 +37,7 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
       }
       const billing = buildPaymongoBilling(input);
       const paymentMethodTypes = [...resolvePaymongoPaymentMethodTypes(input.paymentMethodId)];
-      const response = await fetch(`${PAYMONGO_API_BASE}/checkout_sessions`, {
+      const response = await fetch(`${PAYMONGO_CHECKOUT_API}/checkout_sessions`, {
         method: 'POST',
         headers: {
           Authorization: encodeBasicAuth(secretKey),
@@ -92,7 +93,7 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
       if (secretKey.length === 0 || input.providerSessionId.length === 0) {
         return null;
       }
-      const response = await fetch(`${PAYMONGO_API_BASE}/checkout_sessions/${encodeURIComponent(input.providerSessionId)}`, {
+      const response = await fetch(`${PAYMONGO_CHECKOUT_API}/checkout_sessions/${encodeURIComponent(input.providerSessionId)}`, {
         headers: { Authorization: encodeBasicAuth(secretKey) },
       });
       const payload: unknown = await response.json().catch(() => ({}));
@@ -145,7 +146,7 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
       if (secretKey.length === 0) {
         return { ok: false, message: 'Missing PayMongo secret key.' };
       }
-      const response = await fetch(`${PAYMONGO_API_BASE}/webhooks`, {
+      const response = await fetch(`${PAYMONGO_API_V1}/webhooks`, {
         headers: { Authorization: encodeBasicAuth(secretKey) },
       });
       if (response.ok) {

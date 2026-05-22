@@ -14,6 +14,9 @@ import {
 } from '@/lib/data/diagnostic-template-summary-cache';
 import { formatDiagnosticThread } from '@/lib/marketing/diagnostic-thread';
 import { SITUATION_OPTIONS } from '@/lib/marketing/situation-options';
+import { KNOWN_CATALOG_SERVICE_KEYS } from '@/domain/monetization-types';
+import { getPublicCatalogServices } from '@/lib/data/public-catalog-services';
+import { resolveRecommendedServiceKey } from '@/lib/marketing/resolve-recommended-service-key';
 import {
   buildProjectRescueServicePromptBlock,
   resolveProjectRescueBriefAssessment,
@@ -43,6 +46,7 @@ const responseSchema = z.object({
   briefAssessment: z.string().max(420),
   sessionTitle: z.string().max(120),
   goodFitBullets: z.array(z.string().max(220)).length(3),
+  recommendedServiceKey: z.enum(KNOWN_CATALOG_SERVICE_KEYS),
 });
 
 function resolveDiagnosticModel(): string {
@@ -68,21 +72,39 @@ export async function POST(request: Request): Promise<NextResponse> {
     initialPrompt,
     rounds,
   });
+  const catalog = await getPublicCatalogServices();
+  const enabledServiceKeys = [...catalog.sessions, ...catalog.packages].map((row) => row.serviceKey);
   const cacheHit = await findValidDiagnosticTemplateSummaryCache(threadHash);
   if (cacheHit !== null) {
     await incrementDiagnosticTemplateSummaryCacheHit(cacheHit.documentThreadHash);
+    const recommendedServiceKey = resolveRecommendedServiceKey({
+      candidateKey: cacheHit.payload.recommendedServiceKey ?? null,
+      mappedSituation,
+      initialPrompt,
+      advisorSummary: cacheHit.payload.summaryForAdvisor,
+      enabledServiceKeys,
+    });
     return NextResponse.json({
       ...cacheHit.payload,
+      recommendedServiceKey,
       source: 'cache',
       model: cacheHit.model,
     });
   }
   if (!process.env.OPENAI_API_KEY) {
+    const recommendedServiceKey = resolveRecommendedServiceKey({
+      candidateKey: null,
+      mappedSituation,
+      initialPrompt,
+      advisorSummary: fallbackSummary,
+      enabledServiceKeys,
+    });
     return NextResponse.json({
       summaryForAdvisor: fallbackSummary,
       briefAssessment: resolveProjectRescueBriefAssessment(''),
       sessionTitle: resolveProjectRescueSessionTitle(''),
       goodFitBullets: resolveProjectRescueGoodFitBullets(null),
+      recommendedServiceKey,
       mappedSituation,
       source: 'fallback',
       model: null,
@@ -108,6 +130,13 @@ Also output briefAssessment: 1–2 short sentences under the title: connect thei
 
 Also output goodFitBullets: exactly 3 strings for a customer-facing “Good fit if” list (plain sentences; no leading • or - in each string; transcript-grounded reasons this rescue advisory session fits them; max ~220 characters each).
 
+Also output recommendedServiceKey: pick exactly one catalog key that best matches this intake:
+- project-rescue — troubled in-flight delivery, scope churn, vendor finger-pointing, stabilization
+- vendor-validation — evaluating vendors, RFP, proposals, contracts before commitment
+- automation-scoping — workflow/automation/integration scoping
+- consultation — general clarity when situation is broad or early-stage
+- package-3-sessions — when multiple checkpoints across a program are implied (less common)
+
 Write a concise summaryForAdvisor that:
 - synthesizes the most important selections, symptoms, constraints, and risks
 - mentions timeline/impact clues only if they appear in the answers
@@ -129,12 +158,20 @@ ${thread}`,
     const briefAssessment = resolveProjectRescueBriefAssessment(object.briefAssessment);
     const sessionTitle = resolveProjectRescueSessionTitle(object.sessionTitle);
     const goodFitBullets = resolveProjectRescueGoodFitBullets(object.goodFitBullets);
+    const recommendedServiceKey = resolveRecommendedServiceKey({
+      candidateKey: object.recommendedServiceKey,
+      mappedSituation,
+      initialPrompt,
+      advisorSummary: summaryForAdvisor,
+      enabledServiceKeys,
+    });
     const responseBody = {
       summaryForAdvisor,
       briefAssessment,
       sessionTitle,
       mappedSituation,
       goodFitBullets,
+      recommendedServiceKey,
     };
     await upsertDiagnosticTemplateSummaryCache({
       threadHash,
@@ -152,11 +189,19 @@ ${thread}`,
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[api/quiz/diagnostic-template-summary]', message, error);
+    const recommendedServiceKey = resolveRecommendedServiceKey({
+      candidateKey: null,
+      mappedSituation,
+      initialPrompt,
+      advisorSummary: fallbackSummary,
+      enabledServiceKeys,
+    });
     return NextResponse.json({
       summaryForAdvisor: fallbackSummary,
       briefAssessment: resolveProjectRescueBriefAssessment(''),
       sessionTitle: resolveProjectRescueSessionTitle(''),
       goodFitBullets: resolveProjectRescueGoodFitBullets(null),
+      recommendedServiceKey,
       mappedSituation,
       source: 'fallback',
       model: null,

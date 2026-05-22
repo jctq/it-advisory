@@ -23,6 +23,7 @@ const cachedResponseSchema = z.object({
   sessionTitle: z.string(),
   mappedSituation: z.string(),
   goodFitBullets: z.array(z.string()).length(3).optional(),
+  recommendedServiceKey: z.string().optional(),
 });
 
 /**

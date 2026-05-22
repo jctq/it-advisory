@@ -5,6 +5,7 @@
 import { MongoServerError, ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { BookingDocument, LeadDocument, UserAccountDocument } from '@/domain/types';
+import type { UpdateFilter } from 'mongodb';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { getDb } from '@/lib/mongodb';
 import { findQuizSessionForBookingSnapshot, findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
@@ -27,6 +28,8 @@ export type BookingRow = {
   hasDiagnosticSnapshot: boolean;
   /** Quiz session document id captured at booking time, when Mongo had a session row. */
   quizSessionId: string | null;
+  quotedAmountCentavos: number | null;
+  quoteExpiresAtIso: string | null;
 };
 
 /** Admin calendar row with lead contact and guest/account context for hover previews. */
@@ -63,6 +66,12 @@ function mapBooking(
     hasDiagnosticSnapshot:
       typeof doc.guidedDiagnosticSnapshot === 'string' && doc.guidedDiagnosticSnapshot.trim().length > 0,
     quizSessionId,
+    quotedAmountCentavos:
+      typeof doc.quotedAmountCentavos === 'number' && Number.isFinite(doc.quotedAmountCentavos)
+        ? doc.quotedAmountCentavos
+        : null,
+    quoteExpiresAtIso:
+      doc.quoteExpiresAt instanceof Date ? doc.quoteExpiresAt.toISOString() : null,
   };
 }
 
@@ -459,11 +468,19 @@ export async function countBookingsByQuizSessionId(sessionId: ObjectId): Promise
 }
 
 export type PrimaryBookingSlotRow = {
+  readonly bookingId: string;
   readonly status: BookingDocument['status'];
   readonly startsAtIso: string;
   readonly timezone: string;
   readonly serviceKey: string;
   readonly meetingUrl: string | null;
+  readonly paymentTransactionId: string | null;
+  readonly paymentMethodLabel: string | null;
+  readonly paymentStatus: BookingDocument['paymentStatus'] | null;
+  readonly customerName: string | null;
+  readonly customerEmail: string | null;
+  readonly customerCompany: string | null;
+  readonly customerPhone: string | null;
 };
 
 /**
@@ -478,19 +495,112 @@ export async function findPrimaryBookingSlotByQuizSessionId(quizSessionId: Objec
     { quizSessionId },
     {
       sort: { createdAt: 1 },
-      projection: { status: 1, startsAt: 1, timezone: 1, serviceKey: 1, meetingUrl: 1 },
+      projection: {
+        status: 1,
+        startsAt: 1,
+        timezone: 1,
+        serviceKey: 1,
+        meetingUrl: 1,
+        paymentTransactionId: 1,
+        paymentMethodLabel: 1,
+        paymentStatus: 1,
+        leadId: 1,
+      },
     },
   );
   if (doc === null || doc._id === undefined || doc.startsAt === undefined) {
     return null;
   }
+  let customerName: string | null = null;
+  let customerEmail: string | null = null;
+  let customerCompany: string | null = null;
+  let customerPhone: string | null = null;
+  if (doc.leadId !== undefined) {
+    const leadDoc = await db.collection<LeadDocument>(COLLECTIONS.leads).findOne(
+      { _id: doc.leadId },
+      { projection: { name: 1, email: 1, company: 1, phone: 1 } },
+    );
+    if (leadDoc !== null) {
+      const nameRaw = typeof leadDoc.name === 'string' ? leadDoc.name.trim() : '';
+      const emailRaw = typeof leadDoc.email === 'string' ? leadDoc.email.trim() : '';
+      const companyRaw = typeof leadDoc.company === 'string' ? leadDoc.company.trim() : '';
+      const phoneRaw = typeof leadDoc.phone === 'string' ? leadDoc.phone.trim() : '';
+      customerName = nameRaw.length > 0 ? nameRaw : null;
+      customerEmail = emailRaw.length > 0 ? emailRaw : null;
+      customerCompany = companyRaw.length > 0 ? companyRaw : null;
+      customerPhone = phoneRaw.length > 0 ? phoneRaw : null;
+    }
+  }
   const meetingRaw = doc.meetingUrl;
   const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+  const paymentMethodRaw = doc.paymentMethodLabel;
+  const paymentMethodLabel =
+    typeof paymentMethodRaw === 'string' && paymentMethodRaw.trim().length > 0 ? paymentMethodRaw.trim() : null;
   return {
+    bookingId: doc._id.toString(),
     status: doc.status,
     startsAtIso: doc.startsAt.toISOString(),
     timezone: doc.timezone,
     serviceKey: doc.serviceKey,
     meetingUrl,
+    paymentTransactionId:
+      doc.paymentTransactionId !== undefined && doc.paymentTransactionId !== null
+        ? doc.paymentTransactionId.toString()
+        : null,
+    paymentMethodLabel,
+    paymentStatus: doc.paymentStatus ?? null,
+    customerName,
+    customerEmail,
+    customerCompany,
+    customerPhone,
   };
+}
+
+export type UpdateBookingQuoteInput = {
+  readonly quotedAmountCentavos: number | null;
+  readonly quoteExpiresAt: Date | null;
+};
+
+/**
+ * Sets or clears a custom checkout quote on a pending booking.
+ */
+export async function updateBookingQuote(
+  bookingId: string,
+  input: UpdateBookingQuoteInput,
+): Promise<BookingDetailRow | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(bookingId);
+  } catch {
+    return null;
+  }
+  const db = await getDb();
+  const existing = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: objectId });
+  if (existing === null) {
+    return null;
+  }
+  if (existing.status !== 'pending') {
+    throw new Error('Custom quotes can only be set on pending bookings.');
+  }
+  if (existing.paymentStatus === 'paid') {
+    throw new Error('This booking is already paid.');
+  }
+  const quoteUpdate: UpdateFilter<BookingDocument> =
+    input.quotedAmountCentavos === null
+      ? {
+          $unset: { quotedAmountCentavos: true, quoteExpiresAt: true },
+          $set: { updatedAt: new Date() },
+        }
+      : {
+          $set: {
+            quotedAmountCentavos: Math.max(100, Math.min(100_000_000, Math.round(input.quotedAmountCentavos))),
+            quoteExpiresAt: input.quoteExpiresAt,
+            updatedAt: new Date(),
+          },
+        };
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne({ _id: objectId }, quoteUpdate);
+  return findBookingById(bookingId);
 }

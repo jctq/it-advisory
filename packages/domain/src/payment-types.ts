@@ -42,6 +42,8 @@ export const PAYMENT_GATEWAY_METHOD_CATALOG: Record<PaymentGatewayId, readonly P
     { id: 'card', label: 'Credit / Debit Card', hint: 'Visa · Mastercard · JCB' },
     { id: 'gcash', label: 'GCash', hint: 'Pay with GCash' },
     { id: 'maya', label: 'Maya', hint: 'Pay with Maya' },
+    { id: 'grabpay', label: 'GrabPay', hint: 'Pay with GrabPay' },
+    { id: 'shopeepay', label: 'ShopeePay', hint: 'ShopeePay wallet' },
   ],
   xendit: [
     { id: 'card', label: 'Credit / Debit Card', hint: 'Visa · Mastercard' },
@@ -61,8 +63,8 @@ export const PAYMENT_GATEWAY_PUBLIC_CONFIGS: readonly PaymentGatewayPublicConfig
   {
     id: 'paymongo',
     label: 'PayMongo',
-    description: 'Cards, GCash, and Maya via PayMongo.',
-    methodLabels: ['Card', 'GCash', 'Maya'],
+    description: 'Cards, e-wallets, and BNPL via PayMongo.',
+    methodLabels: ['Card', 'GCash', 'Maya', 'GrabPay', 'ShopeePay'],
     methods: PAYMENT_GATEWAY_METHOD_CATALOG.paymongo,
   },
   {

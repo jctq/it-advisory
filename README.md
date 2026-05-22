@@ -42,6 +42,7 @@ Suggested indexes (create in Atlas when you begin writing documents):
 - `advisor_booking_settings`: singleton `{ _id: 'default' }` (no extra index required beyond `_id`).
 - `availability_slots`: `{ startsAt: 1, timezone: 1 }` (legacy / unused by current rule-based schedule)
 - `email_settings`: singleton `{ _id: 'default' }` (admin transactional email providers).
+- `monetization_settings`: singleton `{ _id: 'default' }` (service catalog, packages, promo codes).
 - `email_sends`: `{ createdAt: -1 }`, `{ to: 1 }`
 - `diagnostic_round_cache`: `{ threadHash: 1 }` unique. For **semantic** reuse of similar prompts, add an Atlas **Vector Search** index on path `embedding` (1536 dimensions, cosine, matching `OPENAI_EMBEDDING_MODEL` / `OPENAI_EMBEDDING_DIMENSIONS`) and **filter** fields `cacheVersion`, `roundsCompleted`; set `DIAGNOSTIC_CACHE_VECTOR_INDEX_NAME` to that index name in `apps/web/.env.local`.
 - `blog_posts`: `{ slug: 1 }` unique, `{ status: 1, publishedAt: -1 }` (marketing blog index).

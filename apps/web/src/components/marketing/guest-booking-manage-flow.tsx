@@ -517,7 +517,7 @@ function ResultView(props: ResultViewProps): ReactElement {
               </div>
             </fieldset>
           ) : null}
-          {props.availablePaymentMethods.length > 0 ? (
+          {props.availablePaymentMethods.length > 1 ? (
             <fieldset>
               <legend className="text-sm font-semibold text-foreground">Payment method</legend>
               <div className="mt-3 space-y-2">

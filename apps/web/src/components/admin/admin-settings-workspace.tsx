@@ -1,6 +1,6 @@
 'use client';
 
-import { BrainCircuit, CreditCard, Mail, Video } from 'lucide-react';
+import { BrainCircuit, CircleDollarSign, CreditCard, Mail, Video } from 'lucide-react';
 import { useCallback, useRef, useState, type ReactElement } from 'react';
 import { AdminFormStickyFooter } from '@/components/admin/admin-form-sticky-footer';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
@@ -20,13 +20,18 @@ import {
   type AdminPaymentSettingsFormState,
 } from '@/components/admin/admin-payment-settings-form';
 import {
+  AdminPricingSettingsForm,
+  type AdminPricingSettingsFormHandle,
+  type AdminPricingSettingsFormState,
+} from '@/components/admin/admin-pricing-settings-form';
+import {
   AdminSettingsForm,
   type AdminSettingsFormHandle,
   type AdminSettingsFormState,
 } from '@/components/admin/admin-settings-form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-type SettingsTab = 'diagnostics' | 'payments' | 'email' | 'meetings';
+type SettingsTab = 'diagnostics' | 'pricing' | 'payments' | 'email' | 'meetings';
 
 const EMPTY_DIAGNOSTICS_STATE: AdminSettingsFormState = {
   isDirty: false,
@@ -46,6 +51,12 @@ const EMPTY_EMAIL_STATE: AdminEmailSettingsFormState = {
   isLoading: true,
 };
 
+const EMPTY_PRICING_STATE: AdminPricingSettingsFormState = {
+  isDirty: false,
+  isSaving: false,
+  isLoading: true,
+};
+
 const EMPTY_MEETINGS_STATE: AdminMeetingSettingsFormState = {
   isDirty: false,
   isSaving: false,
@@ -55,24 +66,32 @@ const EMPTY_MEETINGS_STATE: AdminMeetingSettingsFormState = {
 export function AdminSettingsWorkspace(): ReactElement {
   const [activeTab, setActiveTab] = useState<SettingsTab>('diagnostics');
   const [diagnosticsState, setDiagnosticsState] = useState<AdminSettingsFormState>(EMPTY_DIAGNOSTICS_STATE);
+  const [pricingState, setPricingState] = useState<AdminPricingSettingsFormState>(EMPTY_PRICING_STATE);
   const [paymentsState, setPaymentsState] = useState<AdminPaymentSettingsFormState>(EMPTY_PAYMENTS_STATE);
   const [emailState, setEmailState] = useState<AdminEmailSettingsFormState>(EMPTY_EMAIL_STATE);
   const [meetingsState, setMeetingsState] = useState<AdminMeetingSettingsFormState>(EMPTY_MEETINGS_STATE);
   const diagnosticsFormRef = useRef<AdminSettingsFormHandle>(null);
+  const pricingFormRef = useRef<AdminPricingSettingsFormHandle>(null);
   const paymentsFormRef = useRef<AdminPaymentSettingsFormHandle>(null);
   const emailFormRef = useRef<AdminEmailSettingsFormHandle>(null);
   const meetingsFormRef = useRef<AdminMeetingSettingsFormHandle>(null);
   const activeState =
     activeTab === 'diagnostics'
       ? diagnosticsState
-      : activeTab === 'payments'
-        ? paymentsState
-        : activeTab === 'email'
-          ? emailState
-          : meetingsState;
+      : activeTab === 'pricing'
+        ? pricingState
+        : activeTab === 'payments'
+          ? paymentsState
+          : activeTab === 'email'
+            ? emailState
+            : meetingsState;
   const executeSaveActive = useCallback((): void => {
     if (activeTab === 'diagnostics') {
       void diagnosticsFormRef.current?.save();
+      return;
+    }
+    if (activeTab === 'pricing') {
+      void pricingFormRef.current?.save();
       return;
     }
     if (activeTab === 'payments') {
@@ -90,6 +109,10 @@ export function AdminSettingsWorkspace(): ReactElement {
       diagnosticsFormRef.current?.reset();
       return;
     }
+    if (activeTab === 'pricing') {
+      pricingFormRef.current?.reset();
+      return;
+    }
     if (activeTab === 'payments') {
       paymentsFormRef.current?.reset();
       return;
@@ -104,26 +127,30 @@ export function AdminSettingsWorkspace(): ReactElement {
     ? 'You have unsaved changes on this tab. Reset discards them, or save to apply.'
     : activeTab === 'diagnostics'
       ? 'Diagnostic intake settings apply to web and native customer flows.'
-      : activeTab === 'payments'
-        ? 'Payment settings control checkout, gateways, and booking confirmation timing.'
-        : activeTab === 'email'
-          ? 'Email settings control transactional providers and BCC copies for booking confirmations.'
-          : 'Meeting settings control Zoom, Google Meet, or Microsoft Teams join links for confirmed bookings.';
+      : activeTab === 'pricing'
+        ? 'Pricing settings control per-service checkout amounts, packages, and promo codes.'
+        : activeTab === 'payments'
+          ? 'Payment settings control gateways, fallback checkout amount, and booking confirmation timing.'
+          : activeTab === 'email'
+            ? 'Email settings control transactional providers and BCC copies for booking confirmations.'
+            : 'Meeting settings control Zoom, Google Meet, or Microsoft Teams join links for confirmed bookings.';
   const saveLabel =
     activeTab === 'diagnostics'
       ? 'Save diagnostic settings'
-      : activeTab === 'payments'
-        ? 'Save payment settings'
-        : activeTab === 'email'
-          ? 'Save email settings'
-          : 'Save meeting settings';
+      : activeTab === 'pricing'
+        ? 'Save pricing settings'
+        : activeTab === 'payments'
+          ? 'Save payment settings'
+          : activeTab === 'email'
+            ? 'Save email settings'
+            : 'Save meeting settings';
   return (
-    <section className="mx-auto flex min-h-0 flex-col">
+    <section className="mx-auto flex min-h-0 flex-col w-full">
       <div className="space-y-6 pb-6">
         <AdminPageHeader
           eyebrow="Configuration"
           title="Settings"
-          description="Manage diagnostic intake, payments, transactional email, and video meetings for customer-facing web and native experiences."
+          description="Manage diagnostic intake, pricing, payments, transactional email, and video meetings for customer-facing web and native experiences."
         />
         <Tabs
           value={activeTab}
@@ -136,6 +163,10 @@ export function AdminSettingsWorkspace(): ReactElement {
             <TabsTrigger value="diagnostics" className="min-h-10 gap-2 px-4 text-sm">
               <BrainCircuit className="size-4 shrink-0" aria-hidden />
               Diagnostics
+            </TabsTrigger>
+            <TabsTrigger value="pricing" className="min-h-10 gap-2 px-4 text-sm">
+              <CircleDollarSign className="size-4 shrink-0" aria-hidden />
+              Pricing
             </TabsTrigger>
             <TabsTrigger value="payments" className="min-h-10 gap-2 px-4 text-sm">
               <CreditCard className="size-4 shrink-0" aria-hidden />
@@ -152,6 +183,9 @@ export function AdminSettingsWorkspace(): ReactElement {
           </TabsList>
           <TabsContent value="diagnostics" className="mt-0 space-y-6 focus-visible:outline-none my-0">
             <AdminSettingsForm formRef={diagnosticsFormRef} onStateChange={setDiagnosticsState} />
+          </TabsContent>
+          <TabsContent value="pricing" className="mt-0 space-y-6 focus-visible:outline-none">
+            <AdminPricingSettingsForm formRef={pricingFormRef} onStateChange={setPricingState} />
           </TabsContent>
           <TabsContent value="payments" className="mt-0 space-y-6 focus-visible:outline-none">
             <AdminPaymentSettingsForm formRef={paymentsFormRef} onStateChange={setPaymentsState} />

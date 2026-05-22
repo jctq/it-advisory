@@ -5,8 +5,10 @@ import { findBookingById } from '@/lib/data/bookings';
 import { findLeadById } from '@/lib/data/leads';
 import { findPaymentTransactionById, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
 import { getDb } from '@/lib/mongodb';
+import { getCatalogServiceByKey } from '@/lib/data/public-catalog-services';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
+import type { CatalogServiceKind } from '@/domain/monetization-types';
 import { formatInTimeZone } from 'date-fns-tz';
 import { executeDispatchTransactionalEmail } from '@/lib/email/send-transactional-email';
 import {
@@ -38,6 +40,45 @@ function formatServiceKeyLabel(serviceKey: string): string {
   return parts
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
     .join(' ');
+}
+
+type BookingCatalogEmailDetails = {
+  readonly title: string;
+  readonly description: string;
+  readonly durationLabel: string;
+  readonly amountLabel: string;
+  readonly kind: CatalogServiceKind;
+  readonly sessionsIncluded: number | null;
+};
+
+function buildCatalogServiceSectionHtml(catalog: BookingCatalogEmailDetails): string {
+  const rows: string[] = [
+    buildEmailDetailRow('Service', catalog.title),
+    buildEmailDetailRow('Duration', catalog.durationLabel),
+    buildEmailDetailRow('Price', catalog.amountLabel),
+  ];
+  if (catalog.kind === 'package' && catalog.sessionsIncluded !== null) {
+    rows.push(buildEmailDetailRow('Package', `${catalog.sessionsIncluded} sessions included`));
+  }
+  const descriptionBlock =
+    catalog.description.trim().length > 0
+      ? `<tr><td colspan="2" style="padding:12px 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#3f3f46;">${escapeHtml(catalog.description)}</td></tr>`
+      : '';
+  return `${buildEmailSectionHeading('Your service')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px 0;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tr><td style="padding:18px 20px;border:1px solid #e4e4e7;border-radius:10px;background-color:#fafafa;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tbody>${rows.join('')}${descriptionBlock}</tbody></table></td></tr></table>`;
+}
+
+function buildCatalogServicePlainLines(catalog: BookingCatalogEmailDetails): string[] {
+  const lines: string[] = ['YOUR SERVICE'];
+  lines.push(`Service: ${catalog.title}`);
+  lines.push(`Duration: ${catalog.durationLabel}`);
+  lines.push(`Price: ${catalog.amountLabel}`);
+  if (catalog.kind === 'package' && catalog.sessionsIncluded !== null) {
+    lines.push(`Package: ${catalog.sessionsIncluded} sessions included`);
+  }
+  if (catalog.description.trim().length > 0) {
+    lines.push(catalog.description.trim());
+  }
+  return lines;
 }
 
 function escapeHtml(raw: string): string {
@@ -118,6 +159,7 @@ function buildConfirmationPlainText(input: {
   readonly manageUrl: string;
   readonly meetingUrl: string | null;
   readonly calendarBundle: BookingCalendarLinkBundle;
+  readonly catalogPlainLines: readonly string[] | null;
   readonly paymentPlainLines: readonly string[] | null;
 }): string {
   const lines: string[] = [];
@@ -125,8 +167,11 @@ function buildConfirmationPlainText(input: {
   lines.push('');
   lines.push('Your booking is confirmed. Thank you — we have received your payment and reserved your slot.');
   lines.push('');
+  if (input.catalogPlainLines !== null) {
+    lines.push(...input.catalogPlainLines);
+    lines.push('');
+  }
   lines.push('RESERVATION');
-  lines.push(`Service: ${input.serviceLabel}`);
   lines.push(`When: ${input.dateLong} · ${input.timeLabel}`);
   lines.push(`Booking reference: ${input.bookingReference}`);
   lines.push('');
@@ -185,6 +230,7 @@ function buildConfirmationHtml(input: {
   readonly meetingUrl: string | null;
   readonly siteOrigin: string;
   readonly calendarBundle: BookingCalendarLinkBundle;
+  readonly catalogSectionHtml: string | null;
   readonly paymentSectionHtml: string | null;
 }): string {
   const preheader = `Your ${TRANSACTIONAL_EMAIL_BRAND_NAME} consultation is confirmed. Reference ${input.bookingReference}.`;
@@ -195,7 +241,6 @@ function buildConfirmationHtml(input: {
       ? `<tr><td style="padding:0 0 24px 0;"><img src="${escapeHtml(`${input.siteOrigin}/brand/techmd-logo-full.png`)}" width="152" alt="${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)}" style="display:block;width:152px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr>`
       : `<tr><td style="padding:0 0 16px 0;font-family:${EMAIL_FONT_STACK};font-size:22px;font-weight:700;line-height:28px;color:#0f172a;letter-spacing:-0.02em;">${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)}</td></tr>`;
   const reservationRows = [
-    buildEmailDetailRow('Service', input.serviceLabel),
     buildEmailDetailRow('When', `${input.dateLong} · ${input.timeLabel}`),
     buildEmailDetailRow('Booking reference', input.bookingReference),
   ].join('');
@@ -209,6 +254,7 @@ function buildConfirmationHtml(input: {
     input.manageUrl.length > 0
       ? `${buildEmailSectionHeading('Manage booking')}<p style="margin:0 0 12px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">You will need your booking reference, email, and the last four digits of your phone number.</p>${buildBulletproofButton('View or manage booking', input.manageUrl)}`
       : `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">To update this reservation, visit the ${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)} website and use <strong style="color:#18181b;">Manage booking</strong> with your reference, email, and phone last four.</p>`;
+  const catalogBlock = input.catalogSectionHtml ?? '';
   const paymentBlock =
     input.paymentSectionHtml !== null && input.paymentSectionHtml.length > 0
       ? `${buildEmailSectionHeading('Payment')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px 0;"><tr><td style="padding:16px 18px;border:1px solid #e4e4e7;border-radius:10px;background-color:#fafafa;">${input.paymentSectionHtml}</td></tr></table>`
@@ -230,7 +276,7 @@ ${escapeHtml(preheader)}&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#82
 <tr><td align="center" style="padding:32px 16px;">
 <table role="presentation" width="${EMAIL_INNER_WIDTH_PX}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${EMAIL_INNER_WIDTH_PX}px;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;">
 <tr><td style="padding:32px 28px 28px 28px;background-color:#ffffff;border:1px solid #e4e4e7;border-radius:12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoBlock}<tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;line-height:28px;color:#18181b;">Booking confirmed</td></tr><tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.customerName)}, we have received your payment and reserved your consultation time.</td></tr><tr><td>${reservationCard}</td></tr><tr><td>${calendarHtml}</td></tr><tr><td>${meetingSection}</td></tr><tr><td>${manageSection}</td></tr><tr><td>${paymentBlock}</td></tr><tr><td style="padding:24px 0 0 0;border-top:1px solid #e4e4e7;"><p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:12px;line-height:18px;color:#71717a;">This message was sent automatically by ${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)}. If you did not make this booking, please contact support.</p></td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoBlock}<tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;line-height:28px;color:#18181b;">Booking confirmed</td></tr><tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.customerName)}, we have received your payment and reserved your consultation time.</td></tr><tr><td>${catalogBlock}</td></tr><tr><td>${reservationCard}</td></tr><tr><td>${calendarHtml}</td></tr><tr><td>${meetingSection}</td></tr><tr><td>${manageSection}</td></tr><tr><td>${paymentBlock}</td></tr><tr><td style="padding:24px 0 0 0;border-top:1px solid #e4e4e7;"><p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:12px;line-height:18px;color:#71717a;">This message was sent automatically by ${escapeHtml(TRANSACTIONAL_EMAIL_BRAND_NAME)}. If you did not make this booking, please contact support.</p></td></tr></table>
 </td></tr>
 </table>
 </td></tr>
@@ -334,10 +380,27 @@ async function runSendBookingConfirmationEmail(input: {
     booking.meetingUrl !== undefined && typeof booking.meetingUrl === 'string' && booking.meetingUrl.trim().length > 0
       ? booking.meetingUrl.trim()
       : null;
+  const catalogRow = await getCatalogServiceByKey(booking.serviceKey);
+  const serviceTitle = catalogRow?.title ?? formatServiceKeyLabel(booking.serviceKey);
+  const paidAmountLabel =
+    transaction !== null ? formatAmountPhp(transaction.amountCentavos) : (catalogRow?.amountLabel ?? null);
+  const catalogDetails: BookingCatalogEmailDetails | null =
+    catalogRow !== null
+      ? {
+          title: catalogRow.title,
+          description: catalogRow.description,
+          durationLabel: catalogRow.durationLabel,
+          amountLabel: paidAmountLabel ?? catalogRow.amountLabel,
+          kind: catalogRow.kind,
+          sessionsIncluded: catalogRow.sessionsIncluded,
+        }
+      : null;
+  const catalogSectionHtml = catalogDetails !== null ? buildCatalogServiceSectionHtml(catalogDetails) : null;
+  const catalogPlainLines = catalogDetails !== null ? buildCatalogServicePlainLines(catalogDetails) : null;
   const paymentSectionHtml = transaction !== null ? buildPaymentSectionHtml(transaction) : null;
   const paymentPlainLines = transaction !== null ? buildPaymentSectionPlainLines(transaction) : null;
   const calendarBundle = buildBookingCalendarLinkBundle({
-    title: `${formatServiceKeyLabel(booking.serviceKey)} — ${bookingReference}`,
+    title: `${serviceTitle} — ${bookingReference}`,
     description: `Booking reference ${bookingReference}. ${manageUrl.length > 0 ? `Manage: ${manageUrl}` : `Manage on ${TRANSACTIONAL_EMAIL_BRAND_NAME}.`}`,
     location: meetingUrl ?? '',
     startsAtUtc: startsAt,
@@ -347,24 +410,26 @@ async function runSendBookingConfirmationEmail(input: {
   const html = buildConfirmationHtml({
     customerName,
     bookingReference,
-    serviceLabel: formatServiceKeyLabel(booking.serviceKey),
+    serviceLabel: serviceTitle,
     dateLong,
     timeLabel,
     manageUrl,
     meetingUrl,
     siteOrigin,
     calendarBundle,
+    catalogSectionHtml,
     paymentSectionHtml,
   });
   const text = buildConfirmationPlainText({
     customerName,
     bookingReference,
-    serviceLabel: formatServiceKeyLabel(booking.serviceKey),
+    serviceLabel: serviceTitle,
     dateLong,
     timeLabel,
     manageUrl,
     meetingUrl,
     calendarBundle,
+    catalogPlainLines,
     paymentPlainLines,
   });
   const subject = `Booking confirmed — ${bookingReference}`;

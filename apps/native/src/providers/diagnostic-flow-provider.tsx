@@ -248,6 +248,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
           sessionTitle: resolveProjectRescueSessionTitle(response.sessionTitle),
           briefAssessment: resolveProjectRescueBriefAssessment(response.briefAssessment),
           goodFitBullets: resolveProjectRescueGoodFitBullets(response.goodFitBullets),
+          recommendedServiceKey: 'project-rescue',
         };
         setGuided({
           ...guided,
@@ -323,6 +324,10 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
         sessionTitle: resolveProjectRescueSessionTitle(response.sessionTitle),
         briefAssessment: resolveProjectRescueBriefAssessment(response.briefAssessment),
         goodFitBullets: resolveProjectRescueGoodFitBullets(response.goodFitBullets),
+        recommendedServiceKey:
+          typeof response.recommendedServiceKey === 'string' && response.recommendedServiceKey.trim().length > 0
+            ? response.recommendedServiceKey.trim()
+            : 'project-rescue',
       };
     },
     [activeTemplate, guided.initialPrompt],

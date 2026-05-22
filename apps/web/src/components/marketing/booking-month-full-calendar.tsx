@@ -5,6 +5,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
 import { parse } from 'date-fns';
+import { momentTimezonePlugin } from '@/lib/fullcalendar-moment-timezone-plugin';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { useEffect, useRef, type ReactElement } from 'react';
 
@@ -52,7 +53,7 @@ export function BookingMonthFullCalendar(props: BookingMonthFullCalendarProps): 
     <div className="booking-month-fc">
       <FullCalendar
         ref={calendarRef}
-        plugins={[dayGridPlugin, interactionPlugin]}
+        plugins={[momentTimezonePlugin, dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
         timeZone={PRIMARY_TIMEZONE}
         initialDate={manilaInitialDate(props.visibleManilaYearMonth)}

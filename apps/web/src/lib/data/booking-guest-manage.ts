@@ -4,6 +4,7 @@ import type { PaymentPolicy } from '@/domain/payment-types';
 import type { BookingDocument, LeadDocument } from '@/domain/types';
 import { findBookingById } from '@/lib/data/bookings';
 import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
+import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 import {
   formatBookingReferenceId,
   matchesPhoneLastFour,
@@ -146,6 +147,10 @@ export async function buildGuestBookingManageView(
   });
   const meetingRaw = verified.booking.meetingUrl;
   const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+  const resolvedPricing = await resolveCheckoutAmountCentavos({
+    serviceKey: verified.booking.serviceKey,
+    bookingId: verified.bookingId,
+  });
   return {
     bookingReference: formatBookingReferenceId(verified.bookingId),
     status: verified.booking.status,
@@ -158,7 +163,7 @@ export async function buildGuestBookingManageView(
     paymentExpiresAtIso: paymentExpiresAt !== null ? paymentExpiresAt.toISOString() : null,
     canPayOnline: verified.booking.status === 'pending' && payBlockedReason === null,
     payBlockedReason,
-    checkoutAmountLabel: publicSettings.checkoutAmountLabel,
+    checkoutAmountLabel: resolvedPricing.amountLabel,
     paymentsEnabled: publicSettings.paymentsEnabled,
   };
 }
@@ -256,4 +261,38 @@ export async function findVerifiedGuestBookingForCheckout(
     return null;
   }
   return resolved;
+}
+
+/**
+ * Resolves a pending payable booking linked to a quiz session for the same marketing visitor.
+ */
+export async function findVerifiedQuizSessionPendingBookingForCheckout(
+  visitorId: string,
+  quizSessionId: ObjectId,
+): Promise<VerifiedGuestBooking | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const db = await getDb();
+  const bookingDoc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
+    { quizSessionId, visitorId, status: 'pending' },
+    { sort: { createdAt: 1 } },
+  );
+  if (bookingDoc === null || bookingDoc._id === undefined || bookingDoc.leadId === undefined) {
+    return null;
+  }
+  const leadDoc = await db.collection<LeadDocument>(COLLECTIONS.leads).findOne({ _id: bookingDoc.leadId });
+  if (leadDoc === null || leadDoc._id === undefined) {
+    return null;
+  }
+  const verified: VerifiedGuestBooking = {
+    bookingId: bookingDoc._id.toString(),
+    booking: bookingDoc as BookingDocument & { _id: ObjectId },
+    lead: leadDoc as LeadDocument & { _id: ObjectId },
+  };
+  const view = await buildGuestBookingManageView(verified);
+  if (!view.canPayOnline) {
+    return null;
+  }
+  return verified;
 }

@@ -42,6 +42,7 @@ export type CreatePaymentCheckoutSessionParams = {
   readonly appBaseUrl?: string;
   /** Minimal HTML return route for in-app PSP browsers (Expo / ASWebAuthenticationSession). */
   readonly nativeInAppPaymentReturn?: boolean;
+  readonly promoCode?: string;
   /** Native anonymous visitor; must match checkout so GET /status can load the transaction. */
   readonly deviceId?: string | null;
   /** When set, visitor resolves to the signed-in account (must match checkout). */
@@ -81,15 +82,44 @@ function buildMarketingAuthHeaders(marketingSessionToken: string | null | undefi
   return { Authorization: `Bearer ${token}` };
 }
 
+export class PaymentConfigFetchError extends Error {
+  readonly code: string | undefined;
+  readonly status: number;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'PaymentConfigFetchError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export function isPaymentConfigPromoInvalidError(error: unknown): error is PaymentConfigFetchError {
+  return error instanceof PaymentConfigFetchError && error.code === 'promo_invalid';
+}
+
 export async function fetchPaymentConfigPublic(params: {
   readonly apiBaseUrl: string;
+  readonly serviceKey?: string;
+  readonly promoCode?: string;
   readonly signal?: AbortSignal;
 }): Promise<PaymentConfigPublic> {
-  const url = buildApiUrl(params.apiBaseUrl, '/api/checkout/payment-config');
+  const query = new URLSearchParams();
+  const serviceKey = params.serviceKey?.trim() ?? '';
+  if (serviceKey.length > 0) {
+    query.set('serviceKey', serviceKey);
+  }
+  const promoCode = params.promoCode?.trim() ?? '';
+  if (promoCode.length > 0) {
+    query.set('promoCode', promoCode);
+  }
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  const url = buildApiUrl(params.apiBaseUrl, `/api/checkout/payment-config${suffix}`);
   const response = await fetch(url, { signal: params.signal, cache: 'no-store' });
-  const payload = (await response.json()) as PaymentConfigPublic & { error?: string };
+  const payload = (await response.json()) as PaymentConfigPublic & { error?: string; code?: string };
   if (!response.ok) {
-    throw new Error(typeof payload.error === 'string' ? payload.error : 'Failed to load payment config');
+    const message = typeof payload.error === 'string' ? payload.error : 'Failed to load payment config';
+    throw new PaymentConfigFetchError(message, response.status, payload.code);
   }
   return payload;
 }
@@ -121,6 +151,10 @@ export async function createPaymentCheckoutSession(
   }
   if (params.nativeInAppPaymentReturn === true) {
     body.nativeInAppPaymentReturn = true;
+  }
+  const promoCode = params.promoCode?.trim() ?? '';
+  if (promoCode.length > 0) {
+    body.promoCode = promoCode;
   }
   const response = await fetch(url, {
     method: 'POST',
@@ -163,6 +197,9 @@ export type PaymentTransactionStatusPayload = {
   readonly bookingId: string | null;
   readonly gatewayId: PaymentGatewayId;
   readonly paymentMethodLabel: string | null;
+  readonly amountCentavos: number | null;
+  readonly amountLabel: string | null;
+  readonly serviceKey: string | null;
   readonly startsAtIso: string | null;
   readonly timezone: string | null;
   readonly meetingUrl: string | null;
@@ -197,6 +234,9 @@ export async function fetchPaymentTransactionStatus(params: {
     bookingId?: string | null;
     gatewayId?: PaymentGatewayId;
     paymentMethodLabel?: string | null;
+    amountCentavos?: number;
+    amountLabel?: string | null;
+    serviceKey?: string | null;
     startsAtIso?: string | null;
     timezone?: string | null;
     meetingUrl?: string | null;
@@ -207,6 +247,12 @@ export async function fetchPaymentTransactionStatus(params: {
     throw new Error(typeof payload.error === 'string' ? payload.error : 'Failed to load payment status');
   }
   const meetingRaw = typeof payload.meetingUrl === 'string' ? payload.meetingUrl.trim() : '';
+  const amountCentavos =
+    typeof payload.amountCentavos === 'number' && Number.isFinite(payload.amountCentavos)
+      ? payload.amountCentavos
+      : null;
+  const amountLabelRaw = typeof payload.amountLabel === 'string' ? payload.amountLabel.trim() : '';
+  const serviceKeyRaw = typeof payload.serviceKey === 'string' ? payload.serviceKey.trim() : '';
   const rawBookingStatus = payload.bookingStatus;
   const bookingStatus =
     rawBookingStatus === 'pending' || rawBookingStatus === 'confirmed' || rawBookingStatus === 'cancelled'
@@ -218,6 +264,9 @@ export async function fetchPaymentTransactionStatus(params: {
     bookingId: payload.bookingId ?? null,
     gatewayId: payload.gatewayId ?? 'paymongo',
     paymentMethodLabel: payload.paymentMethodLabel ?? null,
+    amountCentavos,
+    amountLabel: amountLabelRaw.length > 0 ? amountLabelRaw : null,
+    serviceKey: serviceKeyRaw.length > 0 ? serviceKeyRaw : null,
     startsAtIso: payload.startsAtIso ?? null,
     timezone: payload.timezone ?? null,
     meetingUrl: meetingRaw.length > 0 ? meetingRaw : null,

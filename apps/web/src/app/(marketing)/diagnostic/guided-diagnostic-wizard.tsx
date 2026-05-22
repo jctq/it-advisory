@@ -40,8 +40,10 @@ import {
   type ReactElement,
   type SetStateAction,
 } from 'react';
+import { DiagnosticOutcomePanel } from '@/components/marketing/diagnostic-outcome-panel';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { inferRecommendedServiceKeyFromContext } from '@/lib/marketing/resolve-recommended-service-key';
 import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
 import {
   buildNextTemplateRoundFromState,
@@ -75,10 +77,6 @@ import { notifyError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import {
-  PROJECT_RESCUE_BOOKING_FOOTNOTE,
-  PROJECT_RESCUE_PRICE_HEADLINE,
-  PROJECT_RESCUE_SESSION_DURATION,
-  PROJECT_RESCUE_WHATS_INCLUDED,
   resolveProjectRescueBriefAssessment,
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
@@ -1118,8 +1116,8 @@ export type GuidedDiagnosticWizardProps = {
   readonly suppressEmptyTemplateBootstrap?: boolean;
   /** Booking-linked session: review only, no API writes or starting a new run from this screen. */
   readonly sessionReadOnly?: boolean;
-  /** Destination for “Book this session” from the outcome panel (`/book/[sessionRef]` when the quiz URL targets a row). */
-  readonly marketingBookHref?: string;
+  /** Quiz session ref for booking after service selection (`/book/[sessionRef]?serviceKey=…`). */
+  readonly marketingBookSessionRef?: string | null;
   /**
    * When set, `/api/quiz/diagnostic-template` is scoped to this session so the pinned template is used on revisit
    * even if the admin activated a different template later.
@@ -1233,6 +1231,7 @@ type DiagnosticTemplateSummaryApiBody = {
   readonly briefAssessment?: string;
   readonly sessionTitle?: string;
   readonly goodFitBullets?: readonly string[];
+  readonly recommendedServiceKey?: string;
   readonly mappedSituation?: string;
   readonly error?: string;
   readonly details?: string;
@@ -1247,7 +1246,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     onGuidedChange,
     suppressEmptyTemplateBootstrap = false,
     sessionReadOnly = false,
-    marketingBookHref,
+    marketingBookSessionRef = null,
     templateSessionMarketingRef = null,
   } = props;
   const executeGoBackWithScroll = useCallback((): void => {
@@ -1613,6 +1612,11 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             goodFitBullets: resolveProjectRescueGoodFitBullets(
               Array.isArray(data.goodFitBullets) ? data.goodFitBullets : null,
             ),
+            recommendedServiceKey: inferRecommendedServiceKeyFromContext({
+              mappedSituation,
+              initialPrompt: guided.initialPrompt,
+              advisorSummary,
+            }),
           };
           onGuidedChange((previous) => ({
             ...previous,
@@ -1677,6 +1681,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           '',
           '',
           null,
+          'project-rescue',
         );
       }
       const response = await fetch(DIAGNOSTIC_TEMPLATE_SUMMARY_API_URL, {
@@ -1700,6 +1705,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         data.briefAssessment ?? '',
         data.sessionTitle ?? '',
         Array.isArray(data.goodFitBullets) ? data.goodFitBullets : null,
+        data.recommendedServiceKey ?? 'project-rescue',
       );
     },
     [activeTemplate, guided.initialPrompt, sessionReadOnly],
@@ -1960,7 +1966,6 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     scheduleScrollQuizWizardToTop();
   }, [onGuidedChange]);
   if (guided.outcome !== null && guided.activeRound === null) {
-    const { advisorSummary, briefAssessment, sessionTitle, goodFitBullets } = guided.outcome;
     return (
       <div>
         <DiagnosticCacheDebugPanel
@@ -1968,70 +1973,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           entries={diagnosticDebugLog}
           onClear={() => setDiagnosticDebugLog([])}
         />
-        <p className="mt-2 text-pretty text-muted-foreground">
-          {!sessionReadOnly && (
-            <>
-              Here is the session we recommend from your answers. Click{' '}
-              <span className="font-medium text-foreground">Book this session</span> below to reserve your consultation, or{' '}
-              <span className="font-medium text-foreground">Review diagnostic</span> to revisit your answers in this session.
-            </>
-          )}
-        </p>
-        <div className="mt-6 grid gap-6 md:mt-10 md:gap-10 lg:grid-cols-[1fr_minmax(0,280px)] lg:items-start">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Intake complete</p>
-            <h2 className="mt-1.5 text-balance text-xl font-semibold tracking-tight text-foreground md:mt-2 md:text-2xl lg:text-3xl">
-              {sessionTitle}
-            </h2>
-            <p className="mt-3 text-pretty text-base text-muted-foreground md:text-lg">{briefAssessment}</p>
-            <div className="mt-5 rounded-xl border border-border bg-card p-4 shadow-xs md:mt-8 md:rounded-2xl md:p-6">
-              <h3 className="text-lg font-semibold text-foreground">Your advisor summary</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Pulled from your diagnostic — the same summary you see at the end of this guided flow.
-              </p>
-              <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{advisorSummary}</p>
-            </div>
-            <div className="mt-5 rounded-xl border border-border bg-card p-4 shadow-xs md:mt-10 md:rounded-2xl md:p-6">
-              <h3 className="text-lg font-semibold text-foreground">What&apos;s included</h3>
-              <ul className="mt-3 space-y-2.5 md:mt-5 md:space-y-4">
-                {PROJECT_RESCUE_WHATS_INCLUDED.map((item) => (
-                  <li key={item} className="flex gap-3 text-sm text-foreground">
-                    <CheckCircle2 className="mt-0.5 hidden size-4 shrink-0 text-primary sm:block md:size-5" aria-hidden />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="mt-5 rounded-xl border border-dashed border-border bg-muted/30 p-4 md:mt-10 md:rounded-2xl md:p-6">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Good fit if</h3>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                {goodFitBullets.map((line, index) => (
-                  <li key={`${index}-${line.slice(0, 24)}`}>{line}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <aside className="rounded-2xl border border-border bg-card p-4 shadow-xs md:rounded-3xl md:p-6 lg:sticky lg:top-48">
-            <p className="text-sm font-medium text-muted-foreground">Duration</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{PROJECT_RESCUE_SESSION_DURATION}</p>
-            <p className="mt-6 text-sm font-medium text-muted-foreground">Investment</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{PROJECT_RESCUE_PRICE_HEADLINE}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{PROJECT_RESCUE_BOOKING_FOOTNOTE}</p>
-            {sessionReadOnly ? (
-              <p className="mt-8 text-sm text-muted-foreground">This intake is already linked to a booking.</p>
-            ) : marketingBookHref !== undefined && marketingBookHref.trim().length > 0 ? (
-              <Button asChild className="mt-8 w-full" size="lg">
-                <Link href={marketingBookHref}>
-                  Book this session
-                  <ArrowRight className="size-4" aria-hidden />
-                </Link>
-              </Button>
-            ) : null}
-            <Button type="button" variant="outline" className="mt-3 w-full" onClick={executeOpenDiagnosticReview}>
-              Review diagnostic
-            </Button>
-          </aside>
-        </div>
+        <DiagnosticOutcomePanel
+          outcome={guided.outcome}
+          initialPrompt={guided.initialPrompt}
+          sessionReadOnly={sessionReadOnly}
+          marketingBookSessionRef={marketingBookSessionRef ?? null}
+          onReviewDiagnostic={executeOpenDiagnosticReview}
+        />
       </div>
     );
   }

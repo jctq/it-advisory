@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminMarketingUsersPage() {
   const users = await listMarketingUsersForAdmin();
   return (
-    <section className="mx-auto space-y-8">
+    <section className="mx-auto space-y-8 w-full">
       <AdminPageHeader
         eyebrow="Accounts"
         title="Marketing users"

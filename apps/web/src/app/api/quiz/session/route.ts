@@ -81,11 +81,19 @@ export async function GET(request: Request): Promise<NextResponse> {
       linkedBookingSlot === null
         ? null
         : {
+            bookingId: linkedBookingSlot.bookingId,
             status: linkedBookingSlot.status,
             startsAtIso: linkedBookingSlot.startsAtIso,
             timezone: linkedBookingSlot.timezone,
             serviceKey: linkedBookingSlot.serviceKey,
             meetingUrl: linkedBookingSlot.meetingUrl,
+            paymentTransactionId: linkedBookingSlot.paymentTransactionId,
+            paymentMethodLabel: linkedBookingSlot.paymentMethodLabel,
+            paymentStatus: linkedBookingSlot.paymentStatus,
+            customerName: linkedBookingSlot.customerName,
+            customerEmail: linkedBookingSlot.customerEmail,
+            customerCompany: linkedBookingSlot.customerCompany,
+            customerPhone: linkedBookingSlot.customerPhone,
           },
   });
 }

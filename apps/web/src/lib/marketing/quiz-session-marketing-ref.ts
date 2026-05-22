@@ -42,6 +42,11 @@ export function buildMarketingQuizRetakePath(sessionRef: string | null): string 
 /**
  * Path for booking checkout scoped to a quiz diagnostic row (same ref shape as quiz paths).
  */
-export function buildMarketingBookSessionPath(sessionRef: string): string {
-  return `/book/${encodeURIComponent(sessionRef.trim())}`;
+export function buildMarketingBookSessionPath(sessionRef: string, serviceKey?: string | null): string {
+  const base = `/book/${encodeURIComponent(sessionRef.trim())}`;
+  const key = typeof serviceKey === 'string' ? serviceKey.trim() : '';
+  if (key.length === 0) {
+    return base;
+  }
+  return `${base}?serviceKey=${encodeURIComponent(key)}`;
 }

@@ -230,7 +230,7 @@ export function BlogPostsList(props: BlogPostsListProps): ReactElement {
   });
 
   return (
-    <section className="mx-auto space-y-8">
+    <section className="mx-auto space-y-8 w-full">
       <AdminPageHeader
         eyebrow="Content"
         title="Blog"

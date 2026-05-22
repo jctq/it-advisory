@@ -26,7 +26,7 @@ export default async function AdminMarketingUserDetailPage(props: AdminMarketing
     notFound();
   }
   return (
-    <section className="mx-auto space-y-8">
+    <section className="mx-auto space-y-8 w-full">
       <AdminPageHeader
         eyebrow="Accounts"
         title="Marketing user"

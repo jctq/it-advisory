@@ -145,6 +145,7 @@ type DiagnosticTemplateSummaryPayload = {
   readonly briefAssessment: string;
   readonly sessionTitle: string;
   readonly goodFitBullets: readonly string[];
+  readonly recommendedServiceKey?: string;
   readonly source: 'ai' | 'cache' | 'fallback';
   readonly model: string | null;
 };

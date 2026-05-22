@@ -168,15 +168,20 @@ export function buildTemplateDiagnosticOutcome(
   briefAssessmentInput: string,
   sessionTitleInput: string,
   goodFitBulletsInput: readonly unknown[] | null,
+  recommendedServiceKeyInput: string,
 ): GuidedDiagnosticOutcome {
-  return {
-    mappedSituation: buildTemplateMappedSituation(initialPrompt, bundles),
-    advisorSummary: advisorSummary.trim().length > 0
+  const mappedSituation = buildTemplateMappedSituation(initialPrompt, bundles);
+  const resolvedAdvisorSummary =
+    advisorSummary.trim().length > 0
       ? advisorSummary.trim()
-      : `Completed the "${template.name}" diagnostic template with ${bundles.length} rounds and ${countAnsweredQuestions(bundles)} questions.`,
+      : `Completed the "${template.name}" diagnostic template with ${bundles.length} rounds and ${countAnsweredQuestions(bundles)} questions.`;
+  return {
+    mappedSituation,
+    advisorSummary: resolvedAdvisorSummary,
     sessionTitle: resolveProjectRescueSessionTitle(sessionTitleInput),
     briefAssessment: resolveProjectRescueBriefAssessment(briefAssessmentInput),
     goodFitBullets: resolveProjectRescueGoodFitBullets(goodFitBulletsInput),
+    recommendedServiceKey: recommendedServiceKeyInput.trim().length > 0 ? recommendedServiceKeyInput.trim() : 'project-rescue',
   };
 }
 

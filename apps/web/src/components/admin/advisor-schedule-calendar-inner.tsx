@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { useCallback, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
+import { momentTimezonePlugin } from '@/lib/fullcalendar-moment-timezone-plugin';
 import type { DatesSetArg, EventInput } from '@fullcalendar/core';
 import {
   listYmdsForVisibleRange,
@@ -60,7 +61,7 @@ export function AdvisorScheduleCalendarInner(props: AdvisorScheduleCalendarInner
   return (
     <div className="fc-advisor-preview overflow-hidden rounded-lg border border-border bg-background text-foreground">
       <FullCalendar
-        plugins={[timeGridPlugin]}
+        plugins={[momentTimezonePlugin, timeGridPlugin]}
         initialView="timeGridWeek"
         headerToolbar={{
           left: 'prev,next',

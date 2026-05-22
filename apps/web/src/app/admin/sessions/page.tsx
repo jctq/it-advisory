@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminQuizSessionsPage() {
   const sessions = await listQuizSessionsForAdmin();
   return (
-    <section className="mx-auto space-y-8">
+    <section className="mx-auto space-y-8 w-full">
       <AdminPageHeader
         eyebrow="Intake"
         title="Sessions"

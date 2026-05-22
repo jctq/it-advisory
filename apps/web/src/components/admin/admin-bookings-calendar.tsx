@@ -7,6 +7,7 @@ import listPlugin from '@fullcalendar/list';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import FullCalendar from '@fullcalendar/react';
 import { addMinutes } from 'date-fns';
+import { momentTimezonePlugin } from '@/lib/fullcalendar-moment-timezone-plugin';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState, type ReactElement } from 'react';
 import { AdminBookingEventPreview } from '@/components/admin/admin-booking-event-preview';
@@ -145,7 +146,7 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
       </Popover>
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
         <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+          plugins={[momentTimezonePlugin, dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView="dayGridMonth"
           headerToolbar={{
             left: 'prev,next today',

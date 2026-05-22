@@ -6,8 +6,10 @@ import {
 } from '@techmd/domain/booking-calendar-links';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
+import { AdminBookingQuoteForm } from '@/components/admin/admin-booking-quote-form';
 import { MarkBookingPaidButton } from '@/components/admin/mark-booking-paid-button';
 import { findBookingById } from '@/lib/data/bookings';
+import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 
 type AdminBookingDetailPageProps = {
@@ -36,6 +38,10 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
     booking.meetingUrl !== undefined && typeof booking.meetingUrl === 'string' && booking.meetingUrl.trim().length > 0
       ? booking.meetingUrl.trim()
       : '';
+  const catalogPricing = await resolveCheckoutAmountCentavos({
+    serviceKey: booking.serviceKey,
+    bookingId: null,
+  });
   const calendarBundle =
     booking.status === 'confirmed'
       ? buildBookingCalendarLinkBundle({
@@ -48,7 +54,7 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
         })
       : null;
   return (
-    <section className="mx-auto space-y-8">
+    <section className="mx-auto space-y-8 w-full">
       <AdminPageHeader
         eyebrow="CRM"
         title="Booking details"
@@ -130,6 +136,18 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
         </dl>
         <div className="mt-6">
           <MarkBookingPaidButton bookingId={booking.id} status={booking.status} />
+        </div>
+      </div>
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
+        <h2 className="text-lg font-semibold text-foreground">Custom checkout quote</h2>
+        <div className="mt-4">
+          <AdminBookingQuoteForm
+            bookingId={booking.id}
+            status={booking.status}
+            initialQuotedAmountCentavos={booking.quotedAmountCentavos}
+            initialQuoteExpiresAtIso={booking.quoteExpiresAtIso}
+            catalogAmountLabel={catalogPricing.amountLabel}
+          />
         </div>
       </div>
       <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">

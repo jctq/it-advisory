@@ -98,6 +98,8 @@ export type GuidedDiagnosticOutcome = {
   readonly briefAssessment: string;
   /** Three transcript-grounded "good fit if" bullets for this recommendation. */
   readonly goodFitBullets: readonly string[];
+  /** Catalog serviceKey to highlight in the pricing step (AI or heuristic). */
+  readonly recommendedServiceKey: string;
 };
 
 export type ActiveGuidedRound = {
@@ -1321,6 +1323,10 @@ function normalizeGuidedDiagnostic(parsed: GuidedDiagnosticV1): GuidedDiagnostic
       goodFitBullets: resolveProjectRescueGoodFitBullets(
         Array.isArray(outcome.goodFitBullets) ? outcome.goodFitBullets : null,
       ),
+      recommendedServiceKey:
+        typeof outcome.recommendedServiceKey === 'string' && outcome.recommendedServiceKey.trim().length > 0
+          ? outcome.recommendedServiceKey.trim()
+          : 'project-rescue',
     };
   }
   return {

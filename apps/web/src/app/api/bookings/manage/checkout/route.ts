@@ -30,6 +30,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     paymentMethodLabel: parsed.data.paymentMethodLabel,
     appBaseUrl: resolveCheckoutAppBaseUrl(request, parsed.data.appBaseUrl),
     nativeInAppPaymentReturn: parsed.data.nativeInAppPaymentReturn === true,
+    promoCode: parsed.data.promoCode,
   });
   if (!result.ok) {
     const status =

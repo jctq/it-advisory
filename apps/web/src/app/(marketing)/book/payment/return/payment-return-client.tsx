@@ -40,11 +40,12 @@ export function PaymentReturnClient(): ReactElement {
     setPollGeneration((current) => current + 1);
   }, [setStatus]);
   const displayStatus: ReturnStatus = transactionId.length === 0 ? 'failed' : status;
+  const [paidServiceKey, setPaidServiceKey] = useState<string | null>(null);
   const bookCheckoutHref = hasValidSessionRef
-    ? buildMarketingBookSessionPath(sessionRef)
+    ? buildMarketingBookSessionPath(sessionRef, paidServiceKey)
     : '/book/manage';
   const paidRedirectPath = hasValidSessionRef
-    ? `${buildMarketingBookSessionPath(sessionRef)}?payment=success&transactionId=${encodeURIComponent(transactionId)}`
+    ? `${buildMarketingBookSessionPath(sessionRef, paidServiceKey)}?payment=success&transactionId=${encodeURIComponent(transactionId)}`
     : `/book/manage?payment=success&transactionId=${encodeURIComponent(transactionId)}`;
   useEffect(() => {
     if (transactionId.length === 0) {
@@ -65,9 +66,15 @@ export function PaymentReturnClient(): ReactElement {
           return;
         }
         setPaymentLabel(result.paymentMethodLabel ?? result.gatewayId);
+        if (result.serviceKey !== null) {
+          setPaidServiceKey(result.serviceKey);
+        }
         if (result.status === 'paid' && result.bookingId !== null) {
           setStatus('paid');
-          router.replace(paidRedirectPath);
+          const redirectPath = hasValidSessionRef
+            ? `${buildMarketingBookSessionPath(sessionRef, result.serviceKey)}?payment=success&transactionId=${encodeURIComponent(transactionId)}`
+            : paidRedirectPath;
+          router.replace(redirectPath);
           return;
         }
         if (result.status === 'failed' || result.status === 'expired') {
@@ -91,7 +98,7 @@ export function PaymentReturnClient(): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [isMock, paidRedirectPath, pollGeneration, router, transactionId]);
+  }, [hasValidSessionRef, isMock, paidRedirectPath, pollGeneration, router, sessionRef, transactionId]);
   if (displayStatus === 'loading') {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 text-center">

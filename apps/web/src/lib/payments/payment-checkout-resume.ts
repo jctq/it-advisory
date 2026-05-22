@@ -9,11 +9,14 @@ import {
 } from '@/lib/data/booking-guest-manage';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
+import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
+import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
-import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout';
+import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { getDb } from '@/lib/mongodb';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
+import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 
 type ResumeCheckoutParams = {
   readonly credentials: GuestBookingManageCredentials;
@@ -22,6 +25,7 @@ type ResumeCheckoutParams = {
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
+  readonly promoCode?: string | null;
 };
 
 type ResumeCheckoutCommonParams = {
@@ -30,6 +34,9 @@ type ResumeCheckoutCommonParams = {
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
+  readonly promoCode?: string | null;
+  /** When set, PSP cancel returns to `/book/[ref]?payment=cancelled` instead of manage booking. */
+  readonly sessionMarketingRef?: string;
 };
 
 async function updateTransactionProvider(
@@ -54,7 +61,7 @@ async function updateTransactionProvider(
   );
 }
 
-async function createPaymentCheckoutForVerifiedBooking(
+export async function createPaymentCheckoutForVerifiedBooking(
   verified: VerifiedGuestBooking,
   params: ResumeCheckoutCommonParams,
 ): Promise<CreateCheckoutSessionResult> {
@@ -85,12 +92,26 @@ async function createPaymentCheckoutForVerifiedBooking(
     settings.paymentPolicy === 'pay_after_hold'
       ? holdExpiresAt ?? new Date(Date.now() + settings.holdExpiresMinutes * 60_000)
       : null;
+  let resolvedPricing;
+  try {
+    resolvedPricing = await resolveCheckoutAmountCentavos({
+      serviceKey: booking.serviceKey,
+      promoCode: params.promoCode,
+      bookingId: verified.bookingId,
+    });
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      code: 'promo_invalid',
+      error: error instanceof Error ? error.message : 'Invalid promo code.',
+    };
+  }
   const insertedId = await insertPaymentTransaction({
     gatewayId: params.gatewayId,
     providerRef: bookingDraftId,
     providerSessionId: bookingDraftId,
     paymentPolicy: settings.paymentPolicy,
-    amountCentavos: publicSettings.checkoutAmountCentavos,
+    amountCentavos: resolvedPricing.amountCentavos,
     visitorId: booking.visitorId,
     bookingDraftId,
     serviceKey: booking.serviceKey,
@@ -104,7 +125,17 @@ async function createPaymentCheckoutForVerifiedBooking(
     quizSessionIdHex: booking.quizSessionId !== undefined && booking.quizSessionId !== null ? booking.quizSessionId.toString() : null,
     paymentMethodLabel: resolvedPaymentMethodLabel,
     redirectUrl: null,
-    metadata: { bookingDraftId, resumeBookingId: verified.bookingId },
+    metadata: {
+      bookingDraftId,
+      resumeBookingId: verified.bookingId,
+      pricingSource: resolvedPricing.source,
+      ...(resolvedPricing.appliedPromoCode !== undefined
+        ? { promoCode: resolvedPricing.appliedPromoCode }
+        : {}),
+      ...(resolvedPricing.catalogServiceKey !== undefined
+        ? { catalogServiceKey: resolvedPricing.catalogServiceKey }
+        : {}),
+    },
     expiresAt,
     bookingId: booking._id,
   });
@@ -117,11 +148,23 @@ async function createPaymentCheckoutForVerifiedBooking(
   }
   const gatewayCredentials = await getGatewayCredentials(params.gatewayId);
   const useMock = gatewayCredentials === null && process.env.NODE_ENV === 'development';
+  const sessionMarketingRefFromParams = params.sessionMarketingRef?.trim() ?? '';
+  const sessionMarketingRefFromBooking =
+    booking.quizSessionId !== undefined && booking.quizSessionId !== null
+      ? encodeQuizSessionRefForMarketingUrl(booking.quizSessionId.toString())
+      : '';
+  const sessionMarketingRef =
+    sessionMarketingRefFromParams.length > 0 ? sessionMarketingRefFromParams : sessionMarketingRefFromBooking;
+  const cancelRelativeUrl =
+    sessionMarketingRef.length > 0
+      ? `${buildMarketingBookSessionPath(sessionMarketingRef)}?payment=cancelled`
+      : '/book/manage?payment=cancelled';
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: params.appBaseUrl,
     transactionId,
     nativeInAppPaymentReturn: params.nativeInAppPaymentReturn === true,
-    cancelRelativeUrl: '/book/manage?payment=cancelled',
+    cancelRelativeUrl,
+    sessionMarketingRef: sessionMarketingRef.length > 0 ? sessionMarketingRef : undefined,
   });
   const adapter =
     useMock
@@ -135,9 +178,9 @@ async function createPaymentCheckoutForVerifiedBooking(
   let providerSession: { readonly providerRef: string; readonly providerSessionId: string; readonly redirectUrl: string };
   try {
     providerSession = await adapter.createCheckoutSession({
-      amountCentavos: publicSettings.checkoutAmountCentavos,
+      amountCentavos: resolvedPricing.amountCentavos,
       currency: 'PHP',
-      description: 'TechMD consultation booking',
+      description: 'TechMD Consultation Booking',
       successUrl,
       cancelUrl,
       referenceId: bookingDraftId,
@@ -189,7 +232,14 @@ export async function createPaymentCheckoutForExistingBooking(
       error: 'This booking cannot be paid online. Check your details or contact support.',
     };
   }
-  return createPaymentCheckoutForVerifiedBooking(verified, params);
+  return createPaymentCheckoutForVerifiedBooking(verified, {
+    gatewayId: params.gatewayId,
+    paymentMethodId: params.paymentMethodId,
+    paymentMethodLabel: params.paymentMethodLabel,
+    appBaseUrl: params.appBaseUrl,
+    nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
+    promoCode: params.promoCode,
+  });
 }
 
 /**
@@ -203,6 +253,7 @@ export async function createPaymentCheckoutForAccountBooking(params: {
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
+  readonly promoCode?: string | null;
 }): Promise<CreateCheckoutSessionResult> {
   const verified = await findVerifiedAccountBookingForCheckout(params.bookingId, params.visitorId);
   if (verified === null) {
@@ -218,5 +269,6 @@ export async function createPaymentCheckoutForAccountBooking(params: {
     paymentMethodLabel: params.paymentMethodLabel,
     appBaseUrl: params.appBaseUrl,
     nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
+    promoCode: params.promoCode,
   });
 }

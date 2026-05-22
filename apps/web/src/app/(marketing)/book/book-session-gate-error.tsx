@@ -20,7 +20,7 @@ function resolveMessage(reason: BookSessionGateReason): string {
     return 'This booking link is not valid. Start a new diagnostic to get a fresh booking link.';
   }
   if (reason === 'already_booked') {
-    return 'This diagnostic is already linked to a booking. You cannot start a new checkout for this session.';
+    return 'This diagnostic is already linked to a booking. Open your diagnostic or manage the existing booking below.';
   }
   return 'This diagnostic was not found or you no longer have access to it.';
 }

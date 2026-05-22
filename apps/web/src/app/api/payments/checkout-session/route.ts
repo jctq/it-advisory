@@ -23,6 +23,7 @@ const postBodySchema = z.object({
   appBaseUrl: z.string().max(240).optional(),
   /** Use minimal HTML return URL so in-app payment browsers can close the auth session. */
   nativeInAppPaymentReturn: z.boolean().optional(),
+  promoCode: z.string().max(64).optional(),
 });
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -66,6 +67,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     paymentMethodLabel: parsed.data.paymentMethodLabel,
     appBaseUrl: resolveCheckoutAppBaseUrl(request, parsed.data.appBaseUrl),
     nativeInAppPaymentReturn: parsed.data.nativeInAppPaymentReturn === true,
+    promoCode: parsed.data.promoCode,
   });
   if (!result.ok) {
     const status =
@@ -75,7 +77,9 @@ export async function POST(request: Request): Promise<NextResponse> {
           ? 404
           : result.code === 'database_unavailable'
             ? 503
-            : 400;
+            : result.code === 'promo_invalid'
+              ? 400
+              : 400;
     return NextResponse.json({ error: result.error, code: result.code }, { status });
   }
   return NextResponse.json(result);

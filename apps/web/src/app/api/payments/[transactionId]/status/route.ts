@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { findBookingById } from '@/lib/data/bookings';
 import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
+import { formatPaymentAmountLabel } from '@/lib/data/payment-settings';
 import { completeMockPayment, ensurePaidTransactionFulfilled } from '@/lib/payments/payment-completion';
 import { reconcilePaymentTransactionIfPending } from '@/lib/payments/payment-reconciliation';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
@@ -41,6 +42,8 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     gatewayId: transaction.gatewayId,
     paymentMethodLabel: transaction.paymentMethodLabel,
     amountCentavos: transaction.amountCentavos,
+    amountLabel: formatPaymentAmountLabel(transaction.amountCentavos),
+    serviceKey: transaction.serviceKey,
     startsAtIso: transaction.startsAtIso,
     timezone: transaction.timezone,
     paidAtIso: transaction.paidAtIso,

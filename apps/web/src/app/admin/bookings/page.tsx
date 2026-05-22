@@ -5,7 +5,7 @@ import { listBookingsForAdminCalendar } from '@/lib/data/bookings';
 export default async function AdminBookingsPage() {
   const bookings = await listBookingsForAdminCalendar();
   return (
-    <section className="mx-auto space-y-8">
+    <section className="mx-auto space-y-8 w-full">
       <AdminPageHeader
         eyebrow="Scheduling"
         title="Bookings"

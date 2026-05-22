@@ -450,7 +450,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
   }, [lastSavedSettings, settings]);
   const isScheduleReady: boolean = !isLoading && settings !== null;
   return (
-    <div className="mx-auto space-y-8">
+    <div className="mx-auto space-y-8 w-full">
       <AdminPageHeader
         eyebrow="Operations"
         title="Booking schedule"
@@ -1424,7 +1424,7 @@ function WeeklyCapEditor(props: WeeklyCapEditorProps): ReactElement {
 
 export function AdminAdvisorSchedulePageContent(): ReactElement {
   return (
-    <section className="mx-auto space-y-8">
+    <section className="mx-auto space-y-8 w-full">
       <AdminAdvisorScheduleManager />
     </section>
   );

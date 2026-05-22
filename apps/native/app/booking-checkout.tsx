@@ -68,6 +68,8 @@ export default function BookingCheckoutScreen() {
     email?: string;
     company?: string;
     phone?: string;
+    serviceKey?: string;
+    promoCode?: string;
   }>();
   const { apiBaseUrl } = useMemo(() => readNativeAppConfig(), []);
   const { deviceId, sessionToken } = useMarketingAuth();
@@ -83,6 +85,11 @@ export default function BookingCheckoutScreen() {
   const customerEmail = typeof params.email === 'string' ? params.email : '';
   const customerCompany = typeof params.company === 'string' ? params.company : '';
   const customerPhone = typeof params.phone === 'string' ? params.phone : '';
+  const serviceKey =
+    typeof params.serviceKey === 'string' && params.serviceKey.trim().length > 0
+      ? params.serviceKey.trim()
+      : DEFAULT_SERVICE_KEY;
+  const promoCodeParam = typeof params.promoCode === 'string' ? params.promoCode.trim() : '';
   const selectedGateway = useMemo(() => {
     if (paymentConfig === null || gatewayId === null) {
       return null;
@@ -96,7 +103,11 @@ export default function BookingCheckoutScreen() {
       setLoadError('Set EXPO_PUBLIC_API_BASE_URL to your web API origin.');
       return;
     }
-    void fetchPaymentConfigPublic({ apiBaseUrl })
+    void fetchPaymentConfigPublic({
+      apiBaseUrl,
+      serviceKey,
+      promoCode: promoCodeParam.length > 0 ? promoCodeParam : undefined,
+    })
       .then((config) => {
         setPaymentConfig(config);
         const firstGateway = config.gateways[0];
@@ -110,7 +121,7 @@ export default function BookingCheckoutScreen() {
         setLoadStatus('error');
         setLoadError(error instanceof Error ? error.message : 'Failed to load payment options.');
       });
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, serviceKey, promoCodeParam]);
   useEffect(() => {
     if (availableMethods.length === 0) {
       setPaymentMethodId(null);
@@ -149,13 +160,14 @@ export default function BookingCheckoutScreen() {
         paymentMethodId,
         date,
         time,
-        serviceKey: DEFAULT_SERVICE_KEY,
+        serviceKey,
         customerName,
         customerEmail,
         customerPhone,
         customerCompany: customerCompany.length > 0 ? customerCompany : undefined,
         quizSessionId,
         paymentMethodLabel: methodOption?.label,
+        promoCode: promoCodeParam.length > 0 ? promoCodeParam : undefined,
       });
       if (session.manualConfirm || session.redirectUrl === null) {
         router.replace({
@@ -268,7 +280,7 @@ export default function BookingCheckoutScreen() {
           );
         })}
       </AppCard>
-      {availableMethods.length > 0 ? (
+      {availableMethods.length > 1 ? (
         <AppCard>
           <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>Payment method</ThemedText>
           {availableMethods.map((method) => {

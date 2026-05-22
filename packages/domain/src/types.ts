@@ -72,6 +72,10 @@ export type BookingDocument = {
   paymentTransactionId?: ObjectId | null;
   paymentProviderRef?: string | null;
   paymentExpiresAt?: Date | null;
+  /** Admin-set custom checkout amount (centavos); overrides catalog when valid. */
+  quotedAmountCentavos?: number | null;
+  /** When set, custom quote is ignored after this instant. */
+  quoteExpiresAt?: Date | null;
   meetingUrl?: string;
   /** Zoom meeting id when created via API — used to avoid duplicate creates. */
   zoomMeetingId?: string;
@@ -300,6 +304,7 @@ export type DiagnosticTemplateSummaryCachedPayload = {
   readonly sessionTitle: string;
   readonly mappedSituation: string;
   readonly goodFitBullets: readonly string[];
+  readonly recommendedServiceKey?: string;
 };
 
 export type DiagnosticTemplateSummaryCacheDocument = {

@@ -323,8 +323,11 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <label htmlFor="checkoutAmountPesos" className="text-sm font-medium text-foreground">
-              Checkout amount (PHP)
+              Fallback checkout amount (PHP)
             </label>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Used when no enabled catalog price matches the booking service. Per-service prices are configured in Settings → Pricing.
+            </p>
             <Input
               id="checkoutAmountPesos"
               type="number"
