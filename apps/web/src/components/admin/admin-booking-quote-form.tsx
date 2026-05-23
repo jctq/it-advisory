@@ -138,7 +138,7 @@ export function AdminBookingQuoteForm(props: AdminBookingQuoteFormProps): ReactE
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={isSaving} onClick={() => void executeSave()}>
-          {isSaving ? 'Saving…' : 'Save custom quote'}
+          {isSaving ? 'Saving…' : 'Save'}
         </Button>
         <Button type="button" variant="outline" disabled={isSaving} onClick={() => void executeClear()}>
           Clear quote

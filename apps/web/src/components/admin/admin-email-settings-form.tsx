@@ -13,6 +13,7 @@ import {
   type Ref,
 } from 'react';
 import type { TransactionalEmailActiveProvider, TransactionalEmailProviderId } from '@/domain/email-types';
+import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
@@ -281,7 +282,7 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
     });
   }, [isDirty, isLoading, isSaving]);
   if (isLoading || settings === null) {
-    return <p className="text-sm text-muted-foreground">Loading email settings…</p>;
+    return <AdminFormLoadingPanel label="Loading email settings" variant="providers" />;
   }
   return (
     <div className="space-y-6">
@@ -383,7 +384,7 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                 : provider.configured);
             return (
               <div key={provider.id} className="space-y-4 rounded-2xl border border-border bg-background p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-4">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{provider.label}</p>
                     <p className="text-xs text-muted-foreground">{provider.description}</p>
@@ -393,12 +394,12 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <Button
                       type="button"
                       variant="default"
                       size="sm"
-                      className={getAdminPrimaryActionButtonClass('min-w-36')}
+                      className={getAdminPrimaryActionButtonClass('w-full sm:min-w-36')}
                       disabled={!canTestThisProvider || testingProviderId === provider.id}
                       onClick={() => void executeTestProvider(provider.id)}
                     >
@@ -408,7 +409,7 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                       type="button"
                       variant="default"
                       size="sm"
-                      className={getAdminPrimaryActionButtonClass('min-w-44')}
+                      className={getAdminPrimaryActionButtonClass('w-full sm:min-w-44')}
                       disabled={!provider.configured && !willClear}
                       onClick={() => {
                         setClearFlags((prev) => ({ ...prev, [provider.id]: !willClear }));

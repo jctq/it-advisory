@@ -13,10 +13,7 @@ import {
   Clock,
   Eye,
   Gauge,
-  Loader2,
   Plus,
-  RotateCcw,
-  Save,
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
@@ -28,6 +25,10 @@ import {
   resolveAdvisorSchedulePreviewAnchorYmd,
 } from '@techmd/domain/booking-schedule';
 import type { AdvisorBookingSettingsDocument, AdvisorWeekdayOverride } from '@/domain/types';
+import {
+  AdminFormStickyFooter,
+  adminFormStickyFooterScrollPaddingClass,
+} from '@/components/admin/admin-form-sticky-footer';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -47,7 +48,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AdminSkeleton } from '@/components/admin/admin-skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -186,43 +187,43 @@ function SchedulePageSkeleton(): ReactElement {
     <div className="space-y-6" aria-busy="true" aria-label="Loading schedule">
       <div className="rounded-xl border border-border/80 bg-muted/40 p-2">
         <div className="flex flex-wrap gap-1">
-          <Skeleton className="h-10 w-28 rounded-md" />
-          <Skeleton className="h-10 w-32 rounded-md" />
-          <Skeleton className="h-10 w-32 rounded-md" />
-          <Skeleton className="h-10 w-28 rounded-md" />
-          <Skeleton className="h-10 w-28 rounded-md" />
+          <AdminSkeleton className="h-10 w-28 rounded-md" />
+          <AdminSkeleton className="h-10 w-32 rounded-md" />
+          <AdminSkeleton className="h-10 w-32 rounded-md" />
+          <AdminSkeleton className="h-10 w-28 rounded-md" />
+          <AdminSkeleton className="h-10 w-28 rounded-md" />
         </div>
       </div>
       <Card className="overflow-hidden border-border/90 shadow-sm">
         <CardHeader className="border-b border-border/80 bg-muted/25 pb-6">
           <div className="flex gap-3">
-            <Skeleton className="size-10 shrink-0 rounded-xl" />
+            <AdminSkeleton className="size-10 shrink-0 rounded-xl" />
             <div className="min-w-0 flex-1 space-y-2">
-              <Skeleton className="h-5 w-52" />
-              <Skeleton className="h-4 w-full max-w-xl" />
+              <AdminSkeleton className="h-5 w-52" />
+              <AdminSkeleton className="h-4 w-full max-w-xl" />
             </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-6 pt-6 md:grid-cols-2">
           <div className="space-y-2">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-11 w-full" />
+            <AdminSkeleton className="h-4 w-24" />
+            <AdminSkeleton className="h-11 w-full" />
           </div>
           <div className="space-y-2">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-11 w-full" />
+            <AdminSkeleton className="h-4 w-32" />
+            <AdminSkeleton className="h-11 w-full" />
           </div>
-          <Skeleton className="h-24 md:col-span-2" />
+          <AdminSkeleton className="h-24 md:col-span-2" />
         </CardContent>
       </Card>
       <Card className="overflow-hidden border-border/90 shadow-sm">
         <CardHeader className="border-b border-border/80 bg-muted/25">
-          <Skeleton className="h-5 w-48" />
+          <AdminSkeleton className="h-5 w-48" />
         </CardHeader>
         <CardContent className="divide-y divide-border p-0">
-          <Skeleton className="h-16 w-full rounded-none" />
-          <Skeleton className="h-16 w-full rounded-none" />
-          <Skeleton className="h-16 w-full rounded-none" />
+          <AdminSkeleton className="h-16 w-full rounded-none" />
+          <AdminSkeleton className="h-16 w-full rounded-none" />
+          <AdminSkeleton className="h-16 w-full rounded-none" />
         </CardContent>
       </Card>
     </div>
@@ -450,7 +451,8 @@ export function AdminAdvisorScheduleManager(): ReactElement {
   }, [lastSavedSettings, settings]);
   const isScheduleReady: boolean = !isLoading && settings !== null;
   return (
-    <div className="mx-auto space-y-8 w-full">
+    <div className="mx-auto flex min-h-0 w-full flex-col">
+      <div className={cn('space-y-8', adminFormStickyFooterScrollPaddingClass)}>
       <AdminPageHeader
         eyebrow="Operations"
         title="Booking schedule"
@@ -826,48 +828,15 @@ export function AdminAdvisorScheduleManager(): ReactElement {
           </Tabs>
         </div>
       ) : null}
+      </div>
       {isScheduleReady ? (
-        <div className="sticky bottom-0 z-20 border-t border-border bg-background/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_-16px_rgba(15,23,42,0.12)] backdrop-blur-md dark:shadow-[0_-12px_40px_-16px_rgba(0,0,0,0.45)]">
-          <div className="mx-auto flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-            <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
-              {hasScheduleChanges
-                ? 'You have unsaved edits. Reset to saved discards them, or save to update what clients see from the availability API.'
-                : 'All changes are saved. Switch tabs above to review or edit the schedule.'}
-            </p>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="min-h-11 gap-2"
-                onClick={executeResetToSaved}
-                disabled={isSaving || !hasScheduleChanges}
-              >
-                <RotateCcw className="size-4 shrink-0" aria-hidden />
-                Reset to saved
-              </Button>
-              <Button
-                type="button"
-                size="lg"
-                className="min-h-11 min-w-40 gap-2"
-                onClick={() => void executeSave()}
-                disabled={isSaving || !hasScheduleChanges}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                    Saving…
-                  </>
-                ) : (
-                  <>
-                    <Save className="size-4 shrink-0" aria-hidden />
-                    Save schedule
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <AdminFormStickyFooter
+          isSaving={isSaving}
+          isDisabled={isSaving || !hasScheduleChanges}
+          onSave={() => void executeSave()}
+          onReset={executeResetToSaved}
+          isResetDisabled={!hasScheduleChanges}
+        />
       ) : null}
     </div>
   );

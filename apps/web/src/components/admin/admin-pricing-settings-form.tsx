@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -518,7 +519,7 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
     }
   };
   if (isLoading || settings === null) {
-    return <p className="text-sm text-muted-foreground">Loading pricing settings…</p>;
+    return <AdminFormLoadingPanel label="Loading pricing settings" variant="pricing" className="min-h-128" />;
   }
   return (
     <div className="space-y-6">
@@ -527,7 +528,7 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
         <Link href="/admin/settings" className="font-medium text-primary underline-offset-4 hover:underline">
           Settings → Payments
         </Link>
-        . Use <span className="font-medium text-foreground">Save pricing settings</span> in the footer to persist
+        . Use <span className="font-medium text-foreground">Save</span> in the footer to persist
         changes.
       </p>
       <Tabs
@@ -914,7 +915,7 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
             </DialogTitle>
             <DialogDescription>
               {catalogDialogMode === 'create'
-                ? 'Service key is normalized to lowercase with hyphens. Save pricing settings to persist.'
+                ? 'Service key is normalized to lowercase with hyphens. Save to persist.'
                 : 'Changes apply after you save pricing settings.'}
             </DialogDescription>
           </DialogHeader>
@@ -1038,7 +1039,7 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
           <DialogHeader>
             <DialogTitle>{promoDialogMode === 'create' ? 'Add promo code' : 'Edit promo code'}</DialogTitle>
             <DialogDescription>
-              Codes are normalized to uppercase without spaces. Save pricing settings to persist.
+              Codes are normalized to uppercase without spaces. Save to persist.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
@@ -1160,7 +1161,7 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
             <AlertDialogTitle>Soft-delete this item?</AlertDialogTitle>
             <AlertDialogDescription>
               It will be hidden from checkout and the public catalog. You can restore it later from this table (enable
-              &quot;Show deleted&quot;). Save pricing settings to persist.
+              &quot;Show deleted&quot;). Save to persist.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

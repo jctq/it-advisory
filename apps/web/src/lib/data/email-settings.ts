@@ -435,13 +435,13 @@ export async function executeTransactionalEmailProviderConnectionTest(
     }
     return {
       ok: false,
-      message: 'Save Resend credentials below or set RESEND_API_KEY and EMAIL_FROM to run this test.',
+      message: 'Save credentials below or set RESEND_API_KEY and EMAIL_FROM to run this test.',
     };
   }
   const blobs = await loadCredentialsMap();
   const blob = blobs[providerId];
   if (blob === undefined) {
-    return { ok: false, message: 'No saved credentials for this provider. Save credentials first, then send a test.' };
+    return { ok: false, message: 'No saved credentials for this provider. Save first, then send a test.' };
   }
   try {
     const plain = decryptEmailCredentials(blob);

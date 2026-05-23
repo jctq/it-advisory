@@ -2679,7 +2679,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                 disabled={!hasUnsavedPatchChangesForSelectedTemplate || isSaving}
               >
                 <Save className="size-4" aria-hidden />
-                {isSaving ? 'Saving…' : 'Save template'}
+                {isSaving ? 'Saving…' : 'Save'}
               </Button>
             ) : null}
           </div>

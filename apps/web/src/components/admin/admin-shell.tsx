@@ -159,7 +159,12 @@ export function AdminShell(props: AdminShellProps) {
           onCloseMobile={() => setMobileOpen(false)}
           onToggleCollapsed={executeToggleCollapsed}
         />
-        <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
+        <div
+          className={cn(
+            'flex min-h-dvh min-w-0 flex-1 flex-col [--admin-sidebar-width:0px]',
+            collapsed ? 'md:[--admin-sidebar-width:5rem]' : 'md:[--admin-sidebar-width:18rem]',
+          )}
+        >
           <div className="sticky top-0 z-20 border-b border-border/80 bg-background/90 shadow-[0_1px_0_0_rgb(0_0_0/0.03)] backdrop-blur-md dark:shadow-[0_1px_0_0_rgb(255_255_255/0.04)]">
             <div className="mx-auto flex min-h-16 w-full flex-col gap-4 px-4 py-3 sm:px-6 lg:px-8">
               <div className="flex items-center justify-between gap-3">

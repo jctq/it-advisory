@@ -12,6 +12,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
+import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { Input } from '@/components/ui/input';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -225,7 +226,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   }, [isDirty, isLoading, isSaving]);
   const disableAiNumericFields = isLoading || !diagnosticAiEnabled;
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading diagnostic settings…</p>;
+    return <AdminFormLoadingPanel label="Loading diagnostic settings" variant="cards" />;
   }
   return (
     <div className="space-y-6">

@@ -102,7 +102,7 @@ export function MarketingCookiePreferencesDialog(): ReactElement {
             Required only
           </Button>
           <Button type="button" size="lg" className="w-full sm:w-auto" onClick={saveCustomPreferences}>
-            Save preferences
+            Save
           </Button>
         </DialogFooter>
       </DialogContent>

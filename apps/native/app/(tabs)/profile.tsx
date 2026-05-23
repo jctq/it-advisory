@@ -300,7 +300,7 @@ export default function ProfileTabScreen() {
                 });
             }}
           >
-            Save profile
+            Save
           </AppButton>
         </View>
         <View style={styles.profileFooterButtonSlot}>

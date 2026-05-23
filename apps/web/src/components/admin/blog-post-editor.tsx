@@ -6,7 +6,10 @@ import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { AdminBlogMarkdownEditor } from '@/components/admin/admin-blog-markdown-editor';
 import { BlogPostEditHistoryDialog } from '@/components/admin/blog-post-edit-history-dialog';
 import { BlogPostEditorSidebar } from '@/components/admin/blog-post-editor-sidebar';
-import { AdminFormStickyFooter } from '@/components/admin/admin-form-sticky-footer';
+import {
+  AdminFormStickyFooter,
+  adminFormStickyFooterScrollPaddingClass,
+} from '@/components/admin/admin-form-sticky-footer';
 import { MarketingBlogProse } from '@/components/marketing/blog/marketing-blog-prose';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -119,12 +122,6 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
   }, [apiUrl, contentMarkdown, description, showInBlogList, showTitle, slug, status, title]);
 
   const publicPreviewHref = status === 'published' ? `/blog/${slug}` : null;
-  const footerHint =
-    status === 'published'
-      ? showInBlogList
-        ? 'Published and listed on /blog. Unsaved edits are not in edit history until you save.'
-        : 'Published but hidden from /blog — reachable via URL and embed id.'
-      : 'Draft — hidden from the marketing site until published.';
 
   return (
     <section className="mx-auto flex min-h-0 w-full flex-1 flex-col">
@@ -168,7 +165,12 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
           </div>
         </div>
       </header>
-      <div className="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 pb-32 lg:flex-row lg:items-stretch lg:px-6">
+      <div
+        className={cn(
+          'flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 lg:flex-row lg:items-stretch lg:px-6',
+          adminFormStickyFooterScrollPaddingClass,
+        )}
+      >
         <BlogPostEditorSidebar
           post={post}
           title={title}
@@ -256,12 +258,9 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
         </div>
       ) : null}
       <AdminFormStickyFooter
-        hint={footerHint}
-        saveLabel="Save post"
         isSaving={isSaving}
         isDisabled={!isDirty || isSaving}
         onSave={() => void executeSave()}
-        resetLabel="Discard changes"
         onReset={executeReset}
         isResetDisabled={!isDirty || isSaving}
       />

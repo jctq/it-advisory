@@ -12,6 +12,7 @@ import {
   type Ref,
 } from 'react';
 import { PAYMENT_POLICIES, type PaymentGatewayId, type PaymentPolicy } from '@/domain/payment-types';
+import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
@@ -264,7 +265,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
     });
   }, [isDirty, isLoading, isSaving]);
   if (isLoading || settings === null) {
-    return <p className="text-sm text-muted-foreground">Loading payment settings…</p>;
+    return <AdminFormLoadingPanel label="Loading payment settings" variant="providers" />;
   }
   const checkoutAmountPesos = (settings.checkoutAmountCentavos / 100).toFixed(2);
   return (
@@ -435,7 +436,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
             const draft = credentialDrafts[gateway.id] ?? {};
             return (
               <div key={gateway.id} className="space-y-4 rounded-2xl border border-border bg-background p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-4">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{gateway.label}</p>
                     <p className="text-xs text-muted-foreground">{gateway.description}</p>
@@ -449,7 +450,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
                     type="button"
                     variant="default"
                     size="sm"
-                    className={getAdminPrimaryActionButtonClass('w-33')}
+                    className={getAdminPrimaryActionButtonClass('w-full sm:w-33')}
                     disabled={testingGatewayId === gateway.id}
                     onClick={() => void executeTestGateway(gateway.id)}
                   >

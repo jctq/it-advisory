@@ -190,7 +190,7 @@ export function AccountProfileForm(props: AccountProfileFormProps): ReactElement
           ) : null}
         </div>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : 'Save profile'}
+          {isSubmitting ? 'Saving…' : 'Save'}
         </Button>
       </form>
     </div>

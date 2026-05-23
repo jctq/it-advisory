@@ -16,6 +16,7 @@ import {
   type VideoMeetingActiveProvider,
   type VideoMeetingProviderId,
 } from '@/domain/meeting-types';
+import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -154,18 +155,20 @@ function SettingsCard(props: {
   readonly children: ReactNode;
 }): ReactElement {
   return (
-    <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-xs">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 gap-3">
+    <section className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
+      <div className="space-y-4">
+        <div className="flex gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground">
             {props.icon}
           </div>
-          <div className="min-w-0 space-y-1">
+          <div className="min-w-0 flex-1 space-y-1">
             <h2 className="text-base font-semibold text-foreground">{props.title}</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">{props.description}</p>
           </div>
         </div>
-        {props.actions !== undefined ? <div className="flex shrink-0 items-start gap-2">{props.actions}</div> : null}
+        {props.actions !== undefined ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">{props.actions}</div>
+        ) : null}
       </div>
       {props.children}
     </section>
@@ -325,7 +328,7 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
     });
   }, [isDirty, isLoading, isSaving]);
   if (isLoading || settings === null) {
-    return <p className="text-sm text-muted-foreground">Loading meeting settings…</p>;
+    return <AdminFormLoadingPanel label="Loading meeting settings" variant="providers" />;
   }
   return (
     <div className="space-y-6">
@@ -423,7 +426,7 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
                   type="button"
                   variant="default"
                   size="sm"
-                  className={getAdminPrimaryActionButtonClass('w-33')}
+                  className={getAdminPrimaryActionButtonClass('w-full sm:w-33')}
                   disabled={!canTestConnection || testingProviderId !== null}
                   onClick={() => void executeTestProvider(providerId)}
                 >
@@ -433,7 +436,7 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
                   type="button"
                   variant="default"
                   size="sm"
-                  className={getAdminPrimaryActionButtonClass('w-40')}
+                  className={getAdminPrimaryActionButtonClass('w-full sm:w-40')}
                   disabled={!row.configured && !willClear}
                   onClick={() => {
                     setClearProviders((previous) => ({ ...previous, [providerId]: !willClear }));

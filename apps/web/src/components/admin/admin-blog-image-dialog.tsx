@@ -393,7 +393,7 @@ export function AdminBlogImageDialog(): ReactElement | null {
                   Uploading…
                 </>
               ) : isEditing ? (
-                'Save changes'
+                'Save'
               ) : (
                 'Insert image'
               )}
