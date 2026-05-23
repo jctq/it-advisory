@@ -468,7 +468,6 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     gatewayId: null,
     methodId: null,
   });
-  paymentSelectionRef.current = { gatewayId: selectedGatewayId, methodId: selectedPaymentMethodId };
   const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, readonly string[]>>({});
   const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle');
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -874,6 +873,12 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     }, PROMO_CODE_DEBOUNCE_MS);
     return () => window.clearTimeout(timeoutId);
   }, [promoCode]);
+  useEffect(() => {
+    paymentSelectionRef.current = {
+      gatewayId: selectedGatewayId,
+      methodId: selectedPaymentMethodId,
+    };
+  }, [selectedGatewayId, selectedPaymentMethodId]);
   useEffect(() => {
     if (phase === 'success' || phase === 'processing') {
       return;

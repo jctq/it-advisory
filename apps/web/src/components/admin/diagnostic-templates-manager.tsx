@@ -2652,39 +2652,6 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
           )}
         </section>
       </div>
-      {selectedTemplate !== null ? (
-        <div className="sticky bottom-0 z-10">
-          <div className="flex w-full flex-wrap items-center justify-center gap-2 p-3 shadow-lg backdrop-blur supports-backdrop-filter:bg-background/80">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void executeActivateTemplate(selectedTemplate.id)}
-              disabled={selectedTemplate.isActive || activatingTemplateId === selectedTemplate.id}
-            >
-              {activatingTemplateId === selectedTemplate.id ? 'Activating…' : 'Set active'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void executeDeleteTemplate(selectedTemplate.id)}
-              disabled={deletingTemplateId === selectedTemplate.id}
-            >
-              <Trash2 className="size-4" aria-hidden />
-              {deletingTemplateId === selectedTemplate.id ? 'Deleting…' : 'Delete'}
-            </Button>
-            {!hideEditorChrome ? (
-              <Button
-                type="button"
-                onClick={() => void executeSaveSelectedTemplate()}
-                disabled={!hasUnsavedPatchChangesForSelectedTemplate || isSaving}
-              >
-                <Save className="size-4" aria-hidden />
-                {isSaving ? 'Saving…' : 'Save'}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

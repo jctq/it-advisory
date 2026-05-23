@@ -194,8 +194,8 @@ function SchedulePageSkeleton(): ReactElement {
           <AdminSkeleton className="h-10 w-28 rounded-md" />
         </div>
       </div>
-      <Card className="overflow-hidden border-border/90 shadow-sm">
-        <CardHeader className="border-b border-border/80 bg-muted/25 pb-6">
+      <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+        <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
           <div className="flex gap-3">
             <AdminSkeleton className="size-10 shrink-0 rounded-xl" />
             <div className="min-w-0 flex-1 space-y-2">
@@ -216,8 +216,8 @@ function SchedulePageSkeleton(): ReactElement {
           <AdminSkeleton className="h-24 md:col-span-2" />
         </CardContent>
       </Card>
-      <Card className="overflow-hidden border-border/90 shadow-sm">
-        <CardHeader className="border-b border-border/80 bg-muted/25">
+      <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+        <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
           <AdminSkeleton className="h-5 w-48" />
         </CardHeader>
         <CardContent className="divide-y divide-border p-0">
@@ -451,7 +451,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
   }, [lastSavedSettings, settings]);
   const isScheduleReady: boolean = !isLoading && settings !== null;
   return (
-    <div className="mx-auto flex min-h-0 w-full flex-col">
+    <div className="mx-auto flex min-h-0 w-full flex-col pb-16">
       <div className={cn('space-y-8', adminFormStickyFooterScrollPaddingClass)}>
       <AdminPageHeader
         eyebrow="Operations"
@@ -644,8 +644,8 @@ export function AdminAdvisorScheduleManager(): ReactElement {
             </Card>
             </TabsContent>
             <TabsContent value="weekdays" className="mt-6 outline-none">
-            <Card className="overflow-hidden border-border/90 shadow-sm">
-              <CardHeader className="border-b border-border/80 bg-muted/25 pb-6">
+            <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+              <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex min-w-0 gap-3">
                   <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
                     <CalendarRange className="size-5" aria-hidden />
@@ -719,8 +719,8 @@ export function AdminAdvisorScheduleManager(): ReactElement {
             </Card>
             </TabsContent>
             <TabsContent value="dates" className="mt-6 outline-none">
-            <Card className="overflow-hidden border-border/90 shadow-sm">
-              <CardHeader className="border-b border-border/80 bg-muted/25 pb-6">
+            <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+              <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex min-w-0 gap-3">
                   <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
                     <CalendarDays className="size-5" aria-hidden />
@@ -749,8 +749,8 @@ export function AdminAdvisorScheduleManager(): ReactElement {
             </Card>
             </TabsContent>
             <TabsContent value="caps" className="mt-6 outline-none">
-            <Card className="overflow-hidden border-border/90 shadow-sm">
-              <CardHeader className="border-b border-border/80 bg-muted/25 pb-6">
+            <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+              <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex min-w-0 gap-3">
                   <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
                     <BarChart3 className="size-5" aria-hidden />
@@ -793,19 +793,21 @@ export function AdminAdvisorScheduleManager(): ReactElement {
             </Card>
             </TabsContent>
             <TabsContent value="preview" className="mt-6 outline-none">
-            <Card className="overflow-hidden border-primary/20 shadow-md ring-1 ring-primary/10">
-              <CardHeader className="space-y-2 border-b border-border/80 pb-4">
-                <CardTitle className="inline-flex items-center gap-2 text-lg tracking-tight">
-                  <span className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
-                    <Eye className="size-4" aria-hidden />
+            <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+              <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
+                <div className="flex min-w-0 gap-3">
+                  <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                    <Eye className="size-5" aria-hidden />
                   </span>
-                  Week preview
-                </CardTitle>
-                <CardDescription className="text-pretty leading-relaxed">
-                  Gray cells are closed. Customer apps use the real-time availability API.
-                </CardDescription>
+                  <div className="min-w-0 space-y-1">
+                    <CardTitle className="text-lg tracking-tight">Week preview</CardTitle>
+                    <CardDescription className="text-pretty">
+                      Gray cells are closed. Customer apps use the real-time availability API.
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-3 px-4 pb-5 pt-4 sm:px-6">
+              <CardContent className="space-y-3 pt-6">
                 <p className="rounded-lg border border-dashed border-border/80 bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
                   {previewWeekRangeLabel !== null ? (
                     <>

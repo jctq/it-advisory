@@ -163,7 +163,7 @@ export function AdminSettingsWorkspace(): ReactElement {
     meetingsFormRef.current?.reset();
   }, [activeTab]);
   return (
-    <section className="mx-auto flex min-h-0 flex-col w-full">
+    <section className="mx-auto flex min-h-0 flex-col w-full pb-16">
       <div className={cn('space-y-6', adminFormStickyFooterScrollPaddingClass)}>
         <AdminPageHeader
           eyebrow="Configuration"
