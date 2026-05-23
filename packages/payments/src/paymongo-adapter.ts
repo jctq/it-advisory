@@ -93,9 +93,11 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
       if (secretKey.length === 0 || input.providerSessionId.length === 0) {
         return null;
       }
-      const response = await fetch(`${PAYMONGO_CHECKOUT_API}/checkout_sessions/${encodeURIComponent(input.providerSessionId)}`, {
-        headers: { Authorization: encodeBasicAuth(secretKey) },
-      });
+      // Hosted Checkout is created on v2, but status retrieval is only exposed on v1.
+      const response = await fetch(
+        `${PAYMONGO_API_V1}/checkout_sessions/${encodeURIComponent(input.providerSessionId)}`,
+        { headers: { Authorization: encodeBasicAuth(secretKey) } },
+      );
       const payload: unknown = await response.json().catch(() => ({}));
       if (!response.ok) {
         return null;
@@ -116,30 +118,42 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
       } catch {
         return null;
       }
-      const eventType =
-        typeof json === 'object' && json !== null && 'data' in json
-          ? (json as { data?: { attributes?: { type?: string } } }).data?.attributes?.type
-          : undefined;
-      const resource =
-        typeof json === 'object' && json !== null && 'data' in json
-          ? (json as { data?: { attributes?: { data?: { id?: string; attributes?: { amount?: number; metadata?: Record<string, string>; reference_number?: string } } } } })
-              .data?.attributes?.data
-          : undefined;
-      const providerSessionId = resource?.id ?? '';
-      const providerRef = resource?.attributes?.reference_number ?? resource?.attributes?.metadata?.referenceId ?? providerSessionId;
-      const amountCentavos = resource?.attributes?.amount;
+      const eventType = resolvePaymongoWebhookEventType(json);
+      const checkoutSession = resolvePaymongoWebhookCheckoutSession(json);
       const isPaid = eventType === 'checkout_session.payment.paid' || eventType === 'payment.paid';
       const isFailed = eventType === 'checkout_session.payment.failed' || eventType === 'payment.failed';
       if (!isPaid && !isFailed) {
         return null;
       }
-      return {
-        providerRef,
-        providerSessionId,
-        status: isPaid ? 'paid' : 'failed',
-        amountCentavos: typeof amountCentavos === 'number' ? amountCentavos : undefined,
-        raw: json,
-      };
+      const nextStatus = isPaid ? 'paid' : 'failed';
+      if (checkoutSession !== null) {
+        const fromSession = parsePaymongoCheckoutSessionPayload({ data: checkoutSession }, {
+          providerSessionId: checkoutSession.id ?? '',
+          providerRef:
+            checkoutSession.attributes?.reference_number ??
+            checkoutSession.attributes?.metadata?.referenceId ??
+            checkoutSession.id ??
+            '',
+          sandboxMode: true,
+        });
+        if (fromSession !== null) {
+          return { ...fromSession, status: nextStatus, raw: json };
+        }
+        const providerSessionId = checkoutSession.id?.trim() ?? '';
+        if (providerSessionId.length > 0) {
+          const providerRef =
+            checkoutSession.attributes?.reference_number ??
+            checkoutSession.attributes?.metadata?.referenceId ??
+            providerSessionId;
+          return {
+            providerRef,
+            providerSessionId,
+            status: nextStatus,
+            raw: json,
+          };
+        }
+      }
+      return null;
     },
     async testConnection(): Promise<{ readonly ok: boolean; readonly message: string }> {
       const secretKey = resolveSecretKey(credentials, true);
@@ -163,7 +177,7 @@ function parsePaymongoCheckoutSessionPayload(
 ): ParsedWebhookEvent | null {
   const data =
     typeof payload === 'object' && payload !== null && 'data' in payload
-      ? (payload as { data?: { id?: string; attributes?: PaymongoCheckoutAttributes } }).data
+      ? (payload as { data?: PaymongoCheckoutSessionResource }).data
       : null;
   if (data === null || data === undefined) {
     return null;
@@ -172,13 +186,13 @@ function parsePaymongoCheckoutSessionPayload(
   const providerRef = data.attributes?.reference_number ?? input.providerRef;
   const payments = data.attributes?.payments ?? [];
   for (const payment of payments) {
-    const paymentStatus = payment.attributes?.status?.toLowerCase() ?? '';
-    if (paymentStatus === 'paid') {
+    const paymentStatus = resolvePaymongoPaymentStatus(payment);
+    if (paymentStatus === 'paid' || paymentStatus === 'succeeded') {
       return {
         providerRef,
         providerSessionId,
         status: 'paid',
-        amountCentavos: payment.attributes?.amount,
+        amountCentavos: resolvePaymongoPaymentAmount(payment),
         raw: payload,
       };
     }
@@ -187,13 +201,24 @@ function parsePaymongoCheckoutSessionPayload(
         providerRef,
         providerSessionId,
         status: 'failed',
-        amountCentavos: payment.attributes?.amount,
+        amountCentavos: resolvePaymongoPaymentAmount(payment),
         raw: payload,
       };
     }
   }
+  const paidAt = data.attributes?.paid_at;
+  if (typeof paidAt === 'number' && paidAt > 0) {
+    const amountCentavos = data.attributes?.payment_intent?.attributes?.amount;
+    return {
+      providerRef,
+      providerSessionId,
+      status: 'paid',
+      amountCentavos: typeof amountCentavos === 'number' ? amountCentavos : undefined,
+      raw: payload,
+    };
+  }
   const paymentIntentStatus = data.attributes?.payment_intent?.attributes?.status?.toLowerCase() ?? '';
-  if (paymentIntentStatus === 'succeeded') {
+  if (paymentIntentStatus === 'succeeded' || paymentIntentStatus === 'paid') {
     const amountCentavos = data.attributes?.payment_intent?.attributes?.amount;
     return {
       providerRef,
@@ -209,14 +234,93 @@ function parsePaymongoCheckoutSessionPayload(
   return null;
 }
 
+/** @internal Exported for unit tests only. */
+export function parsePaymongoCheckoutSessionPayloadForTest(
+  payload: unknown,
+  input: ReconcileCheckoutSessionInput,
+): ParsedWebhookEvent | null {
+  return parsePaymongoCheckoutSessionPayload(payload, input);
+}
+
+type PaymongoCheckoutSessionResource = {
+  readonly id?: string;
+  readonly attributes?: PaymongoCheckoutAttributes;
+};
+
 type PaymongoCheckoutAttributes = {
   readonly reference_number?: string;
   readonly status?: string;
-  readonly payments?: readonly {
-    readonly attributes?: { readonly status?: string; readonly amount?: number };
-  }[];
+  readonly paid_at?: number;
+  readonly metadata?: Readonly<Record<string, string>>;
+  readonly payments?: readonly PaymongoPaymentResource[];
   readonly payment_intent?: {
     readonly attributes?: { readonly status?: string; readonly amount?: number };
+  };
+};
+
+type PaymongoPaymentResource = {
+  readonly status?: string;
+  readonly attributes?: { readonly status?: string; readonly amount?: number };
+};
+
+function resolvePaymongoPaymentStatus(payment: PaymongoPaymentResource): string {
+  const raw = payment.attributes?.status ?? payment.status ?? '';
+  return raw.trim().toLowerCase();
+}
+
+function resolvePaymongoPaymentAmount(payment: PaymongoPaymentResource): number | undefined {
+  const amount = payment.attributes?.amount;
+  return typeof amount === 'number' ? amount : undefined;
+}
+
+function resolvePaymongoWebhookEventType(json: unknown): string | undefined {
+  if (typeof json !== 'object' || json === null || !('data' in json)) {
+    return undefined;
+  }
+  const data = (json as { data?: PaymongoWebhookEnvelope }).data;
+  if (data === undefined) {
+    return undefined;
+  }
+  const directType = data.type?.trim() ?? '';
+  const legacyType = data.attributes?.type?.trim() ?? '';
+  if (legacyType.length > 0 && isPaymongoWebhookEnvelopeType(directType)) {
+    return legacyType;
+  }
+  if (directType.length > 0) {
+    return directType;
+  }
+  return legacyType.length > 0 ? legacyType : undefined;
+}
+
+function isPaymongoWebhookEnvelopeType(type: string): boolean {
+  return type === 'event' || type === 'send.webhook';
+}
+
+function resolvePaymongoWebhookCheckoutSession(json: unknown): PaymongoCheckoutSessionResource | null {
+  if (typeof json !== 'object' || json === null || !('data' in json)) {
+    return null;
+  }
+  const data = (json as { data?: PaymongoWebhookEnvelope }).data;
+  if (data === undefined) {
+    return null;
+  }
+  const directSession = data.data;
+  if (directSession !== undefined && typeof directSession.id === 'string') {
+    return directSession;
+  }
+  const legacySession = data.attributes?.data;
+  if (legacySession !== undefined && typeof legacySession.id === 'string') {
+    return legacySession;
+  }
+  return null;
+}
+
+type PaymongoWebhookEnvelope = {
+  readonly type?: string;
+  readonly data?: PaymongoCheckoutSessionResource;
+  readonly attributes?: {
+    readonly type?: string;
+    readonly data?: PaymongoCheckoutSessionResource;
   };
 };
 

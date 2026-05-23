@@ -44,9 +44,6 @@ export function PaymentReturnClient(): ReactElement {
   const bookCheckoutHref = hasValidSessionRef
     ? buildMarketingBookSessionPath(sessionRef, paidServiceKey)
     : '/book/manage';
-  const paidRedirectPath = hasValidSessionRef
-    ? `${buildMarketingBookSessionPath(sessionRef, paidServiceKey)}?payment=success&transactionId=${encodeURIComponent(transactionId)}`
-    : `/book/manage?payment=success&transactionId=${encodeURIComponent(transactionId)}`;
   useEffect(() => {
     if (transactionId.length === 0) {
       return;
@@ -54,6 +51,12 @@ export function PaymentReturnClient(): ReactElement {
     let cancelled = false;
     let polls = 0;
     const apiBaseUrl = resolveApiBaseUrl();
+    const buildPaidRedirectPath = (serviceKey: string | null): string => {
+      if (hasValidSessionRef) {
+        return `${buildMarketingBookSessionPath(sessionRef, serviceKey)}?payment=success&transactionId=${encodeURIComponent(transactionId)}`;
+      }
+      return `/book/manage?payment=success&transactionId=${encodeURIComponent(transactionId)}`;
+    };
     const poll = async (): Promise<void> => {
       polls += 1;
       try {
@@ -71,10 +74,7 @@ export function PaymentReturnClient(): ReactElement {
         }
         if (result.status === 'paid' && result.bookingId !== null) {
           setStatus('paid');
-          const redirectPath = hasValidSessionRef
-            ? `${buildMarketingBookSessionPath(sessionRef, result.serviceKey)}?payment=success&transactionId=${encodeURIComponent(transactionId)}`
-            : paidRedirectPath;
-          router.replace(redirectPath);
+          router.replace(buildPaidRedirectPath(result.serviceKey));
           return;
         }
         if (result.status === 'failed' || result.status === 'expired') {
@@ -98,7 +98,7 @@ export function PaymentReturnClient(): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [hasValidSessionRef, isMock, paidRedirectPath, pollGeneration, router, sessionRef, transactionId]);
+  }, [hasValidSessionRef, isMock, pollGeneration, router, sessionRef, transactionId]);
   if (displayStatus === 'loading') {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 text-center">

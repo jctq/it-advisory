@@ -20,6 +20,9 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
   }
   let transaction = await findPaymentTransactionById(transactionId, visitorId);
   if (transaction === null) {
+    transaction = await findPaymentTransactionById(transactionId);
+  }
+  if (transaction === null) {
     return NextResponse.json({ error: 'Payment session not found.' }, { status: 404 });
   }
   transaction = await reconcilePaymentTransactionIfPending(transaction);
