@@ -30,8 +30,8 @@ export default async function AccountProfilePage(): Promise<ReactElement> {
     phoneNationalDigits: parseNationalDigitsFromStoredPhone(doc.phone),
   };
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
-      <div className="mb-8">
+    <main className="mx-auto max-w-6xl px-0 py-0 md:px-6 md:py-12">
+      <div className="mb-8 hidden md:block">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Account</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Profile</h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
