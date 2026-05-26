@@ -46,6 +46,7 @@
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "diff": "^9.0.0",
+    "driver.js": "^1.4.0",
     "framer-motion": "^12.39.0",
     "lucide-react": "^0.511.0",
     "moment-timezone": "^0.5.48",
