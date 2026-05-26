@@ -2048,32 +2048,9 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       answers: activeRound.answers,
       currentIndex: activeRound.stepIndex,
     });
-    const nextTemplateRound =
-      !diagnosticAiEnabled && activeTemplate !== null
-        ? buildNextTemplateRoundFromState({
-            template: activeTemplate,
-            completedBundles: [
-              ...guided.completedBundles,
-              buildVisibleBundleFromActive({
-                activeRound,
-                completedBundles: guided.completedBundles,
-              }),
-            ].filter((bundle): bundle is CompletedRoundBundle => bundle !== null),
-            startRoundIndex: activeRound.roundIndex + 1,
-          })
-        : null;
-    const nextTemplateRoundTitle = nextTemplateRound?.roundTitle ?? null;
     const hasMoreQuestionsInRound: boolean = nextVisibleQuestionIndex !== null;
-    const trimmedNextTemplateRoundTitle: string | null =
-      nextTemplateRoundTitle !== null && nextTemplateRoundTitle.trim().length > 0 ? nextTemplateRoundTitle.trim() : null;
     const advanceLabel =
-      hasMoreQuestionsInRound
-        ? 'Next'
-        : !diagnosticAiEnabled
-          ? trimmedNextTemplateRoundTitle !== null
-            ? `Continue to ${trimmedNextTemplateRoundTitle}`
-            : 'Continue: Recommendation'
-          : 'Submit round';
+      hasMoreQuestionsInRound || !diagnosticAiEnabled ? 'Next' : 'Submit round';
     const isFirstVisibleQuestionInRound: boolean = positionInRound === 1;
     const shouldShowDetailNoteTextbox =
       question !== undefined &&
@@ -2198,7 +2175,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               ) : null}
             </div>
             <Button type="button" onClick={() => void executeAdvanceOrSubmitRound()}>
-              <span className="sm:hidden">Continue</span>
+              <span className="sm:hidden">Next</span>
               <span className="hidden sm:inline">{advanceLabel}</span>
             </Button>
           </DiagnosticStickyActionBar>
