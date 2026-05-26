@@ -14,10 +14,7 @@ import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { getDb } from '@/lib/mongodb';
 import { executeSendBookingConfirmationEmail } from '@/lib/email/send-booking-confirmation-email';
 import { incrementPromoRedemptionCount } from '@/lib/data/monetization-settings';
-import {
-  applyBookingRecordingFieldsFromCheckout,
-  parseRecordingOptInFromTransactionMetadata,
-} from '@/lib/booking/apply-booking-recording-fields';
+import { syncBookingRecordingFieldsFromTransaction } from '@/lib/booking/apply-booking-recording-fields';
 import { ensureVideoMeetingStoredForBooking } from '@/lib/video-meetings/ensure-video-meeting-for-booking';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
@@ -83,6 +80,10 @@ export async function applyPaymentStatusToBooking(input: {
 
 async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promise<CompletePaymentTransactionResult> {
   if (transaction.status === 'paid' && transaction.bookingId !== null) {
+    await syncBookingRecordingFieldsFromTransaction({
+      bookingId: new ObjectId(transaction.bookingId),
+      metadata: transaction.metadata,
+    });
     return { kind: 'noop', transaction };
   }
   let bookingId: ObjectId | null = transaction.bookingId !== null ? new ObjectId(transaction.bookingId) : null;
@@ -92,6 +93,10 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
   if (bookingId === null) {
     return null;
   }
+  await syncBookingRecordingFieldsFromTransaction({
+    bookingId,
+    metadata: transaction.metadata,
+  });
   await confirmBookingRow(bookingId);
   const db = await getDb();
   await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
@@ -169,6 +174,10 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
     startsAt,
   });
   if (existing !== null) {
+    await syncBookingRecordingFieldsFromTransaction({
+      bookingId: existing,
+      metadata: transaction.metadata,
+    });
     return existing;
   }
   const contact: MarketingBookingLeadContact | null =
@@ -226,9 +235,9 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
       },
     },
   );
-  await applyBookingRecordingFieldsFromCheckout({
+  await syncBookingRecordingFieldsFromTransaction({
     bookingId: created.bookingId,
-    recordingOptIn: parseRecordingOptInFromTransactionMetadata(transaction.metadata),
+    metadata: transaction.metadata,
   });
   return created.bookingId;
 }
@@ -268,16 +277,20 @@ export async function createPendingBookingForHoldPolicy(input: {
     guidedDiagnosticSnapshot: snapshot,
     paymentMethodLabel: transaction.paymentMethodLabel,
   });
-  if (inserted === null || inserted.kind === 'duplicate_key') {
-    return findBookingByVisitorSlot({
-      visitorId: transaction.visitorId,
-      serviceKey: transaction.serviceKey,
-      startsAt: await loadTransactionStartsAt(transaction.id),
-    });
+  let bookingId: ObjectId | null =
+    inserted === null || inserted.kind === 'duplicate_key'
+      ? await findBookingByVisitorSlot({
+          visitorId: transaction.visitorId,
+          serviceKey: transaction.serviceKey,
+          startsAt: await loadTransactionStartsAt(transaction.id),
+        })
+      : inserted.id;
+  if (bookingId === null) {
+    return null;
   }
   const db = await getDb();
   await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
-    { _id: inserted.id },
+    { _id: bookingId },
     {
       $set: {
         status: 'pending',
@@ -293,9 +306,13 @@ export async function createPendingBookingForHoldPolicy(input: {
   await updatePaymentTransactionStatus({
     transactionId: transaction.id,
     status: 'processing',
-    bookingId: inserted.id,
+    bookingId,
   });
-  return inserted.id;
+  await syncBookingRecordingFieldsFromTransaction({
+    bookingId,
+    metadata: transaction.metadata,
+  });
+  return bookingId;
 }
 
 export async function createManualConfirmBooking(input: {
@@ -355,6 +372,10 @@ export async function createManualConfirmBooking(input: {
     transactionId: input.transaction.id,
     status: 'pending',
     bookingId,
+  });
+  await syncBookingRecordingFieldsFromTransaction({
+    bookingId,
+    metadata: input.transaction.metadata,
   });
   return bookingId;
 }

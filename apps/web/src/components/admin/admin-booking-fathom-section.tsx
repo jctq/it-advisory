@@ -42,14 +42,50 @@ export function AdminBookingFathomSection(props: AdminBookingFathomSectionProps)
       setIsSaving(false);
     }
   };
+  const [isSyncingOptIn, setIsSyncingOptIn] = useState<boolean>(false);
   const statusLabel = props.booking.fathomMatchStatus ?? (props.booking.recordingOptIn ? 'pending' : 'skipped');
+  const executeSyncOptInFromPayment = async (): Promise<void> => {
+    setIsSyncingOptIn(true);
+    try {
+      const response = await fetch(buildApiUrl(`/api/admin/bookings/${props.booking.id}/sync-recording-opt-in`), {
+        method: 'POST',
+      });
+      const data = (await response.json()) as { ok?: boolean; reason?: string };
+      if (!response.ok || data.ok !== true) {
+        throw new Error(
+          data.reason === 'no_transaction'
+            ? 'No payment transaction linked to this booking.'
+            : 'Could not sync opt-in from checkout.',
+        );
+      }
+      notifySuccess('Recording opt-in synced from payment.');
+      window.location.reload();
+    } catch (error: unknown) {
+      notifyError(error instanceof Error ? error.message : 'Sync failed.');
+    } finally {
+      setIsSyncingOptIn(false);
+    }
+  };
   return (
     <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
       <h2 className="text-lg font-semibold text-foreground">Meeting notes (Fathom)</h2>
       <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recording opt-in</dt>
-          <dd className="mt-1 text-sm text-foreground">{props.booking.recordingOptIn ? 'Yes' : 'No'}</dd>
+          <dd className="mt-1 flex flex-wrap items-center gap-2 text-sm text-foreground">
+            <span>{props.booking.recordingOptIn ? 'Yes' : 'No'}</span>
+            {!props.booking.recordingOptIn && props.booking.paymentTransactionId !== null ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isSyncingOptIn}
+                onClick={() => void executeSyncOptInFromPayment()}
+              >
+                {isSyncingOptIn ? 'Syncing…' : 'Sync from checkout'}
+              </Button>
+            ) : null}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Match status</dt>

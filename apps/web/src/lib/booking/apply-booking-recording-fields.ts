@@ -37,3 +37,14 @@ export function parseRecordingOptInFromTransactionMetadata(
   const raw = metadata.recordingOptIn?.trim().toLowerCase() ?? '';
   return raw === 'true' || raw === '1' || raw === 'yes';
 }
+
+/** Applies recording opt-in from checkout transaction metadata to an existing booking row. */
+export async function syncBookingRecordingFieldsFromTransaction(input: {
+  readonly bookingId: ObjectId;
+  readonly metadata: Record<string, string> | undefined;
+}): Promise<void> {
+  await applyBookingRecordingFieldsFromCheckout({
+    bookingId: input.bookingId,
+    recordingOptIn: parseRecordingOptInFromTransactionMetadata(input.metadata),
+  });
+}
