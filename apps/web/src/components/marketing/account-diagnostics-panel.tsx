@@ -66,7 +66,14 @@ const TABLE_COLUMN_CLASS_NAMES: Record<string, string> = {
 function BookingReferenceCell(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
   const [copied, setCopied] = useState(false);
   const reference = props.row.bookingReferenceId;
+  const paymentStatus = props.row.paymentTransactionStatus;
   if (reference === null) {
+    if (paymentStatus === 'paid' || paymentStatus === 'processing') {
+      return <span className="text-sm font-medium text-primary">Payment received</span>;
+    }
+    if (paymentStatus === 'pending') {
+      return <span className="text-sm text-muted-foreground">Checkout started</span>;
+    }
     return <span className="text-sm text-muted-foreground">Not booked</span>;
   }
   const executeCopy = (): void => {
@@ -105,7 +112,28 @@ function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary 
 }
 
 function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
+  const paymentStatus = props.row.paymentTransactionStatus;
   if (props.row.bookingStatus === null) {
+    if (paymentStatus === 'paid') {
+      return <Badge className="bg-emerald-600/15 text-emerald-800 hover:bg-emerald-600/15 dark:text-emerald-200">Paid</Badge>;
+    }
+    if (paymentStatus === 'processing') {
+      return (
+        <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">
+          Confirming
+        </Badge>
+      );
+    }
+    if (paymentStatus === 'pending') {
+      return (
+        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
+          Awaiting payment
+        </Badge>
+      );
+    }
+    if (paymentStatus === 'failed' || paymentStatus === 'expired') {
+      return <Badge variant="outline">Payment {paymentStatus}</Badge>;
+    }
     return <span className="text-sm text-muted-foreground">—</span>;
   }
   if (props.row.bookingStatus === 'confirmed') {
@@ -128,15 +156,25 @@ function buildBookManageHref(bookingId: string | null): string {
   return '/book/manage';
 }
 
+function hasActiveCheckout(row: VisitorQuizSessionSummary): boolean {
+  return (
+    row.paymentTransactionStatus === 'paid' ||
+    row.paymentTransactionStatus === 'processing' ||
+    row.paymentTransactionStatus === 'pending'
+  );
+}
+
 function SessionActions(props: {
   readonly row: VisitorQuizSessionSummary;
   readonly deletingId: string | null;
   readonly manageBookingEnabled: boolean;
   readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
 }): ReactElement {
+  const showBookedActions = props.row.isBooked || props.row.paymentTransactionStatus === 'paid';
+  const canDelete = !props.row.isBooked && !hasActiveCheckout(props.row);
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      {props.row.isBooked ? (
+      {showBookedActions ? (
         <>
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
@@ -152,7 +190,7 @@ function SessionActions(props: {
           <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>Continue</Link>
         </Button>
       )}
-      {!props.row.isBooked ? (
+      {canDelete ? (
         <Button
           type="button"
           variant="ghost"
@@ -330,24 +368,25 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
         header: 'Scheduled session',
         cell: (info) => {
           const row = info.row.original;
-          if (row.bookingStartsAtIso === null || row.bookingTimezone === null) {
+          const startsAtIso = row.bookingStartsAtIso ?? row.checkoutStartsAtIso;
+          const timezone = row.bookingTimezone ?? row.checkoutTimezone;
+          const serviceKey = row.bookingServiceKey ?? row.checkoutServiceKey;
+          if (startsAtIso === null || timezone === null) {
             return <span className="text-sm text-muted-foreground">—</span>;
           }
           const slotFormatter = new Intl.DateTimeFormat('en-PH', {
             dateStyle: 'medium',
             timeStyle: 'short',
-            timeZone: row.bookingTimezone,
+            timeZone: timezone,
           });
           const title =
-            row.bookingServiceKey === 'project-rescue'
-              ? PROJECT_RESCUE_SERVICE_TITLE
-              : row.bookingServiceKey ?? 'Consultation';
+            serviceKey === 'project-rescue' ? PROJECT_RESCUE_SERVICE_TITLE : serviceKey ?? 'Consultation';
           return (
             <div className="flex max-w-[18rem] flex-col gap-2">
-              <span className="text-xs text-muted-foreground">{slotFormatter.format(new Date(row.bookingStartsAtIso))}</span>
+              <span className="text-xs text-muted-foreground">{slotFormatter.format(new Date(startsAtIso))}</span>
               {row.bookingStatus === 'confirmed' ? (
                 <AddToCalendarButtons
-                  startsAtIso={row.bookingStartsAtIso}
+                  startsAtIso={startsAtIso}
                   title={title}
                   description={
                     row.bookingReferenceId !== null
@@ -355,8 +394,10 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                       : 'Account diagnostics.'
                   }
                   location={row.bookingMeetingUrl ?? undefined}
-                  icsUidSeed={row.bookingReferenceId ?? row.bookingStartsAtIso}
+                  icsUidSeed={row.bookingReferenceId ?? startsAtIso}
                 />
+              ) : row.paymentTransactionStatus === 'paid' && row.bookingStatus === null ? (
+                <span className="text-xs text-muted-foreground">Booking confirmation in progress</span>
               ) : null}
             </div>
           );

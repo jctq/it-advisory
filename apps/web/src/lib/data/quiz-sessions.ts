@@ -7,6 +7,8 @@ import type {
   QuizSessionDocument,
   VisitorSessionDocument,
 } from '@/domain/types';
+import type { PaymentStatus } from '@/domain/payment-types';
+import { fetchLatestPaymentTransactionsByQuizSessionIds } from '@/lib/data/payment-transactions';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import { getActiveDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
@@ -367,11 +369,25 @@ export type VisitorQuizSessionSummary = {
   readonly bookingTimezone: string | null;
   readonly bookingServiceKey: string | null;
   readonly bookingMeetingUrl: string | null;
+  readonly paymentTransactionId: string | null;
+  readonly paymentTransactionStatus: PaymentStatus | null;
+  readonly checkoutStartsAtIso: string | null;
+  readonly checkoutTimezone: string | null;
+  readonly checkoutServiceKey: string | null;
+};
+
+type LinkedPaymentSummary = {
+  readonly paymentTransactionId: string;
+  readonly paymentTransactionStatus: PaymentStatus;
+  readonly checkoutStartsAtIso: string;
+  readonly checkoutTimezone: string;
+  readonly checkoutServiceKey: string;
 };
 
 function mapVisitorQuizSessionSummary(
   doc: QuizSessionDocument & { _id: ObjectId },
   linkedBooking: LinkedBookingSummary | null,
+  linkedPayment: LinkedPaymentSummary | null,
 ): VisitorQuizSessionSummary {
   const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
   const idHex = doc._id.toString();
@@ -388,10 +404,15 @@ function mapVisitorQuizSessionSummary(
     bookingId,
     bookingReferenceId: bookingId !== null ? formatBookingReferenceId(bookingId) : null,
     bookingStatus: linkedBooking?.bookingStatus ?? null,
-    bookingStartsAtIso: linkedBooking?.bookingStartsAtIso ?? null,
-    bookingTimezone: linkedBooking?.bookingTimezone ?? null,
-    bookingServiceKey: linkedBooking?.bookingServiceKey ?? null,
+    bookingStartsAtIso: linkedBooking?.bookingStartsAtIso ?? linkedPayment?.checkoutStartsAtIso ?? null,
+    bookingTimezone: linkedBooking?.bookingTimezone ?? linkedPayment?.checkoutTimezone ?? null,
+    bookingServiceKey: linkedBooking?.bookingServiceKey ?? linkedPayment?.checkoutServiceKey ?? null,
     bookingMeetingUrl: linkedBooking?.bookingMeetingUrl ?? null,
+    paymentTransactionId: linkedPayment?.paymentTransactionId ?? null,
+    paymentTransactionStatus: linkedPayment?.paymentTransactionStatus ?? null,
+    checkoutStartsAtIso: linkedPayment?.checkoutStartsAtIso ?? null,
+    checkoutTimezone: linkedPayment?.checkoutTimezone ?? null,
+    checkoutServiceKey: linkedPayment?.checkoutServiceKey ?? null,
   };
 }
 
@@ -414,10 +435,24 @@ export async function listQuizSessionsForVisitor(
     .toArray();
   const validDocs = docs.filter((doc): doc is QuizSessionDocument & { _id: ObjectId } => doc._id !== undefined);
   const sessionIds = validDocs.map((doc) => doc._id);
+  const sessionIdHexes = sessionIds.map((id) => id.toString());
   const bookingBySessionId = await fetchPrimaryBookingByQuizSessionIds(sessionIds);
-  return validDocs.map((doc) =>
-    mapVisitorQuizSessionSummary(doc, bookingBySessionId.get(doc._id.toString()) ?? null),
-  );
+  const paymentBySessionId = await fetchLatestPaymentTransactionsByQuizSessionIds(sessionIdHexes);
+  return validDocs.map((doc) => {
+    const sessionHex = doc._id.toString();
+    const paymentRow = paymentBySessionId.get(sessionHex);
+    const linkedPayment =
+      paymentRow !== undefined
+        ? {
+            paymentTransactionId: paymentRow.id,
+            paymentTransactionStatus: paymentRow.status,
+            checkoutStartsAtIso: paymentRow.startsAtIso,
+            checkoutTimezone: paymentRow.timezone,
+            checkoutServiceKey: paymentRow.serviceKey,
+          }
+        : null;
+    return mapVisitorQuizSessionSummary(doc, bookingBySessionId.get(sessionHex) ?? null, linkedPayment);
+  });
 }
 
 function buildVisitorSessionStatusMatch(status: VisitorQuizSessionListStatusFilter): Document {
@@ -536,6 +571,9 @@ export async function listQuizSessionsForVisitorPaginated(input: {
   const facetResult = facetRows[0] as { total?: { count: number }[]; rows?: AggregatedVisitorQuizSessionRow[] } | undefined;
   const totalCount = facetResult?.total?.[0]?.count ?? 0;
   const rows = facetResult?.rows ?? [];
+  const paymentBySessionId = await fetchLatestPaymentTransactionsByQuizSessionIds(
+    rows.map((row) => row._id.toString()),
+  );
   const sessions = rows.map((row) => {
     const linkedBooking =
       row.linkedBooking !== null && row.linkedBooking !== undefined
@@ -553,7 +591,19 @@ export async function listQuizSessionsForVisitorPaginated(input: {
             };
           })()
         : null;
-    return mapVisitorQuizSessionSummary(row, linkedBooking);
+    const sessionHex = row._id.toString();
+    const paymentRow = paymentBySessionId.get(sessionHex);
+    const linkedPayment =
+      paymentRow !== undefined
+        ? {
+            paymentTransactionId: paymentRow.id,
+            paymentTransactionStatus: paymentRow.status,
+            checkoutStartsAtIso: paymentRow.startsAtIso,
+            checkoutTimezone: paymentRow.timezone,
+            checkoutServiceKey: paymentRow.serviceKey,
+          }
+        : null;
+    return mapVisitorQuizSessionSummary(row, linkedBooking, linkedPayment);
   });
   return {
     sessions,

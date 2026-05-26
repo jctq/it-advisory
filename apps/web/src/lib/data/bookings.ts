@@ -5,6 +5,7 @@
 import { MongoServerError, ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { FathomMatchStatus } from '@/domain/recording-types';
+import type { PaymentGatewayId, PaymentStatus } from '@/domain/payment-types';
 import type { BookingDocument, LeadDocument, UserAccountDocument } from '@/domain/types';
 import type { UpdateFilter } from 'mongodb';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
@@ -26,6 +27,10 @@ export type BookingRow = {
   teamsOnlineMeetingId?: string;
   /** Linked checkout transaction when payment was taken online. */
   paymentTransactionId: string | null;
+  paymentStatus: PaymentStatus | null;
+  paymentGatewayId: PaymentGatewayId | null;
+  paymentMethodLabel: string | null;
+  paymentProviderRef: string | null;
   hasDiagnosticSnapshot: boolean;
   /** Quiz session document id captured at booking time, when Mongo had a session row. */
   quizSessionId: string | null;
@@ -73,6 +78,10 @@ function mapBooking(
       doc.paymentTransactionId !== undefined && doc.paymentTransactionId !== null
         ? doc.paymentTransactionId.toString()
         : null,
+    paymentStatus: doc.paymentStatus ?? null,
+    paymentGatewayId: doc.paymentGatewayId ?? null,
+    paymentMethodLabel: doc.paymentMethodLabel ?? null,
+    paymentProviderRef: doc.paymentProviderRef ?? null,
     hasDiagnosticSnapshot:
       typeof doc.guidedDiagnosticSnapshot === 'string' && doc.guidedDiagnosticSnapshot.trim().length > 0,
     quizSessionId,

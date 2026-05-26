@@ -7,9 +7,11 @@ import {
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
 import { AdminBookingFathomSection } from '@/components/admin/admin-booking-fathom-section';
+import { AdminBookingPaymentSection } from '@/components/admin/admin-booking-payment-section';
 import { AdminBookingQuoteForm } from '@/components/admin/admin-booking-quote-form';
 import { MarkBookingPaidButton } from '@/components/admin/mark-booking-paid-button';
 import { findBookingById } from '@/lib/data/bookings';
+import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 
@@ -43,6 +45,11 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
     serviceKey: booking.serviceKey,
     bookingId: null,
   });
+  const linkedTransaction =
+    booking.paymentTransactionId !== null ? await findPaymentTransactionById(booking.paymentTransactionId) : null;
+  const paymentAmountCentavos =
+    linkedTransaction?.amountCentavos ??
+    (booking.quotedAmountCentavos !== null ? booking.quotedAmountCentavos : catalogPricing.amountCentavos);
   const calendarBundle =
     booking.status === 'confirmed'
       ? buildBookingCalendarLinkBundle({
@@ -150,10 +157,19 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
             </div>
           ) : null}
         </dl>
-        <div className="mt-6">
+        <div className="mt-6 flex flex-wrap gap-3">
           <MarkBookingPaidButton bookingId={booking.id} status={booking.status} />
         </div>
       </div>
+      <AdminBookingPaymentSection
+        bookingId={booking.id}
+        paymentTransactionId={booking.paymentTransactionId}
+        paymentStatus={booking.paymentStatus}
+        paymentGatewayId={booking.paymentGatewayId}
+        paymentMethodLabel={booking.paymentMethodLabel}
+        paymentProviderRef={booking.paymentProviderRef}
+        amountCentavos={paymentAmountCentavos}
+      />
       <AdminBookingFathomSection booking={booking} />
       <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
         <h2 className="text-lg font-semibold text-foreground">Custom checkout quote</h2>

@@ -209,6 +209,132 @@ export async function updatePaymentTransactionStatus(input: {
   return mapTransaction(result as PaymentTransactionDocument & { _id: { toString: () => string } });
 }
 
+const RECONCILABLE_PAYMENT_STATUSES: readonly PaymentStatus[] = ['pending', 'processing'];
+
+export async function listReconcilablePaymentTransactionsForVisitor(
+  visitorId: string,
+  limit = 50,
+): Promise<readonly PaymentTransactionRow[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find({
+      visitorId,
+      status: { $in: RECONCILABLE_PAYMENT_STATUSES },
+    })
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .toArray();
+  return docs.map((doc) => mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } }));
+}
+
+export async function listPaidUnfulfilledPaymentTransactionsForVisitor(
+  visitorId: string,
+  limit = 50,
+): Promise<readonly PaymentTransactionRow[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find({
+      visitorId,
+      status: 'paid',
+      $or: [{ bookingId: { $exists: false } }, { bookingId: null }],
+    })
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .toArray();
+  return docs.map((doc) => mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } }));
+}
+
+export async function listStaleReconcilablePaymentTransactions(
+  olderThan: Date,
+  limit = 100,
+): Promise<readonly PaymentTransactionRow[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find({
+      status: { $in: RECONCILABLE_PAYMENT_STATUSES },
+      updatedAt: { $lte: olderThan },
+    })
+    .sort({ updatedAt: 1 })
+    .limit(limit)
+    .toArray();
+  return docs.map((doc) => mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } }));
+}
+
+export type PaymentTransactionSummaryRow = Pick<
+  PaymentTransactionRow,
+  'id' | 'status' | 'gatewayId' | 'amountCentavos' | 'bookingId' | 'startsAtIso' | 'timezone' | 'serviceKey' | 'paidAtIso'
+>;
+
+export async function fetchLatestPaymentTransactionsByQuizSessionIds(
+  quizSessionIdHexes: readonly string[],
+): Promise<Map<string, PaymentTransactionSummaryRow>> {
+  const uniqueIds = [...new Set(quizSessionIdHexes.map((id) => id.trim()).filter((id) => id.length > 0))];
+  if (!process.env.MONGODB_URI || uniqueIds.length === 0) {
+    return new Map();
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find({ quizSessionIdHex: { $in: uniqueIds } })
+    .sort({ createdAt: -1 })
+    .toArray();
+  const bySession = new Map<string, PaymentTransactionSummaryRow>();
+  for (const doc of docs) {
+    const sessionHex = doc.quizSessionIdHex?.trim() ?? '';
+    if (sessionHex.length === 0 || bySession.has(sessionHex) || doc._id === undefined) {
+      continue;
+    }
+    const row = mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } });
+    bySession.set(sessionHex, {
+      id: row.id,
+      status: row.status,
+      gatewayId: row.gatewayId,
+      amountCentavos: row.amountCentavos,
+      bookingId: row.bookingId,
+      startsAtIso: row.startsAtIso,
+      timezone: row.timezone,
+      serviceKey: row.serviceKey,
+      paidAtIso: row.paidAtIso,
+    });
+  }
+  return bySession;
+}
+
+export async function findLatestPaymentTransactionByQuizSessionIdHex(
+  quizSessionIdHex: string,
+): Promise<PaymentTransactionRow | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const sessionHex = quizSessionIdHex.trim();
+  if (sessionHex.length === 0) {
+    return null;
+  }
+  const db = await getDb();
+  const doc = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find({ quizSessionIdHex: sessionHex })
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .next();
+  if (doc === null) {
+    return null;
+  }
+  return mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } });
+}
+
 export async function listExpiredHoldTransactions(now: Date): Promise<readonly PaymentTransactionRow[]> {
   if (!process.env.MONGODB_URI) {
     return [];

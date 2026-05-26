@@ -5,6 +5,7 @@ import {
   listQuizSessionsForVisitorPaginated,
   type VisitorQuizSessionListStatusFilter,
 } from '@/lib/data/quiz-sessions';
+import { reconcileVisitorPaymentTransactions } from '@/lib/payments/reconcile-visitor-payments';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 
@@ -34,6 +35,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid query parameters', code: 'invalid_query' }, { status: 400 });
   }
   const visitorId = buildAccountVisitorId(user.id);
+  await reconcileVisitorPaymentTransactions(visitorId);
   const result = await listQuizSessionsForVisitorPaginated({
     visitorId,
     page: parsed.data.page,

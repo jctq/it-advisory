@@ -9,6 +9,9 @@ import {
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
 import { QuizSessionAuditTable } from '@/components/admin/quiz-session-audit-table';
+import { AdminSessionPaymentSection } from '@/components/admin/admin-session-payment-section';
+import { findLatestPaymentTransactionByQuizSessionIdHex, findPaymentTransactionById } from '@/lib/data/payment-transactions';
+import { reconcilePaymentTransactionById } from '@/lib/payments/reconcile-visitor-payments';
 import { findQuizSessionById, listQuizAuditForSession } from '@/lib/data/quiz-sessions';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 
@@ -39,6 +42,11 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
     notFound();
   }
   const auditRows = await listQuizAuditForSession(new ObjectId(session.id));
+  let checkoutTransaction = await findLatestPaymentTransactionByQuizSessionIdHex(session.id);
+  if (checkoutTransaction !== null) {
+    await reconcilePaymentTransactionById(checkoutTransaction.id);
+    checkoutTransaction = (await findPaymentTransactionById(checkoutTransaction.id)) ?? checkoutTransaction;
+  }
   return (
     <section className="mx-auto space-y-8 w-full">
       <AdminPageHeader
@@ -104,6 +112,17 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
           </div>
         </dl>
       </div>
+      {checkoutTransaction !== null ? (
+        <AdminSessionPaymentSection
+          sessionId={session.id}
+          transactionId={checkoutTransaction.id}
+          status={checkoutTransaction.status}
+          gatewayId={checkoutTransaction.gatewayId}
+          amountCentavos={checkoutTransaction.amountCentavos}
+          bookingId={checkoutTransaction.bookingId}
+          customerEmail={checkoutTransaction.customerEmail}
+        />
+      ) : null}
       {session.linkedBookings.length > 0 ? (
         <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
           <h2 className="text-lg font-semibold text-foreground">Linked bookings</h2>
