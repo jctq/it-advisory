@@ -18,6 +18,7 @@ declare global {
     dataLayer?: unknown[];
     gtag?: (...args: unknown[]) => void;
     __techmdGtagConsentDefaultApplied?: boolean;
+    __techmdGaTransportDiagnosticsInstalled?: boolean;
   }
 }
 
@@ -29,10 +30,91 @@ function logAnalyticsEvent(message: string, payload?: unknown): void {
   console.info(`${GA_LOG_PREFIX} ${message}`, payload);
 }
 
+function isGoogleAnalyticsEndpoint(url: string): boolean {
+  return /(^https:\/\/(www|region\d+)\.google-analytics\.com\/g\/collect)|(^https:\/\/www\.googletagmanager\.com)/i.test(url);
+}
+
+function installTransportDiagnostics(): void {
+  if (typeof window === 'undefined' || window.__techmdGaTransportDiagnosticsInstalled === true) {
+    return;
+  }
+  const originalSendBeacon = navigator.sendBeacon.bind(navigator);
+  navigator.sendBeacon = function sendBeacon(url: string | URL, data?: BodyInit | null): boolean {
+    const resolvedUrl = String(url);
+    if (isGoogleAnalyticsEndpoint(resolvedUrl)) {
+      const payloadSize = typeof data === 'string' ? data.length : data === null || data === undefined ? 0 : -1;
+      logAnalyticsEvent('sendBeacon called', { url: resolvedUrl, payloadSize });
+    }
+    const result = originalSendBeacon(url, data);
+    if (isGoogleAnalyticsEndpoint(resolvedUrl)) {
+      logAnalyticsEvent('sendBeacon result', { url: resolvedUrl, result });
+    }
+    return result;
+  };
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async function fetchWithGaDiagnostics(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const isTracked = isGoogleAnalyticsEndpoint(requestUrl);
+    if (isTracked) {
+      logAnalyticsEvent('fetch called', { url: requestUrl, method: init?.method ?? 'GET' });
+    }
+    try {
+      const response = await originalFetch(input, init);
+      if (isTracked) {
+        logAnalyticsEvent('fetch response', { url: requestUrl, status: response.status, ok: response.ok });
+      }
+      return response;
+    } catch (error) {
+      if (isTracked) {
+        logAnalyticsEvent('fetch error', { url: requestUrl, error });
+      }
+      throw error;
+    }
+  };
+  const originalXhrOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function openWithGaDiagnostics(
+    method: string,
+    url: string | URL,
+    async?: boolean,
+    username?: string | null,
+    password?: string | null,
+  ): void {
+    const resolvedUrl = String(url);
+    const isTracked = isGoogleAnalyticsEndpoint(resolvedUrl);
+    if (isTracked) {
+      logAnalyticsEvent('xhr open', { method, url: resolvedUrl });
+      this.addEventListener('loadend', () => {
+        logAnalyticsEvent('xhr loadend', { url: resolvedUrl, status: this.status });
+      });
+      this.addEventListener('error', () => {
+        logAnalyticsEvent('xhr error', { url: resolvedUrl });
+      });
+    }
+    originalXhrOpen.call(this, method, resolvedUrl, async ?? true, username ?? null, password ?? null);
+  };
+  window.addEventListener('securitypolicyviolation', (event: SecurityPolicyViolationEvent) => {
+    if (isGoogleAnalyticsEndpoint(event.blockedURI)) {
+      logAnalyticsEvent('CSP blocked analytics request', {
+        blockedUri: event.blockedURI,
+        violatedDirective: event.violatedDirective,
+        effectiveDirective: event.effectiveDirective,
+        sourceFile: event.sourceFile,
+        lineNumber: event.lineNumber,
+      });
+    }
+  });
+  window.__techmdGaTransportDiagnosticsInstalled = true;
+  logAnalyticsEvent('Installed transport diagnostics');
+}
+
 export function ensureGtagConsentDefaults(): void {
   if (typeof window === 'undefined') {
     return;
   }
+  installTransportDiagnostics();
   window.dataLayer = window.dataLayer ?? [];
   if (typeof window.gtag !== 'function') {
     window.gtag = function gtag(...args: unknown[]): void {
