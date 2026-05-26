@@ -93,12 +93,32 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
   if (bookingId === null) {
     return null;
   }
+  const db = await getDb();
+  const existingBooking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
+    { _id: bookingId },
+    { projection: { status: 1, paymentStatus: 1 } },
+  );
+  if (existingBooking?.status === 'confirmed' && existingBooking.paymentStatus === 'paid') {
+    await syncBookingRecordingFieldsFromTransaction({
+      bookingId,
+      metadata: transaction.metadata,
+    });
+    await ensureVideoMeetingStoredForBooking(bookingId);
+    const updated = await updatePaymentTransactionStatus({
+      transactionId: transaction.id,
+      status: 'paid',
+      bookingId,
+    });
+    if (updated === null) {
+      return null;
+    }
+    return { kind: 'noop', transaction: updated };
+  }
   await syncBookingRecordingFieldsFromTransaction({
     bookingId,
     metadata: transaction.metadata,
   });
   await confirmBookingRow(bookingId);
-  const db = await getDb();
   await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
     { _id: bookingId },
     {

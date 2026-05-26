@@ -12,6 +12,12 @@ import type { CatalogServiceKind } from '@/domain/monetization-types';
 import { formatInTimeZone } from 'date-fns-tz';
 import { getResolvedSiteName } from '@/lib/data/app-settings';
 import { resolveBookingConfirmationSubject } from '@/lib/data/email-settings';
+import {
+  buildTransactionalEmailBrandNameRow,
+  buildTransactionalEmailLogoHeaderRow,
+  resolveAbsoluteSiteOrigin,
+  resolveTransactionalEmailLogoUrl,
+} from '@/lib/email/email-brand';
 import { executeDispatchTransactionalEmail } from '@/lib/email/send-transactional-email';
 import {
   BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
@@ -89,32 +95,6 @@ function escapeHtml(raw: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-function resolveMarketingSiteBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (raw === undefined || raw.length === 0) {
-    return '';
-  }
-  return raw.replace(/\/$/, '');
-}
-
-/**
- * Prefer public app URL; fall back to Vercel deployment host so transactional links work when only `VERCEL_URL` is set.
- */
-function resolveAbsoluteSiteOrigin(): string {
-  const fromPublic = resolveMarketingSiteBaseUrl();
-  if (fromPublic.length > 0) {
-    return fromPublic;
-  }
-  const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel === undefined || vercel.length === 0) {
-    return '';
-  }
-  if (vercel.startsWith('http://') || vercel.startsWith('https://')) {
-    return vercel.replace(/\/$/, '');
-  }
-  return `https://${vercel.replace(/\/$/, '')}`;
 }
 
 function formatAmountPhp(centavos: number): string {
@@ -254,10 +234,14 @@ function buildConfirmationHtml(input: {
   const preheader = `Your ${input.brandName} consultation is confirmed. Reference ${input.bookingReference}.`;
   const trimmedMeeting =
     input.meetingUrl !== null && input.meetingUrl.trim().length > 0 ? input.meetingUrl.trim() : '';
-  const logoBlock =
-    input.siteOrigin.length > 0
-      ? `<tr><td style="padding:0 0 24px 0;"><img src="${escapeHtml(`${input.siteOrigin}/brand/techmd-logo-full.png`)}" width="152" alt="${escapeHtml(input.brandName)}" style="display:block;width:152px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr>`
-      : `<tr><td style="padding:0 0 16px 0;font-family:${EMAIL_FONT_STACK};font-size:22px;font-weight:700;line-height:28px;color:#0f172a;letter-spacing:-0.02em;">${escapeHtml(input.brandName)}</td></tr>`;
+  const logoHeaderRow = buildTransactionalEmailLogoHeaderRow({
+    siteOrigin: input.siteOrigin,
+    brandName: input.brandName,
+  });
+  const brandNameRow =
+    resolveTransactionalEmailLogoUrl(input.siteOrigin) === null
+      ? buildTransactionalEmailBrandNameRow({ brandName: input.brandName, fontStack: EMAIL_FONT_STACK })
+      : '';
   const reservationRows = [
     buildEmailDetailRow('When', `${input.dateLong} · ${input.timeLabel}`),
     buildEmailDetailRow('Booking reference', input.bookingReference),
@@ -299,8 +283,10 @@ ${escapeHtml(preheader)}&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#82
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background-color:#f4f4f5;border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;">
 <tr><td align="center" style="padding:32px 16px;">
 <table role="presentation" width="${EMAIL_INNER_WIDTH_PX}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${EMAIL_INNER_WIDTH_PX}px;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;">
-<tr><td style="padding:32px 28px 28px 28px;background-color:#ffffff;border:1px solid #e4e4e7;border-radius:12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoBlock}<tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;line-height:28px;color:#18181b;">Booking confirmed</td></tr><tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.customerName)}, we have received your payment and reserved your consultation time.</td></tr><tr><td>${catalogBlock}</td></tr><tr><td>${reservationCard}</td></tr><tr><td>${calendarHtml}</td></tr><tr><td>${meetingSection}</td></tr><tr><td>${manageSection}</td></tr><tr><td>${paymentBlock}</td></tr><tr><td style="padding:24px 0 0 0;border-top:1px solid #e4e4e7;"><p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:12px;line-height:18px;color:#71717a;">This message was sent automatically by ${escapeHtml(input.brandName)}. If you did not make this booking, please contact support.</p></td></tr></table>
+<tr><td style="padding:0;background-color:#ffffff;border:1px solid #e4e4e7;border-radius:12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoHeaderRow}<tr><td style="padding:32px 28px 28px 28px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${brandNameRow}<tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;line-height:28px;color:#18181b;">Booking confirmed</td></tr><tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.customerName)}, we have received your payment and reserved your consultation time.</td></tr><tr><td>${catalogBlock}</td></tr><tr><td>${reservationCard}</td></tr><tr><td>${calendarHtml}</td></tr><tr><td>${meetingSection}</td></tr><tr><td>${manageSection}</td></tr><tr><td>${paymentBlock}</td></tr><tr><td style="padding:24px 0 0 0;border-top:1px solid #e4e4e7;"><p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:12px;line-height:18px;color:#71717a;">This message was sent automatically by ${escapeHtml(input.brandName)}. If you did not make this booking, please contact support.</p></td></tr></table>
+</td></tr></table>
 </td></tr>
 </table>
 </td></tr>
@@ -364,10 +350,23 @@ export async function executeSendBookingConfirmationEmail(input: {
   }
 }
 
+async function hasBookingConfirmationEmailBeenSent(bookingId: string): Promise<boolean> {
+  const db = await getDb();
+  const existing = await db.collection<EmailSendDocument>(COLLECTIONS.emailSends).findOne({
+    templateKey: BOOKING_PAYMENT_CONFIRMED_TEMPLATE_KEY,
+    'payload.bookingId': bookingId,
+    status: { $in: ['sent', 'mock_sent'] },
+  });
+  return existing !== null;
+}
+
 async function runSendBookingConfirmationEmail(input: {
   readonly bookingId: string;
   readonly transaction: PaymentTransactionRow | null;
 }): Promise<void> {
+  if (await hasBookingConfirmationEmailBeenSent(input.bookingId)) {
+    return;
+  }
   const booking = await findBookingById(input.bookingId);
   if (booking === null || booking.status !== 'confirmed') {
     return;

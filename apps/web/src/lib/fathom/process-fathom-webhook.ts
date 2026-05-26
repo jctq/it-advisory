@@ -5,6 +5,7 @@ import { fetchFathomRecordingSummary } from '@/lib/fathom/fetch-fathom-recording
 import { matchFathomRecordingToBooking } from '@/lib/fathom/match-fathom-recording-to-booking';
 import { parseFathomWebhookPayload } from '@/lib/fathom/parse-fathom-webhook-payload';
 import { verifyFathomWebhook } from '@/lib/fathom/verify-fathom-webhook';
+import { findBookingById } from '@/lib/data/bookings';
 import { getRecordingSettings, resolveFathomCredentialsForRuntime } from '@/lib/data/recording-settings';
 import { executeSendBookingFathomNotesEmail } from '@/lib/email/send-booking-fathom-notes-email';
 import { getDb } from '@/lib/mongodb';
@@ -109,6 +110,11 @@ export async function processFathomWebhook(input: {
     { webhookId },
     { $set: { bookingId: match.bookingId, matchStatus: 'linked' } },
   );
-  await executeSendBookingFathomNotesEmail({ bookingId: match.bookingId });
+  const linkedBooking = await findBookingById(match.bookingId);
+  const notesEmailAlreadySent =
+    linkedBooking?.fathomNotesEmailSentAtIso !== null && linkedBooking?.fathomNotesEmailSentAtIso !== undefined;
+  if (!notesEmailAlreadySent) {
+    await executeSendBookingFathomNotesEmail({ bookingId: match.bookingId });
+  }
   return { handled: true, status: 200 };
 }

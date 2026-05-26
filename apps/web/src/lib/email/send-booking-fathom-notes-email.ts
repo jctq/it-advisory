@@ -6,6 +6,12 @@ import { findBookingById } from '@/lib/data/bookings';
 import { findLeadById } from '@/lib/data/leads';
 import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
 import { getResolvedSiteName } from '@/lib/data/app-settings';
+import {
+  buildTransactionalEmailBrandNameRow,
+  buildTransactionalEmailLogoHeaderRow,
+  resolveAbsoluteSiteOrigin,
+  resolveTransactionalEmailLogoUrl,
+} from '@/lib/email/email-brand';
 import { executeDispatchTransactionalEmail } from '@/lib/email/send-transactional-email';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import { getDb } from '@/lib/mongodb';
@@ -61,6 +67,18 @@ async function runSendBookingFathomNotesEmail(input: { readonly bookingId: strin
   if (booking.fathomNotesEmailSentAtIso !== null && booking.fathomNotesEmailSentAtIso !== undefined) {
     return;
   }
+  const db = await getDb();
+  const claimNow = new Date();
+  const claimResult = await db.collection(COLLECTIONS.bookings).updateOne(
+    {
+      _id: new ObjectId(booking.id),
+      fathomNotesEmailSentAt: { $exists: false },
+    },
+    { $set: { fathomNotesEmailSentAt: claimNow, updatedAt: claimNow } },
+  );
+  if (claimResult.modifiedCount === 0) {
+    return;
+  }
   const lead = await findLeadById(booking.leadId);
   const transaction =
     booking.paymentTransactionId !== null
@@ -68,6 +86,10 @@ async function runSendBookingFathomNotesEmail(input: { readonly bookingId: strin
       : null;
   const attendee = resolveBookingAttendeeContact({ lead, transaction });
   if (attendee === null || !EMAIL_ADDRESS_PATTERN.test(attendee.email)) {
+    await db.collection(COLLECTIONS.bookings).updateOne(
+      { _id: new ObjectId(booking.id) },
+      { $unset: { fathomNotesEmailSentAt: '' }, $set: { updatedAt: new Date() } },
+    );
     return;
   }
   const brandName = await getResolvedSiteName();
@@ -86,7 +108,13 @@ async function runSendBookingFathomNotesEmail(input: { readonly bookingId: strin
     summaryPreview.length > 0
       ? `<p style="margin:12px 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#3f3f46;">${escapeHtml(summaryPreview)}</p>`
       : '';
-  const html = `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#fafafa;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;padding:28px;"><tr><td style="font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;color:#18181b;">Your consultation notes are ready</td></tr><tr><td style="padding-top:16px;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(attendee.displayName)}, thank you for your session on ${escapeHtml(dateLong)} at ${escapeHtml(timeLabel)}.</td></tr><tr><td style="padding-top:20px;">${buildBulletproofButton('View meeting notes', shareUrl)}</td></tr><tr><td style="font-family:${EMAIL_FONT_STACK};font-size:13px;color:#71717a;">Booking reference: ${escapeHtml(bookingReference)}</td></tr><tr><td>${summaryHtml}${actionItemsHtml}</td></tr><tr><td style="padding-top:24px;border-top:1px solid #e4e4e7;font-family:${EMAIL_FONT_STACK};font-size:12px;color:#71717a;">Sent by ${escapeHtml(brandName)}.</td></tr></table></body></html>`;
+  const siteOrigin = resolveAbsoluteSiteOrigin();
+  const logoHeaderRow = buildTransactionalEmailLogoHeaderRow({ siteOrigin, brandName });
+  const brandNameRow =
+    resolveTransactionalEmailLogoUrl(siteOrigin) === null
+      ? buildTransactionalEmailBrandNameRow({ brandName, fontStack: EMAIL_FONT_STACK })
+      : '';
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#fafafa;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;"><tr><td style="padding:0;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoHeaderRow}<tr><td style="padding:28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${brandNameRow}<tr><td style="font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;color:#18181b;">Your consultation notes are ready</td></tr><tr><td style="padding-top:16px;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(attendee.displayName)}, thank you for your session on ${escapeHtml(dateLong)} at ${escapeHtml(timeLabel)}.</td></tr><tr><td style="padding-top:20px;">${buildBulletproofButton('View meeting notes', shareUrl)}</td></tr><tr><td style="font-family:${EMAIL_FONT_STACK};font-size:13px;color:#71717a;">Booking reference: ${escapeHtml(bookingReference)}</td></tr><tr><td>${summaryHtml}${actionItemsHtml}</td></tr><tr><td style="padding-top:24px;border-top:1px solid #e4e4e7;font-family:${EMAIL_FONT_STACK};font-size:12px;color:#71717a;">Sent by ${escapeHtml(brandName)}.</td></tr></table></td></tr></table></td></tr></table></body></html>`;
   const plainLines = [
     'Your consultation notes are ready',
     '',
@@ -109,20 +137,18 @@ async function runSendBookingFathomNotesEmail(input: { readonly bookingId: strin
     text: plainLines.join('\n'),
   });
   if (outcome.kind !== 'sent') {
+    await db.collection(COLLECTIONS.bookings).updateOne(
+      { _id: new ObjectId(booking.id) },
+      { $unset: { fathomNotesEmailSentAt: '' }, $set: { updatedAt: new Date() } },
+    );
     return;
   }
-  const db = await getDb();
-  const now = new Date();
-  await db.collection(COLLECTIONS.bookings).updateOne(
-    { _id: new ObjectId(booking.id) },
-    { $set: { fathomNotesEmailSentAt: now, updatedAt: now } },
-  );
   const emailDoc: Omit<EmailSendDocument, '_id'> = {
     to: attendee.email,
     templateKey: BOOKING_FATHOM_NOTES_TEMPLATE_KEY,
     payload: { bookingId: booking.id, subject },
     status: 'sent',
-    createdAt: now,
+    createdAt: claimNow,
   };
   await db.collection<EmailSendDocument>(COLLECTIONS.emailSends).insertOne(emailDoc);
 }
