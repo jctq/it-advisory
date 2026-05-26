@@ -25,6 +25,7 @@ import {
   BRAND_MARK_DARK,
   BRAND_MARK_LIGHT,
 } from '@/lib/brand/brand-assets';
+import type { AdminOnboardingTourTarget } from '@/lib/admin/admin-onboarding';
 import { cn } from '@/lib/utils';
 
 type AdminSidebarProps = {
@@ -38,6 +39,7 @@ type AdminSidebarItem = {
   readonly href: string;
   readonly label: string;
   readonly icon: typeof FileStack;
+  readonly tourTarget: AdminOnboardingTourTarget;
 };
 
 const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
@@ -45,51 +47,61 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     href: '/admin',
     label: 'Dashboard',
     icon: LayoutDashboard,
+    tourTarget: 'nav-dashboard',
   },
   {
     href: '/admin/diagnostic-templates',
     label: 'Templates',
     icon: FileStack,
+    tourTarget: 'nav-templates',
   },
   {
     href: '/admin/blog-posts',
     label: 'Blog',
     icon: FileText,
+    tourTarget: 'nav-blog',
   },
   {
     href: '/admin/sessions',
     label: 'Sessions',
     icon: ClipboardList,
+    tourTarget: 'nav-sessions',
   },
   {
     href: '/admin/leads',
     label: 'Leads',
     icon: Users,
+    tourTarget: 'nav-leads',
   },
   {
     href: '/admin/users',
     label: 'Marketing users',
     icon: CircleUser,
+    tourTarget: 'nav-users',
   },
   {
     href: '/admin/schedule',
     label: 'Schedule',
     icon: CalendarClock,
+    tourTarget: 'nav-schedule',
   },
   {
     href: '/admin/bookings',
     label: 'Bookings',
     icon: CalendarDays,
+    tourTarget: 'nav-bookings',
   },
   {
     href: '/admin/advisor',
     label: 'Advisor',
     icon: LifeBuoy,
+    tourTarget: 'nav-advisor',
   },
   {
     href: '/admin/settings',
     label: 'Settings',
     icon: Settings,
+    tourTarget: 'nav-settings',
   },
 ] as const;
 
@@ -113,6 +125,7 @@ export function AdminSidebar(props: AdminSidebarProps) {
         onClick={props.onCloseMobile}
       />
       <aside
+        data-admin-tour="sidebar"
         className={cn(
           'fixed inset-y-0 left-0 z-50 flex border-r border-sidebar-border/90 bg-sidebar/95 text-sidebar-foreground backdrop-blur md:sticky md:top-0 md:z-35 md:h-dvh',
           'transition-[width,transform] duration-200 ease-out',
@@ -176,7 +189,10 @@ export function AdminSidebar(props: AdminSidebarProps) {
           </div>
           <div className="px-4 pt-4">
             {!props.collapsed ? (
-              <div className="rounded-2xl border border-sidebar-border/80 bg-sidebar-accent/70 px-3 py-3">
+              <div
+                data-admin-tour="sidebar-workspace"
+                className="rounded-2xl border border-sidebar-border/80 bg-sidebar-accent/70 px-3 py-3"
+              >
                 <p className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/60">Workspace</p>
                 <p className="mt-1 text-sm font-semibold text-sidebar-foreground">Customer operations</p>
                 <p className="mt-1 text-xs text-sidebar-foreground/68">Templates, sessions, leads, marketing users, bookings, advisor, and settings.</p>
@@ -191,6 +207,7 @@ export function AdminSidebar(props: AdminSidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  data-admin-tour={item.tourTarget}
                   onClick={props.onCloseMobile}
                   className={cn(
                     'flex min-h-11 items-center rounded-2xl px-3 py-2 text-sm font-medium transition-colors',

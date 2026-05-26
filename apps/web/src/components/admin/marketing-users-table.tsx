@@ -49,10 +49,12 @@ export function MarketingUsersTable(props: MarketingUsersTableProps): ReactEleme
     [],
   );
   return (
-    <DataTable
-      columns={columns}
-      data={props.initialData.slice()}
-      emptyMessage="No marketing accounts yet (or MONGODB_URI is unset)."
-    />
+    <div data-admin-tour="page-users-table">
+      <DataTable
+        columns={columns}
+        data={props.initialData.slice()}
+        emptyMessage="No marketing accounts yet (or MONGODB_URI is unset)."
+      />
+    </div>
   );
 }

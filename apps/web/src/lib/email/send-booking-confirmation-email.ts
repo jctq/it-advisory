@@ -162,6 +162,7 @@ function buildConfirmationPlainText(input: {
   readonly timeLabel: string;
   readonly manageUrl: string;
   readonly meetingUrl: string | null;
+  readonly includeRecordingDisclosure: boolean;
   readonly calendarBundle: BookingCalendarLinkBundle;
   readonly catalogPlainLines: readonly string[] | null;
   readonly paymentPlainLines: readonly string[] | null;
@@ -193,6 +194,12 @@ function buildConfirmationPlainText(input: {
     lines.push('');
   } else {
     lines.push('Your meeting link will follow in a separate message if your advisor attaches one to this booking.');
+    lines.push('');
+  }
+  if (input.includeRecordingDisclosure) {
+    lines.push(
+      'This consultation includes a visible AI notetaker (Fathom) to capture notes and summaries. By joining, you consent to recording and transcription for service delivery.',
+    );
     lines.push('');
   }
   if (input.manageUrl.length > 0) {
@@ -238,6 +245,7 @@ function buildConfirmationHtml(input: {
   readonly timeLabel: string;
   readonly manageUrl: string;
   readonly meetingUrl: string | null;
+  readonly includeRecordingDisclosure: boolean;
   readonly siteOrigin: string;
   readonly calendarBundle: BookingCalendarLinkBundle;
   readonly catalogSectionHtml: string | null;
@@ -259,10 +267,13 @@ function buildConfirmationHtml(input: {
     brandName: input.brandName,
     ...input.calendarBundle,
   });
+  const recordingDisclosureBlock = input.includeRecordingDisclosure
+    ? `<p style="margin:12px 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;">This consultation includes a visible AI notetaker (Fathom) to capture notes and summaries. By joining, you consent to recording and transcription for service delivery.</p>`
+    : '';
   const meetingSection =
     trimmedMeeting.length > 0
-      ? `${buildEmailSectionHeading('Video meeting')}${buildBulletproofButton('Join video meeting', trimmedMeeting)}<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;word-break:break-word;">If the button above does not open your call, copy this link into your browser:<br /><a href="${escapeHtml(trimmedMeeting)}" style="color:#1d4ed8;text-decoration:underline;">${escapeHtml(trimmedMeeting)}</a></p>`
-      : `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">Your meeting link will follow in a separate message if your advisor attaches one to this booking.</p>`;
+      ? `${buildEmailSectionHeading('Video meeting')}${buildBulletproofButton('Join video meeting', trimmedMeeting)}<p style="margin:0 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;word-break:break-word;">If the button above does not open your call, copy this link into your browser:<br /><a href="${escapeHtml(trimmedMeeting)}" style="color:#1d4ed8;text-decoration:underline;">${escapeHtml(trimmedMeeting)}</a></p>${recordingDisclosureBlock}<p style="margin:0 0 28px 0;"></p>`
+      : `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">Your meeting link will follow in a separate message if your advisor attaches one to this booking.</p>${recordingDisclosureBlock}`;
   const manageSection =
     input.manageUrl.length > 0
       ? `${buildEmailSectionHeading('Manage booking')}<p style="margin:0 0 12px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">You will need your booking reference, email, and the last four digits of your phone number.</p>${buildBulletproofButton('View or manage booking', input.manageUrl)}`
@@ -421,6 +432,7 @@ async function runSendBookingConfirmationEmail(input: {
     durationMinutes: BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
     icsUidSeed: bookingReference,
   });
+  const includeRecordingDisclosure = booking.recordingOptIn === true;
   const html = buildConfirmationHtml({
     brandName,
     customerName,
@@ -430,6 +442,7 @@ async function runSendBookingConfirmationEmail(input: {
     timeLabel,
     manageUrl,
     meetingUrl,
+    includeRecordingDisclosure,
     siteOrigin,
     calendarBundle,
     catalogSectionHtml,
@@ -444,6 +457,7 @@ async function runSendBookingConfirmationEmail(input: {
     timeLabel,
     manageUrl,
     meetingUrl,
+    includeRecordingDisclosure,
     calendarBundle,
     catalogPlainLines,
     paymentPlainLines,

@@ -142,6 +142,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     resolvedPricing = await resolveCheckoutAmountCentavos({
       serviceKey: params.serviceKey,
       promoCode: params.promoCode,
+      recordingOptIn: params.recordingOptIn === true,
     });
   } catch (error: unknown) {
     return {
@@ -182,6 +183,10 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
         : {}),
       ...(resolvedPricing.catalogServiceKey !== undefined
         ? { catalogServiceKey: resolvedPricing.catalogServiceKey }
+        : {}),
+      recordingOptIn: resolvedPricing.recordingOptIn ? 'true' : 'false',
+      ...(resolvedPricing.recordingSurchargeCentavos > 0
+        ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
         : {}),
     },
     expiresAt,

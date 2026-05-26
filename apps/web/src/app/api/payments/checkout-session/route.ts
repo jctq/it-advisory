@@ -24,6 +24,7 @@ const postBodySchema = z.object({
   /** Use minimal HTML return URL so in-app payment browsers can close the auth session. */
   nativeInAppPaymentReturn: z.boolean().optional(),
   promoCode: z.string().max(64).optional(),
+  recordingOptIn: z.boolean().optional(),
 });
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -68,6 +69,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     appBaseUrl: resolveCheckoutAppBaseUrl(request, parsed.data.appBaseUrl),
     nativeInAppPaymentReturn: parsed.data.nativeInAppPaymentReturn === true,
     promoCode: parsed.data.promoCode,
+    recordingOptIn: parsed.data.recordingOptIn === true,
   });
   if (!result.ok) {
     const status =

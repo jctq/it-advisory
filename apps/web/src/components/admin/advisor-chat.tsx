@@ -77,7 +77,10 @@ export function AdvisorChat() {
     }
   }
   return (
-    <section className="flex flex-1 flex-col gap-4 rounded-lg border bg-card p-4 shadow-xs">
+    <section
+      data-admin-tour="page-advisor-chat"
+      className="flex flex-1 flex-col gap-4 rounded-lg border bg-card p-4 shadow-xs"
+    >
       <div className="flex min-h-[40dvh] flex-col gap-3 overflow-y-auto" aria-live="polite">
         {bubbles.length === 0 ? (
           <EmptyState />

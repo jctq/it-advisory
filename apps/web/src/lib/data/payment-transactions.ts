@@ -28,6 +28,7 @@ export type PaymentTransactionRow = {
   readonly startsAtIso: string;
   readonly expiresAtIso: string | null;
   readonly paidAtIso: string | null;
+  readonly metadata?: Record<string, string>;
 };
 
 function mapTransaction(
@@ -58,6 +59,7 @@ function mapTransaction(
     startsAtIso: doc.startsAt.toISOString(),
     expiresAtIso: doc.expiresAt ? doc.expiresAt.toISOString() : null,
     paidAtIso: doc.paidAt ? doc.paidAt.toISOString() : null,
+    metadata: doc.metadata,
   };
 }
 

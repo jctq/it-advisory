@@ -18,6 +18,7 @@ export type CreateCheckoutSessionParams = {
   /** When true, PSP success URL targets a minimal HTML route for in-app browser completion. */
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string | null;
+  readonly recordingOptIn?: boolean;
 };
 
 export type CreateCheckoutSessionResult =

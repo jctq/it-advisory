@@ -5,11 +5,15 @@ type AdminPageHeaderProps = {
   readonly title: string;
   readonly description?: string;
   readonly actions?: ReactNode;
+  readonly tourTarget?: string;
 };
 
 export function AdminPageHeader(props: AdminPageHeaderProps) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4">
+    <header
+      {...(props.tourTarget !== undefined ? { 'data-admin-tour': props.tourTarget } : {})}
+      className="flex flex-wrap items-end justify-between gap-4"
+    >
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">{props.eyebrow}</p>
         <div>

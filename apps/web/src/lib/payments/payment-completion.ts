@@ -14,6 +14,10 @@ import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { getDb } from '@/lib/mongodb';
 import { executeSendBookingConfirmationEmail } from '@/lib/email/send-booking-confirmation-email';
 import { incrementPromoRedemptionCount } from '@/lib/data/monetization-settings';
+import {
+  applyBookingRecordingFieldsFromCheckout,
+  parseRecordingOptInFromTransactionMetadata,
+} from '@/lib/booking/apply-booking-recording-fields';
 import { ensureVideoMeetingStoredForBooking } from '@/lib/video-meetings/ensure-video-meeting-for-booking';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
@@ -222,6 +226,10 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
       },
     },
   );
+  await applyBookingRecordingFieldsFromCheckout({
+    bookingId: created.bookingId,
+    recordingOptIn: parseRecordingOptInFromTransactionMetadata(transaction.metadata),
+  });
   return created.bookingId;
 }
 

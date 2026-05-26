@@ -258,7 +258,7 @@ export function BlogPostsList(props: BlogPostsListProps): ReactElement {
             aria-label="Search blog posts"
           />
         </div>
-        <div className="overflow-hidden rounded-xl border border-border">
+        <div data-admin-tour="page-blog-list" className="overflow-hidden rounded-xl border border-border">
           <table className="w-full text-sm">
             <thead className="border-b border-border bg-muted/40">
               {table.getHeaderGroups().map((headerGroup) => (

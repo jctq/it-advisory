@@ -33,6 +33,9 @@ export type GuestBookingManageView = {
   readonly payBlockedReason: string | null;
   readonly checkoutAmountLabel: string;
   readonly paymentsEnabled: boolean;
+  readonly recordingOptIn: boolean;
+  readonly fathomNotesUrl: string | null;
+  readonly fathomSummaryPreview: string | null;
 };
 
 export type VerifiedGuestBooking = {
@@ -147,10 +150,20 @@ export async function buildGuestBookingManageView(
   });
   const meetingRaw = verified.booking.meetingUrl;
   const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+  const recordingOptIn = verified.booking.recordingOptIn === true;
   const resolvedPricing = await resolveCheckoutAmountCentavos({
     serviceKey: verified.booking.serviceKey,
     bookingId: verified.bookingId,
+    recordingOptIn,
   });
+  const fathomShareUrl = verified.booking.fathomShareUrl?.trim() ?? '';
+  const fathomSummaryRaw = verified.booking.fathomSummary?.trim() ?? '';
+  const fathomSummaryPreview =
+    recordingOptIn && fathomSummaryRaw.length > 0
+      ? fathomSummaryRaw.length > 280
+        ? `${fathomSummaryRaw.slice(0, 279)}…`
+        : fathomSummaryRaw
+      : null;
   return {
     bookingReference: formatBookingReferenceId(verified.bookingId),
     status: verified.booking.status,
@@ -165,6 +178,9 @@ export async function buildGuestBookingManageView(
     payBlockedReason,
     checkoutAmountLabel: resolvedPricing.amountLabel,
     paymentsEnabled: publicSettings.paymentsEnabled,
+    recordingOptIn,
+    fathomNotesUrl: recordingOptIn && fathomShareUrl.length > 0 ? fathomShareUrl : null,
+    fathomSummaryPreview,
   };
 }
 

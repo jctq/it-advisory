@@ -9,6 +9,9 @@ export type PaymentConfigPublic = {
   readonly checkoutAmountLabel: string;
   readonly holdExpiresMinutes: number;
   readonly sandboxMode: boolean;
+  readonly recordingsEnabled: boolean;
+  readonly recordingOptInPriceCentavos: number;
+  readonly recordingOptInPriceLabel: string;
   readonly gateways: readonly {
     readonly id: PaymentGatewayId;
     readonly label: string;
@@ -43,6 +46,7 @@ export type CreatePaymentCheckoutSessionParams = {
   /** Minimal HTML return route for in-app PSP browsers (Expo / ASWebAuthenticationSession). */
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string;
+  readonly recordingOptIn?: boolean;
   /** Native anonymous visitor; must match checkout so GET /status can load the transaction. */
   readonly deviceId?: string | null;
   /** When set, visitor resolves to the signed-in account (must match checkout). */
@@ -102,6 +106,7 @@ export async function fetchPaymentConfigPublic(params: {
   readonly apiBaseUrl: string;
   readonly serviceKey?: string;
   readonly promoCode?: string;
+  readonly recordingOptIn?: boolean;
   readonly signal?: AbortSignal;
 }): Promise<PaymentConfigPublic> {
   const query = new URLSearchParams();
@@ -112,6 +117,9 @@ export async function fetchPaymentConfigPublic(params: {
   const promoCode = params.promoCode?.trim() ?? '';
   if (promoCode.length > 0) {
     query.set('promoCode', promoCode);
+  }
+  if (params.recordingOptIn === true) {
+    query.set('recordingOptIn', 'true');
   }
   const suffix = query.size > 0 ? `?${query.toString()}` : '';
   const url = buildApiUrl(params.apiBaseUrl, `/api/checkout/payment-config${suffix}`);
@@ -155,6 +163,9 @@ export async function createPaymentCheckoutSession(
   const promoCode = params.promoCode?.trim() ?? '';
   if (promoCode.length > 0) {
     body.promoCode = promoCode;
+  }
+  if (params.recordingOptIn === true) {
+    body.recordingOptIn = true;
   }
   const response = await fetch(url, {
     method: 'POST',

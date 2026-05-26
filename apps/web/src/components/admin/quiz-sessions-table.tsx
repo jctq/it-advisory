@@ -97,10 +97,12 @@ export function QuizSessionsTable(props: QuizSessionsTableProps): ReactElement {
     [],
   );
   return (
-    <DataTable
-      columns={columns}
-      data={props.initialData.slice()}
-      emptyMessage="No sessions in MongoDB yet (or MONGODB_URI is unset)."
-    />
+    <div data-admin-tour="page-sessions-table">
+      <DataTable
+        columns={columns}
+        data={props.initialData.slice()}
+        emptyMessage="No sessions in MongoDB yet (or MONGODB_URI is unset)."
+      />
+    </div>
   );
 }

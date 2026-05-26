@@ -76,6 +76,7 @@ export function AdminBookingsWorkspace(props: AdminBookingsWorkspaceProps): Reac
   return (
     <div className="fc-admin-bookings flex flex-col gap-6 lg:flex-row lg:items-start">
       <aside
+        data-admin-tour="page-bookings-filters"
         className="w-full shrink-0 lg:sticky lg:top-24 lg:w-60 xl:w-64"
         aria-label="Booking status filters"
       >
@@ -130,7 +131,7 @@ export function AdminBookingsWorkspace(props: AdminBookingsWorkspaceProps): Reac
           </nav>
         </div>
       </aside>
-      <div className="min-w-0 flex-1 space-y-3">
+      <div data-admin-tour="page-bookings-calendar" className="min-w-0 flex-1 space-y-3">
         <p className="text-sm text-muted-foreground">
           Showing{' '}
           <span className="font-medium text-foreground">

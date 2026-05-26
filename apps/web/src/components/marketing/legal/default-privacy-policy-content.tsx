@@ -93,8 +93,13 @@ export function DefaultPrivacyPolicyContent(): ReactElement {
         <h2>Sharing and processors</h2>
         <p>
           We do not sell your personal information. We share data only with service providers that help us operate the
-          site (for example hosting, email delivery, video meetings, or payment processing), under contracts that require
-          appropriate safeguards, or when required by law.
+          site (for example hosting, email delivery, video meetings, AI meeting notes, or payment processing), under
+          contracts that require appropriate safeguards, or when required by law.
+        </p>
+        <p>
+          When you opt in at booking, consultation calls may be recorded and transcribed by our AI notetaker provider
+          (Fathom) so we can deliver meeting notes and summaries. You can decline the opt-in at checkout; joining a call
+          after opting in means you consent to that processing for service delivery.
         </p>
       </section>
       <section className="space-y-3">

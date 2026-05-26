@@ -22,6 +22,8 @@ import {
   syncMarketingDocumentAppearanceFromStorage,
 } from '@/lib/admin/document-appearance';
 import { AdminAppearanceControls } from '@/components/admin/admin-appearance-controls';
+import { AdminOnboardingGuideButton } from '@/components/admin/admin-onboarding-guide-button';
+import { AdminOnboardingProvider } from '@/components/admin/admin-onboarding-provider';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -144,15 +146,37 @@ export function AdminShell(props: AdminShellProps) {
     setColorThemeOverride(nextColorTheme);
     applyDocumentAppearance({ colorTheme: nextColorTheme, isDark });
   };
+  const executePrepareForOnboardingTour = (): void => {
+    if (collapsed) {
+      window.localStorage.setItem(ADMIN_SIDEBAR_STORAGE_KEY, 'false');
+      setCollapsedOverride(false);
+    }
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      setMobileOpen(true);
+    }
+  };
+  const executeOpenMobileSidebarForTour = (): void => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      setMobileOpen(true);
+    }
+  };
+  const executeCloseMobileSidebarForTour = (): void => {
+    setMobileOpen(false);
+  };
   if (pathname === '/admin/login') {
     return props.children;
   }
   return (
-    <div
-      suppressHydrationWarning
-      className={cn('min-h-dvh bg-muted/30 scheme-light dark:bg-background dark:scheme-dark')}
+    <AdminOnboardingProvider
+      onPrepareTour={executePrepareForOnboardingTour}
+      onOpenMobileSidebar={executeOpenMobileSidebarForTour}
+      onCloseMobileSidebar={executeCloseMobileSidebarForTour}
     >
-      <div className="flex min-h-dvh [--admin-sticky-top:4rem]">
+      <div
+        suppressHydrationWarning
+        className={cn('min-h-dvh bg-muted/30 scheme-light dark:bg-background dark:scheme-dark')}
+      >
+        <div className="flex min-h-dvh [--admin-sticky-top:4rem]">
         <AdminSidebar
           collapsed={collapsed}
           mobileOpen={mobileOpen}
@@ -165,7 +189,10 @@ export function AdminShell(props: AdminShellProps) {
             collapsed ? 'md:[--admin-sidebar-width:5rem]' : 'md:[--admin-sidebar-width:18rem]',
           )}
         >
-          <div className="sticky top-0 z-20 border-b border-border/80 bg-background/90 shadow-[0_1px_0_0_rgb(0_0_0/0.03)] backdrop-blur-md dark:shadow-[0_1px_0_0_rgb(255_255_255/0.04)]">
+          <div
+            data-admin-tour="admin-header"
+            className="sticky top-0 z-20 border-b border-border/80 bg-background/90 shadow-[0_1px_0_0_rgb(0_0_0/0.03)] backdrop-blur-md dark:shadow-[0_1px_0_0_rgb(255_255_255/0.04)]"
+          >
             <div className="mx-auto flex min-h-16 w-full flex-col gap-4 px-4 py-3 sm:px-6 lg:px-8">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -188,13 +215,18 @@ export function AdminShell(props: AdminShellProps) {
                     </div>
                   </div>
                 </div>
-                <AdminAppearanceControls
-                  variant="toolbar"
-                  mode={colorMode}
-                  theme={colorTheme}
-                  onModeChange={executeChangeColorMode}
-                  onThemeChange={executeChangeColorTheme}
-                />
+                <div className="flex shrink-0 items-center gap-2">
+                  <AdminOnboardingGuideButton />
+                  <div data-admin-tour="appearance-controls">
+                    <AdminAppearanceControls
+                      variant="toolbar"
+                      mode={colorMode}
+                      theme={colorTheme}
+                      onModeChange={executeChangeColorMode}
+                      onThemeChange={executeChangeColorTheme}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -204,7 +236,8 @@ export function AdminShell(props: AdminShellProps) {
             </div>
           </main>
         </div>
+        </div>
       </div>
-    </div>
+    </AdminOnboardingProvider>
   );
 }

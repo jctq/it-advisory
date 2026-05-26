@@ -16,6 +16,7 @@
     "./meeting-types": "./src/meeting-types.ts",
     "./monetization-types": "./src/monetization-types.ts",
     "./payment-types": "./src/payment-types.ts",
+    "./recording-types": "./src/recording-types.ts",
     "./philippine-mobile-phone": "./src/philippine-mobile-phone.ts",
     "./types": "./src/types.ts",
     "./visitor-session": "./src/visitor-session.ts"

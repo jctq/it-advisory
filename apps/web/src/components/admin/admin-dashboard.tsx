@@ -334,7 +334,10 @@ export function AdminDashboard(props: AdminDashboardProps) {
         title="Dashboard"
         description="Operational snapshot across diagnostics, leads, scheduling, and customer accounts."
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div
+        data-admin-tour="page-dashboard-stats"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
+      >
         {statCards.map((card) => (
           <StatCard key={card.label} {...card} />
         ))}
@@ -359,7 +362,7 @@ export function AdminDashboard(props: AdminDashboardProps) {
           <ThisWeekBookingsList bookings={props.data.bookingsThisWeek} weekRange={props.data.weekRange} />
         </CardContent>
       </Card>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div data-admin-tour="page-dashboard-activity" className="grid gap-6 lg:grid-cols-2">
         <Card className="rounded-2xl border-border/80 shadow-xs">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>

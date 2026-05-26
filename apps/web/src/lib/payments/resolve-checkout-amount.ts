@@ -7,6 +7,7 @@ import {
   validatePromoCode,
 } from '@/lib/data/monetization-settings';
 import { formatPaymentAmountLabel, getPaymentSettings } from '@/lib/data/payment-settings';
+import { getRecordingSettings } from '@/lib/data/recording-settings';
 
 export type ResolvedCheckoutAmount = {
   readonly amountCentavos: number;
@@ -14,6 +15,8 @@ export type ResolvedCheckoutAmount = {
   readonly source: CheckoutPricingSource;
   readonly appliedPromoCode?: string;
   readonly catalogServiceKey?: string;
+  readonly recordingOptIn: boolean;
+  readonly recordingSurchargeCentavos: number;
 };
 
 function isQuoteActive(quotedAmountCentavos: number | null, quoteExpiresAtIso: string | null): boolean {
@@ -50,6 +53,43 @@ async function resolveCatalogOrFallbackAmount(serviceKey: string): Promise<{
   };
 }
 
+async function resolveRecordingSurcharge(
+  baseCentavos: number,
+  recordingOptIn: boolean,
+): Promise<{ readonly amountCentavos: number; readonly recordingSurchargeCentavos: number }> {
+  if (!recordingOptIn) {
+    return { amountCentavos: baseCentavos, recordingSurchargeCentavos: 0 };
+  }
+  const settings = await getRecordingSettings();
+  if (!settings.recordingsEnabled) {
+    return { amountCentavos: baseCentavos, recordingSurchargeCentavos: 0 };
+  }
+  const surcharge = clampAmountCentavos(settings.recordingOptInPriceCentavos);
+  return {
+    amountCentavos: clampAmountCentavos(baseCentavos + surcharge),
+    recordingSurchargeCentavos: surcharge,
+  };
+}
+
+async function buildResolvedCheckoutAmount(input: {
+  readonly amountCentavos: number;
+  readonly source: CheckoutPricingSource;
+  readonly appliedPromoCode?: string;
+  readonly catalogServiceKey?: string;
+  readonly recordingOptIn: boolean;
+}): Promise<ResolvedCheckoutAmount> {
+  const withSurcharge = await resolveRecordingSurcharge(input.amountCentavos, input.recordingOptIn);
+  return {
+    amountCentavos: withSurcharge.amountCentavos,
+    amountLabel: formatPaymentAmountLabel(withSurcharge.amountCentavos),
+    source: input.source,
+    ...(input.appliedPromoCode !== undefined ? { appliedPromoCode: input.appliedPromoCode } : {}),
+    ...(input.catalogServiceKey !== undefined ? { catalogServiceKey: input.catalogServiceKey } : {}),
+    recordingOptIn: input.recordingOptIn,
+    recordingSurchargeCentavos: withSurcharge.recordingSurchargeCentavos,
+  };
+}
+
 /**
  * Resolves checkout amount: custom quote → promo → catalog → payment settings fallback.
  */
@@ -57,20 +97,19 @@ export async function resolveCheckoutAmountCentavos(input: {
   readonly serviceKey: string;
   readonly promoCode?: string | null;
   readonly bookingId?: string | null;
+  readonly recordingOptIn?: boolean;
 }): Promise<ResolvedCheckoutAmount> {
+  const recordingOptIn = input.recordingOptIn === true;
   const serviceKey = input.serviceKey.trim();
   if (input.bookingId !== null && input.bookingId !== undefined && input.bookingId.trim().length > 0) {
     const booking = await findBookingById(input.bookingId.trim());
-    if (
-      booking !== null &&
-      isQuoteActive(booking.quotedAmountCentavos, booking.quoteExpiresAtIso)
-    ) {
+    if (booking !== null && isQuoteActive(booking.quotedAmountCentavos, booking.quoteExpiresAtIso)) {
       const amountCentavos = clampAmountCentavos(booking.quotedAmountCentavos!);
-      return {
+      return buildResolvedCheckoutAmount({
         amountCentavos,
-        amountLabel: formatPaymentAmountLabel(amountCentavos),
         source: 'custom_quote',
-      };
+        recordingOptIn,
+      });
     }
   }
   const base = await resolveCatalogOrFallbackAmount(serviceKey);
@@ -81,18 +120,18 @@ export async function resolveCheckoutAmountCentavos(input: {
     if (!validation.ok) {
       throw new Error(validation.error);
     }
-    return {
+    return buildResolvedCheckoutAmount({
       amountCentavos: validation.discountedAmountCentavos,
-      amountLabel: formatPaymentAmountLabel(validation.discountedAmountCentavos),
       source: 'promo',
       appliedPromoCode: validation.promo.code,
       catalogServiceKey: base.catalogServiceKey,
-    };
+      recordingOptIn,
+    });
   }
-  return {
+  return buildResolvedCheckoutAmount({
     amountCentavos: base.amountCentavos,
-    amountLabel: formatPaymentAmountLabel(base.amountCentavos),
     source: base.source,
     catalogServiceKey: base.catalogServiceKey,
-  };
+    recordingOptIn,
+  });
 }

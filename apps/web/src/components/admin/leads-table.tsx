@@ -27,10 +27,12 @@ export function LeadsTable({ initialData }: LeadsTableProps) {
     [],
   );
   return (
+    <div data-admin-tour="page-leads-table">
     <DataTable
       columns={columns}
       data={initialData}
       emptyMessage="No leads yet."
     />
+    </div>
   );
 }

@@ -4,6 +4,7 @@
  */
 import { MongoServerError, ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
+import type { FathomMatchStatus } from '@/domain/recording-types';
 import type { BookingDocument, LeadDocument, UserAccountDocument } from '@/domain/types';
 import type { UpdateFilter } from 'mongodb';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
@@ -30,6 +31,15 @@ export type BookingRow = {
   quizSessionId: string | null;
   quotedAmountCentavos: number | null;
   quoteExpiresAtIso: string | null;
+  recordingOptIn: boolean;
+  recordingOptInPriceCentavos: number | null;
+  fathomRecordingId?: string;
+  fathomShareUrl?: string;
+  fathomSummary?: string;
+  fathomActionItems?: string[];
+  fathomMatchStatus?: FathomMatchStatus;
+  fathomProcessedAtIso?: string | null;
+  fathomNotesEmailSentAtIso?: string | null;
 };
 
 /** Admin calendar row with lead contact and guest/account context for hover previews. */
@@ -72,6 +82,19 @@ function mapBooking(
         : null,
     quoteExpiresAtIso:
       doc.quoteExpiresAt instanceof Date ? doc.quoteExpiresAt.toISOString() : null,
+    recordingOptIn: doc.recordingOptIn === true,
+    recordingOptInPriceCentavos:
+      typeof doc.recordingOptInPriceCentavos === 'number' && Number.isFinite(doc.recordingOptInPriceCentavos)
+        ? doc.recordingOptInPriceCentavos
+        : null,
+    fathomRecordingId: doc.fathomRecordingId,
+    fathomShareUrl: doc.fathomShareUrl,
+    fathomSummary: doc.fathomSummary,
+    fathomActionItems: doc.fathomActionItems,
+    fathomMatchStatus: doc.fathomMatchStatus,
+    fathomProcessedAtIso: doc.fathomProcessedAt instanceof Date ? doc.fathomProcessedAt.toISOString() : null,
+    fathomNotesEmailSentAtIso:
+      doc.fathomNotesEmailSentAt instanceof Date ? doc.fathomNotesEmailSentAt.toISOString() : null,
   };
 }
 

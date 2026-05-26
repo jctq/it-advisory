@@ -98,6 +98,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
       serviceKey: booking.serviceKey,
       promoCode: params.promoCode,
       bookingId: verified.bookingId,
+      recordingOptIn: booking.recordingOptIn === true,
     });
   } catch (error: unknown) {
     return {
@@ -134,6 +135,10 @@ export async function createPaymentCheckoutForVerifiedBooking(
         : {}),
       ...(resolvedPricing.catalogServiceKey !== undefined
         ? { catalogServiceKey: resolvedPricing.catalogServiceKey }
+        : {}),
+      recordingOptIn: resolvedPricing.recordingOptIn ? 'true' : 'false',
+      ...(resolvedPricing.recordingSurchargeCentavos > 0
+        ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
         : {}),
     },
     expiresAt,

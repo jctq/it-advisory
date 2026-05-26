@@ -474,6 +474,21 @@ function ResultView(props: ResultViewProps): ReactElement {
                   </a>
                 </p>
               ) : null}
+              {props.booking.fathomNotesUrl !== null ? (
+                <p className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={props.booking.fathomNotesUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-emerald-900 underline-offset-4 hover:underline dark:text-emerald-200"
+                  >
+                    View meeting notes
+                  </a>
+                </p>
+              ) : null}
+              {props.booking.fathomSummaryPreview !== null ? (
+                <p className="text-xs text-emerald-900/90 dark:text-emerald-200/90">{props.booking.fathomSummaryPreview}</p>
+              ) : null}
             </div>
           </div>
         ) : null}

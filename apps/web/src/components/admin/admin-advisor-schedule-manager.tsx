@@ -463,7 +463,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
         <ScheduleLoadFailurePanel errorMessage={loadErrorMessage} onRetry={executeRetryLoad} />
       ) : null}
       {!isLoading && settings !== null ? (
-        <div className="space-y-6">
+        <div data-admin-tour="page-schedule-calendar" className="space-y-6">
           <Tabs defaultValue="hours-grid" className="w-full">
             <TabsList
               aria-label="Schedule sections"

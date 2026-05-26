@@ -1,6 +1,6 @@
 'use client';
 
-import { BrainCircuit, CircleDollarSign, CreditCard, Mail, Video, type LucideIcon } from 'lucide-react';
+import { BrainCircuit, CircleDollarSign, Clapperboard, CreditCard, Mail, Video, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
   AdminFormStickyFooter,
@@ -28,6 +28,11 @@ import {
   type AdminPricingSettingsFormState,
 } from '@/components/admin/admin-pricing-settings-form';
 import {
+  AdminRecordingSettingsForm,
+  type AdminRecordingSettingsFormHandle,
+  type AdminRecordingSettingsFormState,
+} from '@/components/admin/admin-recording-settings-form';
+import {
   AdminSettingsForm,
   type AdminSettingsFormHandle,
   type AdminSettingsFormState,
@@ -35,7 +40,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
-type SettingsTab = 'general' | 'pricing' | 'payments' | 'email' | 'meetings';
+type SettingsTab = 'general' | 'pricing' | 'payments' | 'email' | 'meetings' | 'recordings';
 
 type SettingsTabConfig = {
   readonly value: SettingsTab;
@@ -49,6 +54,7 @@ const SETTINGS_TABS: readonly SettingsTabConfig[] = [
   { value: 'payments', label: 'Payments', icon: CreditCard },
   { value: 'email', label: 'Email', icon: Mail },
   { value: 'meetings', label: 'Meetings', icon: Video },
+  { value: 'recordings', label: 'Recordings', icon: Clapperboard },
 ];
 
 const EMPTY_GENERAL_STATE: AdminSettingsFormState = {
@@ -81,6 +87,12 @@ const EMPTY_MEETINGS_STATE: AdminMeetingSettingsFormState = {
   isLoading: true,
 };
 
+const EMPTY_RECORDINGS_STATE: AdminRecordingSettingsFormState = {
+  isDirty: false,
+  isSaving: false,
+  isLoading: true,
+};
+
 function addMountedSettingsTab(
   previous: ReadonlySet<SettingsTab>,
   tab: SettingsTab,
@@ -101,11 +113,13 @@ export function AdminSettingsWorkspace(): ReactElement {
   const [paymentsState, setPaymentsState] = useState<AdminPaymentSettingsFormState>(EMPTY_PAYMENTS_STATE);
   const [emailState, setEmailState] = useState<AdminEmailSettingsFormState>(EMPTY_EMAIL_STATE);
   const [meetingsState, setMeetingsState] = useState<AdminMeetingSettingsFormState>(EMPTY_MEETINGS_STATE);
+  const [recordingsState, setRecordingsState] = useState<AdminRecordingSettingsFormState>(EMPTY_RECORDINGS_STATE);
   const generalFormRef = useRef<AdminSettingsFormHandle>(null);
   const pricingFormRef = useRef<AdminPricingSettingsFormHandle>(null);
   const paymentsFormRef = useRef<AdminPaymentSettingsFormHandle>(null);
   const emailFormRef = useRef<AdminEmailSettingsFormHandle>(null);
   const meetingsFormRef = useRef<AdminMeetingSettingsFormHandle>(null);
+  const recordingsFormRef = useRef<AdminRecordingSettingsFormHandle>(null);
   const tabTriggerRefs = useRef<Partial<Record<SettingsTab, HTMLButtonElement>>>({});
   useEffect(() => {
     const activeTrigger = tabTriggerRefs.current[activeTab];
@@ -123,7 +137,9 @@ export function AdminSettingsWorkspace(): ReactElement {
           ? paymentsState
           : activeTab === 'email'
             ? emailState
-            : meetingsState;
+            : activeTab === 'meetings'
+              ? meetingsState
+              : recordingsState;
   const executeSaveActive = useCallback((): void => {
     if (activeTab === 'general') {
       void generalFormRef.current?.save();
@@ -141,7 +157,11 @@ export function AdminSettingsWorkspace(): ReactElement {
       void emailFormRef.current?.save();
       return;
     }
-    void meetingsFormRef.current?.save();
+    if (activeTab === 'meetings') {
+      void meetingsFormRef.current?.save();
+      return;
+    }
+    void recordingsFormRef.current?.save();
   }, [activeTab]);
   const executeResetActive = useCallback((): void => {
     if (activeTab === 'general') {
@@ -160,7 +180,11 @@ export function AdminSettingsWorkspace(): ReactElement {
       emailFormRef.current?.reset();
       return;
     }
-    meetingsFormRef.current?.reset();
+    if (activeTab === 'meetings') {
+      meetingsFormRef.current?.reset();
+      return;
+    }
+    recordingsFormRef.current?.reset();
   }, [activeTab]);
   return (
     <section className="mx-auto flex min-h-0 flex-col w-full pb-16">
@@ -168,7 +192,7 @@ export function AdminSettingsWorkspace(): ReactElement {
         <AdminPageHeader
           eyebrow="Configuration"
           title="Settings"
-          description="Manage diagnostic intake, pricing, payments, transactional email, and video meetings for customer-facing web and native experiences."
+          description="Manage diagnostic intake, pricing, payments, transactional email, video meetings, and consultation recordings for customer-facing web and native experiences."
         />
         <Tabs
           value={activeTab}
@@ -179,7 +203,7 @@ export function AdminSettingsWorkspace(): ReactElement {
           }}
           className="space-y-6"
         >
-          <div className="relative -mx-3 sm:mx-0">
+          <div className="relative -mx-3 sm:mx-0" data-admin-tour="page-settings-tabs">
             <div
               className="overflow-x-auto overscroll-x-contain scroll-smooth pb-0.5 scrollbar-none sm:overflow-visible"
               role="presentation"
@@ -219,6 +243,7 @@ export function AdminSettingsWorkspace(): ReactElement {
               className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-linear-to-l from-background to-transparent sm:hidden"
             />
           </div>
+          <div data-admin-tour="page-settings-content">
           <TabsContent
             value="general"
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
@@ -259,6 +284,15 @@ export function AdminSettingsWorkspace(): ReactElement {
               <AdminMeetingSettingsForm formRef={meetingsFormRef} onStateChange={setMeetingsState} />
             ) : null}
           </TabsContent>
+          <TabsContent
+            value="recordings"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+          >
+            {mountedTabs.has('recordings') ? (
+              <AdminRecordingSettingsForm formRef={recordingsFormRef} onStateChange={setRecordingsState} />
+            ) : null}
+          </TabsContent>
+          </div>
         </Tabs>
       </div>
       <AdminFormStickyFooter

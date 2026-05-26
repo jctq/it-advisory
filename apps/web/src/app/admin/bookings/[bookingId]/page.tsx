@@ -6,6 +6,7 @@ import {
 } from '@techmd/domain/booking-calendar-links';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
+import { AdminBookingFathomSection } from '@/components/admin/admin-booking-fathom-section';
 import { AdminBookingQuoteForm } from '@/components/admin/admin-booking-quote-form';
 import { MarkBookingPaidButton } from '@/components/admin/mark-booking-paid-button';
 import { findBookingById } from '@/lib/data/bookings';
@@ -133,11 +134,27 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diagnostic snapshot</dt>
             <dd className="mt-1 text-sm text-foreground">{booking.hasDiagnosticSnapshot ? 'Stored' : 'Not stored'}</dd>
           </div>
+          {meetingUrl.length > 0 ? (
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Video meeting</dt>
+              <dd className="mt-1 text-sm">
+                <a
+                  href={meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Join meeting
+                </a>
+              </dd>
+            </div>
+          ) : null}
         </dl>
         <div className="mt-6">
           <MarkBookingPaidButton bookingId={booking.id} status={booking.status} />
         </div>
       </div>
+      <AdminBookingFathomSection booking={booking} />
       <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
         <h2 className="text-lg font-semibold text-foreground">Custom checkout quote</h2>
         <div className="mt-4">

@@ -30,6 +30,10 @@ export const COLLECTIONS = {
   paymentTransactions: 'payment_transactions',
   /** Singleton `{ _id: 'default' }` — video meeting providers (Zoom, etc.) for booking links (admin). */
   meetingSettings: 'meeting_settings',
+  /** Singleton `{ _id: 'default' }` — consultation recording / Fathom (admin). */
+  recordingSettings: 'recording_settings',
+  /** Idempotent log of inbound Fathom webhook deliveries. */
+  fathomWebhookDeliveries: 'fathom_webhook_deliveries',
   /** Admin-managed blog posts (markdown CMS for marketing site). */
   blogPosts: 'blog_posts',
   /** Append-only save history for blog post edits (field snapshots for diffs). */

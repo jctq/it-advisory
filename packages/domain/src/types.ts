@@ -1,5 +1,6 @@
 import type { ObjectId } from 'mongodb';
 import type { PaymentGatewayId, PaymentStatus } from './payment-types.js';
+import type { FathomMatchStatus } from './recording-types.js';
 
 export type QuizAnswers = Readonly<Record<string, string | string[] | number | boolean>>;
 
@@ -83,6 +84,19 @@ export type BookingDocument = {
   googleMeetEventId?: string;
   /** Microsoft Graph online meeting id when created via API. */
   teamsOnlineMeetingId?: string;
+  /** Customer opted in to AI meeting notes / recording surcharge at checkout. */
+  recordingOptIn?: boolean;
+  /** Recording opt-in price charged (centavos), snapshotted at booking time. */
+  recordingOptInPriceCentavos?: number | null;
+  /** Fathom recording id after webhook or manual link. */
+  fathomRecordingId?: string;
+  /** Customer-shareable Fathom notes URL. */
+  fathomShareUrl?: string;
+  fathomSummary?: string;
+  fathomActionItems?: string[];
+  fathomMatchStatus?: FathomMatchStatus;
+  fathomProcessedAt?: Date;
+  fathomNotesEmailSentAt?: Date;
   /** Raw guided diagnostic JSON (string or legacy object stringified) at booking time — full rounds, questions, options. */
   guidedDiagnosticSnapshot?: string | null;
   quizSessionId?: ObjectId | null;

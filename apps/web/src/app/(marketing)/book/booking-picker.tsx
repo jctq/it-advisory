@@ -460,6 +460,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId | null>('card');
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfigPublic | null>(null);
   const [promoCode, setPromoCode] = useState<string>('');
+  const [recordingOptIn, setRecordingOptIn] = useState<boolean>(false);
   const [debouncedPromoCode, setDebouncedPromoCode] = useState<string>('');
   const [promoError, setPromoError] = useState<string | null>(null);
   const [selectedGatewayId, setSelectedGatewayId] = useState<PaymentGatewayId | null>(null);
@@ -888,6 +889,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
       serviceKey: bookingServiceKey.trim().length > 0 ? bookingServiceKey : undefined,
       promoCode: debouncedPromoCode.length > 0 ? debouncedPromoCode : undefined,
+      recordingOptIn,
       signal: controller.signal,
     })
       .then((config) => {
@@ -916,7 +918,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [bookingServiceKey, phase, debouncedPromoCode]);
+  }, [bookingServiceKey, phase, debouncedPromoCode, recordingOptIn]);
   useEffect(() => {
     const controller = new AbortController();
     void fetch(AUTH_ME_API_URL, { credentials: 'include', signal: controller.signal })
@@ -1284,6 +1286,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           quizSessionId: quizSessionRef,
           paymentMethodLabel: resolvedPaymentLabel,
           promoCode: promoCode.trim().length > 0 ? promoCode.trim() : undefined,
+          recordingOptIn,
         });
         if (session.manualConfirm || session.redirectUrl === null) {
           clearCheckoutDraftFromSessionStorage(quizSessionRef);
@@ -2089,6 +2092,28 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                     })}
                   </div>
                 </fieldset>
+              ) : null}
+              {paymentConfig?.recordingsEnabled === true ? (
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-4">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={recordingOptIn}
+                    onChange={(event) => setRecordingOptIn(event.target.checked)}
+                  />
+                  <span>
+                    <span className="text-sm font-medium text-foreground">
+                      Add AI meeting notes &amp; recording
+                      {paymentConfig.recordingOptInPriceCentavos > 0
+                        ? ` (+${paymentConfig.recordingOptInPriceLabel})`
+                        : ' (included)'}
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      A visible Fathom notetaker may join your video call to capture notes and a summary. By opting in,
+                      you consent to recording and transcription for this consultation.
+                    </span>
+                  </span>
+                </label>
               ) : null}
               <div className="space-y-2">
                 <label htmlFor="promoCode" className="text-sm font-medium text-foreground">
