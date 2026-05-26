@@ -775,7 +775,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="hidden border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive sm:inline-flex"
                   onClick={() => {
                     setDeleteError(null);
                     setIsDeleteDialogOpen(true);
@@ -783,6 +783,20 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
                 >
                   <Trash2 className="size-4" aria-hidden />
                   Delete diagnostic
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive sm:hidden"
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteDialogOpen(true);
+                  }}
+                  aria-label="Delete diagnostic"
+                  title="Delete diagnostic"
+                >
+                  <Trash2 className="size-4" aria-hidden />
                 </Button>
               </>
             ) : null}

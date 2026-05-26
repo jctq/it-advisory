@@ -2184,12 +2184,14 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             <div>
               {canGoBack ? (
                 <Button type="button" variant="outline" onClick={executeGoBackWithScroll}>
-                  {backLabel}
+                  <span className="sm:hidden">Back</span>
+                  <span className="hidden sm:inline">{backLabel}</span>
                 </Button>
               ) : null}
             </div>
             <Button type="button" onClick={() => void executeAdvanceOrSubmitRound()}>
-              {advanceLabel}
+              <span className="sm:hidden">Continue</span>
+              <span className="hidden sm:inline">{advanceLabel}</span>
             </Button>
           </div>
         )}
