@@ -26,7 +26,7 @@ const OPTION_SEARCH_EXTRA: Partial<Record<SituationOption, string>> = {
   'Requirements keep changing':
     'scope creep change churn pivot specs unclear stakeholders roadmap backlog refinement sprint planning change request cr scope statement',
   'Users are unhappy with the system':
-    'adoption complaints ux frustration training resistance mongodb mongo database mysql postgres sql atlas redis cache replica slow query latency performance throughput disk cpu memory indexing query explain nagios pagerduty incident sla uptime reliability observability logging apm downtime freeze crash bug production incidents app slow loading timeout error 500',
+    'adoption complaints ux frustration training resistance staff complaints unhappy users low satisfaction poor usability confusing workflow hard to use',
   'Budget or scope is unclear':
     'cost funding capex opex roi unclear estimate budget variance burn rate license subscription infra cloud aws gcp azure pricing contract sow change order',
   'Leadership needs an independent view':

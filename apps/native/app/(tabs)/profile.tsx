@@ -51,6 +51,10 @@ function formatBookingStatusLine(row: MarketingDiagnosticSessionSummary): string
 }
 
 function formatSessionTitle(row: MarketingDiagnosticSessionSummary): string {
+  const title = row.sessionTitlePreview?.trim();
+  if (title !== undefined && title.length > 0) {
+    return title.length > 72 ? `${title.slice(0, 69)}…` : title;
+  }
   const preview = row.situationPreview?.trim();
   if (preview !== undefined && preview.length > 0) {
     return preview.length > 72 ? `${preview.slice(0, 69)}…` : preview;

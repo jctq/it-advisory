@@ -22,8 +22,8 @@ export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
     redirect('/login?next=%2Faccount%2Fdiagnostics');
   }
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+    <main className="mx-auto max-w-6xl px-0 py-0 md:px-6 md:py-12">
+      <div className="mb-8 hidden flex-wrap items-start justify-between gap-4 md:flex">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Account</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">My diagnostics</h1>

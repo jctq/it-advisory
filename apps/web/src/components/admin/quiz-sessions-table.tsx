@@ -68,17 +68,42 @@ export function QuizSessionsTable(props: QuizSessionsTableProps): ReactElement {
           );
         },
       }),
-      columnHelper.accessor('situationPreview', {
-        header: 'Situation',
+      columnHelper.accessor('sessionTitlePreview', {
+        header: 'Session',
         cell: (info) => {
-          const value = info.getValue();
-          return value !== null && value.length > 0 ? (
-            <span className="line-clamp-2 text-muted-foreground" title={value}>
-              {value}
+          const row = info.row.original;
+          const title = info.getValue();
+          if (title !== null && title.length > 0) {
+            return (
+              <span className="line-clamp-2 font-medium text-foreground" title={title}>
+                {title}
+              </span>
+            );
+          }
+          const summary = row.situationPreview;
+          return summary !== null && summary.length > 0 ? (
+            <span className="line-clamp-2 text-muted-foreground" title={summary}>
+              {summary}
             </span>
           ) : (
             '—'
           );
+        },
+      }),
+      columnHelper.accessor('situationPreview', {
+        header: 'Summary',
+        cell: (info) => {
+          const row = info.row.original;
+          const value = info.getValue();
+          const hasTitle = row.sessionTitlePreview !== null && row.sessionTitlePreview.length > 0;
+          if (value !== null && value.length > 0 && hasTitle) {
+            return (
+              <span className="line-clamp-2 text-muted-foreground" title={value}>
+                {value}
+              </span>
+            );
+          }
+          return '—';
         },
       }),
       columnHelper.display({

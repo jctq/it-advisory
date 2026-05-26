@@ -22,14 +22,16 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AccountDiagnosticsMobile } from '@/components/marketing/account-diagnostics-mobile';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/quiz-session-list-display';
 import type {
   PaginatedVisitorQuizSessionsResult,
   VisitorQuizSessionListStatusFilter,
@@ -40,26 +42,20 @@ import { cn } from '@/lib/utils';
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const MY_SESSIONS_API_URL = '/api/quiz/my-sessions';
 const PAGE_SIZE = 8;
+const MOBILE_PAGE_SIZE = 15;
 const BOOKING_REFERENCE_DEBOUNCE_MS = 350;
+const MOBILE_VIEWPORT_MEDIA_QUERY = '(max-width: 767px)';
 
 const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
-
-const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-  timeZone: 'Asia/Manila',
-});
 
 const columnHelper = createColumnHelper<VisitorQuizSessionSummary>();
 
 const TABLE_COLUMN_CLASS_NAMES: Record<string, string> = {
   bookingReference: 'w-[10.5rem]',
-  updatedAtIso: 'w-[11.5rem]',
   diagnosticStatus: 'w-[7.5rem]',
   bookingStatus: 'w-[7.5rem]',
   bookingSession: 'min-w-[14rem]',
-  situationPreview: 'min-w-[12rem]',
-  currentStep: 'w-[4.5rem]',
+  sessionTitlePreview: 'min-w-[11rem]',
   actions: 'min-w-[14rem]',
 };
 
@@ -208,6 +204,7 @@ function SessionActions(props: {
 
 type DeleteTarget = {
   readonly marketingSessionRef: string;
+  readonly sessionTitlePreview: string | null;
   readonly situationPreview: string | null;
 };
 
@@ -233,11 +230,23 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
   const [bookingReferenceInput, setBookingReferenceInput] = useState('');
   const [debouncedBookingReference, setDebouncedBookingReference] = useState('');
   const [statusFilter, setStatusFilter] = useState<VisitorQuizSessionListStatusFilter>('pending');
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const fetchRequestIdRef = useRef(0);
+  const pageSize = isMobileViewport ? MOBILE_PAGE_SIZE : PAGE_SIZE;
   const onNavigateError = useCallback((message: string): void => {
     setActionError(message);
   }, []);
   const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(true, onNavigateError);
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(MOBILE_VIEWPORT_MEDIA_QUERY);
+    const updateViewport = (): void => {
+      setIsMobileViewport(mediaQuery.matches);
+    };
+    updateViewport();
+    mediaQuery.addEventListener('change', updateViewport);
+    return () => mediaQuery.removeEventListener('change', updateViewport);
+  }, []);
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedBookingReference(bookingReferenceInput.trim());
@@ -246,7 +255,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
   }, [bookingReferenceInput]);
   useEffect(() => {
     setPage(1);
-  }, [debouncedBookingReference, statusFilter]);
+  }, [debouncedBookingReference, statusFilter, isMobileViewport]);
   useEffect(() => {
     if (totalPages > 0 && page > totalPages) {
       setPage(totalPages);
@@ -255,11 +264,16 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
   const fetchSessions = useCallback(async (): Promise<void> => {
     const requestId = fetchRequestIdRef.current + 1;
     fetchRequestIdRef.current = requestId;
-    setIsLoading(true);
+    const shouldAppend = isMobileViewport && page > 1;
+    if (shouldAppend) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
     setLoadError(null);
     const params = new URLSearchParams({
       page: String(page),
-      pageSize: String(PAGE_SIZE),
+      pageSize: String(pageSize),
       status: statusFilter,
     });
     if (debouncedBookingReference.length > 0) {
@@ -280,7 +294,15 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
         return;
       }
       const data = payload as PaginatedVisitorQuizSessionsResult;
-      setSessions(data.sessions);
+      if (shouldAppend) {
+        setSessions((current) => {
+          const existingRefs = new Set(current.map((session) => session.marketingSessionRef));
+          const nextSessions = data.sessions.filter((session) => !existingRefs.has(session.marketingSessionRef));
+          return [...current, ...nextSessions];
+        });
+      } else {
+        setSessions(data.sessions);
+      }
       setTotalCount(data.totalCount);
       setTotalPages(data.totalPages);
       setHasAnySessions(data.hasAnySessions);
@@ -292,9 +314,10 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     } finally {
       if (fetchRequestIdRef.current === requestId) {
         setIsLoading(false);
+        setIsLoadingMore(false);
       }
     }
-  }, [page, statusFilter, debouncedBookingReference]);
+  }, [page, pageSize, statusFilter, debouncedBookingReference, isMobileViewport]);
   useEffect(() => {
     void fetchSessions();
   }, [fetchSessions]);
@@ -333,6 +356,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
   const handleRequestDelete = useCallback((row: VisitorQuizSessionSummary): void => {
     setDeleteTarget({
       marketingSessionRef: row.marketingSessionRef,
+      sessionTitlePreview: row.sessionTitlePreview,
       situationPreview: row.situationPreview,
     });
   }, []);
@@ -343,15 +367,6 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
         id: 'bookingReference',
         header: 'Booking ref.',
         cell: (info) => <BookingReferenceCell row={info.row.original} />,
-      }),
-      columnHelper.accessor('updatedAtIso', {
-        id: 'updatedAtIso',
-        header: 'Last updated',
-        cell: (info) => (
-          <span className="whitespace-nowrap text-muted-foreground">
-            {DATE_TIME_FORMATTER.format(new Date(info.getValue()))}
-          </span>
-        ),
       }),
       columnHelper.display({
         id: 'diagnosticStatus',
@@ -403,28 +418,29 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
           );
         },
       }),
-      columnHelper.accessor('situationPreview', {
-        id: 'situationPreview',
-        header: 'Summary',
+      columnHelper.accessor('sessionTitlePreview', {
+        id: 'sessionTitlePreview',
+        header: 'Session',
         cell: (info) => {
           const row = info.row.original;
-          if (row.situationPreview !== null && row.situationPreview.length > 0) {
+          const title = info.getValue();
+          if (title !== null && title.length > 0) {
             return (
-              <span className="line-clamp-2 text-muted-foreground" title={row.situationPreview}>
-                {row.situationPreview}
+              <span className="line-clamp-2 font-medium text-foreground" title={title}>
+                {title}
               </span>
             );
           }
-          if (row.hasGuidedDiagnostic) {
-            return <span className="text-sm text-muted-foreground">Guided diagnostic</span>;
+          const fallbackTitle = resolveAccountDiagnosticListTitle(row);
+          if (fallbackTitle !== 'Diagnostic session' && fallbackTitle !== 'Guided diagnostic') {
+            return (
+              <span className="line-clamp-2 text-muted-foreground" title={fallbackTitle}>
+                {fallbackTitle}
+              </span>
+            );
           }
           return <span className="text-muted-foreground">—</span>;
         },
-      }),
-      columnHelper.accessor('currentStep', {
-        id: 'currentStep',
-        header: 'Step',
-        cell: (info) => <span className="tabular-nums text-muted-foreground">{info.getValue()}</span>,
       }),
       columnHelper.display({
         id: 'actions',
@@ -448,14 +464,21 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
-  const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const rangeEnd = totalCount === 0 ? 0 : Math.min(page * PAGE_SIZE, totalCount);
-  const handleStatusFilterChange = (value: string): void => {
-    setStatusFilter(value as VisitorQuizSessionListStatusFilter);
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = totalCount === 0 ? 0 : Math.min(page * pageSize, totalCount);
+  const hasMoreSessions = page < totalPages;
+  const handleStatusFilterChange = (value: VisitorQuizSessionListStatusFilter): void => {
+    setStatusFilter(value);
   };
   const handleBookingReferenceInputChange = (value: string): void => {
     setBookingReferenceInput(value);
   };
+  const handleLoadMoreSessions = useCallback((): void => {
+    if (isLoading || isLoadingMore || !hasMoreSessions) {
+      return;
+    }
+    setPage((current) => current + 1);
+  }, [hasMoreSessions, isLoading, isLoadingMore]);
   return (
     <div className="space-y-6">
       <AlertDialog
@@ -473,10 +496,23 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
               This permanently removes the diagnostic snapshot and cannot be undone. Scheduled bookings stay on file
               and are not deleted.
               {deleteTarget !== null &&
-              deleteTarget.situationPreview !== null &&
-              deleteTarget.situationPreview.length > 0 ? (
+              ((deleteTarget.sessionTitlePreview !== null && deleteTarget.sessionTitlePreview.length > 0) ||
+                (deleteTarget.situationPreview !== null && deleteTarget.situationPreview.length > 0)) ? (
                 <span className="mt-2 block rounded-md border border-border bg-muted/40 px-3 py-2 text-foreground">
-                  {deleteTarget.situationPreview}
+                  {deleteTarget.sessionTitlePreview !== null && deleteTarget.sessionTitlePreview.length > 0 ? (
+                    <span className="block font-medium">{deleteTarget.sessionTitlePreview}</span>
+                  ) : null}
+                  {deleteTarget.situationPreview !== null && deleteTarget.situationPreview.length > 0 ? (
+                    <span
+                      className={
+                        deleteTarget.sessionTitlePreview !== null && deleteTarget.sessionTitlePreview.length > 0
+                          ? 'mt-1 block text-sm text-muted-foreground'
+                          : 'block'
+                      }
+                    >
+                      {deleteTarget.situationPreview}
+                    </span>
+                  ) : null}
                 </span>
               ) : null}
             </AlertDialogDescription>
@@ -497,43 +533,21 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <Card className="border-border/80 shadow-sm">
-        <CardHeader className="gap-4 border-b border-border/80 pb-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1.5">
-              <CardTitle className="text-lg">Your diagnostic sessions</CardTitle>
-              <CardDescription className="max-w-2xl text-sm leading-relaxed">
-                Continue in-progress work, review booked sessions as read-only, or start a new diagnostic. Search by
-                booking reference; booked sessions cannot be deleted from this list.
-              </CardDescription>
-            </div>
-            <Button
-              type="button"
-              onClick={() => {
-                setActionError(null);
-                void navigateToNewQuiz();
-              }}
-              disabled={isNavigating}
-              className="w-full shrink-0 sm:w-auto"
-            >
-              <Plus className="size-4" aria-hidden />
-              {isNavigating ? 'Starting…' : 'New diagnostic'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-6">
+      <Card className="gap-0 border-0 bg-transparent py-0 shadow-none md:gap-6 md:border md:border-border/80 md:bg-card md:py-6 md:shadow-sm">
+        <CardContent className="space-y-6 px-0 pt-0 md:px-6">
           {actionError !== null ? (
-            <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+            <p className="mx-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive md:mx-0" role="alert">
               {actionError}
             </p>
           ) : null}
           {loadError !== null ? (
-            <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+            <p className="mx-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive md:mx-0" role="alert">
               {loadError}
             </p>
           ) : null}
           {!isLoading && !hasAnySessions ? (
             <DiagnosticsEmptyState
+              className="mx-4 md:mx-0"
               isNavigating={isNavigating}
               onStart={() => {
                 setActionError(null);
@@ -542,9 +556,29 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
             />
           ) : (
             <div className="space-y-4">
+              <AccountDiagnosticsMobile
+                sessions={sessions}
+                statusFilter={statusFilter}
+                bookingReferenceInput={bookingReferenceInput}
+                isLoading={isLoading}
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMoreSessions}
+                totalCount={totalCount}
+                manageBookingEnabled={manageBookingEnabled}
+                deletingId={deletingId}
+                onStatusFilterChange={handleStatusFilterChange}
+                onBookingReferenceInputChange={handleBookingReferenceInputChange}
+                onLoadMore={handleLoadMoreSessions}
+                onRequestDelete={handleRequestDelete}
+              />
+              <div className="hidden space-y-4 md:block">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
                 <BookingReferenceFilterField value={bookingReferenceInput} onChange={handleBookingReferenceInputChange} />
-                <StatusFilterField value={statusFilter} onChange={handleStatusFilterChange} disabled={isLoading} />
+                <StatusFilterField
+                  value={statusFilter}
+                  onChange={(value) => handleStatusFilterChange(value as VisitorQuizSessionListStatusFilter)}
+                  disabled={isLoading}
+                />
               </div>
               <p className="text-sm text-muted-foreground">
                 {isLoading ? (
@@ -633,6 +667,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                   onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
                 />
               ) : null}
+              </div>
             </div>
           )}
         </CardContent>
@@ -692,9 +727,13 @@ function StatusFilterField(props: {
   );
 }
 
-function DiagnosticsEmptyState(props: { readonly isNavigating: boolean; readonly onStart: () => void }): ReactElement {
+function DiagnosticsEmptyState(props: {
+  readonly isNavigating: boolean;
+  readonly onStart: () => void;
+  readonly className?: string;
+}): ReactElement {
   return (
-    <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-14 text-center">
+    <div className={cn('rounded-xl border border-dashed border-border bg-muted/20 px-6 py-14 text-center', props.className)}>
       <p className="text-sm font-medium text-foreground">No saved diagnostics yet</p>
       <p className="mt-1 text-sm text-muted-foreground">
         Start a guided diagnostic to capture your situation and book a session.

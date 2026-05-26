@@ -6,7 +6,9 @@ export type MarketingDiagnosticSessionSummary = {
   readonly currentStep: number;
   readonly updatedAtIso: string;
   readonly completedAtIso: string | null;
+  readonly sessionTitlePreview: string | null;
   readonly situationPreview: string | null;
+  readonly situationLabel: string | null;
   readonly hasGuidedDiagnostic: boolean;
   readonly isBooked: boolean;
   readonly bookingId: string | null;

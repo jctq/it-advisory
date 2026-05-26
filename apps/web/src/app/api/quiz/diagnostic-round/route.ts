@@ -171,6 +171,11 @@ ${buildProjectRescueServicePromptBlock()}
 Canonical situations (pick exactly ONE for mappedSituation when complete—verbatim):
 ${SITUATION_OPTIONS.map((s) => `- ${s}`).join('\n')}
 
+Situation selection (when complete=true):
+- Choose the narrowest label that fits the transcript; do not default to "Users are unhappy with the system" unless end users, adoption, UX, or staff satisfaction are explicitly mentioned.
+- Vendor or deadline issues → "Vendor keeps missing timelines". Scope or requirements churn → "Requirements keep changing". Budget or funding ambiguity → "Budget or scope is unclear". Board, audit, or neutral executive read → "Leadership needs an independent view".
+- Technical performance or reliability alone (slow app, outages, database) without user/adoption complaints → prefer vendor, requirements, leadership, or "Not sure yet — need clarity first" based on the dominant narrative—not "Users are unhappy with the system".
+
 When complete=true: questions must be an empty array; mappedSituation and summaryForAdvisor must be non-null strings; briefAssessment, sessionTitle, and goodFitBullets (exactly 3 strings) must be non-null (sessionTitle = brief headline for this specialized advisory session; briefAssessment = hero subtitle — both must align with "Advisor specialty" in the fixed offering block; distinct from summaryForAdvisor). summaryForAdvisor must synthesize the intake thread and relate it to the offering above: call out which session focus areas matter most, what remains ambiguous until validated live, and what a successful first session should clarify.
 
 When complete=false: set mappedSituation, summaryForAdvisor, briefAssessment, sessionTitle, and goodFitBullets to null; fill questions with exactly ${maxQuestionsPerRound} items unless finishing early.`,

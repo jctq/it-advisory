@@ -9,6 +9,7 @@ import type {
 } from '@/domain/types';
 import type { PaymentStatus } from '@/domain/payment-types';
 import { fetchLatestPaymentTransactionsByQuizSessionIds } from '@/lib/data/payment-transactions';
+import { resolveQuizSessionDisplayPreview } from '@techmd/diagnostic-core/quiz-session-display-preview';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import { getActiveDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
@@ -19,8 +20,6 @@ import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-m
 const DEFAULT_QUIZ_SESSION_LIST_LIMIT = 500;
 const DEFAULT_QUIZ_AUDIT_LIST_LIMIT = 200;
 const DEFAULT_VISITOR_SESSION_LIST_LIMIT = 50;
-const SITUATION_PREVIEW_MAX_LENGTH = 120;
-
 const BLANK_QUIZ_ANSWERS: QuizAnswers = {
   guidedDiagnostic: serializeGuidedDiagnostic(GUIDED_DIAGNOSTIC_EMPTY),
   situation: '',
@@ -35,7 +34,9 @@ export type QuizSessionListRow = {
   readonly updatedAtIso: string;
   readonly completedAtIso: string | null;
   readonly hasGuidedDiagnostic: boolean;
+  readonly sessionTitlePreview: string | null;
   readonly situationPreview: string | null;
+  readonly situationLabel: string | null;
   /** True when a booking references this session (`bookings.quizSessionId`). */
   readonly isBooked: boolean;
   /** First linked booking id for admin, when `isBooked`. */
@@ -72,18 +73,13 @@ export type QuizAuditAdminRow = {
   readonly answersJson: string;
 };
 
-function resolveSituationPreview(answers: QuizAnswers): string | null {
+function readSituationAnswer(answers: QuizAnswers): string | null {
   const raw = answers.situation;
   if (typeof raw !== 'string') {
     return null;
   }
   const trimmed = raw.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-  return trimmed.length > SITUATION_PREVIEW_MAX_LENGTH
-    ? `${trimmed.slice(0, SITUATION_PREVIEW_MAX_LENGTH)}…`
-    : trimmed;
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function resolveSituationDiagnosticThread(answers: QuizAnswers): string | null {
@@ -100,6 +96,10 @@ function mapQuizSessionListRow(
   bookingId: string | null,
 ): QuizSessionListRow {
   const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
+  const displayPreview = resolveQuizSessionDisplayPreview({
+    guidedDiagnosticRaw: guidedRaw,
+    situationAnswer: readSituationAnswer(doc.answers),
+  });
   return {
     id: doc._id.toString(),
     visitorId: doc.visitorId,
@@ -107,7 +107,9 @@ function mapQuizSessionListRow(
     updatedAtIso: doc.updatedAt.toISOString(),
     completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
     hasGuidedDiagnostic: guidedRaw !== null,
-    situationPreview: resolveSituationPreview(doc.answers),
+    sessionTitlePreview: displayPreview.sessionTitlePreview,
+    situationPreview: displayPreview.situationPreview,
+    situationLabel: displayPreview.situationLabel,
     isBooked: bookingId !== null,
     bookingId,
   };
@@ -365,7 +367,9 @@ export type VisitorQuizSessionSummary = {
   readonly currentStep: number;
   readonly updatedAtIso: string;
   readonly completedAtIso: string | null;
+  readonly sessionTitlePreview: string | null;
   readonly situationPreview: string | null;
+  readonly situationLabel: string | null;
   readonly hasGuidedDiagnostic: boolean;
   readonly isBooked: boolean;
   readonly bookingId: string | null;
@@ -397,6 +401,10 @@ function mapVisitorQuizSessionSummary(
   linkedPayment: LinkedPaymentSummary | null,
 ): VisitorQuizSessionSummary {
   const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
+  const displayPreview = resolveQuizSessionDisplayPreview({
+    guidedDiagnosticRaw: guidedRaw,
+    situationAnswer: readSituationAnswer(doc.answers),
+  });
   const idHex = doc._id.toString();
   const bookingId = linkedBooking?.bookingId ?? null;
   return {
@@ -405,7 +413,9 @@ function mapVisitorQuizSessionSummary(
     currentStep: doc.currentStep,
     updatedAtIso: doc.updatedAt.toISOString(),
     completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
-    situationPreview: resolveSituationPreview(doc.answers),
+    sessionTitlePreview: displayPreview.sessionTitlePreview,
+    situationPreview: displayPreview.situationPreview,
+    situationLabel: displayPreview.situationLabel,
     hasGuidedDiagnostic: guidedRaw !== null,
     isBooked: bookingId !== null,
     bookingId,
