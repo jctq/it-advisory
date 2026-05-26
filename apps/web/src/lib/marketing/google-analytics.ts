@@ -17,10 +17,14 @@ declare global {
   interface Window {
     dataLayer?: unknown[];
     gtag?: (...args: unknown[]) => void;
+    google_tag_data?: Record<string, unknown>;
     __techmdGtagConsentDefaultApplied?: boolean;
     __techmdGaTransportDiagnosticsInstalled?: boolean;
   }
 }
+
+let gaActivationInFlight: Promise<void> | null = null;
+let gaActivatedMeasurementId: string | null = null;
 
 function logAnalyticsEvent(message: string, payload?: unknown): void {
   if (payload === undefined) {
@@ -31,7 +35,54 @@ function logAnalyticsEvent(message: string, payload?: unknown): void {
 }
 
 function isGoogleAnalyticsEndpoint(url: string): boolean {
-  return /(^https:\/\/(www|region\d+)\.google-analytics\.com\/g\/collect)|(^https:\/\/www\.googletagmanager\.com)/i.test(url);
+  return /google-analytics\.com|googletagmanager\.com|analytics\.google\.com/i.test(url);
+}
+
+function logDataLayerSnapshot(label: string): void {
+  const length = window.dataLayer?.length ?? 0;
+  const tail = window.dataLayer?.slice(Math.max(0, length - 8)) ?? [];
+  logAnalyticsEvent(label, { length, tail });
+}
+
+function logGtagRuntimeState(label: string, measurementId: string): void {
+  const gtagSource = typeof window.gtag === 'function' ? String(window.gtag).slice(0, 120) : typeof window.gtag;
+  logAnalyticsEvent(label, {
+    measurementId,
+    gtagType: typeof window.gtag,
+    gtagSourcePreview: gtagSource,
+    hasGoogleTagData: window.google_tag_data !== undefined,
+  });
+}
+
+function verifyAnalyticsTransport(measurementId: string): void {
+  window.setTimeout(() => {
+    const resourceEntries = performance
+      .getEntriesByType('resource')
+      .filter((entry) => isGoogleAnalyticsEndpoint(entry.name));
+    logAnalyticsEvent('Transport verification (performance entries)', {
+      measurementId,
+      resourceCount: resourceEntries.length,
+      resources: resourceEntries.map((entry) => entry.name),
+    });
+    if (resourceEntries.length === 0) {
+      logAnalyticsEvent('No GA network resources detected after activation', { measurementId });
+    }
+  }, 2500);
+}
+
+function sendDirectCollectProbe(measurementId: string): void {
+  const probeUrl = new URL('https://www.google-analytics.com/g/collect');
+  probeUrl.searchParams.set('v', '2');
+  probeUrl.searchParams.set('tid', measurementId);
+  probeUrl.searchParams.set('en', 'techmd_direct_probe');
+  probeUrl.searchParams.set('dl', window.location.href);
+  probeUrl.searchParams.set('_et', '1');
+  const probeResult = navigator.sendBeacon(probeUrl.toString());
+  logAnalyticsEvent('Sent direct collect probe via sendBeacon', {
+    measurementId,
+    probeResult,
+    probeUrl: probeUrl.toString(),
+  });
 }
 
 function installTransportDiagnostics(): void {
@@ -106,6 +157,20 @@ function installTransportDiagnostics(): void {
       });
     }
   });
+  const originalImageSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+  if (originalImageSrcDescriptor !== undefined) {
+    Object.defineProperty(HTMLImageElement.prototype, 'src', {
+      configurable: true,
+      enumerable: originalImageSrcDescriptor.enumerable ?? true,
+      get: originalImageSrcDescriptor.get,
+      set(value: string) {
+        if (isGoogleAnalyticsEndpoint(String(value))) {
+          logAnalyticsEvent('Image beacon src set', { url: String(value) });
+        }
+        originalImageSrcDescriptor.set?.call(this, value);
+      },
+    });
+  }
   window.__techmdGaTransportDiagnosticsInstalled = true;
   logAnalyticsEvent('Installed transport diagnostics');
 }
@@ -146,6 +211,9 @@ export function updateGtagAnalyticsConsent(granted: boolean): void {
     ad_user_data: 'denied',
     ad_personalization: 'denied',
   });
+  if (!granted) {
+    gaActivatedMeasurementId = null;
+  }
   logAnalyticsEvent('Updated analytics consent', { analytics_storage: consentState });
 }
 
@@ -155,18 +223,13 @@ export function configureGoogleAnalytics(measurementId: string): void {
   const pageLocation = window.location.href;
   const pageTitle = document.title;
   const debugTimestamp = Date.now();
-  window.gtag?.('js', new Date());
+  logGtagRuntimeState('Before gtag config', measurementId);
+  logDataLayerSnapshot('DataLayer before gtag config');
   window.gtag?.('config', measurementId, {
     anonymize_ip: true,
     allow_google_signals: false,
     allow_ad_personalization_signals: false,
     send_page_view: true,
-    debug_mode: true,
-  });
-  window.gtag?.('event', 'page_view', {
-    page_location: pageLocation,
-    page_path: pagePath,
-    page_title: pageTitle,
     debug_mode: true,
   });
   window.gtag?.('event', 'techmd_debug_ping', {
@@ -177,11 +240,15 @@ export function configureGoogleAnalytics(measurementId: string): void {
     non_interaction: true,
     debug_timestamp: debugTimestamp,
   });
-  logAnalyticsEvent('Configured gtag and dispatched page_view', {
+  logGtagRuntimeState('After gtag config', measurementId);
+  logDataLayerSnapshot('DataLayer after gtag config');
+  logAnalyticsEvent('Configured gtag and dispatched events', {
     measurementId,
     pagePath,
     debugTimestamp,
   });
+  sendDirectCollectProbe(measurementId);
+  verifyAnalyticsTransport(measurementId);
 }
 
 let gaScriptLoading: Promise<void> | null = null;
@@ -223,9 +290,30 @@ export async function activateGoogleAnalytics(measurementId: string): Promise<vo
     logAnalyticsEvent('Skipped analytics activation due to invalid measurement id', { measurementId });
     return;
   }
-  logAnalyticsEvent('Starting analytics activation', { measurementId });
-  updateGtagAnalyticsConsent(true);
-  await loadGoogleAnalyticsScript(measurementId);
-  configureGoogleAnalytics(measurementId);
-  logAnalyticsEvent('Analytics activation complete', { measurementId });
+  if (gaActivatedMeasurementId === measurementId) {
+    logAnalyticsEvent('Analytics already activated for measurement id', { measurementId });
+    return;
+  }
+  if (gaActivationInFlight !== null) {
+    logAnalyticsEvent('Analytics activation already in flight, waiting', { measurementId });
+    await gaActivationInFlight;
+    return;
+  }
+  gaActivationInFlight = (async () => {
+    logAnalyticsEvent('Starting analytics activation', { measurementId });
+    ensureGtagConsentDefaults();
+    await loadGoogleAnalyticsScript(measurementId);
+    updateGtagAnalyticsConsent(true);
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 100);
+    });
+    configureGoogleAnalytics(measurementId);
+    gaActivatedMeasurementId = measurementId;
+    logAnalyticsEvent('Analytics activation complete', { measurementId });
+  })();
+  try {
+    await gaActivationInFlight;
+  } finally {
+    gaActivationInFlight = null;
+  }
 }

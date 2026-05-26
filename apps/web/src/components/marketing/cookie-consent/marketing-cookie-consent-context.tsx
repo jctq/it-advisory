@@ -60,14 +60,10 @@ function applyConsent(record: CookieConsentRecord): void {
   logConsentEvent('Applying consent record', record);
   writeCookieConsentToStorage(record);
   ensureGtagConsentDefaults();
-  const measurementId = resolveGoogleAnalyticsMeasurementId();
-  if (hasAnalyticsConsent(record) && measurementId !== null) {
-    logConsentEvent('Consent allows analytics, activating GA', { measurementId });
-    void activateGoogleAnalytics(measurementId);
-    return;
+  if (!hasAnalyticsConsent(record)) {
+    logConsentEvent('Consent denies analytics, updating GA consent to denied');
+    updateGtagAnalyticsConsent(false);
   }
-  logConsentEvent('Consent denies analytics, updating GA consent to denied');
-  updateGtagAnalyticsConsent(false);
 }
 
 function subscribeClientMounted(onStoreChange: () => void): () => void {
