@@ -42,26 +42,15 @@ type MarketingCookieConsentContextValue = {
 };
 
 const MarketingCookieConsentContext = createContext<MarketingCookieConsentContextValue | null>(null);
-const CONSENT_LOG_PREFIX = '[TechMD Cookie Consent]';
 
 function readServerCookieConsentSnapshot(): CookieConsentRecord | null {
   return null;
 }
 
-function logConsentEvent(message: string, payload?: unknown): void {
-  if (payload === undefined) {
-    console.info(`${CONSENT_LOG_PREFIX} ${message}`);
-    return;
-  }
-  console.info(`${CONSENT_LOG_PREFIX} ${message}`, payload);
-}
-
 function applyConsent(record: CookieConsentRecord): void {
-  logConsentEvent('Applying consent record', record);
   writeCookieConsentToStorage(record);
   ensureGtagConsentDefaults();
   if (!hasAnalyticsConsent(record)) {
-    logConsentEvent('Consent denies analytics, updating GA consent to denied');
     updateGtagAnalyticsConsent(false);
   }
 }
@@ -98,20 +87,16 @@ export function MarketingCookieConsentProvider(props: MarketingCookieConsentProv
   const [draft, setDraft] = useState<CookieConsentDraft>({ analytics: false });
   useEffect(() => {
     ensureGtagConsentDefaults();
-    logConsentEvent('Initialized consent defaults on mount');
   }, []);
   useEffect(() => {
     if (!isClientMounted || consent === null) {
       return;
     }
     const measurementId = resolveGoogleAnalyticsMeasurementId();
-    logConsentEvent('Observed existing consent snapshot', { consent, measurementId });
     if (hasAnalyticsConsent(consent) && measurementId !== null) {
-      logConsentEvent('Snapshot allows analytics, activating GA', { measurementId });
       void activateGoogleAnalytics(measurementId);
       return;
     }
-    logConsentEvent('Snapshot denies analytics, updating GA consent to denied');
     updateGtagAnalyticsConsent(false);
   }, [consent, isClientMounted]);
   const persistChoice = useCallback((choice: 'essential-only' | 'all', analytics: boolean) => {
