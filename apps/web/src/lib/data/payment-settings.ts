@@ -16,7 +16,10 @@ import {
   maskCredentialHint,
 } from '@/lib/server/payment-credentials-crypto';
 import { getDb } from '@/lib/mongodb';
+import { formatPaymentAmountLabel } from '@/lib/payments/format-payment-amount-label';
 import type { GatewayCredentials } from '@techmd/payments';
+
+export { formatPaymentAmountLabel } from '@/lib/payments/format-payment-amount-label';
 
 export const PAYMENT_SETTINGS_DOCUMENT_ID = 'default';
 
@@ -150,11 +153,6 @@ function mergeDocument(doc: PaymentSettingsDocument | null): PaymentSettingsValu
   };
 }
 
-function formatCheckoutAmountLabel(amountCentavos: number): string {
-  const pesos = amountCentavos / 100;
-  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(pesos);
-}
-
 export async function getPaymentSettings(): Promise<PaymentSettingsValues> {
   if (!process.env.MONGODB_URI) {
     return defaultSettings();
@@ -242,7 +240,7 @@ export async function getPaymentSettingsPublicView(): Promise<PaymentSettingsPub
     paymentPolicy: settings.paymentPolicy,
     currency: settings.currency,
     checkoutAmountCentavos: settings.checkoutAmountCentavos,
-    checkoutAmountLabel: formatCheckoutAmountLabel(settings.checkoutAmountCentavos),
+    checkoutAmountLabel: formatPaymentAmountLabel(settings.checkoutAmountCentavos),
     holdExpiresMinutes: settings.holdExpiresMinutes,
     sandboxMode: settings.sandboxMode,
     gateways,
@@ -321,6 +319,3 @@ export async function updatePaymentSettings(patch: UpdatePaymentSettingsPatch): 
   return getPaymentSettingsAdminView();
 }
 
-export function formatPaymentAmountLabel(amountCentavos: number): string {
-  return formatCheckoutAmountLabel(amountCentavos);
-}

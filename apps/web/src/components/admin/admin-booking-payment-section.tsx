@@ -6,7 +6,7 @@ import { useState, type ReactElement } from 'react';
 import type { PaymentGatewayId, PaymentStatus } from '@/domain/payment-types';
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
-import { formatPaymentAmountLabel } from '@/lib/data/payment-settings';
+import { formatPaymentAmountLabel } from '@/lib/payments/format-payment-amount-label';
 import { notifyError, notifySuccess } from '@/lib/notify';
 
 type AdminBookingPaymentSectionProps = {

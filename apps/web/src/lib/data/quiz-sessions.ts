@@ -49,6 +49,8 @@ export type QuizSessionLinkedBooking = {
   readonly serviceKey: string;
   readonly meetingUrl: string | null;
   readonly status: BookingDocument['status'];
+  readonly recordingOptIn: boolean;
+  readonly fathomShareUrl: string | null;
 };
 
 export type QuizSessionDetail = {
@@ -220,6 +222,9 @@ export async function findQuizSessionById(sessionId: string): Promise<QuizSessio
     .map((b) => {
       const meetingRaw = b.meetingUrl;
       const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+      const fathomRaw = b.fathomShareUrl;
+      const fathomShareUrl =
+        typeof fathomRaw === 'string' && fathomRaw.trim().length > 0 ? fathomRaw.trim() : null;
       return {
         id: b._id.toString(),
         startsAtIso: b.startsAt.toISOString(),
@@ -227,6 +232,8 @@ export async function findQuizSessionById(sessionId: string): Promise<QuizSessio
         serviceKey: b.serviceKey,
         meetingUrl,
         status: b.status,
+        recordingOptIn: b.recordingOptIn === true,
+        fathomShareUrl,
       };
     });
   return {

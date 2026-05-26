@@ -4,6 +4,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { DataTable } from '@/components/admin/data-table';
+import { AdminFathomNotesLink } from '@/components/admin/admin-fathom-notes-link';
 import type { BookingRow } from '@/lib/data/bookings';
 
 type BookingsTableProps = {
@@ -73,6 +74,23 @@ export function BookingsTable({ initialData }: BookingsTableProps) {
               Open
             </a>
           );
+        },
+      }),
+      columnHelper.display({
+        id: 'fathomNotes',
+        header: 'Notes',
+        cell: (info) => {
+          const row = info.row.original;
+          const link = (
+            <AdminFathomNotesLink
+              fathomShareUrl={row.fathomShareUrl}
+              recordingOptIn={row.recordingOptIn}
+            />
+          );
+          if (link === null) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return link;
         },
       }),
     ],

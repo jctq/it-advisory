@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { AdminFathomNotesLink } from '@/components/admin/admin-fathom-notes-link';
 
 type AdminBookingFathomSectionProps = {
   readonly booking: BookingDetailRow;
@@ -100,16 +101,13 @@ export function AdminBookingFathomSection(props: AdminBookingFathomSectionProps)
           </div>
         ) : null}
       </dl>
-      {props.booking.fathomShareUrl !== undefined && props.booking.fathomShareUrl.trim().length > 0 ? (
+      {props.booking.recordingOptIn ||
+      (props.booking.fathomShareUrl !== undefined && props.booking.fathomShareUrl.trim().length > 0) ? (
         <p className="mt-4 text-sm">
-          <a
-            href={props.booking.fathomShareUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Open Fathom notes
-          </a>
+          <AdminFathomNotesLink
+            fathomShareUrl={props.booking.fathomShareUrl}
+            recordingOptIn={props.booking.recordingOptIn}
+          />
         </p>
       ) : null}
       {props.booking.fathomSummary !== undefined && props.booking.fathomSummary.trim().length > 0 ? (

@@ -10,6 +10,7 @@ import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
 import { QuizSessionAuditTable } from '@/components/admin/quiz-session-audit-table';
 import { AdminSessionPaymentSection } from '@/components/admin/admin-session-payment-section';
+import { AdminFathomNotesLink } from '@/components/admin/admin-fathom-notes-link';
 import { findLatestPaymentTransactionByQuizSessionIdHex, findPaymentTransactionById } from '@/lib/data/payment-transactions';
 import { reconcilePaymentTransactionById } from '@/lib/payments/reconcile-visitor-payments';
 import { findQuizSessionById, listQuizAuditForSession } from '@/lib/data/quiz-sessions';
@@ -161,35 +162,57 @@ export default async function AdminQuizSessionDetailPage(props: AdminQuizSession
                       Open booking
                     </Link>
                   </div>
-                  {calendarBundle !== null ? (
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-medium">
-                      <a
-                        href={calendarBundle.googleCalendarUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline-offset-4 hover:underline"
-                      >
-                        Google Calendar
-                      </a>
-                      <span className="text-muted-foreground">·</span>
-                      <a
-                        href={calendarBundle.outlookCalendarUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline-offset-4 hover:underline"
-                      >
-                        Outlook
-                      </a>
-                      <span className="text-muted-foreground">·</span>
-                      <a
-                        href={calendarBundle.icsDataUrl}
-                        download={`booking-${bookingReference}.ics`}
-                        className="text-primary underline-offset-4 hover:underline"
-                      >
-                        Apple (.ics)
-                      </a>
-                    </div>
-                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
+                    {meetingUrl.length > 0 ? (
+                      <>
+                        <a
+                          href={meetingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          Join meeting
+                        </a>
+                        <span className="text-muted-foreground">·</span>
+                      </>
+                    ) : null}
+                    <AdminFathomNotesLink
+                      fathomShareUrl={booking.fathomShareUrl}
+                      recordingOptIn={booking.recordingOptIn}
+                    />
+                    {calendarBundle !== null ? (
+                      <>
+                        {(meetingUrl.length > 0 || booking.fathomShareUrl !== null || booking.recordingOptIn) ? (
+                          <span className="text-muted-foreground">·</span>
+                        ) : null}
+                        <a
+                          href={calendarBundle.googleCalendarUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          Google Calendar
+                        </a>
+                        <span className="text-muted-foreground">·</span>
+                        <a
+                          href={calendarBundle.outlookCalendarUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          Outlook
+                        </a>
+                        <span className="text-muted-foreground">·</span>
+                        <a
+                          href={calendarBundle.icsDataUrl}
+                          download={`booking-${bookingReference}.ics`}
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          Apple (.ics)
+                        </a>
+                      </>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}

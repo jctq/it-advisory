@@ -7,6 +7,7 @@ import {
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic-readonly';
 import { AdminBookingFathomSection } from '@/components/admin/admin-booking-fathom-section';
+import { AdminFathomNotesLink } from '@/components/admin/admin-fathom-notes-link';
 import { AdminBookingPaymentSection } from '@/components/admin/admin-booking-payment-section';
 import { AdminBookingQuoteForm } from '@/components/admin/admin-booking-quote-form';
 import { MarkBookingPaidButton } from '@/components/admin/mark-booking-paid-button';
@@ -40,6 +41,12 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
   const meetingUrl =
     booking.meetingUrl !== undefined && typeof booking.meetingUrl === 'string' && booking.meetingUrl.trim().length > 0
       ? booking.meetingUrl.trim()
+      : '';
+  const fathomShareUrl =
+    booking.fathomShareUrl !== undefined &&
+    typeof booking.fathomShareUrl === 'string' &&
+    booking.fathomShareUrl.trim().length > 0
+      ? booking.fathomShareUrl.trim()
       : '';
   const catalogPricing = await resolveCheckoutAmountCentavos({
     serviceKey: booking.serviceKey,
@@ -153,6 +160,17 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
                 >
                   Join meeting
                 </a>
+              </dd>
+            </div>
+          ) : null}
+          {fathomShareUrl.length > 0 || booking.recordingOptIn ? (
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meeting notes</dt>
+              <dd className="mt-1 text-sm">
+                <AdminFathomNotesLink
+                  fathomShareUrl={fathomShareUrl.length > 0 ? fathomShareUrl : null}
+                  recordingOptIn={booking.recordingOptIn}
+                />
               </dd>
             </div>
           ) : null}
