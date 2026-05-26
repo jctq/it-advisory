@@ -16,6 +16,14 @@ export type BlogPostDocument = {
   showInBlogList: boolean;
   /** Show the title on article pages, embeds, and list cards (when listed). */
   showTitle: boolean;
+  /** Optional override for HTML meta title and social card title. */
+  seoTitle: string | null;
+  /** Optional override for meta description and social card description. */
+  seoDescription: string | null;
+  /** Optional absolute or site-relative URL for Open Graph / Twitter image. */
+  ogImageUrl: string | null;
+  /** Optional comma-separated keywords for meta keywords. */
+  seoKeywords: string | null;
   createdAt: Date;
   updatedAt: Date;
   /** Set when status first becomes published; retained if unpublished later. */

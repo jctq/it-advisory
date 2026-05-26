@@ -73,6 +73,10 @@ export type BlogPostEditorSidebarProps = {
   readonly status: BlogPostValue['status'];
   readonly showInBlogList: boolean;
   readonly showTitle: boolean;
+  readonly seoTitle: string;
+  readonly seoDescription: string;
+  readonly ogImageUrl: string;
+  readonly seoKeywords: string;
   readonly hasCopiedEmbedId: boolean;
   readonly onTitleChange: (value: string) => void;
   readonly onDescriptionChange: (value: string) => void;
@@ -80,6 +84,10 @@ export type BlogPostEditorSidebarProps = {
   readonly onStatusChange: (value: BlogPostValue['status']) => void;
   readonly onShowInBlogListChange: (checked: boolean) => void;
   readonly onShowTitleChange: (checked: boolean) => void;
+  readonly onSeoTitleChange: (value: string) => void;
+  readonly onSeoDescriptionChange: (value: string) => void;
+  readonly onOgImageUrlChange: (value: string) => void;
+  readonly onSeoKeywordsChange: (value: string) => void;
   readonly onRegenerateSlug: () => void;
   readonly onCopyEmbedId: () => void;
 };
@@ -129,6 +137,59 @@ export function BlogPostEditorSidebar(props: BlogPostEditorSidebarProps): ReactE
           <p className="text-xs text-muted-foreground">
             /blog/<span className="font-mono text-foreground">{props.slug || '…'}</span>
           </p>
+        </div>
+      </EditorSection>
+      <EditorSection
+        title="SEO"
+        description="Search and social previews. Leave blank to use the article title, description, and first image in the body."
+      >
+        <div className="space-y-2">
+          <Label htmlFor="blog-seo-title">Meta title</Label>
+          <Input
+            id="blog-seo-title"
+            value={props.seoTitle}
+            onChange={(event) => props.onSeoTitleChange(event.target.value)}
+            placeholder="Overrides browser tab and share title"
+            maxLength={70}
+          />
+          <p className="text-xs text-muted-foreground">Recommended up to ~60 characters.</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="blog-seo-description">Meta description</Label>
+          <Textarea
+            id="blog-seo-description"
+            value={props.seoDescription}
+            onChange={(event) => props.onSeoDescriptionChange(event.target.value)}
+            placeholder="Overrides search snippet and social description"
+            maxLength={320}
+            rows={3}
+            className="min-h-[4.5rem] resize-y"
+          />
+          <p className="text-xs text-muted-foreground">Recommended up to ~160 characters.</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="blog-og-image">Social image URL</Label>
+          <Input
+            id="blog-og-image"
+            value={props.ogImageUrl}
+            onChange={(event) => props.onOgImageUrlChange(event.target.value)}
+            placeholder="https://… or /api/blog-images/…"
+            maxLength={2000}
+            className="font-mono text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            Used for Open Graph and Twitter cards. Falls back to the first image in the post body.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="blog-seo-keywords">Keywords</Label>
+          <Input
+            id="blog-seo-keywords"
+            value={props.seoKeywords}
+            onChange={(event) => props.onSeoKeywordsChange(event.target.value)}
+            placeholder="keyword one, keyword two"
+            maxLength={500}
+          />
         </div>
       </EditorSection>
       <EditorSection title="Publishing">

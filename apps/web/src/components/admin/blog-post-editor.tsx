@@ -38,6 +38,10 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
   const [status, setStatus] = useState<BlogPostValue['status']>(props.initialPost.status);
   const [showInBlogList, setShowInBlogList] = useState<boolean>(props.initialPost.showInBlogList);
   const [showTitle, setShowTitle] = useState<boolean>(props.initialPost.showTitle);
+  const [seoTitle, setSeoTitle] = useState<string>(props.initialPost.seoTitle ?? '');
+  const [seoDescription, setSeoDescription] = useState<string>(props.initialPost.seoDescription ?? '');
+  const [ogImageUrl, setOgImageUrl] = useState<string>(props.initialPost.ogImageUrl ?? '');
+  const [seoKeywords, setSeoKeywords] = useState<string>(props.initialPost.seoKeywords ?? '');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [hasCopiedEmbedId, setHasCopiedEmbedId] = useState<boolean>(false);
   const [editorRevision, setEditorRevision] = useState<number>(0);
@@ -54,8 +58,25 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
       contentMarkdown !== post.contentMarkdown ||
       status !== post.status ||
       showInBlogList !== post.showInBlogList ||
-      showTitle !== post.showTitle,
-    [contentMarkdown, description, post, showInBlogList, showTitle, slug, status, title],
+      showTitle !== post.showTitle ||
+      (seoTitle.trim().length > 0 ? seoTitle.trim() : null) !== post.seoTitle ||
+      (seoDescription.trim().length > 0 ? seoDescription.trim() : null) !== post.seoDescription ||
+      (ogImageUrl.trim().length > 0 ? ogImageUrl.trim() : null) !== post.ogImageUrl ||
+      (seoKeywords.trim().length > 0 ? seoKeywords.trim() : null) !== post.seoKeywords,
+    [
+      contentMarkdown,
+      description,
+      ogImageUrl,
+      post,
+      seoDescription,
+      seoKeywords,
+      seoTitle,
+      showInBlogList,
+      showTitle,
+      slug,
+      status,
+      title,
+    ],
   );
 
   const executeReset = useCallback((): void => {
@@ -66,6 +87,10 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
     setStatus(post.status);
     setShowInBlogList(post.showInBlogList);
     setShowTitle(post.showTitle);
+    setSeoTitle(post.seoTitle ?? '');
+    setSeoDescription(post.seoDescription ?? '');
+    setOgImageUrl(post.ogImageUrl ?? '');
+    setSeoKeywords(post.seoKeywords ?? '');
     setEditorRevision((current) => current + 1);
   }, [post]);
 
@@ -98,6 +123,10 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
           status,
           showInBlogList,
           showTitle,
+          seoTitle: seoTitle.trim().length > 0 ? seoTitle.trim() : null,
+          seoDescription: seoDescription.trim().length > 0 ? seoDescription.trim() : null,
+          ogImageUrl: ogImageUrl.trim().length > 0 ? ogImageUrl.trim() : null,
+          seoKeywords: seoKeywords.trim().length > 0 ? seoKeywords.trim() : null,
         }),
       });
       const data = (await response.json()) as BlogPostApiResponse;
@@ -112,6 +141,10 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
       setStatus(data.post.status);
       setShowInBlogList(data.post.showInBlogList);
       setShowTitle(data.post.showTitle);
+      setSeoTitle(data.post.seoTitle ?? '');
+      setSeoDescription(data.post.seoDescription ?? '');
+      setOgImageUrl(data.post.ogImageUrl ?? '');
+      setSeoKeywords(data.post.seoKeywords ?? '');
       setHistoryRefreshKey((current) => current + 1);
       notifySuccess('Blog post saved.');
     } catch (error: unknown) {
@@ -119,12 +152,25 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
     } finally {
       setIsSaving(false);
     }
-  }, [apiUrl, contentMarkdown, description, showInBlogList, showTitle, slug, status, title]);
+  }, [
+    apiUrl,
+    contentMarkdown,
+    description,
+    ogImageUrl,
+    seoDescription,
+    seoKeywords,
+    seoTitle,
+    showInBlogList,
+    showTitle,
+    slug,
+    status,
+    title,
+  ]);
 
   const publicPreviewHref = status === 'published' ? `/blog/${slug}` : null;
 
   return (
-    <section className="mx-auto flex min-h-0 w-full flex-1 flex-col">
+    <section className="mx-auto flex min-h-0 w-full flex-1 flex-col pb-20">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Button type="button" variant="ghost" size="sm" className="gap-2" asChild>
@@ -179,6 +225,10 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
           status={status}
           showInBlogList={showInBlogList}
           showTitle={showTitle}
+          seoTitle={seoTitle}
+          seoDescription={seoDescription}
+          ogImageUrl={ogImageUrl}
+          seoKeywords={seoKeywords}
           hasCopiedEmbedId={hasCopiedEmbedId}
           onTitleChange={setTitle}
           onDescriptionChange={setDescription}
@@ -186,6 +236,10 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
           onStatusChange={setStatus}
           onShowInBlogListChange={setShowInBlogList}
           onShowTitleChange={setShowTitle}
+          onSeoTitleChange={setSeoTitle}
+          onSeoDescriptionChange={setSeoDescription}
+          onOgImageUrlChange={setOgImageUrl}
+          onSeoKeywordsChange={setSeoKeywords}
           onRegenerateSlug={executeRegenerateSlug}
           onCopyEmbedId={() => void executeCopyEmbedId()}
         />

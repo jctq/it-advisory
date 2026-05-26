@@ -24,6 +24,7 @@ type BuildMarketingMetadataInput = {
   readonly pathname: string;
   readonly openGraphType?: 'website' | 'article';
   readonly openGraphImageUrl?: string | null;
+  readonly keywords?: readonly string[];
 };
 
 type BuildNoIndexMetadataInput = {
@@ -90,9 +91,11 @@ function buildSocialMetadata(input: BuildMarketingMetadataInput): Pick<Metadata,
  * Indexable marketing metadata with canonical URL, Open Graph, and Twitter cards.
  */
 export function buildMarketingMetadata(input: BuildMarketingMetadataInput): Metadata {
+  const keywords = input.keywords !== undefined && input.keywords.length > 0 ? [...input.keywords] : undefined;
   return {
     title: input.title,
     description: input.description,
+    ...(keywords !== undefined ? { keywords } : {}),
     alternates: {
       canonical: input.pathname,
     },

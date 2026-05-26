@@ -40,6 +40,7 @@ import {
   type ReactElement,
   type SetStateAction,
 } from 'react';
+import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sticky-action-bar';
 import { DiagnosticOutcomePanel } from '@/components/marketing/diagnostic-outcome-panel';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -1123,6 +1124,8 @@ export type GuidedDiagnosticWizardProps = {
    * even if the admin activated a different template later.
    */
   readonly templateSessionMarketingRef?: string | null;
+  /** When this element enters the viewport, the Back / Continue bar is no longer pinned to the bottom. */
+  readonly footerUnpinWhenElement?: HTMLElement | null;
   readonly onGoBack: () => void;
   readonly onGuidedChange: Dispatch<SetStateAction<GuidedDiagnosticV1>>;
 };
@@ -1248,6 +1251,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     sessionReadOnly = false,
     marketingBookSessionRef = null,
     templateSessionMarketingRef = null,
+    footerUnpinWhenElement = null,
   } = props;
   const executeGoBackWithScroll = useCallback((): void => {
     onGoBack();
@@ -1978,6 +1982,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           initialPrompt={guided.initialPrompt}
           sessionReadOnly={sessionReadOnly}
           marketingBookSessionRef={marketingBookSessionRef ?? null}
+          footerUnpinWhenElement={footerUnpinWhenElement}
           onReviewDiagnostic={executeOpenDiagnosticReview}
         />
       </div>
@@ -2180,7 +2185,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             {diagnosticAiEnabled ? 'Updating your diagnostic…' : 'Preparing your advisor summary…'}
           </div>
         ) : (
-          <div className={cn(WIZARD_UI.footerMt, "flex flex-wrap items-center justify-between gap-3")}>
+          <DiagnosticStickyActionBar
+            unpinWhenElement={footerUnpinWhenElement}
+            wrapperClassName={WIZARD_UI.footerMt}
+          >
             <div>
               {canGoBack ? (
                 <Button type="button" variant="outline" onClick={executeGoBackWithScroll}>
@@ -2193,7 +2201,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               <span className="sm:hidden">Continue</span>
               <span className="hidden sm:inline">{advanceLabel}</span>
             </Button>
-          </div>
+          </DiagnosticStickyActionBar>
         )}
       </div>
     );

@@ -21,6 +21,10 @@ const createBlogPostSchema = z.object({
   status: blogPostStatusSchema.optional(),
   showInBlogList: z.boolean().optional(),
   showTitle: z.boolean().optional(),
+  seoTitle: z.string().trim().max(70).nullable().optional(),
+  seoDescription: z.string().trim().max(320).nullable().optional(),
+  ogImageUrl: z.string().trim().max(2000).nullable().optional(),
+  seoKeywords: z.string().trim().max(500).nullable().optional(),
 });
 
 export async function GET(): Promise<NextResponse> {
@@ -51,6 +55,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       status: parsed.data.status,
       showInBlogList: parsed.data.showInBlogList,
       showTitle: parsed.data.showTitle,
+      seoTitle: parsed.data.seoTitle,
+      seoDescription: parsed.data.seoDescription,
+      ogImageUrl: parsed.data.ogImageUrl,
+      seoKeywords: parsed.data.seoKeywords,
     });
     return NextResponse.json({ post }, { status: 201 });
   } catch (error: unknown) {

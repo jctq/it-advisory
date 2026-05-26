@@ -13,6 +13,10 @@ export const BLOG_POST_REVISION_FIELD_LABELS: Record<BlogPostRevisionFieldKey, s
   status: 'Status',
   showInBlogList: 'Show on blog index',
   showTitle: 'Show title',
+  seoTitle: 'SEO title',
+  seoDescription: 'SEO description',
+  ogImageUrl: 'Social image URL',
+  seoKeywords: 'SEO keywords',
 };
 
 export type BlogPostRevisionListItem = {
@@ -53,6 +57,10 @@ export function buildBlogPostRevisionSnapshot(post: BlogPostValue): BlogPostRevi
     status: post.status,
     showInBlogList: post.showInBlogList,
     showTitle: post.showTitle,
+    seoTitle: post.seoTitle,
+    seoDescription: post.seoDescription,
+    ogImageUrl: post.ogImageUrl,
+    seoKeywords: post.seoKeywords,
   };
 }
 
@@ -64,6 +72,10 @@ const BLOG_POST_REVISION_FIELD_KEYS: readonly BlogPostRevisionFieldKey[] = [
   'status',
   'showInBlogList',
   'showTitle',
+  'seoTitle',
+  'seoDescription',
+  'ogImageUrl',
+  'seoKeywords',
 ];
 
 export function listChangedBlogPostRevisionFields(
@@ -91,7 +103,14 @@ export function formatBlogPostRevisionFieldValue(
   if (field === 'showInBlogList' || field === 'showTitle') {
     return value ? 'Yes' : 'No';
   }
-  if (field === 'title' || field === 'description') {
+  if (
+    field === 'title' ||
+    field === 'description' ||
+    field === 'seoTitle' ||
+    field === 'seoDescription' ||
+    field === 'ogImageUrl' ||
+    field === 'seoKeywords'
+  ) {
     const textValue = value as string | null;
     return textValue === null || textValue.trim().length === 0 ? '(empty)' : textValue;
   }

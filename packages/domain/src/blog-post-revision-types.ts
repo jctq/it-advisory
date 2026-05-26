@@ -10,6 +10,10 @@ export type BlogPostRevisionSnapshot = {
   readonly status: BlogPostStatus;
   readonly showInBlogList: boolean;
   readonly showTitle: boolean;
+  readonly seoTitle: string | null;
+  readonly seoDescription: string | null;
+  readonly ogImageUrl: string | null;
+  readonly seoKeywords: string | null;
 };
 
 /** Append-only row written when a blog post is saved with changes. */

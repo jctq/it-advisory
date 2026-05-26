@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, BadgeCheck, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import type { GuidedDiagnosticOutcome } from '@techmd/diagnostic-core/guided-diagnostic-types';
+import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sticky-action-bar';
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import type { PublicCatalogServiceRow, PublicCatalogServicesView } from '@/lib/data/public-catalog-services';
@@ -21,6 +22,8 @@ export type DiagnosticOutcomePanelProps = {
   readonly initialPrompt: string;
   readonly sessionReadOnly: boolean;
   readonly marketingBookSessionRef: string | null;
+  /** When this element enters the viewport, outcome action bars are no longer pinned to the bottom. */
+  readonly footerUnpinWhenElement?: HTMLElement | null;
   readonly onReviewDiagnostic: () => void;
 };
 
@@ -94,7 +97,14 @@ function ServicePricingCard(props: {
 }
 
 export function DiagnosticOutcomePanel(props: DiagnosticOutcomePanelProps): ReactElement {
-  const { outcome, initialPrompt, sessionReadOnly, marketingBookSessionRef, onReviewDiagnostic } = props;
+  const {
+    outcome,
+    initialPrompt,
+    sessionReadOnly,
+    marketingBookSessionRef,
+    footerUnpinWhenElement = null,
+    onReviewDiagnostic,
+  } = props;
   const [step, setStep] = useState<OutcomeStep>('summary');
   const [catalog, setCatalog] = useState<PublicCatalogServicesView | null>(null);
   const [catalogStatus, setCatalogStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -246,17 +256,20 @@ export function DiagnosticOutcomePanel(props: DiagnosticOutcomePanelProps): Reac
               ))}
             </ul>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <DiagnosticStickyActionBar
+            unpinWhenElement={footerUnpinWhenElement}
+            layoutClassName="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          >
             <Button type="button" variant="outline" onClick={onReviewDiagnostic}>
               Review diagnostic
             </Button>
             {!sessionReadOnly ? (
-              <Button type="button" size="lg" className="gap-2" onClick={executeShowPricingStep}>
+              <Button type="button" className="gap-2" onClick={executeShowPricingStep}>
                 Choose your session
                 <ArrowRight className="size-4" aria-hidden />
               </Button>
             ) : null}
-          </div>
+          </DiagnosticStickyActionBar>
         </div>
       </div>
     );
@@ -406,7 +419,10 @@ export function DiagnosticOutcomePanel(props: DiagnosticOutcomePanelProps): Reac
               </span>
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <DiagnosticStickyActionBar
+            unpinWhenElement={footerUnpinWhenElement}
+            layoutClassName="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          >
             <Button type="button" variant="outline" onClick={executeShowSummaryStep}>
               Back to summary
             </Button>
@@ -414,14 +430,14 @@ export function DiagnosticOutcomePanel(props: DiagnosticOutcomePanelProps): Reac
               <p className="text-sm text-muted-foreground">This intake is already linked to a booking.</p>
             ) : bookHref !== null &&
               (selectedService !== null || selectedServiceKey === 'fallback') ? (
-              <Button asChild size="lg" className="gap-2">
+              <Button asChild className="gap-2">
                 <Link href={bookHref}>
                   Book {selectedService?.title ?? fallbackCheckout?.title ?? 'session'}
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
               </Button>
             ) : null}
-          </div>
+          </DiagnosticStickyActionBar>
         </div>
       ) : null}
     </div>

@@ -21,6 +21,10 @@ const updateBlogPostSchema = z.object({
   status: blogPostStatusSchema.optional(),
   showInBlogList: z.boolean().optional(),
   showTitle: z.boolean().optional(),
+  seoTitle: z.string().trim().max(70).nullable().optional(),
+  seoDescription: z.string().trim().max(320).nullable().optional(),
+  ogImageUrl: z.string().trim().max(2000).nullable().optional(),
+  seoKeywords: z.string().trim().max(500).nullable().optional(),
 });
 
 type RouteContext = {

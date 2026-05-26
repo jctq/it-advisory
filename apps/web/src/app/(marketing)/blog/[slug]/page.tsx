@@ -3,8 +3,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { MarketingBlogProse } from '@/components/marketing/blog/marketing-blog-prose';
-import { extractBlogPostCoverImageUrl } from '@/lib/blog-post-cover-image';
-import { getBlogPostDisplayTitle, getBlogPostSummary } from '@/lib/blog-post-types';
+import { resolveBlogPostOpenGraphImageUrl } from '@/lib/blog-post-cover-image';
+import {
+  getBlogPostDisplayTitle,
+  getBlogPostSeoDescription,
+  getBlogPostSeoTitle,
+  parseBlogPostSeoKeywords,
+} from '@/lib/blog-post-types';
 import { findPublishedBlogPostBySlug } from '@/lib/data/blog-posts';
 import { buildMarketingMetadata } from '@/lib/seo/site-seo';
 import { cn } from '@/lib/utils';
@@ -25,13 +30,15 @@ export async function generateMetadata(props: BlogArticlePageProps) {
       pathname: `/blog/${slug}`,
     });
   }
-  const title = getBlogPostDisplayTitle(post);
+  const seoTitle = getBlogPostSeoTitle(post);
+  const seoKeywords = parseBlogPostSeoKeywords(post);
   return buildMarketingMetadata({
-    title: `${title} — TechMD Blog`,
-    description: getBlogPostSummary(post),
+    title: `${seoTitle} — TechMD Blog`,
+    description: getBlogPostSeoDescription(post),
     pathname: `/blog/${slug}`,
     openGraphType: 'article',
-    openGraphImageUrl: extractBlogPostCoverImageUrl(post.contentMarkdown),
+    openGraphImageUrl: resolveBlogPostOpenGraphImageUrl(post),
+    ...(seoKeywords.length > 0 ? { keywords: seoKeywords } : {}),
   });
 }
 

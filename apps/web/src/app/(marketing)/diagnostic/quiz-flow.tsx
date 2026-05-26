@@ -235,6 +235,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   const sessionReadOnlyRef = useRef<boolean>(false);
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [activeTemplate, setActiveTemplate] = useState<PublicDiagnosticTemplateValue | null>(null);
+  const [diagnosticActionsElement, setDiagnosticActionsElement] = useState<HTMLDivElement | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -756,10 +757,14 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           suppressEmptyTemplateBootstrap={sessionTargetId !== null && !isSessionReady}
           sessionReadOnly={sessionReadOnly}
           marketingBookSessionRef={sessionTargetId}
+          footerUnpinWhenElement={diagnosticActionsElement}
           onGoBack={executeGoBack}
           onGuidedChange={setGuided}
         />
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-2 md:mt-10 md:gap-3">
+        <div
+          ref={setDiagnosticActionsElement}
+          className="mt-6 flex flex-wrap items-center justify-between gap-2 md:mt-10 md:gap-3"
+        >
           <Button type="button" variant="ghost" asChild>
             <Link href="/" className="gap-1">
               <ChevronLeft className="size-4" aria-hidden />

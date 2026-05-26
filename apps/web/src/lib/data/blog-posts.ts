@@ -45,6 +45,16 @@ function normalizeOptionalDescription(value: string | null | undefined): string 
   return trimmedValue.length > 0 ? trimmedValue : null;
 }
 
+function normalizeOptionalSeoText(value: string | null | undefined): string | null {
+  const trimmedValue = value?.trim() ?? '';
+  return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
+function normalizeOptionalOgImageUrl(value: string | null | undefined): string | null {
+  const trimmedValue = value?.trim() ?? '';
+  return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
 function normalizeSlugBase(value: string): string {
   return slugifyBlogPostTitle(value);
 }
@@ -59,6 +69,10 @@ function mapBlogPost(doc: BlogPostStoredDocument): BlogPostValue {
     status: doc.status,
     showInBlogList: doc.showInBlogList !== false,
     showTitle: doc.showTitle !== false,
+    seoTitle: doc.seoTitle ?? null,
+    seoDescription: doc.seoDescription ?? null,
+    ogImageUrl: doc.ogImageUrl ?? null,
+    seoKeywords: doc.seoKeywords ?? null,
     createdAtIso: doc.createdAt.toISOString(),
     updatedAtIso: doc.updatedAt.toISOString(),
     publishedAtIso: doc.publishedAt === null ? null : doc.publishedAt.toISOString(),
@@ -224,6 +238,10 @@ export async function createBlogPost(input: CreateBlogPostInput = {}): Promise<B
     status,
     showInBlogList: input.showInBlogList ?? true,
     showTitle: input.showTitle ?? true,
+    seoTitle: normalizeOptionalSeoText(input.seoTitle),
+    seoDescription: normalizeOptionalSeoText(input.seoDescription),
+    ogImageUrl: normalizeOptionalOgImageUrl(input.ogImageUrl),
+    seoKeywords: normalizeOptionalSeoText(input.seoKeywords),
     createdAt: now,
     updatedAt: now,
     publishedAt: status === 'published' ? now : null,
@@ -260,6 +278,13 @@ export async function updateBlogPost(postId: string, input: UpdateBlogPostInput)
   const nextStatus: BlogPostStatus = input.status ?? current.status;
   const nextShowInBlogList = input.showInBlogList ?? current.showInBlogList !== false;
   const nextShowTitle = input.showTitle ?? current.showTitle !== false;
+  const nextSeoTitle = input.seoTitle === undefined ? (current.seoTitle ?? null) : normalizeOptionalSeoText(input.seoTitle);
+  const nextSeoDescription =
+    input.seoDescription === undefined ? (current.seoDescription ?? null) : normalizeOptionalSeoText(input.seoDescription);
+  const nextOgImageUrl =
+    input.ogImageUrl === undefined ? (current.ogImageUrl ?? null) : normalizeOptionalOgImageUrl(input.ogImageUrl);
+  const nextSeoKeywords =
+    input.seoKeywords === undefined ? (current.seoKeywords ?? null) : normalizeOptionalSeoText(input.seoKeywords);
   let nextPublishedAt = current.publishedAt;
   if (nextStatus === 'published' && nextPublishedAt === null) {
     nextPublishedAt = now;
@@ -274,6 +299,10 @@ export async function updateBlogPost(postId: string, input: UpdateBlogPostInput)
     status: nextStatus,
     showInBlogList: nextShowInBlogList,
     showTitle: nextShowTitle,
+    seoTitle: nextSeoTitle,
+    seoDescription: nextSeoDescription,
+    ogImageUrl: nextOgImageUrl,
+    seoKeywords: nextSeoKeywords,
     createdAt: current.createdAt,
     updatedAt: now,
     publishedAt: nextPublishedAt,
@@ -287,6 +316,10 @@ export async function updateBlogPost(postId: string, input: UpdateBlogPostInput)
     status: nextStatus,
     showInBlogList: nextShowInBlogList,
     showTitle: nextShowTitle,
+    seoTitle: nextSeoTitle,
+    seoDescription: nextSeoDescription,
+    ogImageUrl: nextOgImageUrl,
+    seoKeywords: nextSeoKeywords,
     createdAtIso: current.createdAt.toISOString(),
     updatedAtIso: now.toISOString(),
     publishedAtIso: nextPublishedAt === null ? null : nextPublishedAt.toISOString(),
