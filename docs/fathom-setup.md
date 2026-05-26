@@ -35,11 +35,16 @@ Credentials are encrypted with `MEETINGS_CREDENTIALS_MASTER_KEY` (same as Meetin
 
 If auto-match fails (ambiguous title or time), open **Admin → Bookings → [booking]** and use **Manual link** with a Fathom recording id or share URL.
 
+## Auto-match rules
+
+1. **Booking reference in meeting title** (8-character code from calendar titles, e.g. Google Meet `Site · Service — AB12CD34`) links to a **confirmed** booking with **recording opt-in**, even when the call starts outside the scheduled slot.
+2. Otherwise, match by **scheduled time** (± `FATHOM_MATCH_WINDOW_MINUTES`, default 15) and meeting title patterns.
+
 ## Troubleshooting
 
 | Issue | Check |
 |-------|--------|
 | No webhook | URL reachable from internet; `FATHOM_ENABLED` not `0` |
-| Unmatched booking | Meeting title/time vs booking; use manual link |
+| Unmatched booking | Title includes booking reference or start time within match window; use manual link |
 | No customer email | Booking `recordingOptIn`; Fathom share URL present |
 | API test fails | API key; Fathom plan includes API access |

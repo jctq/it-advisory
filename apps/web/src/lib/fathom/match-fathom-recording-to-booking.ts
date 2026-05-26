@@ -6,8 +6,11 @@ import { getDb } from '@/lib/mongodb';
 import { getResolvedSiteName } from '@/lib/data/app-settings';
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import type { ParsedFathomWebhook } from '@/lib/fathom/parse-fathom-webhook-payload';
+import { extractBookingReferenceCandidatesFromFathomText } from '@/lib/fathom/extract-booking-reference-from-fathom-text';
 
 const DEFAULT_MATCH_WINDOW_MINUTES = 15 as const;
+const OBJECT_ID_HEX_LENGTH = 24 as const;
+const BOOKING_REFERENCE_LENGTH = 8 as const;
 
 export type FathomBookingMatchResult =
   | { readonly status: 'linked'; readonly bookingId: string }
@@ -66,13 +69,54 @@ function scoreTitleMatch(title: string, expectedTitles: readonly string[]): numb
   return score;
 }
 
-export async function matchFathomRecordingToBooking(input: {
+async function matchFathomRecordingByBookingReference(
+  references: readonly string[],
+): Promise<FathomBookingMatchResult | null> {
+  if (references.length === 0) {
+    return null;
+  }
+  const db = await getDb();
+  const bookingIds = new Set<string>();
+  for (const reference of references) {
+    const docs = await db
+      .collection<BookingDocument>(COLLECTIONS.bookings)
+      .find({
+        status: 'confirmed',
+        recordingOptIn: true,
+        $expr: {
+          $eq: [
+            {
+              $toUpper: {
+                $substr: [{ $toString: '$_id' }, OBJECT_ID_HEX_LENGTH - BOOKING_REFERENCE_LENGTH, BOOKING_REFERENCE_LENGTH],
+              },
+            },
+            reference,
+          ],
+        },
+      })
+      .toArray();
+    for (const doc of docs) {
+      if (doc._id instanceof ObjectId) {
+        bookingIds.add(doc._id.toString());
+      }
+    }
+  }
+  if (bookingIds.size === 0) {
+    return null;
+  }
+  if (bookingIds.size === 1) {
+    return { status: 'linked', bookingId: [...bookingIds][0]! };
+  }
+  return {
+    status: 'ambiguous',
+    candidateBookingIds: [...bookingIds],
+  };
+}
+
+async function matchFathomRecordingByTimeWindow(input: {
   readonly parsed: ParsedFathomWebhook;
   readonly hostEmail: string;
 }): Promise<FathomBookingMatchResult> {
-  if (!process.env.MONGODB_URI) {
-    return { status: 'unmatched' };
-  }
   const anchor = input.parsed.startedAt ?? new Date();
   const windowMs = resolveMatchWindowMs();
   const rangeStart = new Date(anchor.getTime() - windowMs);
@@ -128,4 +172,19 @@ export async function matchFathomRecordingToBooking(input: {
     status: 'ambiguous',
     candidateBookingIds: topCandidates.map((row) => row.bookingId),
   };
+}
+
+export async function matchFathomRecordingToBooking(input: {
+  readonly parsed: ParsedFathomWebhook;
+  readonly hostEmail: string;
+}): Promise<FathomBookingMatchResult> {
+  if (!process.env.MONGODB_URI) {
+    return { status: 'unmatched' };
+  }
+  const referenceCandidates = extractBookingReferenceCandidatesFromFathomText(input.parsed.title);
+  const byReference = await matchFathomRecordingByBookingReference(referenceCandidates);
+  if (byReference !== null) {
+    return byReference;
+  }
+  return matchFathomRecordingByTimeWindow(input);
 }
