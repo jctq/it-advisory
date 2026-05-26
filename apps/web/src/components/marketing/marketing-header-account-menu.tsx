@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { CalendarDays, ChevronDown, LogOut, LayoutList, User } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { MarketingHeaderAccountMenuPanel } from '@/components/marketing/marketing-header-account-menu-panel';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import type { AuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -91,55 +91,14 @@ export function MarketingHeaderAccountMenu(props: MarketingHeaderAccountMenuProp
       {open ? (
         <div
           id="marketing-header-account-panel"
-          role="menu"
-          aria-label="Account menu"
-          className="absolute right-0 z-50 mt-2 w-[min(calc(100vw-2rem),16rem)] rounded-xl border border-border bg-popover py-1 shadow-lg"
+          className="absolute right-0 z-50 mt-2 w-[min(calc(100vw-2rem),16rem)] rounded-xl border border-border bg-popover py-1 text-popover-foreground shadow-lg"
         >
-          <div className="border-b border-border/60 px-3 py-2">
-            <p className="text-xs font-medium text-muted-foreground">Signed in</p>
-            <p className="break-all text-sm font-medium text-foreground">{props.user.email}</p>
-          </div>
-          <Link
-            href="/account/profile"
-            role="menuitem"
-            className="flex items-center gap-2 px-3 py-2.5 text-sm text-popover-foreground hover:bg-accent"
-            onClick={() => setOpen(false)}
-          >
-            <User className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            Profile
-          </Link>
-          <Link
-            href="/account/diagnostics"
-            role="menuitem"
-            className="flex items-center gap-2 px-3 py-2.5 text-sm text-popover-foreground hover:bg-accent"
-            onClick={() => setOpen(false)}
-          >
-            <LayoutList className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            My diagnostics
-          </Link>
-          {props.manageBookingEnabled ? (
-            <Link
-              href="/book/manage"
-              role="menuitem"
-              className="flex items-center gap-2 px-3 py-2.5 text-sm text-popover-foreground hover:bg-accent"
-              onClick={() => setOpen(false)}
-            >
-              <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              Manage booking
-            </Link>
-          ) : null}
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-popover-foreground hover:bg-accent"
-            onClick={() => {
-              setOpen(false);
-              props.onSignOut();
-            }}
-          >
-            <LogOut className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            Sign out
-          </button>
+          <MarketingHeaderAccountMenuPanel
+            user={props.user}
+            manageBookingEnabled={props.manageBookingEnabled}
+            onSignOut={props.onSignOut}
+            onNavigate={() => setOpen(false)}
+          />
         </div>
       ) : null}
     </div>

@@ -2,23 +2,36 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu } from 'lucide-react';
+import {
+  BookOpen,
+  Briefcase,
+  CalendarDays,
+  CircleHelp,
+  Info,
+  LogIn,
+  Menu,
+  Rocket,
+  UserPlus,
+  type LucideIcon,
+} from 'lucide-react';
+import { MarketingHeaderAccountMenuPanel } from '@/components/marketing/marketing-header-account-menu-panel';
 import type { ReactElement } from 'react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { MarketingHeaderAccountMenu } from '@/components/marketing/marketing-header-account-menu';
 import { MarketingHeaderAppearanceMenu } from '@/components/marketing/marketing-header-appearance-menu';
 import { useMarketingAppearance } from '@/components/marketing/marketing-appearance-provider';
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import type { AuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +43,17 @@ const BASE_NAV_LINKS: readonly { readonly href: string; readonly label: string }
 ] as const;
 
 const MANAGE_BOOKING_NAV_LINK = { href: '/book/manage', label: 'Manage booking' } as const;
+
+const MOBILE_NAV_LINK_ICONS: Record<string, LucideIcon> = {
+  '/#how-it-works': CircleHelp,
+  '/#services': Briefcase,
+  '/#about': Info,
+  '/#resources': BookOpen,
+  '/book/manage': CalendarDays,
+};
+
+const MOBILE_SHEET_NAV_ITEM_CLASS =
+  'flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent';
 
 export type SiteHeaderClientProps = {
   readonly marketingUser: AuthenticatedMarketingUser | null;
@@ -61,6 +85,10 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
     }
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [pathname]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const executeCloseMobileMenu = useCallback((): void => {
+    setIsMobileMenuOpen(false);
+  }, []);
   return (
     <header
       className={cn(
@@ -130,8 +158,8 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
               <Link href="/diagnostic">Get Started</Link>
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger asChild>
               <Button
                 type="button"
                 variant="outline"
@@ -141,66 +169,79 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
               >
                 <Menu className="size-5" aria-hidden />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-[min(100vw-2rem,19rem)] rounded-xl p-2"
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="flex w-[min(100vw-2rem,19rem)] flex-col gap-0 p-0 sm:max-w-xs"
             >
-              {navLinks.map((link) => (
-                <DropdownMenuItem key={link.href} asChild className="cursor-pointer rounded-lg px-3 py-2.5 font-medium">
-                  <a href={link.href}>{link.label}</a>
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator className="my-2" />
-              {user === null ? (
-                <>
-                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2 font-medium">
-                    <Link href="/login">Sign in</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2 font-medium">
-                    <Link href="/register">Register</Link>
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuLabel className="break-all px-2 py-1 text-xs font-normal text-muted-foreground">
-                    {user.email}
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2 font-medium">
-                    <Link href="/account/diagnostics">My diagnostics</Link>
-                  </DropdownMenuItem>
-                  {props.manageBookingEnabled ? (
-                    <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2 font-medium">
-                      <Link href="/book/manage">Manage booking</Link>
-                    </DropdownMenuItem>
-                  ) : null}
-                  <DropdownMenuItem
-                    className="cursor-pointer rounded-lg px-3 py-2 font-medium"
-                    onClick={() => void executeSignOut()}
-                  >
-                    Sign out
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuSeparator className="my-2" />
-              {isAuthenticated ? (
-                <DropdownMenuItem
-                  disabled={isNavigating}
-                  className="cursor-pointer justify-center rounded-lg bg-primary px-3 py-2.5 font-medium text-primary-foreground focus:bg-primary focus:text-primary-foreground disabled:opacity-60"
-                  onClick={() => void navigateToNewQuiz()}
-                >
-                  {isNavigating ? 'Starting…' : 'Get Started'}
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  asChild
-                  className="cursor-pointer justify-center rounded-lg bg-primary px-3 py-2.5 font-medium text-primary-foreground focus:bg-primary focus:text-primary-foreground"
-                >
-                  <Link href="/diagnostic">Get Started</Link>
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <SheetHeader className="border-b border-border px-4 py-4 text-left">
+                <SheetTitle />
+                <SheetDescription className="sr-only">Site navigation and account actions</SheetDescription>
+              </SheetHeader>
+              <nav className="flex flex-1 flex-col overflow-y-auto py-2" aria-label="Mobile">
+                {navLinks.map((link) => {
+                  const NavIcon = MOBILE_NAV_LINK_ICONS[link.href];
+                  return (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      className={MOBILE_SHEET_NAV_ITEM_CLASS}
+                      onClick={executeCloseMobileMenu}
+                    >
+                      {NavIcon !== undefined ? (
+                        <NavIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      ) : null}
+                      {link.label}
+                    </a>
+                  );
+                })}
+                <Separator className="my-2" />
+                {user === null ? (
+                  <>
+                    <Link href="/login" className={MOBILE_SHEET_NAV_ITEM_CLASS} onClick={executeCloseMobileMenu}>
+                      <LogIn className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      Sign in
+                    </Link>
+                    <Link href="/register" className={MOBILE_SHEET_NAV_ITEM_CLASS} onClick={executeCloseMobileMenu}>
+                      <UserPlus className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      Register
+                    </Link>
+                  </>
+                ) : (
+                  <MarketingHeaderAccountMenuPanel
+                    user={user}
+                    manageBookingEnabled={props.manageBookingEnabled}
+                    onSignOut={() => void executeSignOut()}
+                    onNavigate={executeCloseMobileMenu}
+                  />
+                )}
+                <Separator className="my-2" />
+                <div className="px-2">
+                  {isAuthenticated ? (
+                    <Button
+                      type="button"
+                      className="h-10 w-full gap-2"
+                      disabled={isNavigating}
+                      onClick={() => {
+                        executeCloseMobileMenu();
+                        void navigateToNewQuiz();
+                      }}
+                    >
+                      <Rocket className="size-4 shrink-0" aria-hidden />
+                      {isNavigating ? 'Starting…' : 'Get Started'}
+                    </Button>
+                  ) : (
+                    <Button asChild className="h-10 w-full gap-2" onClick={executeCloseMobileMenu}>
+                      <Link href="/diagnostic">
+                        <Rocket className="size-4 shrink-0" aria-hidden />
+                        Get Started
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>
