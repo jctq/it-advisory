@@ -47,19 +47,7 @@ export function resolveTransactionalEmailLogoUrl(siteOrigin: string): string | n
   return `${origin}${brandAssetUrl(BRAND_LOGO_COMPACT_DARK)}`;
 }
 
-/** Keeps the logo header band dark when the client renders the message in dark mode. */
-export function buildTransactionalEmailColorSchemeHead(): string {
-  return `<meta name="color-scheme" content="light dark" />
-<meta name="supported-color-schemes" content="light dark" />
-<style type="text/css">
-.email-logo-header { background-color: ${TRANSACTIONAL_EMAIL_HEADER_BG} !important; }
-@media (prefers-color-scheme: dark) {
-  .email-logo-header { background-color: ${TRANSACTIONAL_EMAIL_HEADER_BG} !important; }
-}
-</style>`;
-}
-
-/** Compact dark wordmark on a slate header band (same asset as the site dark-mode header). */
+/** Compact dark wordmark on a fixed slate header band. */
 export function buildTransactionalEmailLogoHeaderRow(input: {
   readonly siteOrigin: string;
   readonly brandName: string;
@@ -68,7 +56,7 @@ export function buildTransactionalEmailLogoHeaderRow(input: {
   if (logoUrl === null) {
     return '';
   }
-  return `<tr><td class="email-logo-header" align="left" bgcolor="${TRANSACTIONAL_EMAIL_HEADER_BG}" style="padding:24px 28px;background-color:${TRANSACTIONAL_EMAIL_HEADER_BG};"><img src="${escapeHtml(logoUrl)}" width="${TRANSACTIONAL_EMAIL_LOGO_WIDTH_PX}" alt="${escapeHtml(input.brandName)}" style="display:block;width:${TRANSACTIONAL_EMAIL_LOGO_WIDTH_PX}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;background-color:transparent;" /></td></tr>`;
+  return `<tr><td align="left" bgcolor="${TRANSACTIONAL_EMAIL_HEADER_BG}" style="padding:24px 28px;background-color:${TRANSACTIONAL_EMAIL_HEADER_BG};"><img src="${escapeHtml(logoUrl)}" width="${TRANSACTIONAL_EMAIL_LOGO_WIDTH_PX}" alt="${escapeHtml(input.brandName)}" style="display:block;width:${TRANSACTIONAL_EMAIL_LOGO_WIDTH_PX}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr>`;
 }
 
 export function buildTransactionalEmailBrandNameRow(input: {
