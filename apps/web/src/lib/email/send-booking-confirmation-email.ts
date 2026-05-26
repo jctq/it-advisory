@@ -60,7 +60,7 @@ type BookingCatalogEmailDetails = {
   readonly sessionsIncluded: number | null;
 };
 
-function buildCatalogServiceSectionHtml(catalog: BookingCatalogEmailDetails): string {
+export function buildBookingCatalogSectionHtml(catalog: BookingCatalogEmailDetails): string {
   const rows: string[] = [
     buildEmailDetailRow('Service', catalog.title),
     buildEmailDetailRow('Duration', catalog.durationLabel),
@@ -217,7 +217,7 @@ function resolveRecipientEmail(
   return null;
 }
 
-function buildConfirmationHtml(input: {
+export function buildBookingConfirmationEmailHtml(input: {
   readonly brandName: string;
   readonly customerName: string;
   readonly bookingReference: string;
@@ -297,7 +297,7 @@ ${escapeHtml(preheader)}&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#82
 </html>`;
 }
 
-function buildPaymentSectionHtml(transaction: PaymentTransactionRow): string {
+export function buildBookingPaymentSectionHtml(transaction: PaymentTransactionRow): string {
   const rows: string[] = [
     buildEmailDetailRow('Amount', formatAmountPhp(transaction.amountCentavos)),
     buildEmailDetailRow('Gateway', resolveGatewayLabel(transaction.gatewayId)),
@@ -420,9 +420,9 @@ async function runSendBookingConfirmationEmail(input: {
           sessionsIncluded: catalogRow.sessionsIncluded,
         }
       : null;
-  const catalogSectionHtml = catalogDetails !== null ? buildCatalogServiceSectionHtml(catalogDetails) : null;
+  const catalogSectionHtml = catalogDetails !== null ? buildBookingCatalogSectionHtml(catalogDetails) : null;
   const catalogPlainLines = catalogDetails !== null ? buildCatalogServicePlainLines(catalogDetails) : null;
-  const paymentSectionHtml = transaction !== null ? buildPaymentSectionHtml(transaction) : null;
+  const paymentSectionHtml = transaction !== null ? buildBookingPaymentSectionHtml(transaction) : null;
   const paymentPlainLines = transaction !== null ? buildPaymentSectionPlainLines(transaction) : null;
   const brandName = await getResolvedSiteName();
   const calendarBundle = buildBookingCalendarLinkBundle({
@@ -434,7 +434,7 @@ async function runSendBookingConfirmationEmail(input: {
     icsUidSeed: bookingReference,
   });
   const includeRecordingDisclosure = booking.recordingOptIn === true;
-  const html = buildConfirmationHtml({
+  const html = buildBookingConfirmationEmailHtml({
     brandName,
     customerName,
     bookingReference,

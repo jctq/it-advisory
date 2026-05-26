@@ -45,6 +45,34 @@ function buildBulletproofButton(label: string, href: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;"><tr><td bgcolor="#0f172a" style="background-color:#0f172a;border-radius:8px;"><a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-family:${EMAIL_FONT_STACK};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">${escapeHtml(label)}</a></td></tr></table>`;
 }
 
+export function buildBookingFathomNotesEmailHtml(input: {
+  readonly brandName: string;
+  readonly siteOrigin: string;
+  readonly attendeeDisplayName: string;
+  readonly bookingReference: string;
+  readonly dateLong: string;
+  readonly timeLabel: string;
+  readonly shareUrl: string;
+  readonly summary: string;
+  readonly actionItems: readonly string[];
+}): string {
+  const summaryPreview = truncateSummary(input.summary);
+  const actionItemsHtml =
+    input.actionItems.length > 0
+      ? `<ul style="margin:12px 0 0 0;padding-left:20px;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#3f3f46;">${input.actionItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+      : '';
+  const summaryHtml =
+    summaryPreview.length > 0
+      ? `<p style="margin:12px 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#3f3f46;">${escapeHtml(summaryPreview)}</p>`
+      : '';
+  const logoHeaderRow = buildTransactionalEmailLogoHeaderRow({ siteOrigin: input.siteOrigin, brandName: input.brandName });
+  const brandNameRow =
+    resolveTransactionalEmailLogoUrl(input.siteOrigin) === null
+      ? buildTransactionalEmailBrandNameRow({ brandName: input.brandName, fontStack: EMAIL_FONT_STACK })
+      : '';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" />${buildTransactionalEmailColorSchemeHead()}</head><body style="margin:0;padding:24px;background:#fafafa;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;"><tr><td style="padding:0;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoHeaderRow}<tr><td style="padding:28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${brandNameRow}<tr><td style="font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;color:#18181b;">Your consultation notes are ready</td></tr><tr><td style="padding-top:16px;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.attendeeDisplayName)}, thank you for your session on ${escapeHtml(input.dateLong)} at ${escapeHtml(input.timeLabel)}.</td></tr><tr><td style="padding-top:20px;">${buildBulletproofButton('View meeting notes', input.shareUrl)}</td></tr><tr><td style="font-family:${EMAIL_FONT_STACK};font-size:13px;color:#71717a;">Booking reference: ${escapeHtml(input.bookingReference)}</td></tr><tr><td>${summaryHtml}${actionItemsHtml}</td></tr><tr><td style="padding-top:24px;border-top:1px solid #e4e4e7;font-family:${EMAIL_FONT_STACK};font-size:12px;color:#71717a;">Sent by ${escapeHtml(input.brandName)}.</td></tr></table></td></tr></table></td></tr></table></body></html>`;
+}
+
 export async function executeSendBookingFathomNotesEmail(input: { readonly bookingId: string }): Promise<void> {
   if (!process.env.MONGODB_URI) {
     return;
@@ -101,21 +129,18 @@ async function runSendBookingFathomNotesEmail(input: { readonly bookingId: strin
   const summaryPreview = truncateSummary(booking.fathomSummary ?? '');
   const actionItems = booking.fathomActionItems ?? [];
   const subject = `Meeting notes — ${bookingReference}`;
-  const actionItemsHtml =
-    actionItems.length > 0
-      ? `<ul style="margin:12px 0 0 0;padding-left:20px;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#3f3f46;">${actionItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
-      : '';
-  const summaryHtml =
-    summaryPreview.length > 0
-      ? `<p style="margin:12px 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#3f3f46;">${escapeHtml(summaryPreview)}</p>`
-      : '';
   const siteOrigin = resolveAbsoluteSiteOrigin();
-  const logoHeaderRow = buildTransactionalEmailLogoHeaderRow({ siteOrigin, brandName });
-  const brandNameRow =
-    resolveTransactionalEmailLogoUrl(siteOrigin) === null
-      ? buildTransactionalEmailBrandNameRow({ brandName, fontStack: EMAIL_FONT_STACK })
-      : '';
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" />${buildTransactionalEmailColorSchemeHead()}</head><body style="margin:0;padding:24px;background:#fafafa;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;"><tr><td style="padding:0;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoHeaderRow}<tr><td style="padding:28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${brandNameRow}<tr><td style="font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;color:#18181b;">Your consultation notes are ready</td></tr><tr><td style="padding-top:16px;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(attendee.displayName)}, thank you for your session on ${escapeHtml(dateLong)} at ${escapeHtml(timeLabel)}.</td></tr><tr><td style="padding-top:20px;">${buildBulletproofButton('View meeting notes', shareUrl)}</td></tr><tr><td style="font-family:${EMAIL_FONT_STACK};font-size:13px;color:#71717a;">Booking reference: ${escapeHtml(bookingReference)}</td></tr><tr><td>${summaryHtml}${actionItemsHtml}</td></tr><tr><td style="padding-top:24px;border-top:1px solid #e4e4e7;font-family:${EMAIL_FONT_STACK};font-size:12px;color:#71717a;">Sent by ${escapeHtml(brandName)}.</td></tr></table></td></tr></table></td></tr></table></body></html>`;
+  const html = buildBookingFathomNotesEmailHtml({
+    brandName,
+    siteOrigin,
+    attendeeDisplayName: attendee.displayName,
+    bookingReference,
+    dateLong,
+    timeLabel,
+    shareUrl,
+    summary: booking.fathomSummary ?? '',
+    actionItems,
+  });
   const plainLines = [
     'Your consultation notes are ready',
     '',

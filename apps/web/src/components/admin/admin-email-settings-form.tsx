@@ -13,6 +13,7 @@ import {
   type Ref,
 } from 'react';
 import type { TransactionalEmailActiveProvider, TransactionalEmailProviderId } from '@/domain/email-types';
+import { AdminEmailTemplatePreviewDialog } from '@/components/admin/admin-email-template-preview-dialog';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -406,9 +407,12 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <label htmlFor="bookingConfirmationSubject" className="text-sm font-medium text-foreground">
-              Booking confirmation subject
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label htmlFor="bookingConfirmationSubject" className="text-sm font-medium text-foreground">
+                Booking confirmation subject
+              </label>
+              <AdminEmailTemplatePreviewDialog bookingConfirmationSubject={settings.bookingConfirmationSubject} />
+            </div>
             <Input
               id="bookingConfirmationSubject"
               type="text"
