@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
-import { ChevronRight, ClipboardList, Search, Trash2 } from 'lucide-react';
+import { ChevronRight, ClipboardList, Loader2, Search, Trash2 } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -250,8 +250,11 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
         </div>
       </div>
       <p className="px-4 pt-3 text-sm text-muted-foreground">
-        {props.isLoading && props.sessions.length === 0 ? (
-          'Loading sessions…'
+        {props.isLoading ? (
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
+            Loading sessions…
+          </span>
         ) : props.totalCount === 0 ? (
           'No sessions match your filters'
         ) : (
@@ -262,6 +265,17 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
         )}
       </p>
       <div ref={listAnchorRef} className="relative w-full px-4">
+        {props.isLoading && props.sessions.length > 0 ? (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px]"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+            <span className="sr-only">Loading sessions</span>
+          </div>
+        ) : null}
         <div
           className="relative w-full"
           style={{
@@ -387,8 +401,15 @@ function MobileDiagnosticsLoadMoreRow(props: { readonly isLoadingMore: boolean; 
     return <p className="py-6 text-center text-xs text-muted-foreground">End of list</p>;
   }
   return (
-    <p className="py-6 text-center text-sm text-muted-foreground" aria-live="polite">
-      {props.isLoadingMore ? 'Loading more…' : 'Scroll for more'}
+    <p className="flex items-center justify-center gap-2 py-6 text-center text-sm text-muted-foreground" aria-live="polite">
+      {props.isLoadingMore ? (
+        <>
+          <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
+          Loading more…
+        </>
+      ) : (
+        'Scroll for more'
+      )}
     </p>
   );
 }

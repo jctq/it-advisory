@@ -7,7 +7,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ClipboardCopy, Plus, Search, Trash2 } from 'lucide-react';
+import { ClipboardCopy, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useMobileViewport } from '@/hooks/use-mobile-viewport';
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
@@ -278,7 +278,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     const shouldAppend = isMobileViewport && page > 1;
     if (shouldAppend) {
       setIsLoadingMore(true);
-    } else if (sessionsRef.current.length === 0) {
+    } else {
       setIsLoading(true);
     }
     setLoadError(null);
@@ -597,7 +597,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
               </div>
               <p className="text-sm text-muted-foreground">
                 {isLoading ? (
-                  'Loading sessions…'
+                  <DiagnosticsLoadingStatus />
                 ) : totalCount === 0 ? (
                   <>
                     No sessions match your filters
@@ -622,7 +622,8 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                   </>
                 )}
               </p>
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className="relative overflow-hidden rounded-xl border border-border bg-card">
+                {isLoading && sessions.length > 0 ? <DiagnosticsListLoadingOverlay /> : null}
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed text-sm">
                     <colgroup>
@@ -648,7 +649,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                       ))}
                     </thead>
                     <tbody>
-                      {isLoading ? (
+                      {isLoading && sessions.length === 0 ? (
                         <DiagnosticsTableSkeleton columnCount={columns.length} />
                       ) : table.getRowModel().rows.length === 0 ? (
                         <tr>
@@ -756,6 +757,29 @@ function DiagnosticsEmptyState(props: {
       <Button type="button" className="mt-5" disabled={props.isNavigating} onClick={props.onStart}>
         {props.isNavigating ? 'Starting…' : 'Start your first diagnostic'}
       </Button>
+    </div>
+  );
+}
+
+function DiagnosticsLoadingStatus(): ReactElement {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
+      Loading sessions…
+    </span>
+  );
+}
+
+function DiagnosticsListLoadingOverlay(): ReactElement {
+  return (
+    <div
+      className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px]"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+      <span className="sr-only">Loading sessions</span>
     </div>
   );
 }
