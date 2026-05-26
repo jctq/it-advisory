@@ -211,6 +211,36 @@ export async function updatePaymentTransactionStatus(input: {
 
 const RECONCILABLE_PAYMENT_STATUSES: readonly PaymentStatus[] = ['pending', 'processing'];
 
+/**
+ * Fast check before scheduling background payment reconciliation.
+ */
+export async function visitorHasPendingPaymentReconciliation(visitorId: string): Promise<boolean> {
+  if (!process.env.MONGODB_URI) {
+    return false;
+  }
+  const db = await getDb();
+  const collection = db.collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions);
+  const openCheckout = await collection.findOne(
+    {
+      visitorId,
+      status: { $in: RECONCILABLE_PAYMENT_STATUSES },
+    },
+    { projection: { _id: 1 } },
+  );
+  if (openCheckout !== null) {
+    return true;
+  }
+  const paidUnfulfilled = await collection.findOne(
+    {
+      visitorId,
+      status: 'paid',
+      $or: [{ bookingId: { $exists: false } }, { bookingId: null }],
+    },
+    { projection: { _id: 1 } },
+  );
+  return paidUnfulfilled !== null;
+}
+
 export async function listReconcilablePaymentTransactionsForVisitor(
   visitorId: string,
   limit = 50,

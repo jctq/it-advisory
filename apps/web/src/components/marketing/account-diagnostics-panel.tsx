@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardCopy, Plus, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useMobileViewport } from '@/hooks/use-mobile-viewport';
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import {
   AlertDialog,
@@ -30,6 +31,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AccountDiagnosticsMobile } from '@/components/marketing/account-diagnostics-mobile';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
+import {
+  ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS,
+  ACCOUNT_DIAGNOSTICS_MOBILE_PAGE_SIZE,
+  ACCOUNT_DIAGNOSTICS_PAGE_SIZE,
+  buildDefaultAccountDiagnosticsListRequest,
+  matchesAccountDiagnosticsListRequest,
+  type AccountDiagnosticsInitialList,
+} from '@/lib/marketing/account-diagnostics-list';
 import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/quiz-session-list-display';
 import type {
@@ -41,10 +50,7 @@ import { cn } from '@/lib/utils';
 
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const MY_SESSIONS_API_URL = '/api/quiz/my-sessions';
-const PAGE_SIZE = 8;
-const MOBILE_PAGE_SIZE = 15;
 const BOOKING_REFERENCE_DEBOUNCE_MS = 350;
-const MOBILE_VIEWPORT_MEDIA_QUERY = '(max-width: 767px)';
 
 const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
 
@@ -213,40 +219,45 @@ type DeleteTarget = {
  */
 export type AccountDiagnosticsPanelProps = {
   readonly manageBookingEnabled?: boolean;
+  readonly initialList?: AccountDiagnosticsInitialList;
 };
 
 export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}): ReactElement {
   const manageBookingEnabled = props.manageBookingEnabled ?? false;
+  const defaultListRequest = buildDefaultAccountDiagnosticsListRequest();
+  const hasServerInitialList =
+    props.initialList !== undefined &&
+    matchesAccountDiagnosticsListRequest(props.initialList, defaultListRequest);
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [sessions, setSessions] = useState<readonly VisitorQuizSessionSummary[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [isLoading, setIsLoading] = useState(!hasServerInitialList);
+  const [sessions, setSessions] = useState<readonly VisitorQuizSessionSummary[]>(
+    hasServerInitialList ? props.initialList!.result.sessions : [],
+  );
+  const [totalCount, setTotalCount] = useState(hasServerInitialList ? props.initialList!.result.totalCount : 0);
+  const [totalPages, setTotalPages] = useState(hasServerInitialList ? props.initialList!.result.totalPages : 0);
   const [page, setPage] = useState(1);
-  const [hasAnySessions, setHasAnySessions] = useState(false);
+  const [hasAnySessions, setHasAnySessions] = useState(
+    hasServerInitialList ? props.initialList!.result.hasAnySessions : false,
+  );
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [bookingReferenceInput, setBookingReferenceInput] = useState('');
   const [debouncedBookingReference, setDebouncedBookingReference] = useState('');
-  const [statusFilter, setStatusFilter] = useState<VisitorQuizSessionListStatusFilter>('pending');
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<VisitorQuizSessionListStatusFilter>(
+    ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS,
+  );
+  const isMobileViewport = useMobileViewport();
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const fetchRequestIdRef = useRef(0);
-  const pageSize = isMobileViewport ? MOBILE_PAGE_SIZE : PAGE_SIZE;
+  const skipInitialFetchRef = useRef(hasServerInitialList);
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+  const pageSize = isMobileViewport ? ACCOUNT_DIAGNOSTICS_MOBILE_PAGE_SIZE : ACCOUNT_DIAGNOSTICS_PAGE_SIZE;
   const onNavigateError = useCallback((message: string): void => {
     setActionError(message);
   }, []);
   const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(true, onNavigateError);
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(MOBILE_VIEWPORT_MEDIA_QUERY);
-    const updateViewport = (): void => {
-      setIsMobileViewport(mediaQuery.matches);
-    };
-    updateViewport();
-    mediaQuery.addEventListener('change', updateViewport);
-    return () => mediaQuery.removeEventListener('change', updateViewport);
-  }, []);
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedBookingReference(bookingReferenceInput.trim());
@@ -267,7 +278,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     const shouldAppend = isMobileViewport && page > 1;
     if (shouldAppend) {
       setIsLoadingMore(true);
-    } else {
+    } else if (sessionsRef.current.length === 0) {
       setIsLoading(true);
     }
     setLoadError(null);
@@ -319,6 +330,10 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     }
   }, [page, pageSize, statusFilter, debouncedBookingReference, isMobileViewport]);
   useEffect(() => {
+    if (skipInitialFetchRef.current) {
+      skipInitialFetchRef.current = false;
+      return;
+    }
     void fetchSessions();
   }, [fetchSessions]);
   const executeDelete = useCallback(

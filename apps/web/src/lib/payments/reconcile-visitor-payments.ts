@@ -1,7 +1,9 @@
+import { after } from 'next/server';
 import {
   findPaymentTransactionById,
   listPaidUnfulfilledPaymentTransactionsForVisitor,
   listReconcilablePaymentTransactionsForVisitor,
+  visitorHasPendingPaymentReconciliation,
   type PaymentTransactionRow,
 } from '@/lib/data/payment-transactions';
 import { ensurePaidTransactionFulfilled } from '@/lib/payments/payment-completion';
@@ -41,6 +43,22 @@ export async function reconcileVisitorPaymentTransactions(
     }
   }
   return { reconciledCount, fulfilledCount };
+}
+
+/**
+ * Reconciles open checkouts after the HTTP response is sent so list loads stay fast.
+ */
+export function scheduleVisitorPaymentReconciliationIfNeeded(visitorId: string): void {
+  after(async () => {
+    try {
+      if (!(await visitorHasPendingPaymentReconciliation(visitorId))) {
+        return;
+      }
+      await reconcileVisitorPaymentTransactions(visitorId);
+    } catch {
+      // Background reconciliation must not affect the caller response.
+    }
+  });
 }
 
 export async function reconcilePaymentTransactionById(transactionId: string): Promise<PaymentTransactionRow | null> {

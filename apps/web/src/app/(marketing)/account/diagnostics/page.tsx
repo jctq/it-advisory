@@ -1,9 +1,14 @@
 import type { ReactElement } from 'react';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AccountDiagnosticsPanel } from '@/components/marketing/account-diagnostics-panel';
+import { listQuizSessionsForVisitorPaginated } from '@/lib/data/quiz-sessions';
+import {
+  buildDefaultAccountDiagnosticsListRequest,
+  type AccountDiagnosticsInitialList,
+} from '@/lib/marketing/account-diagnostics-list';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
-import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
+import { scheduleVisitorPaymentReconciliationIfNeeded } from '@/lib/payments/reconcile-visitor-payments';
+import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildNoIndexMetadata({
@@ -21,6 +26,16 @@ export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
   if (user === null) {
     redirect('/login?next=%2Faccount%2Fdiagnostics');
   }
+  const defaultListRequest = buildDefaultAccountDiagnosticsListRequest();
+  const initialListResult = await listQuizSessionsForVisitorPaginated({
+    visitorId: buildAccountVisitorId(user.id),
+    ...defaultListRequest,
+  });
+  const initialList: AccountDiagnosticsInitialList = {
+    ...defaultListRequest,
+    result: initialListResult,
+  };
+  scheduleVisitorPaymentReconciliationIfNeeded(buildAccountVisitorId(user.id));
   return (
     <main className="mx-auto max-w-6xl px-0 py-0 md:px-6 md:py-12">
       <div className="mb-8 hidden flex-wrap items-start justify-between gap-4 md:flex">
@@ -32,7 +47,7 @@ export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
           </p>
         </div>
       </div>
-      <AccountDiagnosticsPanel manageBookingEnabled={manageBookingEnabled} />
+      <AccountDiagnosticsPanel manageBookingEnabled={manageBookingEnabled} initialList={initialList} />
     </main>
   );
 }
