@@ -911,6 +911,19 @@
   .fc-admin-bookings .fc-event {
     @apply cursor-pointer rounded px-1 py-0.5 text-xs font-medium;
   }
+  .fc-admin-bookings .fc-booking-highlighted {
+    @apply ring-2 ring-primary ring-offset-2 ring-offset-card;
+    animation: fc-booking-highlight-pulse 1s ease-in-out 2;
+  }
+  @keyframes fc-booking-highlight-pulse {
+    0%,
+    100% {
+      filter: brightness(1);
+    }
+    50% {
+      filter: brightness(1.15);
+    }
+  }
   .fc-admin-bookings .fc-booking-status-confirmed {
     --fc-event-bg-color: var(--booking-confirmed-bg);
     --fc-event-border-color: var(--booking-confirmed-border);

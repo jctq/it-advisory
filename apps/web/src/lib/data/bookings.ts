@@ -11,6 +11,7 @@ import type { UpdateFilter } from 'mongodb';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { getDb } from '@/lib/mongodb';
 import { findQuizSessionForBookingSnapshot, findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { normalizeBookingReferenceInput } from '@/lib/marketing/booking-reference';
 import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 
 export type BookingRow = {
@@ -182,23 +183,34 @@ async function loadAccountVisitorContext(): Promise<{
   return { accountVisitorIds, accountEmailByVisitorId };
 }
 
-/**
- * Admin calendar list: bookings with lead contact fields and guest vs signed-in account context.
- */
-export async function listBookingsForAdminCalendar(limit = 10_000): Promise<AdminBookingCalendarRow[]> {
-  if (!process.env.MONGODB_URI) {
+export type AdminBookingCalendarStatusFilter = 'all' | BookingDocument['status'];
+
+export type AdminBookingCalendarStatusCounts = {
+  readonly all: number;
+  readonly confirmed: number;
+  readonly pending: number;
+  readonly cancelled: number;
+};
+
+export type ListBookingsForAdminCalendarInRangeInput = {
+  readonly startsAtFrom: Date;
+  readonly startsAtToExclusive: Date;
+  readonly status: AdminBookingCalendarStatusFilter;
+};
+
+export type ListBookingsForAdminCalendarInRangeResult = {
+  readonly bookings: readonly AdminBookingCalendarRow[];
+  readonly countsByStatus: AdminBookingCalendarStatusCounts;
+};
+
+async function mapBookingDocsToAdminCalendarRows(
+  bookingDocs: readonly (BookingDocument & { _id: ObjectId })[],
+): Promise<AdminBookingCalendarRow[]> {
+  if (bookingDocs.length === 0) {
     return [];
   }
   const db = await getDb();
-  const [bookingDocs, accountContext] = await Promise.all([
-    db
-      .collection<BookingDocument>(COLLECTIONS.bookings)
-      .find()
-      .sort({ startsAt: -1 })
-      .limit(limit)
-      .toArray(),
-    loadAccountVisitorContext(),
-  ]);
+  const accountContext = await loadAccountVisitorContext();
   const leadIds = [
     ...new Set(
       bookingDocs
@@ -245,6 +257,98 @@ export async function listBookingsForAdminCalendar(limit = 10_000): Promise<Admi
       accountEmail,
     };
   });
+}
+
+function buildAdminBookingStatusCounts(
+  statusCounts: ReadonlyArray<{ readonly _id: BookingDocument['status']; readonly count: number }>,
+): AdminBookingCalendarStatusCounts {
+  let all = 0;
+  let confirmed = 0;
+  let pending = 0;
+  let cancelled = 0;
+  for (const row of statusCounts) {
+    if (row._id === 'confirmed') {
+      confirmed = row.count;
+    } else if (row._id === 'pending') {
+      pending = row.count;
+    } else if (row._id === 'cancelled') {
+      cancelled = row.count;
+    }
+    all += row.count;
+  }
+  return { all, confirmed, pending, cancelled };
+}
+
+/**
+ * Admin calendar list for a `startsAt` range with optional status filter and sidebar counts.
+ */
+export async function listBookingsForAdminCalendarInRange(
+  input: ListBookingsForAdminCalendarInRangeInput,
+): Promise<ListBookingsForAdminCalendarInRangeResult> {
+  const emptyCounts: AdminBookingCalendarStatusCounts = {
+    all: 0,
+    confirmed: 0,
+    pending: 0,
+    cancelled: 0,
+  };
+  if (!process.env.MONGODB_URI) {
+    return { bookings: [], countsByStatus: emptyCounts };
+  }
+  const db = await getDb();
+  const rangeFilter = {
+    startsAt: { $gte: input.startsAtFrom, $lt: input.startsAtToExclusive },
+  };
+  const statusCounts = await db
+    .collection<BookingDocument>(COLLECTIONS.bookings)
+    .aggregate<{ _id: BookingDocument['status']; count: number }>([
+      { $match: rangeFilter },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ])
+    .toArray();
+  const countsByStatus = buildAdminBookingStatusCounts(statusCounts);
+  const statusQuery =
+    input.status === 'all' ? rangeFilter : { ...rangeFilter, status: input.status };
+  const bookingDocs = await db
+    .collection<BookingDocument>(COLLECTIONS.bookings)
+    .find(statusQuery)
+    .sort({ startsAt: 1 })
+    .toArray();
+  const bookings = await mapBookingDocsToAdminCalendarRows(
+    bookingDocs as (BookingDocument & { _id: ObjectId })[],
+  );
+  return { bookings, countsByStatus };
+}
+
+/**
+ * Resolves admin calendar rows whose booking id suffix matches a reference (may be multiple).
+ */
+export async function findAdminCalendarBookingsByReference(
+  referenceInput: string,
+): Promise<readonly AdminBookingCalendarRow[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const bookingReference = normalizeBookingReferenceInput(referenceInput);
+  if (bookingReference.length < 4) {
+    return [];
+  }
+  const escapedReference = bookingReference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const db = await getDb();
+  const bookingDocs = await db
+    .collection<BookingDocument>(COLLECTIONS.bookings)
+    .find({
+      $expr: {
+        $regexMatch: {
+          input: { $toString: '$_id' },
+          regex: `${escapedReference}$`,
+          options: 'i',
+        },
+      },
+    })
+    .sort({ startsAt: -1 })
+    .limit(20)
+    .toArray();
+  return mapBookingDocsToAdminCalendarRows(bookingDocs as (BookingDocument & { _id: ObjectId })[]);
 }
 
 export type BookingDetailRow = BookingRow & {

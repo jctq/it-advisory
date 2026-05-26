@@ -14,6 +14,7 @@ import { getResolvedSiteName } from '@/lib/data/app-settings';
 import { resolveBookingConfirmationSubject } from '@/lib/data/email-settings';
 import {
   buildTransactionalEmailBrandNameRow,
+  buildTransactionalEmailColorSchemeHead,
   buildTransactionalEmailLogoHeaderRow,
   resolveAbsoluteSiteOrigin,
   resolveTransactionalEmailLogoUrl,
@@ -273,6 +274,7 @@ function buildConfirmationHtml(input: {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+${buildTransactionalEmailColorSchemeHead()}
 <title>${escapeHtml(`Booking confirmed — ${input.bookingReference}`)}</title>
 <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
 </head>

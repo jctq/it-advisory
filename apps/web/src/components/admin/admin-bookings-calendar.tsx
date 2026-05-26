@@ -1,6 +1,6 @@
 'use client';
 
-import type { EventClickArg, EventHoveringArg, EventInput } from '@fullcalendar/core';
+import type { DatesSetArg, EventClickArg, EventHoveringArg, EventInput } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
@@ -9,14 +9,32 @@ import FullCalendar from '@fullcalendar/react';
 import { addMinutes } from 'date-fns';
 import { momentTimezonePlugin } from '@/lib/fullcalendar-moment-timezone-plugin';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { AdminBookingEventPreview } from '@/components/admin/admin-booking-event-preview';
 import { Popover, PopoverAnchor } from '@/components/ui/popover';
 import type { AdminBookingCalendarRow } from '@/lib/data/bookings';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
+export type AdminBookingsCalendarFocusRequest = {
+  readonly bookingId: string;
+  readonly startsAtIso: string;
+  /** Increments on each search so repeated lookups still navigate. */
+  readonly token: number;
+};
+
+export type AdminBookingsCalendarNavigateRequest = {
+  readonly fromYmd: string;
+  readonly toYmd: string;
+  readonly token: number;
+};
+
 export type AdminBookingsCalendarProps = {
   readonly bookings: readonly AdminBookingCalendarRow[];
+  readonly isLoading: boolean;
+  readonly initialAnchorYmd: string;
+  readonly focusRequest: AdminBookingsCalendarFocusRequest | null;
+  readonly navigateRequest: AdminBookingsCalendarNavigateRequest | null;
+  readonly onVisibleRangeChange: (start: Date, end: Date) => void;
 };
 
 type AnchorRect = {
@@ -30,8 +48,12 @@ type AnchorRect = {
 const BOOKING_EVENT_MINUTES = 60;
 
 const HOVER_CLOSE_DELAY_MS = 180;
+const HIGHLIGHT_DURATION_MS = 4000;
 
-function mapBookingToEvent(booking: AdminBookingCalendarRow): EventInput {
+function mapBookingToEvent(
+  booking: AdminBookingCalendarRow,
+  highlightedBookingId: string | null,
+): EventInput {
   const start = new Date(booking.startsAtIso);
   const end = addMinutes(start, BOOKING_EVENT_MINUTES);
   return {
@@ -43,7 +65,10 @@ function mapBookingToEvent(booking: AdminBookingCalendarRow): EventInput {
       status: booking.status,
       visitorId: booking.visitorId,
     },
-    classNames: [`fc-booking-status-${booking.status}`],
+    classNames: [
+      `fc-booking-status-${booking.status}`,
+      ...(highlightedBookingId === booking.id ? ['fc-booking-highlighted'] : []),
+    ],
   };
 }
 
@@ -62,9 +87,12 @@ function readAnchorRect(element: HTMLElement): AnchorRect {
  */
 export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactElement {
   const router = useRouter();
+  const calendarRef = useRef<FullCalendar>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hoveredBookingId, setHoveredBookingId] = useState<string | null>(null);
   const [anchorRect, setAnchorRect] = useState<AnchorRect | null>(null);
+  const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const bookingsById = useMemo(() => {
     const map = new Map<string, AdminBookingCalendarRow>();
     for (const booking of props.bookings) {
@@ -72,7 +100,53 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
     }
     return map;
   }, [props.bookings]);
-  const events = useMemo(() => props.bookings.map(mapBookingToEvent), [props.bookings]);
+  const events = useMemo(
+    () => props.bookings.map((booking) => mapBookingToEvent(booking, highlightedBookingId)),
+    [props.bookings, highlightedBookingId],
+  );
+  const executeDatesSet = useCallback(
+    (arg: DatesSetArg): void => {
+      props.onVisibleRangeChange(arg.start, arg.end);
+    },
+    [props.onVisibleRangeChange],
+  );
+  useEffect(() => {
+    const focus = props.focusRequest;
+    if (focus === null) {
+      return;
+    }
+    const api = calendarRef.current?.getApi();
+    if (api === undefined) {
+      return;
+    }
+    api.gotoDate(new Date(focus.startsAtIso));
+    setHighlightedBookingId(focus.bookingId);
+    if (highlightTimerRef.current !== null) {
+      clearTimeout(highlightTimerRef.current);
+    }
+    highlightTimerRef.current = setTimeout(() => {
+      setHighlightedBookingId(null);
+      highlightTimerRef.current = null;
+    }, HIGHLIGHT_DURATION_MS);
+  }, [props.focusRequest]);
+  useEffect(() => {
+    const navigate = props.navigateRequest;
+    if (navigate === null) {
+      return;
+    }
+    const api = calendarRef.current?.getApi();
+    if (api === undefined) {
+      return;
+    }
+    api.gotoDate(navigate.fromYmd);
+  }, [props.navigateRequest]);
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current !== null) {
+        clearTimeout(highlightTimerRef.current);
+      }
+    };
+  }, []);
   const hoveredBooking =
     hoveredBookingId !== null ? (bookingsById.get(hoveredBookingId) ?? null) : null;
   const clearCloseTimer = useCallback((): void => {
@@ -144,10 +218,24 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
           />
         ) : null}
       </Popover>
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+        {props.isLoading ? (
+          <div
+            className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-card/50 pt-8"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+              Loading…
+            </span>
+          </div>
+        ) : null}
         <FullCalendar
+          ref={calendarRef}
           plugins={[momentTimezonePlugin, dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
-          initialView="dayGridMonth"
+          initialView="timeGridDay"
+          initialDate={props.initialAnchorYmd}
+          datesSet={executeDatesSet}
           headerToolbar={{
             left: 'prev,next today',
             center: 'title',

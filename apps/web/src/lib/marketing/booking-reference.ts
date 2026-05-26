@@ -11,6 +11,35 @@ export function normalizeBookingReferenceInput(input: string): string {
   return input.replace(/\s/g, '').toUpperCase();
 }
 
+/** Minimum suffix length when matching a booking id by reference input. */
+const BOOKING_REFERENCE_SUFFIX_MIN_LENGTH = 4;
+
+/**
+ * True when `bookingId` ends with the normalized reference suffix (guest lookup / admin search).
+ */
+export function bookingIdMatchesReferenceInput(bookingId: string, referenceInput: string): boolean {
+  const normalizedReference = normalizeBookingReferenceInput(referenceInput);
+  if (normalizedReference.length < BOOKING_REFERENCE_SUFFIX_MIN_LENGTH) {
+    return false;
+  }
+  const normalizedId = bookingId.replace(/\s/g, '').toLowerCase();
+  return normalizedId.endsWith(normalizedReference.toLowerCase());
+}
+
+/**
+ * Returns bookings whose id suffix matches the reference input (may be multiple when input is short).
+ */
+export function filterBookingsByReferenceInput<T extends { readonly id: string }>(
+  bookings: readonly T[],
+  referenceInput: string,
+): readonly T[] {
+  const normalizedReference = normalizeBookingReferenceInput(referenceInput);
+  if (normalizedReference.length < BOOKING_REFERENCE_SUFFIX_MIN_LENGTH) {
+    return [];
+  }
+  return bookings.filter((booking) => bookingIdMatchesReferenceInput(booking.id, normalizedReference));
+}
+
 export function normalizeGuestManageEmail(email: string): string {
   return email.trim().toLowerCase();
 }
