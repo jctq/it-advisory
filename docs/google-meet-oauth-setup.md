@@ -42,6 +42,18 @@ https://www.googleapis.com/auth/calendar.events
 
 That scope allows creating events (and Meet links) on the user’s calendar.
 
+## Calendar invites for customers
+
+When a paid booking is confirmed and Google Meet is the active provider, the server:
+
+1. Creates a calendar event (with Meet) on the **OAuth calendar owner’s** account.
+2. Adds the customer as an **attendee** (email from the booking lead or payment transaction).
+3. Sends Google’s calendar invitation with `sendUpdates=all`.
+
+The **organizer** shown in Google’s email is always the **Google account that owns the refresh token** (set that account’s display name to **TechMD** in Google profile settings). Customers should accept the invite from that account rather than relying only on “Add to calendar” links in the TechMD confirmation email (self-added events list the customer as organizer).
+
+If no valid customer email is on the booking, the Meet link is still created but no Google calendar invite is emailed.
+
 ## Bookings vs “Test connection”
 
 - **Paid, confirmed bookings** create a video link only for the **Active provider** selected at the top of Admin → Settings → Meetings (must **Save** after changing it).

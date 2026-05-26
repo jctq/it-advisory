@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import { Roboto, Roboto_Mono } from 'next/font/google';
+import { AppTopLoader } from '@/components/providers/app-top-loader';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { brandAssetUrl } from '@/lib/brand/brand-assets';
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-PH" suppressHydrationWarning>
       <body className={`${sans.className} ${mono.variable} min-h-dvh antialiased`}>
         <Script src="/scripts/techmd-appearance-bootstrap.js" strategy="beforeInteractive" />
+        <AppTopLoader />
         <QueryProvider>
           {children}
           <Toaster closeButton position="top-right" richColors />

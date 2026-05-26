@@ -1,6 +1,6 @@
 'use client';
 
-import { BrainCircuit, Bug, CalendarDays, LayoutTemplate } from 'lucide-react';
+import { Bug, Building2, CalendarDays, LayoutTemplate } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -28,6 +28,8 @@ import {
 const ADMIN_SETTINGS_API_URL: string = buildApiUrl('/api/admin/settings');
 
 type SettingsPayload = {
+  readonly siteName: string;
+  readonly siteNameEnvDefault: string;
   readonly diagnosticAiEnabled: boolean;
   readonly diagnosticManageBookingEnabled: boolean;
   readonly diagnosticMaxRounds: number;
@@ -54,6 +56,7 @@ type AdminSettingsFormProps = {
 
 function areSettingsEqual(left: SettingsPayload, right: SettingsPayload): boolean {
   return (
+    left.siteName === right.siteName &&
     left.diagnosticAiEnabled === right.diagnosticAiEnabled &&
     left.diagnosticManageBookingEnabled === right.diagnosticManageBookingEnabled &&
     left.diagnosticMaxRounds === right.diagnosticMaxRounds &&
@@ -87,6 +90,8 @@ function SettingsCard(props: {
 }
 
 export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
+  const [siteName, setSiteName] = useState<string>('');
+  const [siteNameEnvDefault, setSiteNameEnvDefault] = useState<string>('TechMD');
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [diagnosticManageBookingEnabled, setDiagnosticManageBookingEnabled] = useState<boolean>(false);
   const [diagnosticMaxRounds, setDiagnosticMaxRounds] = useState<number>(4);
@@ -102,6 +107,8 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   }, [props.onStateChange]);
   const currentPayload: SettingsPayload = useMemo(
     () => ({
+      siteName,
+      siteNameEnvDefault,
       diagnosticAiEnabled,
       diagnosticManageBookingEnabled,
       diagnosticMaxRounds,
@@ -110,6 +117,8 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       diagnosticCacheDebugEnabled,
     }),
     [
+      siteName,
+      siteNameEnvDefault,
       diagnosticAiEnabled,
       diagnosticManageBookingEnabled,
       diagnosticCacheDebugEnabled,
@@ -132,6 +141,8 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       .then((data) => {
         if (!cancelled) {
           const snapshot: SettingsPayload = {
+            siteName: typeof data.siteName === 'string' ? data.siteName : '',
+            siteNameEnvDefault: typeof data.siteNameEnvDefault === 'string' ? data.siteNameEnvDefault : 'TechMD',
             diagnosticAiEnabled: typeof data.diagnosticAiEnabled === 'boolean' ? data.diagnosticAiEnabled : false,
             diagnosticManageBookingEnabled:
               typeof data.diagnosticManageBookingEnabled === 'boolean' ? data.diagnosticManageBookingEnabled : false,
@@ -141,6 +152,8 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
               typeof data.diagnosticOptionsPerQuestion === 'number' ? data.diagnosticOptionsPerQuestion : 4,
             diagnosticCacheDebugEnabled: data.diagnosticCacheDebugEnabled,
           };
+          setSiteName(snapshot.siteName);
+          setSiteNameEnvDefault(snapshot.siteNameEnvDefault);
           setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
           setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
           setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
@@ -170,13 +183,23 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       const response = await fetch(ADMIN_SETTINGS_API_URL, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentPayload),
+        body: JSON.stringify({
+          siteName,
+          diagnosticAiEnabled,
+          diagnosticManageBookingEnabled,
+          diagnosticMaxRounds,
+          diagnosticQuestionsPerRound,
+          diagnosticOptionsPerQuestion,
+          diagnosticCacheDebugEnabled,
+        }),
       });
       const data = (await response.json()) as SettingsPayload & { error?: string };
       if (!response.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Save failed');
       }
       const snapshot: SettingsPayload = {
+        siteName: typeof data.siteName === 'string' ? data.siteName : '',
+        siteNameEnvDefault: typeof data.siteNameEnvDefault === 'string' ? data.siteNameEnvDefault : siteNameEnvDefault,
         diagnosticAiEnabled: data.diagnosticAiEnabled,
         diagnosticManageBookingEnabled: data.diagnosticManageBookingEnabled,
         diagnosticMaxRounds: data.diagnosticMaxRounds,
@@ -184,6 +207,8 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         diagnosticOptionsPerQuestion: data.diagnosticOptionsPerQuestion,
         diagnosticCacheDebugEnabled: data.diagnosticCacheDebugEnabled,
       };
+      setSiteName(snapshot.siteName);
+      setSiteNameEnvDefault(snapshot.siteNameEnvDefault);
       setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
       setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
       setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
@@ -191,17 +216,28 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       setDiagnosticOptionsPerQuestion(snapshot.diagnosticOptionsPerQuestion);
       setDiagnosticCacheDebugEnabled(snapshot.diagnosticCacheDebugEnabled);
       setSavedSnapshot(snapshot);
-      notifySuccess('Diagnostic settings saved.');
+      notifySuccess('Settings saved.');
     } catch (error: unknown) {
       notifyError(error instanceof Error ? error.message : 'Save failed.');
     } finally {
       setIsSaving(false);
     }
-  }, [currentPayload]);
+  }, [
+    diagnosticAiEnabled,
+    diagnosticCacheDebugEnabled,
+    diagnosticManageBookingEnabled,
+    diagnosticMaxRounds,
+    diagnosticOptionsPerQuestion,
+    diagnosticQuestionsPerRound,
+    siteName,
+    siteNameEnvDefault,
+  ]);
   const executeReset = useCallback((): void => {
     if (savedSnapshot === null) {
       return;
     }
+    setSiteName(savedSnapshot.siteName);
+    setSiteNameEnvDefault(savedSnapshot.siteNameEnvDefault);
     setDiagnosticAiEnabled(savedSnapshot.diagnosticAiEnabled);
     setDiagnosticManageBookingEnabled(savedSnapshot.diagnosticManageBookingEnabled);
     setDiagnosticMaxRounds(savedSnapshot.diagnosticMaxRounds);
@@ -224,36 +260,132 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       isLoading,
     });
   }, [isDirty, isLoading, isSaving]);
-  const disableAiNumericFields = isLoading || !diagnosticAiEnabled;
   if (isLoading) {
-    return <AdminFormLoadingPanel label="Loading diagnostic settings" variant="cards" />;
+    return <AdminFormLoadingPanel label="Loading settings" variant="cards" />;
   }
   return (
     <div className="space-y-6">
+      <SettingsCard
+        icon={<Building2 className="size-5" aria-hidden />}
+        title="Site"
+        description="Public brand name used in transactional email sender names, message copy, and related customer-facing content."
+      >
+        <div className="space-y-2">
+          <label htmlFor="siteName" className="text-sm font-medium text-foreground">
+            Site name
+          </label>
+          <Input
+            id="siteName"
+            type="text"
+            autoComplete="organization"
+            placeholder={siteNameEnvDefault}
+            value={siteName}
+            onChange={(event) => {
+              setSiteName(event.target.value);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Leave blank to use the environment default . Email From headers use this as the display name.
+          </p>
+        </div>
+      </SettingsCard>
       <SettingsCard
         icon={<LayoutTemplate className="size-5" aria-hidden />}
         title="Intake mode"
         description="Choose whether customers follow a fixed template or AI-generated follow-up questions on web and native."
       >
-        <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-          <input
-            id="diagnosticAiEnabled"
-            type="checkbox"
-            checked={diagnosticAiEnabled}
-            onChange={(event) => {
-              setDiagnosticAiEnabled(event.target.checked);
-            }}
-            className="mt-1 size-4 rounded border-input"
-          />
-          <div>
-            <label htmlFor="diagnosticAiEnabled" className="text-sm font-medium text-foreground">
-              AI diagnostic
-            </label>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              When enabled, the quiz generates question blocks with AI. When disabled, customers use the active
-              diagnostic template from Templates.
-            </p>
+        <div className="space-y-5">
+          <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
+            <input
+              id="diagnosticAiEnabled"
+              type="checkbox"
+              checked={diagnosticAiEnabled}
+              onChange={(event) => {
+                setDiagnosticAiEnabled(event.target.checked);
+              }}
+              className="mt-1 size-4 rounded border-input"
+            />
+            <div>
+              <label htmlFor="diagnosticAiEnabled" className="text-sm font-medium text-foreground">
+                AI diagnostic
+              </label>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                When enabled, the quiz generates question blocks with AI. When disabled, customers use the active
+                diagnostic template from Templates.
+              </p>
+            </div>
           </div>
+          {diagnosticAiEnabled ? (
+            <div className="space-y-4 rounded-2xl border border-border bg-background p-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium text-foreground">AI generation limits</h3>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Defaults: 4 rounds, 5 questions per round, 4 options per question.
+                </p>
+              </div>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                  <label htmlFor="diagnosticMaxRounds" className="text-sm font-medium text-foreground">
+                    Maximum rounds
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Completion required after this many rounds ({DIAGNOSTIC_MAX_ROUNDS_MIN}–
+                    {DIAGNOSTIC_MAX_ROUNDS_MAX}).
+                  </p>
+                  <Input
+                    id="diagnosticMaxRounds"
+                    type="number"
+                    min={DIAGNOSTIC_MAX_ROUNDS_MIN}
+                    max={DIAGNOSTIC_MAX_ROUNDS_MAX}
+                    value={diagnosticMaxRounds}
+                    onChange={(event) => {
+                      setDiagnosticMaxRounds(Number.parseInt(event.target.value, 10) || DIAGNOSTIC_MAX_ROUNDS_MIN);
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="diagnosticQuestionsPerRound" className="text-sm font-medium text-foreground">
+                    Questions per round
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Range {DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN}–{DIAGNOSTIC_QUESTIONS_PER_ROUND_MAX}.
+                  </p>
+                  <Input
+                    id="diagnosticQuestionsPerRound"
+                    type="number"
+                    min={DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN}
+                    max={DIAGNOSTIC_QUESTIONS_PER_ROUND_MAX}
+                    value={diagnosticQuestionsPerRound}
+                    onChange={(event) => {
+                      setDiagnosticQuestionsPerRound(
+                        Number.parseInt(event.target.value, 10) || DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN,
+                      );
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="diagnosticOptionsPerQuestion" className="text-sm font-medium text-foreground">
+                    Options per question
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Range {DIAGNOSTIC_OPTIONS_PER_QUESTION_MIN}–{DIAGNOSTIC_OPTIONS_PER_QUESTION_MAX}.
+                  </p>
+                  <Input
+                    id="diagnosticOptionsPerQuestion"
+                    type="number"
+                    min={DIAGNOSTIC_OPTIONS_PER_QUESTION_MIN}
+                    max={DIAGNOSTIC_OPTIONS_PER_QUESTION_MAX}
+                    value={diagnosticOptionsPerQuestion}
+                    onChange={(event) => {
+                      setDiagnosticOptionsPerQuestion(
+                        Number.parseInt(event.target.value, 10) || DIAGNOSTIC_OPTIONS_PER_QUESTION_MIN,
+                      );
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </SettingsCard>
       <SettingsCard
@@ -281,81 +413,6 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
             </p>
           </div>
         </div>
-      </SettingsCard>
-      <SettingsCard
-        icon={<BrainCircuit className="size-5" aria-hidden />}
-        title="AI generation limits"
-        description="These values apply only while AI diagnostic is enabled. Defaults: 4 rounds, 5 questions per round, 4 options per question."
-        className={diagnosticAiEnabled ? undefined : 'opacity-80'}
-      >
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-            <label htmlFor="diagnosticMaxRounds" className="text-sm font-medium text-foreground">
-              Maximum rounds
-            </label>
-            <p className="text-xs text-muted-foreground">
-              Completion required after this many rounds ({DIAGNOSTIC_MAX_ROUNDS_MIN}–{DIAGNOSTIC_MAX_ROUNDS_MAX}).
-            </p>
-            <Input
-              id="diagnosticMaxRounds"
-              type="number"
-              min={DIAGNOSTIC_MAX_ROUNDS_MIN}
-              max={DIAGNOSTIC_MAX_ROUNDS_MAX}
-              disabled={disableAiNumericFields}
-              value={diagnosticMaxRounds}
-              onChange={(event) => {
-                setDiagnosticMaxRounds(Number.parseInt(event.target.value, 10) || DIAGNOSTIC_MAX_ROUNDS_MIN);
-              }}
-            />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="diagnosticQuestionsPerRound" className="text-sm font-medium text-foreground">
-              Questions per round
-            </label>
-            <p className="text-xs text-muted-foreground">
-              Range {DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN}–{DIAGNOSTIC_QUESTIONS_PER_ROUND_MAX}.
-            </p>
-            <Input
-              id="diagnosticQuestionsPerRound"
-              type="number"
-              min={DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN}
-              max={DIAGNOSTIC_QUESTIONS_PER_ROUND_MAX}
-              disabled={disableAiNumericFields}
-              value={diagnosticQuestionsPerRound}
-              onChange={(event) => {
-                setDiagnosticQuestionsPerRound(
-                  Number.parseInt(event.target.value, 10) || DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN,
-                );
-              }}
-            />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="diagnosticOptionsPerQuestion" className="text-sm font-medium text-foreground">
-              Options per question
-            </label>
-            <p className="text-xs text-muted-foreground">
-              Range {DIAGNOSTIC_OPTIONS_PER_QUESTION_MIN}–{DIAGNOSTIC_OPTIONS_PER_QUESTION_MAX}.
-            </p>
-            <Input
-              id="diagnosticOptionsPerQuestion"
-              type="number"
-              min={DIAGNOSTIC_OPTIONS_PER_QUESTION_MIN}
-              max={DIAGNOSTIC_OPTIONS_PER_QUESTION_MAX}
-              disabled={disableAiNumericFields}
-              value={diagnosticOptionsPerQuestion}
-              onChange={(event) => {
-                setDiagnosticOptionsPerQuestion(
-                  Number.parseInt(event.target.value, 10) || DIAGNOSTIC_OPTIONS_PER_QUESTION_MIN,
-                );
-              }}
-            />
-          </div>
-        </div>
-        {!diagnosticAiEnabled ? (
-          <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-            Enable AI diagnostic above to edit these limits.
-          </p>
-        ) : null}
       </SettingsCard>
       <SettingsCard
         icon={<Bug className="size-5" aria-hidden />}

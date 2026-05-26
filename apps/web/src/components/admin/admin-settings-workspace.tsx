@@ -35,7 +35,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
-type SettingsTab = 'diagnostics' | 'pricing' | 'payments' | 'email' | 'meetings';
+type SettingsTab = 'general' | 'pricing' | 'payments' | 'email' | 'meetings';
 
 type SettingsTabConfig = {
   readonly value: SettingsTab;
@@ -44,14 +44,14 @@ type SettingsTabConfig = {
 };
 
 const SETTINGS_TABS: readonly SettingsTabConfig[] = [
-  { value: 'diagnostics', label: 'Diagnostics', icon: BrainCircuit },
+  { value: 'general', label: 'General', icon: BrainCircuit },
   { value: 'pricing', label: 'Pricing', icon: CircleDollarSign },
   { value: 'payments', label: 'Payments', icon: CreditCard },
   { value: 'email', label: 'Email', icon: Mail },
   { value: 'meetings', label: 'Meetings', icon: Video },
 ];
 
-const EMPTY_DIAGNOSTICS_STATE: AdminSettingsFormState = {
+const EMPTY_GENERAL_STATE: AdminSettingsFormState = {
   isDirty: false,
   isSaving: false,
   isLoading: true,
@@ -94,14 +94,14 @@ function addMountedSettingsTab(
 }
 
 export function AdminSettingsWorkspace(): ReactElement {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('diagnostics');
-  const [mountedTabs, setMountedTabs] = useState<ReadonlySet<SettingsTab>>(() => new Set(['diagnostics']));
-  const [diagnosticsState, setDiagnosticsState] = useState<AdminSettingsFormState>(EMPTY_DIAGNOSTICS_STATE);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [mountedTabs, setMountedTabs] = useState<ReadonlySet<SettingsTab>>(() => new Set(['general']));
+  const [generalState, setGeneralState] = useState<AdminSettingsFormState>(EMPTY_GENERAL_STATE);
   const [pricingState, setPricingState] = useState<AdminPricingSettingsFormState>(EMPTY_PRICING_STATE);
   const [paymentsState, setPaymentsState] = useState<AdminPaymentSettingsFormState>(EMPTY_PAYMENTS_STATE);
   const [emailState, setEmailState] = useState<AdminEmailSettingsFormState>(EMPTY_EMAIL_STATE);
   const [meetingsState, setMeetingsState] = useState<AdminMeetingSettingsFormState>(EMPTY_MEETINGS_STATE);
-  const diagnosticsFormRef = useRef<AdminSettingsFormHandle>(null);
+  const generalFormRef = useRef<AdminSettingsFormHandle>(null);
   const pricingFormRef = useRef<AdminPricingSettingsFormHandle>(null);
   const paymentsFormRef = useRef<AdminPaymentSettingsFormHandle>(null);
   const emailFormRef = useRef<AdminEmailSettingsFormHandle>(null);
@@ -115,8 +115,8 @@ export function AdminSettingsWorkspace(): ReactElement {
     activeTrigger.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }, [activeTab]);
   const activeState =
-    activeTab === 'diagnostics'
-      ? diagnosticsState
+    activeTab === 'general'
+      ? generalState
       : activeTab === 'pricing'
         ? pricingState
         : activeTab === 'payments'
@@ -125,8 +125,8 @@ export function AdminSettingsWorkspace(): ReactElement {
             ? emailState
             : meetingsState;
   const executeSaveActive = useCallback((): void => {
-    if (activeTab === 'diagnostics') {
-      void diagnosticsFormRef.current?.save();
+    if (activeTab === 'general') {
+      void generalFormRef.current?.save();
       return;
     }
     if (activeTab === 'pricing') {
@@ -144,8 +144,8 @@ export function AdminSettingsWorkspace(): ReactElement {
     void meetingsFormRef.current?.save();
   }, [activeTab]);
   const executeResetActive = useCallback((): void => {
-    if (activeTab === 'diagnostics') {
-      diagnosticsFormRef.current?.reset();
+    if (activeTab === 'general') {
+      generalFormRef.current?.reset();
       return;
     }
     if (activeTab === 'pricing') {
@@ -220,11 +220,11 @@ export function AdminSettingsWorkspace(): ReactElement {
             />
           </div>
           <TabsContent
-            value="diagnostics"
+            value="general"
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
-            {mountedTabs.has('diagnostics') ? (
-              <AdminSettingsForm formRef={diagnosticsFormRef} onStateChange={setDiagnosticsState} />
+            {mountedTabs.has('general') ? (
+              <AdminSettingsForm formRef={generalFormRef} onStateChange={setGeneralState} />
             ) : null}
           </TabsContent>
           <TabsContent

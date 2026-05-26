@@ -12,6 +12,7 @@ import {
   encryptEmailCredentials,
 } from '@/lib/server/email-credentials-crypto';
 import { maskCredentialHint } from '@/lib/server/payment-credentials-crypto';
+import { getResolvedSiteName } from '@/lib/data/app-settings';
 import { getDb } from '@/lib/mongodb';
 
 export const EMAIL_SETTINGS_DOCUMENT_ID = 'default';
@@ -40,10 +41,16 @@ export type EmailSettingsAdminView = {
   readonly activeProvider: TransactionalEmailActiveProvider;
   readonly sandboxMode: boolean;
   readonly bookingConfirmationBcc: string;
+  readonly fromDisplayName: string;
+  readonly defaultFromDisplayName: string;
+  readonly fromEmail: string;
+  readonly bookingConfirmationSubject: string;
   readonly canStoreCredentials: boolean;
   readonly providers: readonly EmailProviderAdminStatus[];
   readonly envResendFallbackAvailable: boolean;
 };
+
+const DEFAULT_BOOKING_CONFIRMATION_SUBJECT_TEMPLATE = 'Booking confirmed — {{bookingReference}}';
 
 export type TransactionalEmailDispatchContext =
   | {
@@ -110,6 +117,9 @@ function mergeDocument(doc: EmailSettingsDocument | null): Omit<EmailSettingsDoc
     activeProvider: defaultActiveProvider(),
     sandboxMode: false,
     bookingConfirmationBcc: '',
+    fromDisplayName: '',
+    fromEmail: '',
+    bookingConfirmationSubject: '',
     providerCredentials: {},
   };
   if (doc === null) {
@@ -121,12 +131,69 @@ function mergeDocument(doc: EmailSettingsDocument | null): Omit<EmailSettingsDoc
       ? doc.activeProvider
       : base.activeProvider;
   const bcc = typeof doc.bookingConfirmationBcc === 'string' ? doc.bookingConfirmationBcc : '';
+  const fromDisplayName = typeof doc.fromDisplayName === 'string' ? doc.fromDisplayName : '';
+  const fromEmail = typeof doc.fromEmail === 'string' ? doc.fromEmail : '';
+  const bookingConfirmationSubject =
+    typeof doc.bookingConfirmationSubject === 'string' ? doc.bookingConfirmationSubject : '';
   return {
     activeProvider: active,
     sandboxMode: typeof doc.sandboxMode === 'boolean' ? doc.sandboxMode : base.sandboxMode,
     bookingConfirmationBcc: bcc,
+    fromDisplayName,
+    fromEmail,
+    bookingConfirmationSubject,
     providerCredentials: doc.providerCredentials ?? {},
   };
+}
+
+function hasFromDisplayName(from: string): boolean {
+  return /^[^<]+<[^>]+>$/.test(from.trim());
+}
+
+function applyFromDisplayName(from: string, displayName: string): string {
+  const trimmed = from.trim();
+  if (trimmed.length === 0 || hasFromDisplayName(trimmed)) {
+    return trimmed;
+  }
+  const name = displayName.trim();
+  if (name.length === 0) {
+    return trimmed;
+  }
+  return `${name} <${trimmed}>`;
+}
+
+async function resolveFromDisplayName(merged: Omit<EmailSettingsDocument, '_id' | 'updatedAt'>): Promise<string> {
+  const emailOverride = merged.fromDisplayName.trim();
+  if (emailOverride.length > 0) {
+    return emailOverride;
+  }
+  return getResolvedSiteName();
+}
+
+async function resolveTransactionalFrom(
+  merged: Omit<EmailSettingsDocument, '_id' | 'updatedAt'>,
+  credentialFrom: string,
+): Promise<string> {
+  const displayName = await resolveFromDisplayName(merged);
+  const globalFrom = merged.fromEmail.trim();
+  if (globalFrom.length > 0 && isValidFromAddress(globalFrom)) {
+    return applyFromDisplayName(globalFrom, displayName);
+  }
+  return applyFromDisplayName(credentialFrom, displayName);
+}
+
+export function formatBookingConfirmationSubject(
+  bookingReference: string,
+  subjectTemplate: string,
+): string {
+  const template =
+    subjectTemplate.trim().length > 0 ? subjectTemplate.trim() : DEFAULT_BOOKING_CONFIRMATION_SUBJECT_TEMPLATE;
+  return template.replace(/\{\{bookingReference\}\}/g, bookingReference);
+}
+
+export async function resolveBookingConfirmationSubject(bookingReference: string): Promise<string> {
+  const merged = mergeDocument(await loadDocument());
+  return formatBookingConfirmationSubject(bookingReference, merged.bookingConfirmationSubject);
 }
 
 const DEFAULT_RESEND_SANDBOX_RECIPIENT = 'delivered@resend.dev';
@@ -250,7 +317,7 @@ export async function getTransactionalEmailDispatchContext(): Promise<Transactio
             return {
               kind: 'resend',
               apiKey: extracted.apiKey,
-              from: extracted.from,
+              from: await resolveTransactionalFrom(merged, extracted.from),
               bcc,
               source: 'admin',
             };
@@ -259,7 +326,7 @@ export async function getTransactionalEmailDispatchContext(): Promise<Transactio
             return {
               kind: 'postmark',
               serverToken: extracted.serverToken,
-              from: extracted.from,
+              from: await resolveTransactionalFrom(merged, extracted.from),
               bcc,
               source: 'admin',
             };
@@ -268,7 +335,7 @@ export async function getTransactionalEmailDispatchContext(): Promise<Transactio
             return {
               kind: 'sendgrid',
               apiKey: extracted.apiKey,
-              from: extracted.from,
+              from: await resolveTransactionalFrom(merged, extracted.from),
               bcc,
               source: 'admin',
             };
@@ -282,7 +349,13 @@ export async function getTransactionalEmailDispatchContext(): Promise<Transactio
   }
   const env = readEnvResend();
   if (env !== null) {
-    return { kind: 'resend', apiKey: env.apiKey, from: env.from, bcc, source: 'env' };
+    return {
+      kind: 'resend',
+      apiKey: env.apiKey,
+      from: await resolveTransactionalFrom(merged, env.from),
+      bcc,
+      source: 'env',
+    };
   }
   return { kind: 'audit_only' };
 }
@@ -329,10 +402,15 @@ export async function getEmailSettingsAdminView(): Promise<EmailSettingsAdminVie
     }
     return { ...row, configured, credentialHint };
   });
+  const defaultFromDisplayName = await getResolvedSiteName();
   return {
     activeProvider: merged.activeProvider,
     sandboxMode: merged.sandboxMode,
     bookingConfirmationBcc: merged.bookingConfirmationBcc,
+    fromDisplayName: merged.fromDisplayName,
+    defaultFromDisplayName,
+    fromEmail: merged.fromEmail,
+    bookingConfirmationSubject: merged.bookingConfirmationSubject,
     canStoreCredentials: canEncryptEmailCredentials(),
     providers,
     envResendFallbackAvailable: envResendFallbackAvailable(),
@@ -343,6 +421,9 @@ export type UpdateEmailSettingsPatch = Partial<{
   activeProvider: TransactionalEmailActiveProvider;
   sandboxMode: boolean;
   bookingConfirmationBcc: string;
+  fromDisplayName: string;
+  fromEmail: string;
+  bookingConfirmationSubject: string;
   providerCredentials: Partial<Record<TransactionalEmailProviderId, Record<string, string> | null>>;
 }>;
 
@@ -358,6 +439,16 @@ export async function updateEmailSettings(patch: UpdateEmailSettingsPatch): Prom
       : current.activeProvider;
   const nextBcc =
     patch.bookingConfirmationBcc !== undefined ? patch.bookingConfirmationBcc : current.bookingConfirmationBcc;
+  const nextFromDisplayName =
+    patch.fromDisplayName !== undefined ? patch.fromDisplayName.trim() : current.fromDisplayName;
+  const nextFromEmail = patch.fromEmail !== undefined ? patch.fromEmail.trim() : current.fromEmail;
+  if (nextFromEmail.length > 0 && !isValidFromAddress(nextFromEmail)) {
+    throw new EmailSettingsCredentialValidationError('From email must be a valid address (e.g. bookings@yourdomain.com or Name <bookings@yourdomain.com>).');
+  }
+  const nextBookingConfirmationSubject =
+    patch.bookingConfirmationSubject !== undefined
+      ? patch.bookingConfirmationSubject.trim()
+      : current.bookingConfirmationSubject;
   const nextSandbox = patch.sandboxMode !== undefined ? patch.sandboxMode : current.sandboxMode;
   if (patch.providerCredentials !== undefined) {
     for (const providerId of TRANSACTIONAL_EMAIL_PROVIDER_IDS) {
@@ -390,6 +481,9 @@ export async function updateEmailSettings(patch: UpdateEmailSettingsPatch): Prom
     activeProvider: nextActive,
     sandboxMode: nextSandbox,
     bookingConfirmationBcc: nextBcc,
+    fromDisplayName: nextFromDisplayName,
+    fromEmail: nextFromEmail,
+    bookingConfirmationSubject: nextBookingConfirmationSubject,
     providerCredentials: blobs,
     updatedAt: new Date(),
   };
@@ -407,6 +501,7 @@ export async function executeTransactionalEmailProviderConnectionTest(
   providerId: TransactionalEmailProviderId,
 ): Promise<{ readonly ok: boolean; readonly message: string }> {
   const { executeSendTransactionalProviderTestEmail } = await import('@/lib/email/send-transactional-email');
+  const merged = mergeDocument(await loadDocument());
   if (providerId === 'resend') {
     const blobs = await loadCredentialsMap();
     const blob = blobs.resend;
@@ -418,7 +513,7 @@ export async function executeTransactionalEmailProviderConnectionTest(
           return executeSendTransactionalProviderTestEmail({
             providerId: 'resend',
             apiKey: extracted.apiKey,
-            from: extracted.from,
+            from: await resolveTransactionalFrom(merged, extracted.from),
           });
         }
       } catch {
@@ -430,7 +525,7 @@ export async function executeTransactionalEmailProviderConnectionTest(
       return executeSendTransactionalProviderTestEmail({
         providerId: 'resend',
         apiKey: env.apiKey,
-        from: env.from,
+        from: await resolveTransactionalFrom(merged, env.from),
       });
     }
     return {
@@ -453,7 +548,7 @@ export async function executeTransactionalEmailProviderConnectionTest(
       return executeSendTransactionalProviderTestEmail({
         providerId: 'postmark',
         serverToken: extracted.serverToken,
-        from: extracted.from,
+        from: await resolveTransactionalFrom(merged, extracted.from),
       });
     }
     if (extracted?.apiKey === undefined) {
@@ -462,7 +557,7 @@ export async function executeTransactionalEmailProviderConnectionTest(
     return executeSendTransactionalProviderTestEmail({
       providerId: 'sendgrid',
       apiKey: extracted.apiKey,
-      from: extracted.from,
+      from: await resolveTransactionalFrom(merged, extracted.from),
     });
   } catch {
     return { ok: false, message: 'Could not decrypt saved credentials.' };

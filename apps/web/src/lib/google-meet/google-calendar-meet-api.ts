@@ -108,42 +108,69 @@ function resolveMeetJoinUrl(payload: GoogleCalendarEventJson): string {
 
 const GOOGLE_EVENT_LOCAL_FORMAT = "yyyy-MM-dd'T'HH:mm:ss" as const;
 
+export type GoogleCalendarMeetAttendee = {
+  readonly email: string;
+  readonly displayName: string;
+};
+
 export async function requestCreateGoogleCalendarEventWithMeet(
   accessToken: string,
   credentials: GoogleMeetOAuthCredentials,
-  input: { readonly topic: string; readonly startsAt: Date; readonly durationMinutes: number; readonly timeZone: string },
+  input: {
+    readonly topic: string;
+    readonly description?: string;
+    readonly startsAt: Date;
+    readonly durationMinutes: number;
+    readonly timeZone: string;
+    readonly attendees?: readonly GoogleCalendarMeetAttendee[];
+  },
 ): Promise<{ readonly joinUrl: string; readonly eventId: string } | null> {
   const timeZone = input.timeZone.trim().length > 0 ? input.timeZone : 'UTC';
   const endAt = addMinutes(input.startsAt, input.durationMinutes);
   const calendarSegment = encodeURIComponent(credentials.calendarId);
-  const url = `${GOOGLE_CALENDAR_API_ORIGIN}/calendars/${calendarSegment}/events?conferenceDataVersion=1`;
+  const hasAttendees = input.attendees !== undefined && input.attendees.length > 0;
+  const sendUpdatesQuery = hasAttendees ? '&sendUpdates=all' : '';
+  const url = `${GOOGLE_CALENDAR_API_ORIGIN}/calendars/${calendarSegment}/events?conferenceDataVersion=1${sendUpdatesQuery}`;
   const requestId =
     typeof globalThis.crypto?.randomUUID === 'function'
       ? globalThis.crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const description = typeof input.description === 'string' ? input.description.trim() : '';
+  const eventBody: Record<string, unknown> = {
+    summary: input.topic,
+    start: {
+      dateTime: formatInTimeZone(input.startsAt, timeZone, GOOGLE_EVENT_LOCAL_FORMAT),
+      timeZone,
+    },
+    end: {
+      dateTime: formatInTimeZone(endAt, timeZone, GOOGLE_EVENT_LOCAL_FORMAT),
+      timeZone,
+    },
+    conferenceData: {
+      createRequest: {
+        requestId,
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    },
+  };
+  if (description.length > 0) {
+    eventBody.description = description;
+  }
+  if (hasAttendees) {
+    eventBody.attendees = input.attendees!.map((attendee) => ({
+      email: attendee.email.trim(),
+      displayName: attendee.displayName.trim(),
+      responseStatus: 'needsAction',
+    }));
+    eventBody.guestsCanModify = false;
+  }
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      summary: input.topic,
-      start: {
-        dateTime: formatInTimeZone(input.startsAt, timeZone, GOOGLE_EVENT_LOCAL_FORMAT),
-        timeZone,
-      },
-      end: {
-        dateTime: formatInTimeZone(endAt, timeZone, GOOGLE_EVENT_LOCAL_FORMAT),
-        timeZone,
-      },
-      conferenceData: {
-        createRequest: {
-          requestId,
-          conferenceSolutionKey: { type: 'hangoutsMeet' },
-        },
-      },
-    }),
+    body: JSON.stringify(eventBody),
   });
   const payload = (await response.json()) as GoogleCalendarEventJson & {
     readonly error?: { readonly message?: string; readonly errors?: readonly unknown[] };

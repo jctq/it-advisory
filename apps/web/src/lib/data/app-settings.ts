@@ -9,16 +9,22 @@ import {
 } from '@/domain/diagnostic-settings-bounds';
 import type { AppSettingsDocument } from '@/domain/types';
 import { getDb } from '@/lib/mongodb';
+import { readEnvSiteName, resolveSiteName } from '@/lib/site/site-name';
 
 export const APP_SETTINGS_DOCUMENT_ID = 'app';
 
 export type AppSettingsValues = {
+  readonly siteName: string;
   readonly diagnosticAiEnabled: boolean;
   readonly diagnosticManageBookingEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;
   readonly diagnosticCacheDebugEnabled: boolean;
+};
+
+export type AppSettingsAdminView = AppSettingsValues & {
+  readonly siteNameEnvDefault: string;
 };
 
 function clampInt(value: number, min: number, max: number, fallback: number): number {
@@ -34,6 +40,7 @@ function clampInt(value: number, min: number, max: number, fallback: number): nu
 
 function defaultSettings(): AppSettingsValues {
   return {
+    siteName: '',
     diagnosticAiEnabled: false,
     diagnosticManageBookingEnabled: false,
     diagnosticMaxRounds: 4,
@@ -49,6 +56,7 @@ function mergeDocument(doc: AppSettingsDocument | null): AppSettingsValues {
     return base;
   }
   return {
+    siteName: typeof doc.siteName === 'string' ? doc.siteName : base.siteName,
     diagnosticAiEnabled:
       typeof doc.diagnosticAiEnabled === 'boolean' ? doc.diagnosticAiEnabled : base.diagnosticAiEnabled,
     diagnosticManageBookingEnabled:
@@ -94,12 +102,26 @@ export async function getAppSettings(): Promise<AppSettingsValues> {
   return mergeDocument(doc);
 }
 
+export async function getResolvedSiteName(): Promise<string> {
+  const settings = await getAppSettings();
+  return resolveSiteName(settings.siteName);
+}
+
+export async function getAppSettingsAdminView(): Promise<AppSettingsAdminView> {
+  const settings = await getAppSettings();
+  return {
+    ...settings,
+    siteNameEnvDefault: readEnvSiteName(),
+  };
+}
+
 export async function updateAppSettings(patch: Partial<AppSettingsValues>): Promise<AppSettingsValues> {
   if (!process.env.MONGODB_URI) {
     throw new Error('MongoDB is not configured. Set MONGODB_URI to save app settings.');
   }
   const current = await getAppSettings();
   const next: AppSettingsValues = {
+    siteName: patch.siteName !== undefined ? patch.siteName.trim() : current.siteName,
     diagnosticAiEnabled:
       patch.diagnosticAiEnabled !== undefined ? patch.diagnosticAiEnabled : current.diagnosticAiEnabled,
     diagnosticManageBookingEnabled:

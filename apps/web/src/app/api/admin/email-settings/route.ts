@@ -16,6 +16,9 @@ const patchSchema = z.object({
   activeProvider: ACTIVE_PROVIDER_SCHEMA.optional(),
   sandboxMode: z.boolean().optional(),
   bookingConfirmationBcc: z.string().max(2000).optional(),
+  fromDisplayName: z.string().max(200).optional(),
+  fromEmail: z.string().max(500).optional(),
+  bookingConfirmationSubject: z.string().max(500).optional(),
   providerCredentials: z
     .object({
       resend: providerCredentialsSchema,
@@ -52,6 +55,9 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     body.activeProvider === undefined &&
     body.sandboxMode === undefined &&
     body.bookingConfirmationBcc === undefined &&
+    body.fromDisplayName === undefined &&
+    body.fromEmail === undefined &&
+    body.bookingConfirmationSubject === undefined &&
     body.providerCredentials === undefined &&
     body.testProviderId === undefined
   ) {
@@ -66,6 +72,9 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       activeProvider: body.activeProvider,
       sandboxMode: body.sandboxMode,
       bookingConfirmationBcc: body.bookingConfirmationBcc,
+      fromDisplayName: body.fromDisplayName,
+      fromEmail: body.fromEmail,
+      bookingConfirmationSubject: body.bookingConfirmationSubject,
       providerCredentials: body.providerCredentials as
         | Partial<Record<TransactionalEmailProviderId, Record<string, string> | null>>
         | undefined,

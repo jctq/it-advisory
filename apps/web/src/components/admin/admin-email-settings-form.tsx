@@ -34,6 +34,10 @@ type SettingsPayload = {
   readonly activeProvider: TransactionalEmailActiveProvider;
   readonly sandboxMode: boolean;
   readonly bookingConfirmationBcc: string;
+  readonly fromDisplayName: string;
+  readonly defaultFromDisplayName: string;
+  readonly fromEmail: string;
+  readonly bookingConfirmationSubject: string;
   readonly canStoreCredentials: boolean;
   readonly providers: readonly ProviderRow[];
   readonly envResendFallbackAvailable: boolean;
@@ -115,7 +119,14 @@ function areEmailSettingsEqual(
   if (Object.values(clearFlags).some(Boolean)) {
     return false;
   }
-  if (left.activeProvider !== right.activeProvider || left.sandboxMode !== right.sandboxMode || left.bookingConfirmationBcc !== right.bookingConfirmationBcc) {
+  if (
+    left.activeProvider !== right.activeProvider ||
+    left.sandboxMode !== right.sandboxMode ||
+    left.bookingConfirmationBcc !== right.bookingConfirmationBcc ||
+    left.fromDisplayName !== right.fromDisplayName ||
+    left.fromEmail !== right.fromEmail ||
+    left.bookingConfirmationSubject !== right.bookingConfirmationSubject
+  ) {
     return false;
   }
   return true;
@@ -217,6 +228,9 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
           activeProvider: settings.activeProvider,
           sandboxMode: settings.sandboxMode,
           bookingConfirmationBcc: settings.bookingConfirmationBcc,
+          fromDisplayName: settings.fromDisplayName,
+          fromEmail: settings.fromEmail,
+          bookingConfirmationSubject: settings.bookingConfirmationSubject,
           providerCredentials: Object.keys(providerCredentials).length > 0 ? providerCredentials : undefined,
         }),
       });
@@ -347,6 +361,66 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
               <code className="font-mono text-[11px]">EMAIL_SANDBOX_TO</code> to choose that inbox; if unset, the app uses its default safe address. BCC is skipped in
               sandbox. The original recipient is still stored on <code className="font-mono text-[11px]">email_sends</code> as{' '}
               <code className="font-mono text-[11px]">sandboxIntendedTo</code> for auditing.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label htmlFor="transactionalFromDisplayName" className="text-sm font-medium text-foreground">
+              From display name (optional)
+            </label>
+            <Input
+              id="transactionalFromDisplayName"
+              type="text"
+              autoComplete="off"
+              placeholder={settings.defaultFromDisplayName}
+              value={settings.fromDisplayName}
+              onChange={(event) => {
+                setSettings({ ...settings, fromDisplayName: event.target.value });
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown in the inbox as the sender. Leave blank to use{' '}
+              <strong className="font-medium text-foreground">General → Site name</strong> (
+              {settings.defaultFromDisplayName}).
+            </p>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="transactionalFromEmail" className="text-sm font-medium text-foreground">
+              From email (optional)
+            </label>
+            <Input
+              id="transactionalFromEmail"
+              type="text"
+              autoComplete="off"
+              placeholder="bookings@yourdomain.com"
+              value={settings.fromEmail}
+              onChange={(event) => {
+                setSettings({ ...settings, fromEmail: event.target.value });
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              When set, overrides the per-provider From address. Combined with the display name above.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <label htmlFor="bookingConfirmationSubject" className="text-sm font-medium text-foreground">
+              Booking confirmation subject
+            </label>
+            <Input
+              id="bookingConfirmationSubject"
+              type="text"
+              autoComplete="off"
+              placeholder="Booking confirmed — {{bookingReference}}"
+              value={settings.bookingConfirmationSubject}
+              onChange={(event) => {
+                setSettings({ ...settings, bookingConfirmationSubject: event.target.value });
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Use <code className="font-mono text-[11px]">{'{{bookingReference}}'}</code> for the booking reference. Leave blank for the default.
             </p>
           </div>
         </div>

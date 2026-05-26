@@ -327,6 +327,10 @@ export type AppSettingsDocument = {
   diagnosticAiEnabled?: boolean;
   /** When false, hides `/book/manage` and disables guest manage-booking APIs. Defaults to false when omitted. */
   diagnosticManageBookingEnabled?: boolean;
+  /**
+   * Public site / brand name override. When empty or omitted, the app uses `SITE_NAME` from the environment.
+   */
+  siteName?: string;
   diagnosticMaxRounds: number;
   diagnosticQuestionsPerRound: number;
   /** Added after initial deploy; omitted on older rows. */

@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import { brandAssetUrl } from '@/lib/brand/brand-assets';
 import { resolveConfiguredAppOrigin } from '@/lib/config/app-origin';
+import { readEnvSiteName } from '@/lib/site/site-name';
 
-export const SITE_NAME = 'TechMD' as const;
+/** Env-based site name for static metadata; runtime sends use {@link getResolvedSiteName}. */
+export const SITE_NAME = readEnvSiteName();
 
 const DEFAULT_SITE_DESCRIPTION =
   'Technology consultation. Better decisions. Stronger business. Guided diagnostics and expert sessions.';

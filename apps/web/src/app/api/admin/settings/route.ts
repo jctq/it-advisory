@@ -8,9 +8,10 @@ import {
   DIAGNOSTIC_QUESTIONS_PER_ROUND_MAX,
   DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN,
 } from '@/domain/diagnostic-settings-bounds';
-import { getAppSettings, updateAppSettings } from '@/lib/data/app-settings';
+import { getAppSettingsAdminView, updateAppSettings } from '@/lib/data/app-settings';
 
 const patchSchema = z.object({
+  siteName: z.string().max(200).optional(),
   diagnosticAiEnabled: z.boolean().optional(),
   diagnosticManageBookingEnabled: z.boolean().optional(),
   diagnosticMaxRounds: z.number().int().min(DIAGNOSTIC_MAX_ROUNDS_MIN).max(DIAGNOSTIC_MAX_ROUNDS_MAX).optional(),
@@ -31,7 +32,7 @@ const patchSchema = z.object({
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const settings = await getAppSettings();
+    const settings = await getAppSettingsAdminView();
     return NextResponse.json(settings);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -52,6 +53,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   }
   const body = parsed.data;
   if (
+    body.siteName === undefined &&
     body.diagnosticAiEnabled === undefined &&
     body.diagnosticManageBookingEnabled === undefined &&
     body.diagnosticMaxRounds === undefined &&
@@ -62,7 +64,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'No fields to update.' }, { status: 400 });
   }
   try {
-    const updated = await updateAppSettings(body);
+    await updateAppSettings(body);
+    const updated = await getAppSettingsAdminView();
     return NextResponse.json(updated);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
