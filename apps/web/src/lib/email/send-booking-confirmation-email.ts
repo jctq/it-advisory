@@ -14,9 +14,7 @@ import { getResolvedSiteName } from '@/lib/data/app-settings';
 import { resolveBookingConfirmationSubject } from '@/lib/data/email-settings';
 import {
   buildTransactionalEmailBrandNameRow,
-  buildTransactionalEmailLogoHeaderRow,
   resolveAbsoluteSiteOrigin,
-  resolveTransactionalEmailLogoUrl,
 } from '@/lib/email/email-brand';
 import { executeDispatchTransactionalEmail } from '@/lib/email/send-transactional-email';
 import {
@@ -234,14 +232,10 @@ export function buildBookingConfirmationEmailHtml(input: {
   const preheader = `Your ${input.brandName} consultation is confirmed. Reference ${input.bookingReference}.`;
   const trimmedMeeting =
     input.meetingUrl !== null && input.meetingUrl.trim().length > 0 ? input.meetingUrl.trim() : '';
-  const logoHeaderRow = buildTransactionalEmailLogoHeaderRow({
-    siteOrigin: input.siteOrigin,
+  const brandNameRow = buildTransactionalEmailBrandNameRow({
     brandName: input.brandName,
+    fontStack: EMAIL_FONT_STACK,
   });
-  const brandNameRow =
-    resolveTransactionalEmailLogoUrl(input.siteOrigin) === null
-      ? buildTransactionalEmailBrandNameRow({ brandName: input.brandName, fontStack: EMAIL_FONT_STACK })
-      : '';
   const reservationRows = [
     buildEmailDetailRow('When', `${input.dateLong} · ${input.timeLabel}`),
     buildEmailDetailRow('Booking reference', input.bookingReference),
@@ -284,7 +278,7 @@ ${escapeHtml(preheader)}&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#82
 <tr><td align="center" style="padding:32px 16px;">
 <table role="presentation" width="${EMAIL_INNER_WIDTH_PX}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${EMAIL_INNER_WIDTH_PX}px;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;">
 <tr><td style="padding:0;background-color:#ffffff;border:1px solid #e4e4e7;border-radius:12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoHeaderRow}<tr><td style="padding:32px 28px 28px 28px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:32px 28px 28px 28px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${brandNameRow}<tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;line-height:28px;color:#18181b;">Booking confirmed</td></tr><tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.customerName)}, we have received your payment and reserved your consultation time.</td></tr><tr><td>${catalogBlock}</td></tr><tr><td>${reservationCard}</td></tr><tr><td>${calendarHtml}</td></tr><tr><td>${meetingSection}</td></tr><tr><td>${manageSection}</td></tr><tr><td>${paymentBlock}</td></tr><tr><td style="padding:24px 0 0 0;border-top:1px solid #e4e4e7;"><p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:12px;line-height:18px;color:#71717a;">This message was sent automatically by ${escapeHtml(input.brandName)}. If you did not make this booking, please contact support.</p></td></tr></table>
 </td></tr></table>
 </td></tr>

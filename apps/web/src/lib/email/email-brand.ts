@@ -1,9 +1,3 @@
-import { BRAND_LOGO_COMPACT_DARK, brandAssetUrl } from '@/lib/brand/brand-assets';
-
-export const TRANSACTIONAL_EMAIL_LOGO_WIDTH_PX = 152 as const;
-/** Slate header band behind the compact dark wordmark (matches site chrome / bullet buttons). */
-export const TRANSACTIONAL_EMAIL_HEADER_BG = '#0f172a' as const;
-
 function escapeHtml(raw: string): string {
   return raw
     .replace(/&/g, '&amp;')
@@ -36,27 +30,6 @@ export function resolveAbsoluteSiteOrigin(): string {
     return vercel.replace(/\/$/, '');
   }
   return `https://${vercel.replace(/\/$/, '')}`;
-}
-
-/** True when the compact dark logo can be loaded from the public site origin. */
-export function resolveTransactionalEmailLogoUrl(siteOrigin: string): string | null {
-  const origin = siteOrigin.trim().replace(/\/$/, '');
-  if (origin.length === 0) {
-    return null;
-  }
-  return `${origin}${brandAssetUrl(BRAND_LOGO_COMPACT_DARK)}`;
-}
-
-/** Compact dark wordmark on a fixed slate header band. */
-export function buildTransactionalEmailLogoHeaderRow(input: {
-  readonly siteOrigin: string;
-  readonly brandName: string;
-}): string {
-  const logoUrl = resolveTransactionalEmailLogoUrl(input.siteOrigin);
-  if (logoUrl === null) {
-    return '';
-  }
-  return `<tr><td align="left" bgcolor="${TRANSACTIONAL_EMAIL_HEADER_BG}" style="padding:24px 28px;background-color:${TRANSACTIONAL_EMAIL_HEADER_BG};"><img src="${escapeHtml(logoUrl)}" width="${TRANSACTIONAL_EMAIL_LOGO_WIDTH_PX}" alt="${escapeHtml(input.brandName)}" style="display:block;width:${TRANSACTIONAL_EMAIL_LOGO_WIDTH_PX}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;" /></td></tr>`;
 }
 
 export function buildTransactionalEmailBrandNameRow(input: {
