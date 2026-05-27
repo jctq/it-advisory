@@ -2,6 +2,7 @@
   "name": "techmd",
   "private": true,
   "scripts": {
+    "sign:fathom-webhook": "pnpm --filter web sign:fathom-webhook",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",

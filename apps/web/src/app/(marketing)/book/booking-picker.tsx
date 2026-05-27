@@ -504,7 +504,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (hasValidQuizSessionParam) {
       clearCheckoutDraftFromSessionStorage(quizSessionRef);
     }
-  }, [hasValidQuizSessionParam, quizSessionRef]);
+  }, [hasValidQuizSessionParam, quizSessionRef, setSelectedDate, setSelectedTime]);
   const restoreCheckoutDraftFromSnapshot = useCallback((draft: CheckoutDraftSnapshot): void => {
     try {
       const slotUtc = parseBookingSlotToUtc(draft.date, draft.time);
@@ -526,7 +526,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (draft.phone.length > 0) {
       setPhone(draft.phone);
     }
-  }, []);
+  }, [setCompany, setEmail, setFullName, setPhone, setSelectedDate, setSelectedTime, setVisibleManilaYearMonth]);
   const hydrateConfirmationFromLinkedBooking = useCallback((linked: LinkedBookingSlotSnapshot): void => {
     setConfirmedServiceKey(linked.serviceKey);
     setConfirmedBookingReference(formatBookingReferenceId(linked.bookingId));
@@ -568,7 +568,18 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           /* Fall back to checkoutAmountLabel from payment config effect. */
         });
     }
-  }, []);
+  }, [
+    setConfirmedBookingReference,
+    setConfirmedCalendarSlot,
+    setConfirmedMeetingUrl,
+    setConfirmedServiceKey,
+    setConfirmedSlotDisplay,
+    setPaidAmountLabel,
+    setPhase,
+    setShowPaidSummary,
+    setSuccessBookingStatus,
+    setSuccessPaymentLabel,
+  ]);
   useEffect(() => {
     if (phase !== 'success') {
       confirmedCatalogLoadedKeyRef.current = null;
@@ -604,7 +615,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [confirmedServiceKey, phase]);
+  }, [confirmedServiceKey, phase, setConfirmedCalendarTitle, setConfirmedCatalogService]);
   useEffect(() => {
     sessionGateResolvedRef.current = null;
     catalogUrlNormalizedRef.current = false;
@@ -614,7 +625,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       setCatalogFallbackCheckout(null);
       setCheckoutCatalogService(null);
     });
-  }, [pathRefTrimmed, querySessionId]);
+  }, [pathRefTrimmed, querySessionId, setCatalogFallbackCheckout, setCheckoutCatalogService, setHasEnabledCatalog]);
   useEffect(() => {
     if (!hasValidQuizSessionParam) {
       return;
@@ -645,7 +656,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams]);
+  }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams, setCatalogFallbackCheckout, setHasEnabledCatalog]);
   useEffect(() => {
     if (phase === 'success' || phase === 'processing') {
       return;
@@ -682,7 +693,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [checkoutServiceKeyForApi, hasEnabledCatalog, phase]);
+  }, [checkoutServiceKeyForApi, hasEnabledCatalog, phase, setCheckoutCatalogService]);
   useEffect(() => {
     if (phase === 'success' || phase === 'processing') {
       queueMicrotask(() => {
@@ -798,6 +809,9 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     clearCheckoutSlotSelection,
     router,
     searchParams,
+    setPaymentCancelledNotice,
+    setPhase,
+    setSessionGateStatus,
   ]);
   useEffect(() => {
     if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
@@ -824,13 +838,15 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     router,
     searchParams,
     sessionGateStatus,
+    setPaymentCancelledNotice,
+    setPhase,
   ]);
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedPromoCode(promoCode.trim());
     }, PROMO_CODE_DEBOUNCE_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [promoCode]);
+  }, [promoCode, setDebouncedPromoCode]);
   useEffect(() => {
     paymentSelectionRef.current = {
       gatewayId: selectedGatewayId,
@@ -875,7 +891,16 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [bookingServiceKey, phase, debouncedPromoCode, recordingOptIn]);
+  }, [
+    bookingServiceKey,
+    debouncedPromoCode,
+    phase,
+    recordingOptIn,
+    setPaymentConfig,
+    setPromoError,
+    setSelectedGatewayId,
+    setSelectedPaymentMethodId,
+  ]);
   useEffect(() => {
     const controller = new AbortController();
     void fetch(AUTH_ME_API_URL, { credentials: 'include', signal: controller.signal })
@@ -907,7 +932,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [setCompany, setEmail, setFullName, setPhone]);
   useLayoutEffect(() => {
     const paymentResult = searchParams.get('payment')?.trim() ?? '';
     const returnTransactionId = searchParams.get('transactionId')?.trim() ?? '';
@@ -990,7 +1015,24 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [bookingServiceKey, hasValidQuizSessionParam, quizSessionRef, router, searchParams]);
+  }, [
+    bookingServiceKey,
+    hasValidQuizSessionParam,
+    quizSessionRef,
+    router,
+    searchParams,
+    setConfirmedBookingReference,
+    setConfirmedCalendarSlot,
+    setConfirmedMeetingUrl,
+    setConfirmedServiceKey,
+    setConfirmedSlotDisplay,
+    setErrorMessage,
+    setPaidAmountLabel,
+    setPhase,
+    setShowPaidSummary,
+    setSuccessBookingStatus,
+    setSuccessPaymentLabel,
+  ]);
   const selectedGateway = useMemo(() => {
     if (paymentConfig === null || selectedGatewayId === null) {
       return null;
@@ -1017,7 +1059,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         setSelectedPaymentMethodId(availablePaymentMethods[0]!.id);
       });
     }
-  }, [availablePaymentMethods, selectedPaymentMethodId]);
+  }, [availablePaymentMethods, selectedPaymentMethodId, setSelectedPaymentMethodId]);
   useEffect(() => {
     const controller = new AbortController();
     void fetchMarketingServerClockOffsetMs({ apiBaseUrl: MARKETING_CLIENT_API_BASE_URL, signal: controller.signal }).then((offset) => {
@@ -1029,7 +1071,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [setServerClockOffsetMs]);
 
   useEffect(() => {
     if (serverClockOffsetMs === null) {
@@ -1040,7 +1082,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     }
     const serverSyncedNow = new Date(Date.now() + serverClockOffsetMs);
     setVisibleManilaYearMonth(formatInTimeZone(serverSyncedNow, PRIMARY_TIMEZONE, 'yyyy-MM'));
-  }, [serverClockOffsetMs]);
+  }, [serverClockOffsetMs, setVisibleManilaYearMonth]);
 
   useEffect(() => {
     const keys = Object.keys(fieldErrors);
@@ -1137,7 +1179,14 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [checkoutServiceKeyForApi, phase, manilaFetchBounds]);
+  }, [
+    checkoutServiceKeyForApi,
+    manilaFetchBounds,
+    phase,
+    setAvailabilityByDate,
+    setAvailabilityError,
+    setAvailabilityStatus,
+  ]);
 
   useEffect(() => {
     if (phase !== 'date' || selectedDate === null) {
@@ -1156,7 +1205,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         return times[0] ?? null;
       });
     });
-  }, [availabilityByDate, selectedDate, phase]);
+  }, [availabilityByDate, phase, selectedDate, setSelectedTime]);
 
   const slotsForSelectedDay = useMemo((): readonly string[] => {
     if (selectedDate === null) {

@@ -56,6 +56,7 @@ function resolvePrefersReducedMotion(): boolean {
 }
 
 export function AdminOnboardingProvider(props: AdminOnboardingProviderProps) {
+  const { children, onCloseMobileSidebar, onOpenMobileSidebar, onPrepareTour } = props;
   const router = useRouter();
   const pathname = usePathname();
   const pathnameRef = useRef<string>(pathname);
@@ -81,19 +82,19 @@ export function AdminOnboardingProvider(props: AdminOnboardingProviderProps) {
       }
       const shouldClose = shouldCloseMobileSidebarForOnboardingStep(stepDefinition.target);
       if (shouldClose) {
-        props.onCloseMobileSidebar?.();
+        onCloseMobileSidebar?.();
       } else {
-        props.onOpenMobileSidebar?.();
+        onOpenMobileSidebar?.();
       }
       window.setTimeout(() => {
         driverRef.current?.refresh();
       }, MOBILE_SIDEBAR_TRANSITION_MS);
     },
-    [props.onCloseMobileSidebar, props.onOpenMobileSidebar],
+    [onCloseMobileSidebar, onOpenMobileSidebar],
   );
   const executeStartTour = useCallback((): void => {
     executeDestroyDriver();
-    props.onPrepareTour?.();
+    onPrepareTour?.();
     const prefersReducedMotion = resolvePrefersReducedMotion();
     const driverInstance = driver({
       showProgress: true,
@@ -121,7 +122,7 @@ export function AdminOnboardingProvider(props: AdminOnboardingProviderProps) {
         setIsTourActive(false);
         markAdminOnboardingWelcomeSeen();
         if (isMobileAdminViewport()) {
-          props.onCloseMobileSidebar?.();
+          onCloseMobileSidebar?.();
         }
       },
     });
@@ -130,7 +131,7 @@ export function AdminOnboardingProvider(props: AdminOnboardingProviderProps) {
     window.requestAnimationFrame(() => {
       driverInstance.drive();
     });
-  }, [executeDestroyDriver, executeSyncMobileSidebarForStep, props.onCloseMobileSidebar, props.onPrepareTour, router]);
+  }, [executeDestroyDriver, executeSyncMobileSidebarForStep, onCloseMobileSidebar, onPrepareTour, router]);
   const executeDismissWelcome = useCallback((): void => {
     setIsWelcomeOpen(false);
     markAdminOnboardingWelcomeSeen();
@@ -170,7 +171,7 @@ export function AdminOnboardingProvider(props: AdminOnboardingProviderProps) {
   );
   return (
     <AdminOnboardingContext.Provider value={contextValue}>
-      {props.children}
+      {children}
       <AdminOnboardingWelcomeDialog
         open={isWelcomeOpen}
         onOpenChange={setIsWelcomeOpen}

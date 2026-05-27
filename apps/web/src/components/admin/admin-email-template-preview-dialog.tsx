@@ -1,7 +1,7 @@
 'use client';
 
 import { Eye } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useState, type ReactElement } from 'react';
 import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +30,7 @@ type AdminEmailTemplatePreviewDialogProps = {
 const EMAIL_TEMPLATE_PREVIEWS_API_URL = buildApiUrl('/api/admin/email-template-previews');
 
 export function AdminEmailTemplatePreviewDialog(props: AdminEmailTemplatePreviewDialogProps): ReactElement {
+  const { bookingConfirmationSubject } = props;
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [templates, setTemplates] = useState<readonly TemplatePreview[]>([]);
@@ -38,8 +39,8 @@ export function AdminEmailTemplatePreviewDialog(props: AdminEmailTemplatePreview
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
-      if (props.bookingConfirmationSubject.trim().length > 0) {
-        params.set('bookingConfirmationSubject', props.bookingConfirmationSubject.trim());
+      if (bookingConfirmationSubject.trim().length > 0) {
+        params.set('bookingConfirmationSubject', bookingConfirmationSubject.trim());
       }
       const query = params.toString();
       const url = query.length > 0 ? `${EMAIL_TEMPLATE_PREVIEWS_API_URL}?${query}` : EMAIL_TEMPLATE_PREVIEWS_API_URL;
@@ -63,13 +64,16 @@ export function AdminEmailTemplatePreviewDialog(props: AdminEmailTemplatePreview
     } finally {
       setIsLoading(false);
     }
-  }, [props.bookingConfirmationSubject]);
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    void executeLoadPreviews();
-  }, [executeLoadPreviews, isOpen, props.bookingConfirmationSubject]);
+  }, [bookingConfirmationSubject]);
+  const handleOpenChange = useCallback(
+    (open: boolean): void => {
+      setIsOpen(open);
+      if (open) {
+        void executeLoadPreviews();
+      }
+    },
+    [executeLoadPreviews],
+  );
   const activeTemplate = templates.find((template) => template.id === activeTemplateId) ?? templates[0] ?? null;
   return (
     <>
@@ -78,12 +82,12 @@ export function AdminEmailTemplatePreviewDialog(props: AdminEmailTemplatePreview
         variant="outline"
         size="sm"
         className={getAdminPrimaryActionButtonClass('gap-2')}
-        onClick={() => setIsOpen(true)}
+        onClick={() => handleOpenChange(true)}
       >
         <Eye className="size-4" aria-hidden />
         Preview templates
       </Button>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogContent className="flex max-h-[min(90dvh,880px)] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
           <DialogHeader className="space-y-1 border-b border-border px-6 py-5 text-left">
             <DialogTitle className="text-base">Email template preview</DialogTitle>

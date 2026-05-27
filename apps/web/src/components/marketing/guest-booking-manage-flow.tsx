@@ -111,7 +111,7 @@ export function GuestBookingManageFlow(): ReactElement {
         setBookingReference(fromQuery);
       });
     }
-  }, [searchParams]);
+  }, [searchParams, setBookingReference]);
   useEffect(() => {
     if (hasAttemptedAccountBookingBootstrapRef.current) {
       return;
@@ -139,7 +139,13 @@ export function GuestBookingManageFlow(): ReactElement {
       .finally(() => {
         setIsAccountBootstrapLoading(false);
       });
-  }, [searchParams]);
+  }, [
+    searchParams,
+    setBooking,
+    setIsAccountBootstrapLoading,
+    setManageContext,
+    setPhase,
+  ]);
   useEffect(() => {
     const controller = new AbortController();
     void fetchPaymentConfigPublic({ apiBaseUrl: MARKETING_CLIENT_API_BASE_URL, signal: controller.signal })
@@ -161,7 +167,7 @@ export function GuestBookingManageFlow(): ReactElement {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [setPaymentConfig, setSelectedGatewayId, setSelectedPaymentMethodId]);
   const selectedGateway = useMemo(() => {
     if (paymentConfig === null || selectedGatewayId === null) {
       return null;
@@ -192,7 +198,7 @@ export function GuestBookingManageFlow(): ReactElement {
         setIsSubmitting(false);
       }
     },
-    [bookingReference, email, phoneLastFour],
+    [bookingReference, email, phoneLastFour, setBooking, setIsSubmitting, setManageContext, setPhase],
   );
   const executePay = useCallback(async (): Promise<void> => {
     if (manageContext === null || booking === null || selectedGatewayId === null || selectedPaymentMethodId === null) {
@@ -237,7 +243,7 @@ export function GuestBookingManageFlow(): ReactElement {
     } finally {
       setIsSubmitting(false);
     }
-  }, [booking, manageContext, selectedGateway, selectedGatewayId, selectedPaymentMethodId]);
+  }, [booking, manageContext, selectedGateway, selectedGatewayId, selectedPaymentMethodId, setIsSubmitting, setPhase]);
   const resetLookup = (): void => {
     setPhase('lookup');
     setBooking(null);

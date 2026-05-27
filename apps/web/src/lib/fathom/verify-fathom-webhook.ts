@@ -22,6 +22,21 @@ function decodeWebhookSecretBytes(webhookSecret: string): Buffer | null {
   }
 }
 
+export function signFathomWebhook(input: {
+  readonly webhookSecret: string;
+  readonly webhookId: string;
+  readonly webhookTimestamp: string;
+  readonly rawBody: string;
+}): string {
+  const secretBytes = decodeWebhookSecretBytes(input.webhookSecret);
+  if (secretBytes === null) {
+    throw new Error('Invalid Fathom webhook secret.');
+  }
+  const signedContent = `${input.webhookId}.${input.webhookTimestamp}.${input.rawBody}`;
+  const signature = createHmac('sha256', secretBytes).update(signedContent).digest('base64');
+  return `v1,${signature}`;
+}
+
 export function verifyFathomWebhook(input: {
   readonly webhookSecret: string;
   readonly headers: Readonly<Record<string, string | undefined>>;

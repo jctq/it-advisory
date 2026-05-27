@@ -149,13 +149,28 @@ export type AccountDiagnosticsMobileProps = {
 };
 
 export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): ReactElement {
+  const {
+    sessions,
+    statusFilter,
+    bookingReferenceInput,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    totalCount,
+    manageBookingEnabled,
+    deletingId,
+    onStatusFilterChange,
+    onBookingReferenceInputChange,
+    onLoadMore,
+    onRequestDelete,
+  } = props;
   const [selectedSession, setSelectedSession] = useState<VisitorQuizSessionSummary | null>(null);
   const listAnchorRef = useRef<HTMLDivElement>(null);
   const loadMoreRequestedRef = useRef(false);
   const [scrollMargin, setScrollMargin] = useState(0);
-  const rowCount = props.sessions.length + (props.hasMore ? 1 : 0);
+  const rowCount = sessions.length + (hasMore ? 1 : 0);
   const virtualizer = useWindowVirtualizer({
-    count: props.isLoading && props.sessions.length === 0 ? 6 : rowCount,
+    count: isLoading && sessions.length === 0 ? 6 : rowCount,
     estimateSize: () => MOBILE_LIST_ITEM_ESTIMATE_PX,
     overscan: 6,
     scrollMargin,
@@ -170,29 +185,29 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
     measureScrollMargin();
     window.addEventListener('resize', measureScrollMargin);
     return () => window.removeEventListener('resize', measureScrollMargin);
-  }, [measureScrollMargin, props.statusFilter, props.bookingReferenceInput]);
+  }, [measureScrollMargin, statusFilter, bookingReferenceInput]);
   const virtualItems = virtualizer.getVirtualItems();
   useEffect(() => {
     loadMoreRequestedRef.current = false;
-  }, [props.statusFilter, props.bookingReferenceInput]);
+  }, [statusFilter, bookingReferenceInput]);
   useEffect(() => {
-    if (!props.isLoadingMore) {
+    if (!isLoadingMore) {
       loadMoreRequestedRef.current = false;
     }
-  }, [props.isLoadingMore]);
+  }, [isLoadingMore]);
   useEffect(() => {
-    if (props.isLoading || props.isLoadingMore || !props.hasMore || props.sessions.length === 0) {
+    if (isLoading || isLoadingMore || !hasMore || sessions.length === 0) {
       return;
     }
     const lastVirtualItem = virtualItems.at(-1);
     if (lastVirtualItem === undefined) {
       return;
     }
-    if (lastVirtualItem.index >= props.sessions.length - 1 && !loadMoreRequestedRef.current) {
+    if (lastVirtualItem.index >= sessions.length - 1 && !loadMoreRequestedRef.current) {
       loadMoreRequestedRef.current = true;
-      props.onLoadMore();
+      onLoadMore();
     }
-  }, [virtualItems, props.isLoading, props.isLoadingMore, props.hasMore, props.onLoadMore, props.sessions.length]);
+  }, [hasMore, isLoading, isLoadingMore, onLoadMore, sessions.length, virtualItems]);
   const handleOpenSession = useCallback((row: VisitorQuizSessionSummary): void => {
     setSelectedSession(row);
   }, []);
@@ -214,8 +229,8 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input
             id="booking-reference-search-mobile"
-            value={props.bookingReferenceInput}
-            onChange={(event) => props.onBookingReferenceInputChange(event.target.value)}
+            value={bookingReferenceInput}
+            onChange={(event) => onBookingReferenceInputChange(event.target.value)}
             placeholder="Search by booking reference"
             className="h-10 pl-9"
             aria-label="Search by booking reference"
@@ -227,15 +242,15 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
           aria-label="Filter diagnostics by status"
         >
           {STATUS_TAB_OPTIONS.map((option) => {
-            const isActive = props.statusFilter === option.id;
+            const isActive = statusFilter === option.id;
             return (
               <button
                 key={option.id}
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                disabled={props.isLoading && props.sessions.length === 0}
-                onClick={() => props.onStatusFilterChange(option.id)}
+                disabled={isLoading && sessions.length === 0}
+                onClick={() => onStatusFilterChange(option.id)}
                 className={cn(
                   'shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors',
                   isActive
@@ -250,22 +265,22 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
         </div>
       </div>
       <p className="px-4 pt-3 text-sm text-muted-foreground">
-        {props.isLoading ? (
+        {isLoading ? (
           <span className="inline-flex items-center gap-2">
             <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
             Loading sessions…
           </span>
-        ) : props.totalCount === 0 ? (
+        ) : totalCount === 0 ? (
           'No sessions match your filters'
         ) : (
           <>
-            <span className="font-medium text-foreground">{props.totalCount}</span> session
-            {props.totalCount === 1 ? '' : 's'}
+            <span className="font-medium text-foreground">{totalCount}</span> session
+            {totalCount === 1 ? '' : 's'}
           </>
         )}
       </p>
       <div ref={listAnchorRef} className="relative w-full px-4">
-        {props.isLoading && props.sessions.length > 0 ? (
+        {isLoading && sessions.length > 0 ? (
           <div
             className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px]"
             role="status"
@@ -283,8 +298,8 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
           }}
         >
           {virtualItems.map((virtualItem) => {
-            const isLoaderRow = virtualItem.index >= props.sessions.length;
-            const row = props.sessions[virtualItem.index];
+            const isLoaderRow = virtualItem.index >= sessions.length;
+            const row = sessions[virtualItem.index];
             return (
               <div
                 key={virtualItem.key}
@@ -295,10 +310,10 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
                   transform: `translateY(${virtualItem.start - scrollMargin}px)`,
                 }}
               >
-                {props.isLoading && props.sessions.length === 0 ? (
+                {isLoading && sessions.length === 0 ? (
                   <MobileDiagnosticsListSkeleton />
                 ) : isLoaderRow ? (
-                  <MobileDiagnosticsLoadMoreRow isLoadingMore={props.isLoadingMore} hasMore={props.hasMore} />
+                  <MobileDiagnosticsLoadMoreRow isLoadingMore={isLoadingMore} hasMore={hasMore} />
                 ) : row !== undefined ? (
                   <MobileDiagnosticsListItem row={row} onOpen={handleOpenSession} />
                 ) : null}
@@ -306,16 +321,16 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
             );
           })}
         </div>
-        {!props.isLoading && props.sessions.length === 0 ? (
+        {!isLoading && sessions.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">No sessions on this page. Try another filter or search term.</p>
         ) : null}
       </div>
       <MobileDiagnosticsSessionDialog
         session={selectedSession}
-        manageBookingEnabled={props.manageBookingEnabled}
-        deletingId={props.deletingId}
+        manageBookingEnabled={manageBookingEnabled}
+        deletingId={deletingId}
         onOpenChange={handleCloseDialog}
-        onRequestDelete={props.onRequestDelete}
+        onRequestDelete={onRequestDelete}
       />
     </div>
   );

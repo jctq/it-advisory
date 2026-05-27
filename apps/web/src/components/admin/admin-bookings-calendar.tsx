@@ -87,6 +87,7 @@ function readAnchorRect(element: HTMLElement): AnchorRect {
  * FullCalendar for admin bookings: month, week, day, and list views with Manila timezone.
  */
 export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactElement {
+  const { bookings, focusRequest, navigateRequest, isLoading, initialAnchorYmd, onVisibleRangeChange } = props;
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,23 +97,23 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
   const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const bookingsById = useMemo(() => {
     const map = new Map<string, AdminBookingCalendarRow>();
-    for (const booking of props.bookings) {
+    for (const booking of bookings) {
       map.set(booking.id, booking);
     }
     return map;
-  }, [props.bookings]);
+  }, [bookings]);
   const events = useMemo(
-    () => props.bookings.map((booking) => mapBookingToEvent(booking, highlightedBookingId)),
-    [props.bookings, highlightedBookingId],
+    () => bookings.map((booking) => mapBookingToEvent(booking, highlightedBookingId)),
+    [bookings, highlightedBookingId],
   );
   const executeDatesSet = useCallback(
     (arg: DatesSetArg): void => {
-      props.onVisibleRangeChange(arg.start, arg.end);
+      onVisibleRangeChange(arg.start, arg.end);
     },
-    [props.onVisibleRangeChange],
+    [onVisibleRangeChange],
   );
   useEffect(() => {
-    const focus = props.focusRequest;
+    const focus = focusRequest;
     if (focus === null) {
       return;
     }
@@ -129,9 +130,9 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
       setHighlightedBookingId(null);
       highlightTimerRef.current = null;
     }, HIGHLIGHT_DURATION_MS);
-  }, [props.focusRequest]);
+  }, [focusRequest]);
   useEffect(() => {
-    const navigate = props.navigateRequest;
+    const navigate = navigateRequest;
     if (navigate === null) {
       return;
     }
@@ -140,7 +141,7 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
       return;
     }
     api.gotoDate(navigate.fromYmd);
-  }, [props.navigateRequest]);
+  }, [navigateRequest]);
   useEffect(() => {
     return () => {
       if (highlightTimerRef.current !== null) {
@@ -220,7 +221,7 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
         ) : null}
       </Popover>
       <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-        {props.isLoading ? (
+        {isLoading ? (
           <div
             className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-card/50 pt-8"
             aria-live="polite"
@@ -235,7 +236,7 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
           ref={calendarRef}
           plugins={[momentTimezonePlugin, dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView="timeGridDay"
-          initialDate={props.initialAnchorYmd}
+          initialDate={initialAnchorYmd}
           datesSet={executeDatesSet}
           headerToolbar={{
             left: 'prev,next today',

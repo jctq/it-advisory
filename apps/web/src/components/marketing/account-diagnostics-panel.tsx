@@ -260,22 +260,22 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
   const pageSize = isMobileViewport ? ACCOUNT_DIAGNOSTICS_MOBILE_PAGE_SIZE : ACCOUNT_DIAGNOSTICS_PAGE_SIZE;
   const onNavigateError = useCallback((message: string): void => {
     setActionError(message);
-  }, []);
+  }, [setActionError]);
   const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(true, onNavigateError);
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedBookingReference(bookingReferenceInput.trim());
     }, BOOKING_REFERENCE_DEBOUNCE_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [bookingReferenceInput]);
+  }, [bookingReferenceInput, setDebouncedBookingReference]);
   useEffect(() => {
     setPage(1);
-  }, [debouncedBookingReference, statusFilter, isMobileViewport]);
+  }, [debouncedBookingReference, isMobileViewport, setPage, statusFilter]);
   useEffect(() => {
     if (totalPages > 0 && page > totalPages) {
       setPage(totalPages);
     }
-  }, [page, totalPages]);
+  }, [page, setPage, totalPages]);
   const fetchSessions = useCallback(async (): Promise<void> => {
     const requestId = fetchRequestIdRef.current + 1;
     fetchRequestIdRef.current = requestId;
@@ -332,7 +332,20 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
         setIsLoadingMore(false);
       }
     }
-  }, [page, pageSize, statusFilter, debouncedBookingReference, isMobileViewport]);
+  }, [
+    debouncedBookingReference,
+    isMobileViewport,
+    page,
+    pageSize,
+    setHasAnySessions,
+    setIsLoading,
+    setIsLoadingMore,
+    setLoadError,
+    setSessions,
+    setTotalCount,
+    setTotalPages,
+    statusFilter,
+  ]);
   useEffect(() => {
     if (skipInitialFetchRef.current) {
       skipInitialFetchRef.current = false;
@@ -364,7 +377,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
         setDeletingId(null);
       }
     },
-    [fetchSessions],
+    [fetchSessions, setActionError, setDeleteTarget, setDeletingId],
   );
   const handleConfirmDelete = useCallback((): void => {
     if (deleteTarget === null) {
@@ -378,7 +391,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
       sessionTitlePreview: row.sessionTitlePreview,
       situationPreview: row.situationPreview,
     });
-  }, []);
+  }, [setDeleteTarget]);
   const tableData = useMemo(() => [...sessions], [sessions]);
   const columns = useMemo(
     () => [
@@ -497,7 +510,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
       return;
     }
     setPage((current) => current + 1);
-  }, [hasMoreSessions, isLoading, isLoadingMore]);
+  }, [hasMoreSessions, isLoading, isLoadingMore, setPage]);
   return (
     <div className="space-y-6">
       <AlertDialog

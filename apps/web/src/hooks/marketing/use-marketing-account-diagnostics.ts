@@ -105,16 +105,20 @@ export function useMarketingAccountDiagnostics(
     [patchAccountDiagnostics, setAccountDiagnosticsField],
   );
   const hasHydratedServerListRef = useRef(false);
-  if (hasServerInitialList && !hasHydratedServerListRef.current) {
+  const initialList = options.initialList;
+  useEffect(() => {
+    if (!hasServerInitialList || hasHydratedServerListRef.current || initialList === undefined) {
+      return;
+    }
     hasHydratedServerListRef.current = true;
     patchAccountDiagnostics({
       isLoading: false,
-      sessions: options.initialList!.result.sessions,
-      totalCount: options.initialList!.result.totalCount,
-      totalPages: options.initialList!.result.totalPages,
-      hasAnySessions: options.initialList!.result.hasAnySessions,
+      sessions: initialList.result.sessions,
+      totalCount: initialList.result.totalCount,
+      totalPages: initialList.result.totalPages,
+      hasAnySessions: initialList.result.hasAnySessions,
     });
-  }
+  }, [hasServerInitialList, initialList, patchAccountDiagnostics]);
   useEffect(() => {
     return () => {
       resetAccountDiagnostics();

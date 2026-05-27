@@ -282,7 +282,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
         body: JSON.stringify(body),
       });
     },
-    [sessionTargetId],
+    [sessionReadOnlyRef, sessionTargetId],
   );
   useEffect(() => {
     if (lastSessionInitKeyRef.current === sessionInitKey && hasHydratedRef.current) {
@@ -378,7 +378,18 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [isRetakeQuery, persistGuided, router, sessionInitKey, sessionTargetId]);
+  }, [
+    isRetakeQuery,
+    persistGuided,
+    router,
+    sessionInitKey,
+    sessionReadOnlyRef,
+    sessionTargetId,
+    setGuided,
+    setIsSessionReady,
+    setSessionReadOnly,
+    setTargetSessionError,
+  ]);
   useEffect(() => {
     let cancelled = false;
     async function loadProgressMetadata(): Promise<void> {
@@ -416,7 +427,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [sessionTargetId]);
+  }, [sessionTargetId, setActiveTemplate, setDiagnosticAiEnabled]);
   useEffect(() => {
     if (!isSessionReady || !hasHydratedRef.current || sessionReadOnlyRef.current) {
       return;
@@ -425,7 +436,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       void persistGuided(guided, false);
     }, 280);
     return () => clearTimeout(handle);
-  }, [guided, isSessionReady, persistGuided]);
+  }, [guided, isSessionReady, persistGuided, sessionReadOnlyRef]);
   useEffect(() => {
     if (!isSessionReady || typeof document === 'undefined' || sessionReadOnlyRef.current) {
       return;
@@ -443,7 +454,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       document.removeEventListener('visibilitychange', flushBeforeLeave);
       window.removeEventListener('pagehide', flushBeforeLeave);
     };
-  }, [guided, isSessionReady, persistGuided]);
+  }, [guided, isSessionReady, persistGuided, sessionReadOnlyRef]);
   const progressPercent = useMemo(() => {
     if (guided.outcome !== null) {
       return 100;
@@ -518,7 +529,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     } finally {
       setIsDeleting(false);
     }
-  }, [router, sessionTargetId]);
+  }, [router, sessionTargetId, setDeleteError, setIsDeleteDialogOpen, setIsDeleting]);
   const executeGoBack = (): void => {
     setGuided((previous) => applyGuidedGoBack(previous));
   };
@@ -561,7 +572,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       );
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    [diagnosticAiEnabled, guided, visibleTemplateRounds],
+    [diagnosticAiEnabled, guided, sessionReadOnlyRef, setGuided, visibleTemplateRounds],
   );
   if (!isSessionReady) {
     return (
