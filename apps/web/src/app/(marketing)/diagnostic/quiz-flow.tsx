@@ -39,6 +39,7 @@ import {
 } from '@/lib/marketing/quiz-session-marketing-ref';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import {
+  type LinkedBookingSlotSnapshot,
   parseLinkedBookingSlotSnapshot,
   resolveDiagnosticShowBookingActions,
 } from '@/lib/marketing/quiz-session-linked-booking';
@@ -255,6 +256,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     sessionReadOnlyRef,
   } = useMarketingDiagnosticQuiz();
   const [showBookingActions, setShowBookingActions] = useState<boolean>(true);
+  const [linkedBookingSlot, setLinkedBookingSlot] = useState<LinkedBookingSlotSnapshot | null>(null);
   const hasHydratedRef = useRef<boolean>(false);
   const lastSessionInitKeyRef = useRef<string | null>(null);
   const skipNextSessionHydrationRef = useRef<boolean>(false);
@@ -293,6 +295,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       sessionReadOnlyRef.current = false;
       setSessionReadOnly(false);
       setShowBookingActions(true);
+      setLinkedBookingSlot(null);
       if (isRetakeQuery) {
         setIsSessionReady(false);
         await persistGuided(GUIDED_DIAGNOSTIC_EMPTY, false);
@@ -329,6 +332,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           sessionReadOnlyRef.current = false;
           setSessionReadOnly(false);
           setShowBookingActions(true);
+          setLinkedBookingSlot(null);
           hasHydratedRef.current = true;
           setIsSessionReady(true);
           return;
@@ -342,16 +346,21 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           sessionReadOnlyRef.current = false;
           setSessionReadOnly(false);
           setShowBookingActions(true);
+          setLinkedBookingSlot(null);
           hasHydratedRef.current = true;
           setIsSessionReady(true);
           return;
         }
         const readOnly = Boolean(data.readOnly);
-        const linkedBookingSlot = parseLinkedBookingSlotSnapshot(data.linkedBookingSlot);
+        const parsedLinkedBookingSlot = parseLinkedBookingSlotSnapshot(data.linkedBookingSlot);
         sessionReadOnlyRef.current = readOnly;
         setSessionReadOnly(readOnly);
+        setLinkedBookingSlot(parsedLinkedBookingSlot);
         setShowBookingActions(
-          resolveDiagnosticShowBookingActions({ sessionReadOnly: readOnly, linkedBookingSlot }),
+          resolveDiagnosticShowBookingActions({
+            sessionReadOnly: readOnly,
+            linkedBookingSlot: parsedLinkedBookingSlot,
+          }),
         );
         const rawGuided = data.session.answers['guidedDiagnostic'];
         const normalized = normalizeGuidedDiagnosticRaw(rawGuided);
@@ -727,7 +736,15 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
         )}
       </div>
       <div className="max-w-6xl mx-auto">
-        {sessionReadOnly ? (
+        {sessionReadOnly && linkedBookingSlot?.status === 'cancelled' ? (
+          <div
+            className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            role="alert"
+          >
+            <p className="font-medium">Cancelled</p>
+            <p className="mt-1">This diagnostic has been cancelled. No further action needed.</p>
+          </div>
+        ) : sessionReadOnly ? (
           <div
             className="mb-6 rounded-lg border border-border px-4 py-3 text-sm text-white dark:text-warning-foreground bg-warning"
             role="status"

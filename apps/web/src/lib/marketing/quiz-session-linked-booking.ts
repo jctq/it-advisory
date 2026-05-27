@@ -23,6 +23,10 @@ export function isLinkedBookingPendingPayment(linked: LinkedBookingSlotSnapshot)
   return linked.status === 'pending' && linked.paymentStatus !== 'paid';
 }
 
+export function isLinkedBookingCancelled(linked: LinkedBookingSlotSnapshot): boolean {
+  return linked.status === 'cancelled';
+}
+
 export function parseLinkedBookingSlotSnapshot(value: unknown): LinkedBookingSlotSnapshot | null {
   if (value === null || value === undefined || typeof value !== 'object') {
     return null;
@@ -77,6 +81,9 @@ export function resolveDiagnosticShowBookingActions(params: {
     return true;
   }
   if (params.linkedBookingSlot === null) {
+    return false;
+  }
+  if (isLinkedBookingCancelled(params.linkedBookingSlot)) {
     return false;
   }
   return isLinkedBookingPendingPayment(params.linkedBookingSlot);
