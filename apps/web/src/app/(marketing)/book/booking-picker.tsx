@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactElement } from 'react';
+import {
+  DEFAULT_BOOKING_SERVICE_KEY,
+  type BookingSlotPhase,
+  type ConfirmedSlotDisplay,
+  type PaymentMethodId,
+} from '@/store/marketing';
+import { useMarketingBookingFlow } from '@/hooks/marketing/use-marketing-booking-flow';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { addMonths, parse } from 'date-fns';
@@ -51,6 +58,11 @@ import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
 import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-slot-times-for-manila-date';
+import {
+  isLinkedBookingPendingPayment,
+  parseLinkedBookingSlotSnapshot,
+  type LinkedBookingSlotSnapshot,
+} from '@/lib/marketing/quiz-session-linked-booking';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { notifyError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
@@ -110,7 +122,7 @@ function resolveMarketingClientApiBaseUrl(): string {
 }
 
 const MARKETING_CLIENT_API_BASE_URL = resolveMarketingClientApiBaseUrl();
-const DEFAULT_SERVICE_KEY = 'project-rescue' as const;
+const DEFAULT_SERVICE_KEY = DEFAULT_BOOKING_SERVICE_KEY;
 
 function resolveBookingServiceKey(searchParams: URLSearchParams, hasEnabledCatalog: boolean | null): string {
   const fromQuery = searchParams.get('serviceKey')?.trim() ?? '';
@@ -125,28 +137,6 @@ function resolveBookingServiceKey(searchParams: URLSearchParams, hasEnabledCatal
 
 const DEFAULT_CHECKOUT_AMOUNT_LABEL = '₱6,000.00';
 const PROMO_CODE_DEBOUNCE_MS = 400;
-type BookingSlotPhase = 'date' | 'details' | 'payment';
-
-type BookingPhase = BookingSlotPhase | 'processing' | 'success' | 'error';
-
-type BookSessionGateStatus = 'loading' | 'missing' | 'invalid_format' | 'not_found' | 'already_booked' | 'ready';
-
-type LinkedBookingSlotSnapshot = {
-  readonly bookingId: string;
-  readonly status: 'pending' | 'confirmed' | 'cancelled';
-  readonly startsAtIso: string;
-  readonly timezone: string;
-  readonly serviceKey: string;
-  readonly meetingUrl: string | null;
-  readonly paymentTransactionId: string | null;
-  readonly paymentMethodLabel: string | null;
-  readonly paymentStatus: string | null;
-  readonly customerName: string | null;
-  readonly customerEmail: string | null;
-  readonly customerCompany: string | null;
-  readonly customerPhone: string | null;
-};
-
 type CheckoutDraftSnapshot = {
   readonly date: string;
   readonly time: string;
@@ -216,59 +206,11 @@ function clearCheckoutDraftFromSessionStorage(sessionRef: string): void {
   }
 }
 
-function isLinkedBookingPendingPayment(linked: LinkedBookingSlotSnapshot): boolean {
-  return linked.status === 'pending' && linked.paymentStatus !== 'paid';
-}
-
 type QuizSessionGateApiPayload = {
   readonly session?: unknown;
   readonly readOnly?: boolean;
   readonly linkedBookingSlot?: LinkedBookingSlotSnapshot | null;
 };
-
-function parseLinkedBookingSlotSnapshot(value: unknown): LinkedBookingSlotSnapshot | null {
-  if (value === null || value === undefined || typeof value !== 'object') {
-    return null;
-  }
-  const row = value as Record<string, unknown>;
-  const bookingId = typeof row.bookingId === 'string' ? row.bookingId.trim() : '';
-  const startsAtIso = typeof row.startsAtIso === 'string' ? row.startsAtIso.trim() : '';
-  if (bookingId.length === 0 || startsAtIso.length === 0) {
-    return null;
-  }
-  const statusRaw = row.status;
-  const status =
-    statusRaw === 'pending' || statusRaw === 'confirmed' || statusRaw === 'cancelled' ? statusRaw : 'confirmed';
-  const timezone = typeof row.timezone === 'string' && row.timezone.trim().length > 0 ? row.timezone.trim() : PRIMARY_TIMEZONE;
-  const serviceKey = typeof row.serviceKey === 'string' && row.serviceKey.trim().length > 0 ? row.serviceKey.trim() : DEFAULT_SERVICE_KEY;
-  const meetingRaw = typeof row.meetingUrl === 'string' ? row.meetingUrl.trim() : '';
-  const paymentTransactionId =
-    typeof row.paymentTransactionId === 'string' && row.paymentTransactionId.trim().length > 0
-      ? row.paymentTransactionId.trim()
-      : null;
-  const paymentMethodRaw = typeof row.paymentMethodLabel === 'string' ? row.paymentMethodLabel.trim() : '';
-  const customerNameRaw = typeof row.customerName === 'string' ? row.customerName.trim() : '';
-  const customerEmailRaw = typeof row.customerEmail === 'string' ? row.customerEmail.trim() : '';
-  const customerCompanyRaw = typeof row.customerCompany === 'string' ? row.customerCompany.trim() : '';
-  const customerPhoneRaw = typeof row.customerPhone === 'string' ? row.customerPhone.trim() : '';
-  return {
-    bookingId,
-    status,
-    startsAtIso,
-    timezone,
-    serviceKey,
-    meetingUrl: meetingRaw.length > 0 ? meetingRaw : null,
-    paymentTransactionId,
-    paymentMethodLabel: paymentMethodRaw.length > 0 ? paymentMethodRaw : null,
-    paymentStatus: typeof row.paymentStatus === 'string' ? row.paymentStatus : null,
-    customerName: customerNameRaw.length > 0 ? customerNameRaw : null,
-    customerEmail: customerEmailRaw.length > 0 ? customerEmailRaw : null,
-    customerCompany: customerCompanyRaw.length > 0 ? customerCompanyRaw : null,
-    customerPhone: customerPhoneRaw.length > 0 ? customerPhoneRaw : null,
-  };
-}
-
-type PaymentMethodId = 'card' | 'gcash' | 'maya' | 'bank_transfer' | 'paypal';
 
 const PAYMENT_METHOD_OPTIONS: readonly {
   readonly id: PaymentMethodId;
@@ -319,16 +261,6 @@ function addManilaYearMonth(manilaYearMonth: string, deltaMonths: number): strin
   );
   return formatInTimeZone(addMonths(pivot, deltaMonths), PRIMARY_TIMEZONE, 'yyyy-MM');
 }
-
-type ConfirmedSlotDisplay = {
-  readonly dateLong: string;
-  readonly timeLabel: string;
-};
-
-type ConfirmedCalendarSlot = {
-  readonly startsAtIso: string;
-  readonly timezone: string;
-};
 
 function formatConfirmedSlotFromStartsAt(startsAtIso: string, timezone: string): ConfirmedSlotDisplay {
   const startsAt = new Date(startsAtIso);
@@ -440,59 +372,99 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     pathSessionRef !== undefined && pathSessionRef !== null ? pathSessionRef.trim() : '';
   const querySessionId = searchParams.get('sessionId')?.trim() ?? '';
   const hasPathSegment = pathRefTrimmed.length > 0;
-  const [sessionGateStatus, setSessionGateStatus] = useState<BookSessionGateStatus>('loading');
-  const [paymentCancelledNotice, setPaymentCancelledNotice] = useState<boolean>(false);
+  const {
+    sessionGateStatus,
+    paymentCancelledNotice,
+    serverClockOffsetMs,
+    phase,
+    visibleManilaYearMonth,
+    selectedDate,
+    selectedTime,
+    slotDialogOpen,
+    slotDialogManilaYmd,
+    fullName,
+    email,
+    company,
+    phone,
+    fieldErrors,
+    paymentMethod,
+    paymentConfig,
+    promoCode,
+    recordingOptIn,
+    debouncedPromoCode,
+    promoError,
+    selectedGatewayId,
+    selectedPaymentMethodId,
+    availabilityByDate,
+    availabilityStatus,
+    availabilityError,
+    errorMessage,
+    successPaymentLabel,
+    confirmedBookingReference,
+    confirmedMeetingUrl,
+    confirmedSlotDisplay,
+    confirmedCalendarSlot,
+    successBookingStatus,
+    paidAmountLabel,
+    showPaidSummary,
+    confirmedServiceKey,
+    confirmedCalendarTitle,
+    confirmedCatalogService,
+    hasEnabledCatalog,
+    catalogFallbackCheckout,
+    checkoutCatalogService,
+    setSessionGateStatus,
+    setPaymentCancelledNotice,
+    setServerClockOffsetMs,
+    setPhase,
+    setVisibleManilaYearMonth,
+    setSelectedDate,
+    setSelectedTime,
+    setSlotDialogOpen,
+    setSlotDialogManilaYmd,
+    setFullName,
+    setEmail,
+    setCompany,
+    setPhone,
+    setFieldErrors,
+    setPaymentMethod,
+    setPaymentConfig,
+    setPromoCode,
+    setRecordingOptIn,
+    setDebouncedPromoCode,
+    setPromoError,
+    setSelectedGatewayId,
+    setSelectedPaymentMethodId,
+    setAvailabilityByDate,
+    setAvailabilityStatus,
+    setAvailabilityError,
+    setErrorMessage,
+    setSuccessPaymentLabel,
+    setConfirmedBookingReference,
+    setConfirmedMeetingUrl,
+    setConfirmedSlotDisplay,
+    setConfirmedCalendarSlot,
+    setSuccessBookingStatus,
+    setPaidAmountLabel,
+    setShowPaidSummary,
+    setConfirmedServiceKey,
+    setConfirmedCalendarTitle,
+    setConfirmedCatalogService,
+    setHasEnabledCatalog,
+    setCatalogFallbackCheckout,
+    setCheckoutCatalogService,
+  } = useMarketingBookingFlow();
   const hasUserNavigatedVisibleMonthRef = useRef<boolean>(false);
-  const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null);
-  const [phase, setPhase] = useState<BookingPhase>('date');
-  const [visibleManilaYearMonth, setVisibleManilaYearMonth] = useState<string>(() =>
-    formatInTimeZone(new Date(), PRIMARY_TIMEZONE, 'yyyy-MM'),
-  );
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [slotDialogOpen, setSlotDialogOpen] = useState<boolean>(false);
-  const [slotDialogManilaYmd, setSlotDialogManilaYmd] = useState<string | null>(null);
-  const [fullName, setFullName] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
-  const [company, setCompany] = useState<string>('');
-  const [phone, setPhone] = useState<string>('');
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId | null>('card');
-  const [paymentConfig, setPaymentConfig] = useState<PaymentConfigPublic | null>(null);
-  const [promoCode, setPromoCode] = useState<string>('');
-  const [recordingOptIn, setRecordingOptIn] = useState<boolean>(false);
-  const [debouncedPromoCode, setDebouncedPromoCode] = useState<string>('');
-  const [promoError, setPromoError] = useState<string | null>(null);
-  const [selectedGatewayId, setSelectedGatewayId] = useState<PaymentGatewayId | null>(null);
-  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
   const paymentSelectionRef = useRef<{ readonly gatewayId: PaymentGatewayId | null; readonly methodId: string | null }>({
     gatewayId: null,
     methodId: null,
   });
-  const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, readonly string[]>>({});
-  const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle');
-  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successPaymentLabel, setSuccessPaymentLabel] = useState<string>('');
-  const [confirmedBookingReference, setConfirmedBookingReference] = useState<string | null>(null);
-  const [confirmedMeetingUrl, setConfirmedMeetingUrl] = useState<string | null>(null);
-  const [confirmedSlotDisplay, setConfirmedSlotDisplay] = useState<ConfirmedSlotDisplay | null>(null);
-  const [confirmedCalendarSlot, setConfirmedCalendarSlot] = useState<ConfirmedCalendarSlot | null>(null);
-  const [successBookingStatus, setSuccessBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled' | null>(null);
-  const [paidAmountLabel, setPaidAmountLabel] = useState<string | null>(null);
-  const [showPaidSummary, setShowPaidSummary] = useState<boolean>(false);
-  const [confirmedServiceKey, setConfirmedServiceKey] = useState<string>(DEFAULT_SERVICE_KEY);
-  const [confirmedCalendarTitle, setConfirmedCalendarTitle] = useState<string>(PROJECT_RESCUE_SERVICE_TITLE);
-  const [confirmedCatalogService, setConfirmedCatalogService] = useState<PublicCatalogServiceRow | null>(null);
   const paymentReturnHandledRef = useRef<string | null>(null);
   const linkedConfirmationHandledRef = useRef<string | null>(null);
   const confirmedCatalogLoadedKeyRef = useRef<string | null>(null);
   const checkoutCatalogLoadedKeyRef = useRef<string | null>(null);
   const sessionGateResolvedRef = useRef<string | null>(null);
   const catalogUrlNormalizedRef = useRef(false);
-  const [hasEnabledCatalog, setHasEnabledCatalog] = useState<boolean | null>(null);
-  const [catalogFallbackCheckout, setCatalogFallbackCheckout] = useState<PublicCatalogFallbackCheckout | null>(null);
-  const [checkoutCatalogService, setCheckoutCatalogService] = useState<PublicCatalogServiceRow | null>(null);
   const bookingServiceKey = resolveBookingServiceKey(searchParams, hasEnabledCatalog);
   const checkoutServiceKeyForApi =
     bookingServiceKey.trim().length > 0 ? bookingServiceKey.trim() : DEFAULT_SERVICE_KEY;
@@ -526,29 +498,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
 
   const checkoutAmountLabel = paymentConfig?.checkoutAmountLabel ?? DEFAULT_CHECKOUT_AMOUNT_LABEL;
   const successAmountLabel = paidAmountLabel ?? checkoutAmountLabel;
-  const restoreCheckoutDraftFromLinkedBooking = useCallback((linked: LinkedBookingSlotSnapshot): void => {
-    const slotParts = formatBookingSlotPartsFromStartsAt(new Date(linked.startsAtIso), linked.timezone);
-    try {
-      const slotUtc = parseBookingSlotToUtc(slotParts.date, slotParts.time);
-      setSelectedDate(slotUtc);
-      setSelectedTime(slotParts.time);
-      setVisibleManilaYearMonth(formatInTimeZone(slotUtc, PRIMARY_TIMEZONE, 'yyyy-MM'));
-    } catch {
-      /* Slot restore is best-effort when parsing fails. */
+  const clearCheckoutSlotSelection = useCallback((): void => {
+    setSelectedDate(null);
+    setSelectedTime(null);
+    if (hasValidQuizSessionParam) {
+      clearCheckoutDraftFromSessionStorage(quizSessionRef);
     }
-    if (linked.customerName !== null) {
-      setFullName(linked.customerName);
-    }
-    if (linked.customerEmail !== null) {
-      setEmail(linked.customerEmail);
-    }
-    if (linked.customerCompany !== null) {
-      setCompany(linked.customerCompany);
-    }
-    if (linked.customerPhone !== null) {
-      setPhone(linked.customerPhone);
-    }
-  }, []);
+  }, [hasValidQuizSessionParam, quizSessionRef]);
   const restoreCheckoutDraftFromSnapshot = useCallback((draft: CheckoutDraftSnapshot): void => {
     try {
       const slotUtc = parseBookingSlotToUtc(draft.date, draft.time);
@@ -790,9 +746,9 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         if (data.readOnly === true && !isPaymentSuccessReturn) {
           if (linkedBooking !== null) {
             if (isLinkedBookingPendingPayment(linkedBooking)) {
-              restoreCheckoutDraftFromLinkedBooking(linkedBooking);
+              clearCheckoutSlotSelection();
               setPaymentCancelledNotice(paymentCancelledReturn);
-              setPhase('payment');
+              setPhase('date');
               const currentServiceKey = searchParams.get('serviceKey')?.trim() ?? '';
               const shouldNormalizeUrl =
                 paymentCancelledReturn ||
@@ -838,7 +794,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     pathname,
     phase,
     querySessionId,
-    restoreCheckoutDraftFromLinkedBooking,
+    restoreCheckoutDraftFromSnapshot,
+    clearCheckoutSlotSelection,
     router,
     searchParams,
   ]);

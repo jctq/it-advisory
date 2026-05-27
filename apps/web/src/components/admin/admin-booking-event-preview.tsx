@@ -10,6 +10,7 @@ import {
   PopoverHeader,
   PopoverTitle,
 } from '@/components/ui/popover';
+import { resolveAdminBookingCalendarEventTitle } from '@/lib/admin/resolve-admin-booking-calendar-event-title';
 import type { AdminBookingCalendarRow } from '@/lib/data/bookings';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import { cn } from '@/lib/utils';
@@ -49,16 +50,6 @@ function resolveStatusBadgeVariant(
   return 'outline';
 }
 
-function formatServiceKeyLabel(serviceKey: string): string {
-  const parts = serviceKey.split(/[-_]/).filter((part) => part.length > 0);
-  if (parts.length === 0) {
-    return 'Consultation';
-  }
-  return parts
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
-    .join(' ');
-}
-
 /**
  * Popover body for an admin calendar booking hover preview.
  */
@@ -86,8 +77,8 @@ export function AdminBookingEventPreview(props: AdminBookingEventPreviewProps): 
       <PopoverArrow className="fill-popover" width={12} height={6} />
       <PopoverHeader className="gap-2 border-b border-border px-4 py-3">
         <div className="flex items-start justify-between gap-2">
-          <PopoverTitle className="text-sm leading-snug">
-            {formatServiceKeyLabel(booking.serviceKey)}
+          <PopoverTitle className="line-clamp-2 text-sm leading-snug">
+            {resolveAdminBookingCalendarEventTitle(booking)}
           </PopoverTitle>
           <Badge variant={resolveStatusBadgeVariant(booking.status)} className="shrink-0 capitalize">
             {booking.status}
@@ -96,6 +87,7 @@ export function AdminBookingEventPreview(props: AdminBookingEventPreviewProps): 
         <PopoverDescription className="text-xs">{startsAtLabel}</PopoverDescription>
       </PopoverHeader>
       <dl className="space-y-2 px-4 py-3">
+        <PreviewField label="Booking id" value={booking.id} mono />
         <PreviewField label="Name" value={booking.contactName} />
         {booking.contactEmail !== null ? (
           <PreviewField label="Email" value={booking.contactEmail} />
@@ -111,7 +103,6 @@ export function AdminBookingEventPreview(props: AdminBookingEventPreviewProps): 
         <div className="space-y-2 border-t border-border bg-muted/30 px-4 py-3">
           <p className="text-xs font-semibold text-foreground">Guest booking</p>
           <dl className="space-y-2">
-            <PreviewField label="Reference" value={bookingReference} mono />
             <PreviewField label="Visitor" value={booking.visitorId} mono />
             {booking.contactEmail === null ? (
               <p className="text-xs text-muted-foreground">No email on file for this lead.</p>

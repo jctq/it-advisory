@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { AdminBookingEventPreview } from '@/components/admin/admin-booking-event-preview';
 import { Popover, PopoverAnchor } from '@/components/ui/popover';
+import { resolveAdminBookingCalendarEventTitle } from '@/lib/admin/resolve-admin-booking-calendar-event-title';
 import type { AdminBookingCalendarRow } from '@/lib/data/bookings';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
@@ -58,7 +59,7 @@ function mapBookingToEvent(
   const end = addMinutes(start, BOOKING_EVENT_MINUTES);
   return {
     id: booking.id,
-    title: booking.serviceKey,
+    title: resolveAdminBookingCalendarEventTitle(booking),
     start: booking.startsAtIso,
     end: end.toISOString(),
     extendedProps: {

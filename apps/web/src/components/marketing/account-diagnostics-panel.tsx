@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardCopy, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useMarketingAccountDiagnostics } from '@/hooks/marketing/use-marketing-account-diagnostics';
 import { useMobileViewport } from '@/hooks/use-mobile-viewport';
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import {
@@ -208,12 +209,6 @@ function SessionActions(props: {
   );
 }
 
-type DeleteTarget = {
-  readonly marketingSessionRef: string;
-  readonly sessionTitlePreview: string | null;
-  readonly situationPreview: string | null;
-};
-
 /**
  * Signed-in user UI: API-paginated, searchable diagnostics list.
  */
@@ -224,31 +219,40 @@ export type AccountDiagnosticsPanelProps = {
 
 export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}): ReactElement {
   const manageBookingEnabled = props.manageBookingEnabled ?? false;
-  const defaultListRequest = buildDefaultAccountDiagnosticsListRequest();
   const hasServerInitialList =
     props.initialList !== undefined &&
-    matchesAccountDiagnosticsListRequest(props.initialList, defaultListRequest);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(!hasServerInitialList);
-  const [sessions, setSessions] = useState<readonly VisitorQuizSessionSummary[]>(
-    hasServerInitialList ? props.initialList!.result.sessions : [],
-  );
-  const [totalCount, setTotalCount] = useState(hasServerInitialList ? props.initialList!.result.totalCount : 0);
-  const [totalPages, setTotalPages] = useState(hasServerInitialList ? props.initialList!.result.totalPages : 0);
-  const [page, setPage] = useState(1);
-  const [hasAnySessions, setHasAnySessions] = useState(
-    hasServerInitialList ? props.initialList!.result.hasAnySessions : false,
-  );
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const [bookingReferenceInput, setBookingReferenceInput] = useState('');
-  const [debouncedBookingReference, setDebouncedBookingReference] = useState('');
-  const [statusFilter, setStatusFilter] = useState<VisitorQuizSessionListStatusFilter>(
-    ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS,
-  );
+    matchesAccountDiagnosticsListRequest(props.initialList, buildDefaultAccountDiagnosticsListRequest());
+  const {
+    actionError,
+    loadError,
+    isLoading,
+    sessions,
+    totalCount,
+    totalPages,
+    page,
+    hasAnySessions,
+    deletingId,
+    deleteTarget,
+    bookingReferenceInput,
+    debouncedBookingReference,
+    statusFilter,
+    isLoadingMore,
+    setSessions,
+    setActionError,
+    setLoadError,
+    setIsLoading,
+    setTotalCount,
+    setTotalPages,
+    setPage,
+    setHasAnySessions,
+    setDeletingId,
+    setDeleteTarget,
+    setBookingReferenceInput,
+    setDebouncedBookingReference,
+    setStatusFilter,
+    setIsLoadingMore,
+  } = useMarketingAccountDiagnostics({ initialList: props.initialList });
   const isMobileViewport = useMobileViewport();
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const fetchRequestIdRef = useRef(0);
   const skipInitialFetchRef = useRef(hasServerInitialList);
   const sessionsRef = useRef(sessions);

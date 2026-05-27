@@ -21,6 +21,8 @@ export type DiagnosticOutcomePanelProps = {
   readonly outcome: GuidedDiagnosticOutcome;
   readonly initialPrompt: string;
   readonly sessionReadOnly: boolean;
+  /** When false, hide service selection and book CTAs (e.g. paid booking-linked session). */
+  readonly showBookingActions: boolean;
   readonly marketingBookSessionRef: string | null;
   /** When this element enters the viewport, outcome action bars are no longer pinned to the bottom. */
   readonly footerUnpinWhenElement?: HTMLElement | null;
@@ -101,6 +103,7 @@ export function DiagnosticOutcomePanel(props: DiagnosticOutcomePanelProps): Reac
     outcome,
     initialPrompt,
     sessionReadOnly,
+    showBookingActions,
     marketingBookSessionRef,
     footerUnpinWhenElement = null,
     onReviewDiagnostic,
@@ -263,7 +266,7 @@ export function DiagnosticOutcomePanel(props: DiagnosticOutcomePanelProps): Reac
             <Button type="button" variant="outline" onClick={onReviewDiagnostic}>
               Review diagnostic
             </Button>
-            {!sessionReadOnly ? (
+            {showBookingActions ? (
               <Button type="button" className="gap-2" onClick={executeShowPricingStep}>
                 Choose your session
                 <ArrowRight className="size-4" aria-hidden />
@@ -426,7 +429,7 @@ export function DiagnosticOutcomePanel(props: DiagnosticOutcomePanelProps): Reac
             <Button type="button" variant="outline" onClick={executeShowSummaryStep}>
               Back to summary
             </Button>
-            {sessionReadOnly ? (
+            {!showBookingActions ? (
               <p className="text-sm text-muted-foreground">This intake is already linked to a booking.</p>
             ) : bookHref !== null &&
               (selectedService !== null || selectedServiceKey === 'fallback') ? (

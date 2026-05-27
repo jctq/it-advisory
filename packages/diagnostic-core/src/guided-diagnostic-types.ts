@@ -1359,85 +1359,10 @@ export function parseGuidedDiagnosticJson(raw: string | undefined): GuidedDiagno
 
 /**
  * Back navigation: within round, previous round, prompt, or from summary to last answered question.
+ * Never removes completed bundles or clears saved round answers.
  */
 export function applyGuidedGoBack(state: GuidedDiagnosticV1): GuidedDiagnosticV1 {
-  if (state.outcome !== null) {
-    const bundles = [...state.completedBundles];
-    const last = bundles.pop();
-    if (last === undefined) {
-      return { ...state, outcome: null };
-    }
-    const lastStep = resolveVisibleStepIndex({
-      questions: last.questions,
-      baseAnswers: buildBundleAnswerLookup(bundles),
-      answers: last.answers,
-      requestedStepIndex: last.questions.length - 1,
-    });
-    return {
-      ...state,
-      outcome: null,
-      completedBundles: bundles,
-      activeRound: {
-        roundIndex: last.roundIndex,
-        roundTitle: last.roundTitle,
-        questions: last.questions,
-        answers: { ...last.answers },
-        answerNotes: { ...last.answerNotes },
-        stepIndex: lastStep,
-        guidance: last.guidance,
-      },
-    };
-  }
-  if (state.activeRound === null) {
-    return state;
-  }
-  const activeRound = state.activeRound;
-  const previousVisibleQuestionIndex = findPreviousVisibleQuestionIndex({
-    questions: activeRound.questions,
-    baseAnswers: buildBundleAnswerLookup(state.completedBundles),
-    answers: activeRound.answers,
-    currentIndex: activeRound.stepIndex,
-  });
-  if (previousVisibleQuestionIndex !== null) {
-    return {
-      ...state,
-      activeRound: {
-        ...activeRound,
-        stepIndex: previousVisibleQuestionIndex,
-      },
-    };
-  }
-  if (activeRound.roundIndex === 0) {
-    return {
-      ...state,
-      activeRound: null,
-      completedBundles: [],
-    };
-  }
-  const bundles = [...state.completedBundles];
-  const previous = bundles.pop();
-  if (previous === undefined) {
-    return state;
-  }
-  const lastStep = resolveVisibleStepIndex({
-    questions: previous.questions,
-    baseAnswers: buildBundleAnswerLookup(bundles),
-    answers: previous.answers,
-    requestedStepIndex: previous.questions.length - 1,
-  });
-  return {
-    ...state,
-    completedBundles: bundles,
-    activeRound: {
-      roundIndex: previous.roundIndex,
-      roundTitle: previous.roundTitle,
-      questions: previous.questions,
-      answers: { ...previous.answers },
-      answerNotes: { ...previous.answerNotes },
-      stepIndex: lastStep,
-      guidance: previous.guidance,
-    },
-  };
+  return applyGuidedGoBackReadOnly(state);
 }
 
 /**
@@ -1468,33 +1393,6 @@ export function restoreActiveGuidedRoundFromCompletedBundle(params: {
 }
 
 /**
- * Jumps to a prior completed round by index in {@link GuidedDiagnosticV1.completedBundles}.
- * Discards the active round (if any) and any bundles after the target. Clears a terminal outcome.
- */
-export function applyGuidedJumpToCompletedBundleIndex(
-  state: GuidedDiagnosticV1,
-  bundleIndex: number,
-): GuidedDiagnosticV1 | null {
-  if (!Number.isInteger(bundleIndex) || bundleIndex < 0 || bundleIndex >= state.completedBundles.length) {
-    return null;
-  }
-  const bundle = state.completedBundles[bundleIndex];
-  if (bundle === undefined) {
-    return null;
-  }
-  const priorBundles = state.completedBundles.slice(0, bundleIndex);
-  return {
-    ...state,
-    outcome: null,
-    completedBundles: [...priorBundles],
-    activeRound: restoreActiveGuidedRoundFromCompletedBundle({
-      bundle,
-      priorBundles,
-    }),
-  };
-}
-
-/**
  * Opens a completed round for review without removing later bundles or clearing a saved outcome.
  * Use for read-only / browse navigation so later answers stay intact.
  */
@@ -1516,6 +1414,129 @@ export function applyGuidedPeekCompletedBundleIndex(
       bundle,
       priorBundles,
     }),
+  };
+}
+
+/**
+ * Opens the first completed round for review while keeping all saved answers and later rounds intact.
+ * Clears a terminal outcome by default so the questionnaire UI is shown without discarding progress.
+ */
+export function applyGuidedOpenDiagnosticReview(
+  state: GuidedDiagnosticV1,
+  options: { readonly preserveOutcome?: boolean } = {},
+): GuidedDiagnosticV1 {
+  if (state.completedBundles.length === 0) {
+    return state;
+  }
+  const firstBundleIndex = state.completedBundles.reduce((bestIndex, bundle, index) => {
+    if (bestIndex < 0) {
+      return index;
+    }
+    const bestBundle = state.completedBundles[bestIndex];
+    if (bestBundle === undefined) {
+      return index;
+    }
+    return bundle.roundIndex < bestBundle.roundIndex ? index : bestIndex;
+  }, -1);
+  if (firstBundleIndex < 0) {
+    return state;
+  }
+  const peeked = applyGuidedPeekCompletedBundleIndex(state, firstBundleIndex);
+  if (peeked === null) {
+    return state;
+  }
+  if (options.preserveOutcome === true) {
+    return peeked;
+  }
+  return {
+    ...peeked,
+    outcome: null,
+  };
+}
+
+/**
+ * Jumps to a prior completed round without discarding later saved answers.
+ */
+export function applyGuidedJumpToCompletedBundleIndex(
+  state: GuidedDiagnosticV1,
+  bundleIndex: number,
+): GuidedDiagnosticV1 | null {
+  const peeked = applyGuidedPeekCompletedBundleIndex(state, bundleIndex);
+  if (peeked === null) {
+    return null;
+  }
+  return {
+    ...peeked,
+    outcome: null,
+  };
+}
+
+/**
+ * Opens a completed template round for review by authored round index.
+ */
+export function applyGuidedPeekToAuthoredRoundIndex(
+  state: GuidedDiagnosticV1,
+  authoredRoundIndex: number,
+  options: { readonly clearOutcome: boolean },
+): GuidedDiagnosticV1 {
+  const bundleIndex = state.completedBundles.findIndex((bundle) => bundle.roundIndex === authoredRoundIndex);
+  if (bundleIndex < 0) {
+    return state;
+  }
+  const peeked = applyGuidedPeekCompletedBundleIndex(state, bundleIndex);
+  if (peeked === null) {
+    return state;
+  }
+  if (options.clearOutcome) {
+    return {
+      ...peeked,
+      outcome: null,
+    };
+  }
+  return peeked;
+}
+
+/**
+ * Replaces or appends a completed round bundle keyed by {@link CompletedRoundBundle.roundIndex}.
+ */
+export function upsertCompletedBundle(
+  bundles: readonly CompletedRoundBundle[],
+  bundle: CompletedRoundBundle,
+): CompletedRoundBundle[] {
+  const existingIndex = bundles.findIndex((entry) => entry.roundIndex === bundle.roundIndex);
+  if (existingIndex < 0) {
+    return [...bundles, bundle];
+  }
+  return bundles.map((entry, index) => (index === existingIndex ? bundle : entry));
+}
+
+/**
+ * Mirrors in-progress answers into an existing completed bundle for the same round.
+ */
+export function syncActiveRoundAnswersToCompletedBundle(state: GuidedDiagnosticV1): GuidedDiagnosticV1 {
+  const activeRound = state.activeRound;
+  if (activeRound === null) {
+    return state;
+  }
+  const bundleIndex = state.completedBundles.findIndex((bundle) => bundle.roundIndex === activeRound.roundIndex);
+  if (bundleIndex < 0) {
+    return state;
+  }
+  const existingBundle = state.completedBundles[bundleIndex];
+  if (existingBundle === undefined) {
+    return state;
+  }
+  const updatedBundle: CompletedRoundBundle = {
+    ...existingBundle,
+    answers: { ...activeRound.answers },
+    answerNotes: { ...activeRound.answerNotes },
+  };
+  const completedBundles = state.completedBundles.map((bundle, index) =>
+    index === bundleIndex ? updatedBundle : bundle,
+  );
+  return {
+    ...state,
+    completedBundles,
   };
 }
 

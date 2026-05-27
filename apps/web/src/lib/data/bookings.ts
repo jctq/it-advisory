@@ -2,11 +2,12 @@
  * Marketing booking persistence. Booking documents are append-only in this application:
  * there is no delete path (API or data layer) so CRM history and slot confirmations stay auditable.
  */
+import { resolveQuizSessionDisplayPreview } from '@techmd/diagnostic-core/quiz-session-display-preview';
 import { MongoServerError, ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { FathomMatchStatus } from '@/domain/recording-types';
 import type { PaymentGatewayId, PaymentStatus } from '@/domain/payment-types';
-import type { BookingDocument, LeadDocument, UserAccountDocument } from '@/domain/types';
+import type { BookingDocument, LeadDocument, QuizAnswers, QuizSessionDocument, UserAccountDocument } from '@/domain/types';
 import type { UpdateFilter } from 'mongodb';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { getDb } from '@/lib/mongodb';
@@ -56,6 +57,9 @@ export type AdminBookingCalendarRow = BookingRow & {
   readonly contactPhone: string | null;
   readonly isGuestBooking: boolean;
   readonly accountEmail: string | null;
+  /** Same headline as account "My diagnostics" when a guided diagnostic exists. */
+  readonly sessionTitlePreview: string | null;
+  readonly situationPreview: string | null;
 };
 
 function mapBooking(
@@ -203,6 +207,45 @@ export type ListBookingsForAdminCalendarInRangeResult = {
   readonly countsByStatus: AdminBookingCalendarStatusCounts;
 };
 
+function readSituationAnswerFromQuizAnswers(answers: QuizAnswers): string | null {
+  const raw = answers.situation;
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function resolveBookingCalendarDisplayPreview(
+  doc: BookingDocument,
+  quizSessionById: ReadonlyMap<string, QuizSessionDocument & { _id: ObjectId }>,
+): { readonly sessionTitlePreview: string | null; readonly situationPreview: string | null } {
+  const snapshotRaw =
+    typeof doc.guidedDiagnosticSnapshot === 'string' && doc.guidedDiagnosticSnapshot.trim().length > 0
+      ? doc.guidedDiagnosticSnapshot.trim()
+      : null;
+  if (snapshotRaw !== null) {
+    return resolveQuizSessionDisplayPreview({
+      guidedDiagnosticRaw: snapshotRaw,
+      situationAnswer: null,
+    });
+  }
+  const quizSessionId =
+    doc.quizSessionId !== undefined && doc.quizSessionId !== null ? doc.quizSessionId.toHexString() : null;
+  if (quizSessionId === null) {
+    return { sessionTitlePreview: null, situationPreview: null };
+  }
+  const sessionDoc = quizSessionById.get(quizSessionId);
+  if (sessionDoc === undefined) {
+    return { sessionTitlePreview: null, situationPreview: null };
+  }
+  const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(sessionDoc.answers);
+  return resolveQuizSessionDisplayPreview({
+    guidedDiagnosticRaw: guidedRaw,
+    situationAnswer: readSituationAnswerFromQuizAnswers(sessionDoc.answers),
+  });
+}
+
 async function mapBookingDocsToAdminCalendarRows(
   bookingDocs: readonly (BookingDocument & { _id: ObjectId })[],
 ): Promise<AdminBookingCalendarRow[]> {
@@ -211,6 +254,27 @@ async function mapBookingDocsToAdminCalendarRows(
   }
   const db = await getDb();
   const accountContext = await loadAccountVisitorContext();
+  const quizSessionIds = [
+    ...new Set(
+      bookingDocs
+        .map((doc) => doc.quizSessionId)
+        .filter((quizSessionId): quizSessionId is ObjectId => quizSessionId !== undefined && quizSessionId !== null),
+    ),
+  ];
+  const quizSessionDocs =
+    quizSessionIds.length === 0
+      ? []
+      : await db
+          .collection<QuizSessionDocument>(COLLECTIONS.quizSessions)
+          .find({ _id: { $in: quizSessionIds } })
+          .toArray();
+  const quizSessionById = new Map<string, QuizSessionDocument & { _id: ObjectId }>();
+  for (const sessionDoc of quizSessionDocs) {
+    if (sessionDoc._id === undefined) {
+      continue;
+    }
+    quizSessionById.set(sessionDoc._id.toHexString(), sessionDoc as QuizSessionDocument & { _id: ObjectId });
+  }
   const leadIds = [
     ...new Set(
       bookingDocs
@@ -250,11 +314,14 @@ async function mapBookingDocsToAdminCalendarRows(
             contactPhone: null,
           };
     const accountEmail = accountContext.accountEmailByVisitorId.get(base.visitorId) ?? null;
+    const displayPreview = resolveBookingCalendarDisplayPreview(doc, quizSessionById);
     return {
       ...base,
       ...contact,
       isGuestBooking: resolveIsGuestBooking(base.visitorId, accountContext.accountVisitorIds),
       accountEmail,
+      sessionTitlePreview: displayPreview.sessionTitlePreview,
+      situationPreview: displayPreview.situationPreview,
     };
   });
 }

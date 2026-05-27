@@ -53,7 +53,10 @@ import {
 import type { DiagnosticRoundDebugMeta } from '@/domain/types';
 import { extractDiagnosticRoundDebugFromResponse } from '@/lib/marketing/diagnostic-cache-debug';
 import {
+  applyGuidedOpenDiagnosticReview,
   applyGuidedPeekCompletedBundleIndex,
+  syncActiveRoundAnswersToCompletedBundle,
+  upsertCompletedBundle,
   type CompletedRoundBundle,
   type DiagnosticQuestionBlock,
   type DiagnosticQuestionOption,
@@ -99,6 +102,50 @@ function scheduleScrollQuizWizardToTop(): void {
 
 function isGuidedStateEmptyForTemplateBootstrap(guided: GuidedDiagnosticV1): boolean {
   return guided.activeRound === null && guided.completedBundles.length === 0 && guided.outcome === null;
+}
+
+function withSyncedCompletedBundles(state: GuidedDiagnosticV1): GuidedDiagnosticV1 {
+  return syncActiveRoundAnswersToCompletedBundle(state);
+}
+
+function areDiagnosticQuestionSelectionsEqual(
+  left: DiagnosticQuestionSelection | undefined,
+  right: DiagnosticQuestionSelection | undefined,
+): boolean {
+  const normalizedLeft = left ?? createEmptyDiagnosticQuestionSelection();
+  const normalizedRight = right ?? createEmptyDiagnosticQuestionSelection();
+  if (normalizedLeft.selectedOptionIds.length !== normalizedRight.selectedOptionIds.length) {
+    return false;
+  }
+  if (!normalizedLeft.selectedOptionIds.every((optionId, index) => optionId === normalizedRight.selectedOptionIds[index])) {
+    return false;
+  }
+  const leftChildKeys = Object.keys(normalizedLeft.childSelections);
+  const rightChildKeys = Object.keys(normalizedRight.childSelections);
+  if (leftChildKeys.length !== rightChildKeys.length) {
+    return false;
+  }
+  for (const parentOptionId of leftChildKeys) {
+    const leftChildOptionIds = normalizedLeft.childSelections[parentOptionId] ?? [];
+    const rightChildOptionIds = normalizedRight.childSelections[parentOptionId] ?? [];
+    if (
+      leftChildOptionIds.length !== rightChildOptionIds.length ||
+      !leftChildOptionIds.every((childOptionId, index) => childOptionId === rightChildOptionIds[index])
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function buildActiveRoundAnswerLookup(params: {
+  readonly activeRound: NonNullable<GuidedDiagnosticV1['activeRound']>;
+  readonly completedBundles: readonly CompletedRoundBundle[];
+}): Readonly<Record<string, DiagnosticQuestionSelection>> {
+  return buildDiagnosticAnswerLookup({
+    completedBundles: params.completedBundles,
+    activeRound: params.activeRound,
+  });
 }
 
 function togglePromptWithSeed(currentPrompt: string, phrase: string): string {
@@ -275,6 +322,7 @@ const WIZARD_UI = {
   gridGapLg: 'gap-3 md:gap-5',
   footerMt: 'mt-6 md:mt-8',
   selectIndicator: 'flex size-5 shrink-0 items-center justify-center rounded-md border md:size-6',
+  viewOnlyOption: 'cursor-not-allowed opacity-60',
 } as const;
 
 function getDisplayOptionTitle(option: DiagnosticQuestionOption): string {
@@ -420,8 +468,10 @@ function MultipleChoiceRoundRenderer(props: {
                     ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
                     : isInSelectedPath
                       ? 'border-primary/40 bg-primary/5'
-                    : 'border-border hover:border-primary/30 hover:bg-muted/30',
-                  sessionReadOnly && 'cursor-default opacity-95',
+                    : sessionReadOnly
+                      ? 'border-border'
+                      : 'border-border hover:border-primary/30 hover:bg-muted/30',
+                  sessionReadOnly && WIZARD_UI.viewOnlyOption,
                 )}
               >
                 <div className="flex items-start gap-3 md:gap-4">
@@ -499,8 +549,10 @@ function MultipleChoiceRoundRenderer(props: {
                             'flex w-full items-start justify-between gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors md:gap-3 md:rounded-xl md:px-4 md:py-3',
                             isChildSelected
                               ? 'border-primary bg-background ring-2 ring-primary/15'
-                              : 'border-border bg-background/80 hover:border-primary/30',
-                            sessionReadOnly && 'cursor-default opacity-95',
+                              : sessionReadOnly
+                                ? 'border-border bg-background/80'
+                                : 'border-border bg-background/80 hover:border-primary/30',
+                            sessionReadOnly && WIZARD_UI.viewOnlyOption,
                           )}
                         >
                           <span>
@@ -647,8 +699,10 @@ function NestedOptionsRoundRenderer(props: {
                     ? 'border-primary bg-primary/5 ring-2 ring-primary/15'
                     : isInSelectedPath
                       ? 'border-primary/35 bg-primary/5'
-                    : 'border-border hover:border-primary/25 hover:bg-muted/30',
-                  isCategoryDisabled && 'cursor-not-allowed opacity-60 hover:border-border hover:bg-card',
+                    : sessionReadOnly
+                      ? 'border-border'
+                      : 'border-border hover:border-primary/25 hover:bg-muted/30',
+                  sessionReadOnly && WIZARD_UI.viewOnlyOption,
                 )}
               >
                 <div className="flex w-full items-start gap-3 md:gap-4">
@@ -731,8 +785,11 @@ function NestedOptionsRoundRenderer(props: {
                           'flex w-full items-start justify-between gap-2 rounded-lg border px-3 py-3 text-left transition-all md:gap-3 md:rounded-2xl md:px-4 md:py-4',
                           isSelected
                             ? 'border-primary bg-primary/5 ring-2 ring-primary/15'
-                            : 'border-border bg-background hover:border-primary/30',
-                          !props.selection.selectedOptionIds.includes(activeOption.id) && 'cursor-not-allowed opacity-60',
+                            : sessionReadOnly
+                              ? 'border-border bg-background'
+                              : 'border-border bg-background hover:border-primary/30',
+                          (sessionReadOnly || !props.selection.selectedOptionIds.includes(activeOption.id)) &&
+                            WIZARD_UI.viewOnlyOption,
                         )}
                       >
                         <span>
@@ -982,7 +1039,7 @@ function RankedOptionsRoundRenderer(props: {
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
                   isSelected && 'border-primary/50 bg-primary/5 shadow-xs',
                   isDisabled
-                    ? 'cursor-not-allowed opacity-60'
+                    ? WIZARD_UI.viewOnlyOption
                     : isSelected
                       ? 'border-primary/50 hover:border-primary/60 hover:bg-primary/10'
                       : 'border-border hover:border-primary/30 hover:bg-muted/20',
@@ -1117,6 +1174,8 @@ export type GuidedDiagnosticWizardProps = {
   readonly suppressEmptyTemplateBootstrap?: boolean;
   /** Booking-linked session: review only, no API writes or starting a new run from this screen. */
   readonly sessionReadOnly?: boolean;
+  /** When false, hide outcome booking CTAs (paid or confirmed booking-linked session). */
+  readonly showBookingActions?: boolean;
   /** Quiz session ref for booking after service selection (`/book/[sessionRef]?serviceKey=…`). */
   readonly marketingBookSessionRef?: string | null;
   /**
@@ -1129,6 +1188,19 @@ export type GuidedDiagnosticWizardProps = {
   readonly onGoBack: () => void;
   readonly onGuidedChange: Dispatch<SetStateAction<GuidedDiagnosticV1>>;
 };
+
+function getActiveRoundForDisplay(params: {
+  readonly activeRound: NonNullable<GuidedDiagnosticV1['activeRound']>;
+  readonly completedBundles: readonly CompletedRoundBundle[];
+}): NonNullable<GuidedDiagnosticV1['activeRound']> {
+  return {
+    ...params.activeRound,
+    stepIndex: resolveVisibleStepIndex({
+      activeRound: params.activeRound,
+      completedBundles: params.completedBundles,
+    }),
+  };
+}
 
 function resolveVisibleStepIndex(params: {
   readonly activeRound: GuidedDiagnosticV1['activeRound'];
@@ -1186,35 +1258,74 @@ function synchronizeActiveRound(params: {
   };
 }
 
-function buildVisibleBundleFromActive(params: {
-  readonly activeRound: GuidedDiagnosticV1['activeRound'];
+function buildCompletedBundlePreservingAnswers(params: {
+  readonly activeRound: NonNullable<GuidedDiagnosticV1['activeRound']>;
   readonly completedBundles: readonly CompletedRoundBundle[];
 }): CompletedRoundBundle | null {
-  const synchronizedRound = synchronizeActiveRound(params);
-  if (synchronizedRound === null) {
-    return null;
-  }
   const visibleQuestionIndexes = getVisibleQuestionIndexes({
-    questions: synchronizedRound.questions,
+    questions: params.activeRound.questions,
     baseAnswers: buildDiagnosticAnswerLookup({
       completedBundles: params.completedBundles,
     }),
-    answers: synchronizedRound.answers,
+    answers: params.activeRound.answers,
   });
-  const visibleQuestions = visibleQuestionIndexes.flatMap((questionIndex) => {
-    const question = synchronizedRound.questions[questionIndex];
-    return question === undefined ? [] : [question];
-  });
-  if (visibleQuestions.length === 0) {
+  if (visibleQuestionIndexes.length === 0) {
     return null;
   }
   return {
-    roundIndex: synchronizedRound.roundIndex,
-    roundTitle: synchronizedRound.roundTitle,
-    questions: visibleQuestions,
-    answers: { ...synchronizedRound.answers },
-    answerNotes: { ...synchronizedRound.answerNotes },
-    guidance: synchronizedRound.guidance,
+    roundIndex: params.activeRound.roundIndex,
+    roundTitle: params.activeRound.roundTitle,
+    questions: params.activeRound.questions,
+    answers: { ...params.activeRound.answers },
+    answerNotes: { ...params.activeRound.answerNotes },
+    guidance: params.activeRound.guidance,
+  };
+}
+
+function tryPeekNextCompletedRound(params: {
+  readonly state: GuidedDiagnosticV1;
+  readonly completedBundles: readonly CompletedRoundBundle[];
+  readonly currentRoundIndex: number;
+  readonly clearOutcome?: boolean;
+}): GuidedDiagnosticV1 | null {
+  const nextBundle = params.completedBundles.find((bundle) => bundle.roundIndex > params.currentRoundIndex);
+  if (nextBundle === undefined) {
+    return null;
+  }
+  const nextBundleIndex = params.completedBundles.findIndex((bundle) => bundle.roundIndex === nextBundle.roundIndex);
+  if (nextBundleIndex < 0) {
+    return null;
+  }
+  const peeked = applyGuidedPeekCompletedBundleIndex(
+    {
+      ...params.state,
+      completedBundles: [...params.completedBundles],
+    },
+    nextBundleIndex,
+  );
+  if (peeked === null) {
+    return null;
+  }
+  if (params.clearOutcome === false) {
+    return peeked;
+  }
+  return {
+    ...peeked,
+    outcome: null,
+  };
+}
+
+function tryRestoreGuidedOutcome(params: {
+  readonly state: GuidedDiagnosticV1;
+  readonly completedBundles: readonly CompletedRoundBundle[];
+}): GuidedDiagnosticV1 | null {
+  if (params.state.outcome === null) {
+    return null;
+  }
+  return {
+    ...params.state,
+    completedBundles: [...params.completedBundles],
+    activeRound: null,
   };
 }
 
@@ -1249,6 +1360,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     onGuidedChange,
     suppressEmptyTemplateBootstrap = false,
     sessionReadOnly = false,
+    showBookingActions = true,
     marketingBookSessionRef = null,
     templateSessionMarketingRef = null,
     footerUnpinWhenElement = null,
@@ -1405,22 +1517,27 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           completedBundles: previous.completedBundles,
           activeRound: previous.activeRound,
         });
+        const previousSelection = previous.activeRound.answers[question.id];
         const nextSelection = toggleQuestionOptionSelection({
           baseAnswers,
           question,
-          selection: previous.activeRound.answers[question.id],
+          selection: previousSelection,
           optionId,
         });
-        let nextActiveRound = synchronizeActiveRound({
-          completedBundles: previous.completedBundles,
-          activeRound: {
-            ...previous.activeRound,
-            answers: {
-              ...previous.activeRound.answers,
-              [question.id]: nextSelection,
-            },
+        const activeRoundWithSelection = {
+          ...previous.activeRound,
+          answers: {
+            ...previous.activeRound.answers,
+            [question.id]: nextSelection,
           },
-        });
+        };
+        const selectionChanged = !areDiagnosticQuestionSelectionsEqual(previousSelection, nextSelection);
+        let nextActiveRound = selectionChanged
+          ? synchronizeActiveRound({
+              completedBundles: previous.completedBundles,
+              activeRound: activeRoundWithSelection,
+            })
+          : activeRoundWithSelection;
         if (nextActiveRound === null) {
           return previous;
         }
@@ -1438,10 +1555,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             answerNotes: nextAnswerNotes,
           };
         }
-        return {
+        return withSyncedCompletedBundles({
           ...previous,
           activeRound: nextActiveRound,
-        };
+        });
       });
     },
     [onGuidedChange, sessionReadOnly],
@@ -1455,33 +1572,38 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         if (previous.activeRound === null) {
           return previous;
         }
+        const previousSelection = previous.activeRound.answers[question.id];
         const nextSelection = toggleChildQuestionOptionSelection({
           baseAnswers: buildDiagnosticAnswerLookup({
             completedBundles: previous.completedBundles,
             activeRound: previous.activeRound,
           }),
           question,
-          selection: previous.activeRound.answers[question.id],
+          selection: previousSelection,
           parentOptionId,
           childOptionId,
         });
-        const nextActiveRound = synchronizeActiveRound({
-          completedBundles: previous.completedBundles,
-          activeRound: {
-            ...previous.activeRound,
-            answers: {
-              ...previous.activeRound.answers,
-              [question.id]: nextSelection,
-            },
+        const activeRoundWithSelection = {
+          ...previous.activeRound,
+          answers: {
+            ...previous.activeRound.answers,
+            [question.id]: nextSelection,
           },
-        });
+        };
+        const selectionChanged = !areDiagnosticQuestionSelectionsEqual(previousSelection, nextSelection);
+        const nextActiveRound = selectionChanged
+          ? synchronizeActiveRound({
+              completedBundles: previous.completedBundles,
+              activeRound: activeRoundWithSelection,
+            })
+          : activeRoundWithSelection;
         if (nextActiveRound === null) {
           return previous;
         }
-        return {
+        return withSyncedCompletedBundles({
           ...previous,
           activeRound: nextActiveRound,
-        };
+        });
       });
     },
     [onGuidedChange, sessionReadOnly],
@@ -1500,16 +1622,21 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           completedBundles: previous.completedBundles,
           activeRound: previous.activeRound,
         });
-        let nextActiveRound = synchronizeActiveRound({
-          completedBundles: previous.completedBundles,
-          activeRound: {
-            ...previous.activeRound,
-            answers: {
-              ...previous.activeRound.answers,
-              [questionId]: nextSelection,
-            },
+        const previousSelection = previous.activeRound.answers[questionId];
+        const activeRoundWithSelection = {
+          ...previous.activeRound,
+          answers: {
+            ...previous.activeRound.answers,
+            [questionId]: nextSelection,
           },
-        });
+        };
+        const selectionChanged = !areDiagnosticQuestionSelectionsEqual(previousSelection, nextSelection);
+        let nextActiveRound = selectionChanged
+          ? synchronizeActiveRound({
+              completedBundles: previous.completedBundles,
+              activeRound: activeRoundWithSelection,
+            })
+          : activeRoundWithSelection;
         if (nextActiveRound === null) {
           return previous;
         }
@@ -1528,10 +1655,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             answerNotes: nextAnswerNotes,
           };
         }
-        return {
+        return withSyncedCompletedBundles({
           ...previous,
           activeRound: nextActiveRound,
-        };
+        });
       });
     },
     [onGuidedChange, sessionReadOnly],
@@ -1547,7 +1674,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         if (previous.activeRound === null) {
           return previous;
         }
-        return {
+        return withSyncedCompletedBundles({
           ...previous,
           activeRound: {
             ...previous.activeRound,
@@ -1556,7 +1683,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               [questionId]: capped,
             },
           },
-        };
+        });
       });
     },
     [onGuidedChange, sessionReadOnly],
@@ -1735,14 +1862,9 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       return;
     }
     if (sessionReadOnly) {
-      const activeRound = synchronizeActiveRound({
-        activeRound: guided.activeRound,
-        completedBundles: guided.completedBundles,
-      });
-      if (activeRound === null) {
-        return;
-      }
-      const priorAnswersOnly = buildDiagnosticAnswerLookup({
+      const activeRound = guided.activeRound;
+      const roundAnswerLookup = buildActiveRoundAnswerLookup({
+        activeRound,
         completedBundles: guided.completedBundles,
       });
       const currentQuestion = activeRound.questions[activeRound.stepIndex];
@@ -1752,10 +1874,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       const selection = activeRound.answers[currentQuestion.id];
       const detailNote = activeRound.answerNotes[currentQuestion.id] ?? '';
       const validation = validateGuidedQuestionResponse({
-        baseAnswers: buildDiagnosticAnswerLookup({
-          completedBundles: guided.completedBundles,
-          activeRound,
-        }),
+        baseAnswers: roundAnswerLookup,
         question: currentQuestion,
         selection,
         detailNote,
@@ -1766,53 +1885,56 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       }
       const nextQuestionIndex = findNextVisibleQuestionIndex({
         questions: activeRound.questions,
-        baseAnswers: priorAnswersOnly,
+        baseAnswers: buildDiagnosticAnswerLookup({
+          completedBundles: guided.completedBundles,
+        }),
         answers: activeRound.answers,
         currentIndex: activeRound.stepIndex,
       });
       if (nextQuestionIndex !== null) {
-        onGuidedChange((previous) => ({
-          ...previous,
-          activeRound: {
-            ...activeRound,
-            stepIndex: nextQuestionIndex,
-          },
-        }));
+        onGuidedChange((previous) => {
+          if (previous.activeRound === null) {
+            return previous;
+          }
+          return {
+            ...previous,
+            activeRound: {
+              ...previous.activeRound,
+              stepIndex: nextQuestionIndex,
+            },
+          };
+        });
         scheduleScrollQuizWizardToTop();
         return;
       }
-      const bundleIndex = guided.completedBundles.findIndex((bundle) => bundle.roundIndex === activeRound.roundIndex);
-      const nextBundleIndex = bundleIndex >= 0 ? bundleIndex + 1 : guided.completedBundles.length;
-      if (nextBundleIndex < guided.completedBundles.length) {
-        const peeked = applyGuidedPeekCompletedBundleIndex(guided, nextBundleIndex);
-        if (peeked !== null) {
-          onGuidedChange(() => peeked);
-        }
+      const peekedNextRound = tryPeekNextCompletedRound({
+        state: guided,
+        completedBundles: guided.completedBundles,
+        currentRoundIndex: activeRound.roundIndex,
+        clearOutcome: false,
+      });
+      if (peekedNextRound !== null) {
+        onGuidedChange(() => peekedNextRound);
         scheduleScrollQuizWizardToTop();
         return;
       }
-      if (guided.outcome !== null) {
-        onGuidedChange((previous) => ({
-          ...previous,
-          activeRound: null,
-        }));
-        scheduleScrollQuizWizardToTop();
-      }
+      onGuidedChange((previous) => ({
+        ...previous,
+        activeRound: null,
+      }));
+      scheduleScrollQuizWizardToTop();
       return;
     }
-    const activeRound = synchronizeActiveRound({
-      activeRound: guided.activeRound,
-      completedBundles: guided.completedBundles,
-    });
-    if (activeRound === null) {
-      return;
-    }
-    const priorAnswersOnly = buildDiagnosticAnswerLookup({
+    const activeRound = guided.activeRound;
+    const roundAnswerLookup = buildActiveRoundAnswerLookup({
+      activeRound,
       completedBundles: guided.completedBundles,
     });
     const answerableQuestionIndexes = getVisibleQuestionIndexes({
       questions: activeRound.questions,
-      baseAnswers: priorAnswersOnly,
+      baseAnswers: buildDiagnosticAnswerLookup({
+        completedBundles: guided.completedBundles,
+      }),
       answers: activeRound.answers,
     });
     if (answerableQuestionIndexes.length === 0) {
@@ -1869,10 +1991,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     const selection = activeRound.answers[currentQuestion.id];
     const detailNote = activeRound.answerNotes[currentQuestion.id] ?? '';
     const validation = validateGuidedQuestionResponse({
-      baseAnswers: buildDiagnosticAnswerLookup({
-        completedBundles: guided.completedBundles,
-        activeRound,
-      }),
+      baseAnswers: roundAnswerLookup,
       question: currentQuestion,
       selection,
       detailNote,
@@ -1890,24 +2009,48 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       currentIndex: activeRound.stepIndex,
     });
     if (nextQuestionIndex !== null) {
-      onGuidedChange((previous) => ({
-        ...previous,
-        activeRound: {
-          ...activeRound,
-          stepIndex: nextQuestionIndex,
-        },
-      }));
+      onGuidedChange((previous) => {
+        if (previous.activeRound === null) {
+          return previous;
+        }
+        return withSyncedCompletedBundles({
+          ...previous,
+          activeRound: {
+            ...previous.activeRound,
+            stepIndex: nextQuestionIndex,
+          },
+        });
+      });
       scheduleScrollQuizWizardToTop();
       return;
     }
-    const bundle = buildVisibleBundleFromActive({
+    const bundle = buildCompletedBundlePreservingAnswers({
       activeRound,
       completedBundles: guided.completedBundles,
     });
     if (bundle === null) {
       return;
     }
-    const nextCompleted = [...guided.completedBundles, bundle];
+    const nextCompleted = upsertCompletedBundle(guided.completedBundles, bundle);
+    const peekedNextRound = tryPeekNextCompletedRound({
+      state: guided,
+      completedBundles: nextCompleted,
+      currentRoundIndex: activeRound.roundIndex,
+    });
+    if (peekedNextRound !== null) {
+      onGuidedChange(() => peekedNextRound);
+      scheduleScrollQuizWizardToTop();
+      return;
+    }
+    const restoredOutcome = tryRestoreGuidedOutcome({
+      state: guided,
+      completedBundles: nextCompleted,
+    });
+    if (restoredOutcome !== null) {
+      onGuidedChange(() => restoredOutcome);
+      scheduleScrollQuizWizardToTop();
+      return;
+    }
     if (!diagnosticAiEnabled) {
       if (activeTemplate === null) {
         notifyError('AI Diagnostic is off, but no active template is ready yet.');
@@ -1956,19 +2099,13 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     }
   }, [activeTemplate, diagnosticAiEnabled, executeFetchRound, executeFetchTemplateSummary, guided, onGuidedChange, sessionReadOnly]);
   const executeOpenDiagnosticReview = useCallback((): void => {
-    onGuidedChange((previous) => {
-      if (previous.completedBundles.length > 0) {
-        const peeked = applyGuidedPeekCompletedBundleIndex(previous, 0);
-        return peeked ?? previous;
-      }
-      return {
-        ...previous,
-        activeRound: null,
-        outcome: null,
-      };
-    });
+    onGuidedChange((previous) =>
+      applyGuidedOpenDiagnosticReview(previous, {
+        preserveOutcome: sessionReadOnly,
+      }),
+    );
     scheduleScrollQuizWizardToTop();
-  }, [onGuidedChange]);
+  }, [onGuidedChange, sessionReadOnly]);
   if (guided.outcome !== null && guided.activeRound === null) {
     return (
       <div>
@@ -1981,6 +2118,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           outcome={guided.outcome}
           initialPrompt={guided.initialPrompt}
           sessionReadOnly={sessionReadOnly}
+          showBookingActions={showBookingActions}
           marketingBookSessionRef={marketingBookSessionRef ?? null}
           footerUnpinWhenElement={footerUnpinWhenElement}
           onReviewDiagnostic={executeOpenDiagnosticReview}
@@ -2009,13 +2147,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     }
   }
   if (guided.activeRound !== null) {
-    const activeRound = synchronizeActiveRound({
+    const activeRound = getActiveRoundForDisplay({
       activeRound: guided.activeRound,
       completedBundles: guided.completedBundles,
     });
-    if (activeRound === null) {
-      return <div />;
-    }
     const baseAnswers = buildDiagnosticAnswerLookup({
       completedBundles: guided.completedBundles,
     });

@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type FormEvent, type ReactElement } from 'react';
+import { useMarketingGuestBooking } from '@/hooks/marketing/use-marketing-guest-booking';
+import type { GuestBookingManagePhase } from '@/store/marketing/marketing-guest-booking-store';
 import { formatInTimeZone } from 'date-fns-tz';
 import { AlertCircle, CalendarClock, CheckCircle2, CreditCard, Loader2, Search, Video } from 'lucide-react';
 import {
@@ -39,12 +41,6 @@ const MARKETING_CLIENT_API_BASE_URL = resolveMarketingClientApiBaseUrl();
 
 const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
 
-type ManageAuthContext =
-  | { readonly kind: 'guest'; readonly credentials: GuestBookingManageCredentials }
-  | { readonly kind: 'account'; readonly bookingId: string };
-
-type ManagePhase = 'lookup' | 'result' | 'paying';
-
 function formatSlotDisplay(startsAtIso: string, timezone: string): { readonly date: string; readonly time: string } {
   const startsAt = new Date(startsAtIso);
   return {
@@ -77,17 +73,30 @@ function StatusBadge(props: { readonly status: GuestBookingManageView['status'] 
 
 export function GuestBookingManageFlow(): ReactElement {
   const searchParams = useSearchParams();
-  const [phase, setPhase] = useState<ManagePhase>('lookup');
-  const [bookingReference, setBookingReference] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneLastFour, setPhoneLastFour] = useState('');
-  const [manageContext, setManageContext] = useState<ManageAuthContext | null>(null);
-  const [booking, setBooking] = useState<GuestBookingManageView | null>(null);
-  const [paymentConfig, setPaymentConfig] = useState<PaymentConfigPublic | null>(null);
-  const [selectedGatewayId, setSelectedGatewayId] = useState<PaymentGatewayId | null>(null);
-  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isAccountBootstrapLoading, setIsAccountBootstrapLoading] = useState(false);
+  const {
+    phase,
+    bookingReference,
+    email,
+    phoneLastFour,
+    manageContext,
+    booking,
+    paymentConfig,
+    selectedGatewayId,
+    selectedPaymentMethodId,
+    isSubmitting,
+    isAccountBootstrapLoading,
+    setPhase,
+    setBookingReference,
+    setEmail,
+    setPhoneLastFour,
+    setManageContext,
+    setBooking,
+    setPaymentConfig,
+    setSelectedGatewayId,
+    setSelectedPaymentMethodId,
+    setIsSubmitting,
+    setIsAccountBootstrapLoading,
+  } = useMarketingGuestBooking();
   const paymentCancelled = searchParams.get('payment') === 'cancelled';
   const hasAppliedBookingReferenceQueryRef = useRef(false);
   const hasAttemptedAccountBookingBootstrapRef = useRef(false);
@@ -391,7 +400,7 @@ type ResultViewProps = {
   readonly booking: GuestBookingManageView;
   readonly slotDisplay: { readonly date: string; readonly time: string };
   readonly isSubmitting: boolean;
-  readonly phase: ManagePhase;
+  readonly phase: GuestBookingManagePhase;
   readonly showPaymentSection: boolean;
   readonly paymentConfig: PaymentConfigPublic | null;
   readonly selectedGatewayId: PaymentGatewayId | null;

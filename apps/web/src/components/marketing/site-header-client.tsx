@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { MarketingHeaderAccountMenuPanel } from '@/components/marketing/marketing-header-account-menu-panel';
 import type { ReactElement } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { useMarketingChromeStore } from '@/store/marketing/marketing-chrome-store';
 import { MarketingHeaderAccountMenu } from '@/components/marketing/marketing-header-account-menu';
 import { MarketingHeaderAppearanceMenu } from '@/components/marketing/marketing-header-appearance-menu';
 import { useMarketingAppearance } from '@/components/marketing/marketing-appearance-provider';
@@ -85,10 +86,9 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
     }
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [pathname]);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const executeCloseMobileMenu = useCallback((): void => {
-    setIsMobileMenuOpen(false);
-  }, []);
+  const isMobileMenuOpen = useMarketingChromeStore((state) => state.isMobileMenuOpen);
+  const setMobileMenuOpen = useMarketingChromeStore((state) => state.setMobileMenuOpen);
+  const executeCloseMobileMenu = useMarketingChromeStore((state) => state.executeCloseMobileMenu);
   return (
     <header
       className={cn(
@@ -158,7 +158,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
               <Link href="/diagnostic">Get Started</Link>
             </Button>
           )}
-          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button
                 type="button"
