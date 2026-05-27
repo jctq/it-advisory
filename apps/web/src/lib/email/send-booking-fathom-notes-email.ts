@@ -20,6 +20,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 const BOOKING_FATHOM_NOTES_TEMPLATE_KEY = 'booking_fathom_notes';
 const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUMMARY_PREVIEW_MAX_LENGTH = 500 as const;
+const EMAIL_INNER_WIDTH_PX = 600;
 
 const EMAIL_FONT_STACK =
   "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
@@ -41,7 +42,9 @@ function truncateSummary(raw: string): string {
 }
 
 function buildBulletproofButton(label: string, href: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;"><tr><td bgcolor="#0f172a" style="background-color:#0f172a;border-radius:8px;"><a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-family:${EMAIL_FONT_STACK};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">${escapeHtml(label)}</a></td></tr></table>`;
+  const safeHref = escapeHtml(href);
+  const safeLabel = escapeHtml(label);
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;"><tr><td bgcolor="#0f172a" style="background-color:#0f172a;border-radius:8px;mso-padding-alt:0;"><a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-family:${EMAIL_FONT_STACK};font-size:15px;font-weight:600;line-height:20px;color:#ffffff;text-decoration:none;border-radius:8px;">${safeLabel}</a></td></tr></table>`;
 }
 
 export function buildBookingFathomNotesEmailHtml(input: {
@@ -64,12 +67,41 @@ export function buildBookingFathomNotesEmailHtml(input: {
     summaryPreview.length > 0
       ? `<p style="margin:12px 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#3f3f46;">${escapeHtml(summaryPreview)}</p>`
       : '';
-  const logoHeaderRow = buildTransactionalEmailLogoHeaderRow({ siteOrigin: input.siteOrigin, brandName: input.brandName });
+  const preheader = `Your ${input.brandName} consultation notes are ready. Reference ${input.bookingReference}.`;
+  const logoHeaderRow = buildTransactionalEmailLogoHeaderRow({
+    siteOrigin: input.siteOrigin,
+    brandName: input.brandName,
+  });
   const brandNameRow =
     resolveTransactionalEmailLogoUrl(input.siteOrigin) === null
       ? buildTransactionalEmailBrandNameRow({ brandName: input.brandName, fontStack: EMAIL_FONT_STACK })
       : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /></head><body style="margin:0;padding:24px;background:#fafafa;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;"><tr><td style="padding:0;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoHeaderRow}<tr><td style="padding:28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${brandNameRow}<tr><td style="font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;color:#18181b;">Your consultation notes are ready</td></tr><tr><td style="padding-top:16px;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.attendeeDisplayName)}, thank you for your session on ${escapeHtml(input.dateLong)} at ${escapeHtml(input.timeLabel)}.</td></tr><tr><td style="padding-top:20px;">${buildBulletproofButton('View meeting notes', input.shareUrl)}</td></tr><tr><td style="font-family:${EMAIL_FONT_STACK};font-size:13px;color:#71717a;">Booking reference: ${escapeHtml(input.bookingReference)}</td></tr><tr><td>${summaryHtml}${actionItemsHtml}</td></tr><tr><td style="padding-top:24px;border-top:1px solid #e4e4e7;font-family:${EMAIL_FONT_STACK};font-size:12px;color:#71717a;">Sent by ${escapeHtml(input.brandName)}.</td></tr></table></td></tr></table></td></tr></table></body></html>`;
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title>${escapeHtml(`Meeting notes — ${input.bookingReference}`)}</title>
+<!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f4f4f5;width:0;opacity:0;">
+${escapeHtml(preheader)}&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;&#8204;&nbsp;
+</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background-color:#f4f4f5;border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;">
+<tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="${EMAIL_INNER_WIDTH_PX}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${EMAIL_INNER_WIDTH_PX}px;border-collapse:separate;mso-table-lspace:0pt;mso-table-rspace:0pt;">
+<tr><td style="padding:0;background-color:#ffffff;border:1px solid #e4e4e7;border-radius:12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${logoHeaderRow}<tr><td style="padding:32px 28px 28px 28px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${brandNameRow}<tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;line-height:28px;color:#18181b;">Your consultation notes are ready</td></tr><tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.attendeeDisplayName)}, thank you for your session on ${escapeHtml(input.dateLong)} at ${escapeHtml(input.timeLabel)}.</td></tr><tr><td>${buildBulletproofButton('View meeting notes', input.shareUrl)}</td></tr><tr><td style="padding:0 0 16px 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#71717a;">Booking reference: ${escapeHtml(input.bookingReference)}</td></tr><tr><td>${summaryHtml}${actionItemsHtml}</td></tr><tr><td style="padding:24px 0 0 0;border-top:1px solid #e4e4e7;"><p style="margin:0;font-family:${EMAIL_FONT_STACK};font-size:12px;line-height:18px;color:#71717a;">Sent by ${escapeHtml(input.brandName)}.</p></td></tr></table>
+</td></tr></table>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 export async function executeSendBookingFathomNotesEmail(input: { readonly bookingId: string }): Promise<void> {

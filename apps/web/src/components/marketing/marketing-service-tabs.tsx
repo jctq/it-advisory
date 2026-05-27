@@ -28,13 +28,22 @@ export type MarketingServiceTabsProps = {
   readonly items: readonly MarketingServiceTabItem[];
   readonly isNavigating: boolean;
   readonly onStartDiagnostic: () => void;
+  readonly activeId?: string;
+  readonly onActiveIdChange?: (id: string) => void;
 };
 
 /**
  * Tabbed service panel (Resonance-style) with a featured detail card.
  */
 export function MarketingServiceTabs(props: MarketingServiceTabsProps): ReactElement {
-  const [activeId, setActiveId] = useState<string>(props.items[0]?.id ?? '');
+  const [internalActiveId, setInternalActiveId] = useState<string>(props.items[0]?.id ?? '');
+  const activeId = props.activeId ?? internalActiveId;
+  const executeSetActiveId = (id: string): void => {
+    if (props.activeId === undefined) {
+      setInternalActiveId(id);
+    }
+    props.onActiveIdChange?.(id);
+  };
   const activeItem = props.items.find((item) => item.id === activeId) ?? props.items[0];
   if (activeItem === undefined) {
     return <div />;
@@ -64,7 +73,7 @@ export function MarketingServiceTabs(props: MarketingServiceTabsProps): ReactEle
                   ? 'marketing-service-tab-active border-primary/40 bg-card shadow-md ring-1 ring-primary/15'
                   : 'border-border/70 bg-background/60 hover:border-primary/25 hover:bg-card/80 dark:bg-card/40',
               )}
-              onClick={() => setActiveId(item.id)}
+              onClick={() => executeSetActiveId(item.id)}
             >
               <span
                 className={cn(

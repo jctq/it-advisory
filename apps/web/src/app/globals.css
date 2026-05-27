@@ -274,9 +274,12 @@
     --marketing-band-border: oklch(0.98 0 0 / 0.16);
     --marketing-band-surface: oklch(0.98 0 0 / 0.08);
     --marketing-band-eyebrow: oklch(0.82 0.04 264);
-    --marketing-elevation-sm: 0 1px 2px oklch(0 0 0 / 0.35), 0 6px 16px oklch(0 0 0 / 0.4);
-    --marketing-elevation-md: 0 2px 6px oklch(0 0 0 / 0.4), 0 16px 36px oklch(0 0 0 / 0.45);
-    --marketing-elevation-lg: 0 8px 24px oklch(0 0 0 / 0.5), 0 32px 64px oklch(0 0 0 / 0.55);
+    --marketing-elevation-sm: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 0 0 1px oklch(1 0 0 / 0.06),
+      0 4px 14px -6px oklch(0 0 0 / 0.35);
+    --marketing-elevation-md: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 0 0 1px oklch(1 0 0 / 0.08),
+      0 12px 28px -10px oklch(0 0 0 / 0.42);
+    --marketing-elevation-lg: 0 1px 0 oklch(1 0 0 / 0.06) inset, 0 0 0 1px oklch(1 0 0 / 0.1),
+      0 18px 40px -12px oklch(0 0 0 / 0.48);
   }
   .marketing-section-eyebrow {
     @apply text-xs font-semibold uppercase tracking-[0.22em] text-primary;
@@ -742,6 +745,30 @@
   }
   .marketing-card-elevated:hover {
     box-shadow: var(--marketing-elevation-lg);
+  }
+  .marketing-stat-card {
+    @apply bg-card/90 backdrop-blur-sm;
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 0.04),
+      0 0 0 1px color-mix(in oklch, var(--foreground) 6%, transparent);
+  }
+  .dark .marketing-stat-card {
+    background: color-mix(in oklch, var(--card) 88%, oklch(0.2 0.02 264));
+    box-shadow:
+      0 1px 0 oklch(1 0 0 / 0.06) inset,
+      0 0 0 1px oklch(1 0 0 / 0.07),
+      0 14px 32px -18px oklch(0 0 0 / 0.55);
+  }
+  .marketing-stat-card:hover {
+    box-shadow:
+      0 2px 4px oklch(0 0 0 / 0.06),
+      0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent);
+  }
+  .dark .marketing-stat-card:hover {
+    box-shadow:
+      0 1px 0 oklch(1 0 0 / 0.08) inset,
+      0 0 0 1px color-mix(in oklch, var(--primary) 22%, transparent),
+      0 18px 36px -16px oklch(0 0 0 / 0.58);
   }
   .marketing-stat-value {
     @apply text-4xl font-semibold tracking-tight tabular-nums text-foreground md:text-5xl lg:text-6xl;

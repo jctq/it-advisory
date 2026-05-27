@@ -25,6 +25,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { MarketingHeroBackground } from '@/components/marketing/marketing-hero-background';
 import { MarketingSectionArt } from '@/components/marketing/marketing-section-art';
+import { MarketingSectionReveal } from '@/components/marketing/marketing-section-reveal';
 import { useMarketingHeroInteraction } from '@/components/marketing/use-marketing-hero-interaction';
 import { MarketingParallaxSection } from '@/components/marketing/marketing-parallax-section';
 import { MarketingSectionHeader } from '@/components/marketing/marketing-section-header';
@@ -120,6 +121,16 @@ const STATS: readonly { readonly value: string; readonly label: string; readonly
   { value: '3', label: 'Steps', detail: 'Diagnose, see your recommendation, book when ready.' },
   { value: '100%', label: 'Neutral', detail: 'Independent guidance — not tied to vendor quotas.' },
   { value: 'No', label: 'retainer', detail: 'On-demand sessions when you need judgment — extend only when the program requires it.' },
+] as const;
+
+const HOW_IT_WORKS_STEPS: readonly {
+  readonly step: string;
+  readonly title: string;
+  readonly body: string;
+}[] = [
+  { step: '01', title: 'Answer focused prompts', body: 'Tap options that match reality — minimal typing.' },
+  { step: '02', title: 'See your recommendation', body: 'Know which session fits before you invest time.' },
+  { step: '03', title: 'Book a slot', body: 'Pick a Philippine-time slot that works for your team.' },
 ] as const;
 
 const SPOTLIGHT_ITEMS: readonly { readonly title: string; readonly subtitle: string }[] = [
@@ -278,6 +289,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
     <main className="relative">
       <MarketingParallaxSection
         ref={heroSectionRef}
+        reveal={false}
         className="relative flex min-h-[88dvh] flex-col justify-end overflow-hidden border-b border-border px-6 pb-14 pt-28 md:min-h-[92dvh] md:pb-20 md:pt-32"
         speed={0.11}
         backgroundSpeed={0}
@@ -346,6 +358,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
       </MarketingParallaxSection>
       <MarketingParallaxSection
         id="proof"
+        reveal={false}
         className="scroll-mt-24 border-b border-border/80 px-6 py-16 md:py-20"
         speed={0.07}
       >
@@ -357,28 +370,36 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             <MarketingSectionArt variant="metrics" />
           </div>
           <MarketingSectionHeader
+            reveal
             eyebrow="At a glance"
             title="Built for decisions, not decks."
             description="Pragmatic metrics from how teams use TechMD — fast routing, neutral advice, and focused on-demand sessions."
             align="center"
           />
-          <ul className="relative mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <MarketingSectionReveal
+            className="relative mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
+            stagger
+          >
             {STATS.map((stat) => (
-              <li
+              <div
                 key={stat.label}
-                className="marketing-card-elevated rounded-2xl border border-border/70 p-6 transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
+                className="marketing-stat-card rounded-2xl border border-border/60 p-6 transition-[transform,box-shadow,border-color] duration-200 motion-safe:hover:-translate-y-0.5 dark:border-border/50"
               >
                 <p className="marketing-stat-value">
                   {stat.value}
                   <span className="ml-1 text-2xl font-medium text-primary md:text-3xl">{stat.label}</span>
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{stat.detail}</p>
-              </li>
+              </div>
             ))}
-          </ul>
+          </MarketingSectionReveal>
         </div>
       </MarketingParallaxSection>
-      <section className="marketing-band-dark relative scroll-mt-24 overflow-hidden border-y border-marketing-band-border px-6 py-16 md:py-24">
+      <MarketingParallaxSection
+        reveal={false}
+        className="marketing-band-dark relative scroll-mt-24 overflow-hidden border-y border-marketing-band-border px-6 py-16 md:py-24"
+        speed={0}
+      >
         <div
           className="marketing-section-art-layer pointer-events-none absolute -left-6 bottom-0 hidden h-48 w-64 md:block lg:h-56 lg:w-72"
           aria-hidden
@@ -387,123 +408,131 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         </div>
         <div className="relative mx-auto max-w-6xl">
           <MarketingSectionHeader
+            reveal
             eyebrow="Why teams start here"
             title="Clarity before commitment."
             inverted
           />
-          <ul className="mt-12 divide-y divide-marketing-band-border">
+          <MarketingSectionReveal as="ul" className="mt-12 divide-y divide-marketing-band-border" stagger>
             {SPOTLIGHT_ITEMS.map((item, index) => (
-              <li key={item.title}>
-                <div className="flex flex-col gap-3 py-9 first:pt-4 last:pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
-                  <div className="min-w-0 space-y-2">
-                    <p className="text-xs font-semibold tabular-nums text-marketing-band-subtle">
-                      {String(index + 1).padStart(2, '0')}
-                    </p>
-                    <p className="text-2xl font-semibold tracking-tight text-marketing-band-fg md:text-3xl lg:text-4xl">
-                      {item.title}
-                    </p>
-                    <p className="max-w-xl text-sm leading-relaxed marketing-band-muted md:text-base">{item.subtitle}</p>
-                  </div>
-                  <ArrowRight className="size-7 shrink-0 text-marketing-band-muted sm:mb-1" aria-hidden />
+              <div
+                key={item.title}
+                className="flex flex-col gap-3 py-9 first:pt-4 last:pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-10"
+              >
+                <div className="min-w-0 space-y-2">
+                  <p className="text-xs font-semibold tabular-nums text-marketing-band-subtle">
+                    {String(index + 1).padStart(2, '0')}
+                  </p>
+                  <p className="text-2xl font-semibold tracking-tight text-marketing-band-fg md:text-3xl lg:text-4xl">
+                    {item.title}
+                  </p>
+                  <p className="max-w-xl text-sm leading-relaxed marketing-band-muted md:text-base">{item.subtitle}</p>
                 </div>
-              </li>
+                <ArrowRight className="size-7 shrink-0 text-marketing-band-muted sm:mb-1" aria-hidden />
+              </div>
             ))}
-          </ul>
+          </MarketingSectionReveal>
         </div>
-      </section>
-      <MarketingParallaxSection id="how-it-works" className="scroll-mt-24 px-6 py-16 md:py-24" speed={0.13}>
+      </MarketingParallaxSection>
+      <MarketingParallaxSection id="how-it-works" reveal={false} className="scroll-mt-24 px-6 py-16 md:py-24" speed={0.13}>
         <div className="mx-auto max-w-6xl space-y-14">
           <MarketingSectionHeader
+            reveal
             eyebrow="Guided flow"
             title="How we work"
             description="Pain-first, guided, fast — three beats: diagnose your situation, see a tailored recommendation, book a focused consultation."
           />
-          <ol className="relative grid gap-5 md:grid-cols-3 md:gap-6">
+          <div className="relative">
             <div
               className="marketing-section-art-layer marketing-section-art-fade-bottom pointer-events-none absolute inset-x-0 -top-4 hidden h-40 md:block"
               aria-hidden
             >
               <MarketingSectionArt variant="process" className="mx-auto max-w-3xl opacity-80" />
             </div>
-            {[
-              { step: '01', title: 'Answer focused prompts', body: 'Tap options that match reality — minimal typing.' },
-              { step: '02', title: 'See your recommendation', body: 'Know which session fits before you invest time.' },
-              { step: '03', title: 'Book a slot', body: 'Pick a Philippine-time slot that works for your team.' },
-            ].map((item) => (
-              <li
-                key={item.step}
-                className="marketing-card-elevated relative z-1 overflow-hidden rounded-2xl border border-border/80 p-6 md:p-8"
-              >
-                <p
-                  className="pointer-events-none absolute -right-2 -top-4 select-none text-[5.5rem] font-semibold leading-none tracking-tighter text-primary/10 md:text-[6.5rem]"
-                  aria-hidden
+            <MarketingSectionReveal
+              as="ol"
+              className="relative grid list-none gap-5 p-0 md:grid-cols-3 md:gap-6"
+              stagger
+            >
+              {HOW_IT_WORKS_STEPS.map((item) => (
+                <div
+                  key={item.step}
+                  className="marketing-card-elevated relative z-1 overflow-hidden rounded-2xl border border-border/80 p-6 md:p-8"
                 >
-                  {item.step}
-                </p>
-                <p className="relative text-xs font-semibold uppercase tracking-[0.2em] text-primary">{item.step}</p>
-                <h3 className="relative mt-4 text-lg font-semibold text-foreground md:text-xl">{item.title}</h3>
-                <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
-              </li>
-            ))}
-          </ol>
+                  <p
+                    className="pointer-events-none absolute -right-2 -top-4 select-none text-[5.5rem] font-semibold leading-none tracking-tighter text-primary/10 md:text-[6.5rem]"
+                    aria-hidden
+                  >
+                    {item.step}
+                  </p>
+                  <p className="relative text-xs font-semibold uppercase tracking-[0.2em] text-primary">{item.step}</p>
+                  <h3 className="relative mt-4 text-lg font-semibold text-foreground md:text-xl">{item.title}</h3>
+                  <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
+                </div>
+              ))}
+            </MarketingSectionReveal>
+          </div>
           <div className="space-y-8 rounded-3xl border border-border/70 bg-muted/30 p-8 md:p-10 dark:bg-muted/15">
-            <div className="max-w-2xl space-y-2">
+            <MarketingSectionReveal stagger className="max-w-2xl space-y-2">
               <h3 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
                 What business or IT problem are you facing?
               </h3>
               <p className="text-muted-foreground">
                 Choose the closest match — you can refine details in the guided diagnostic.
               </p>
-            </div>
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            </MarketingSectionReveal>
+            <MarketingSectionReveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" stagger>
               {PROBLEM_ITEMS.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <li key={item.title}>
-                    <button
-                      type="button"
-                      className={problemCardClassName}
-                      disabled={isNavigating}
-                      onClick={() => void navigateToNewQuiz()}
-                    >
-                      <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <Icon className="size-5" aria-hidden />
-                      </span>
-                      <span className="mt-4 font-semibold text-foreground">{item.title}</span>
-                      <span className="mt-2 text-sm text-muted-foreground">{item.description}</span>
-                      <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                        Start diagnostic
-                        <ArrowRight className="size-4" aria-hidden />
-                      </span>
-                    </button>
-                  </li>
+                  <button
+                    key={item.title}
+                    type="button"
+                    className={problemCardClassName}
+                    disabled={isNavigating}
+                    onClick={() => void navigateToNewQuiz()}
+                  >
+                    <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Icon className="size-5" aria-hidden />
+                    </span>
+                    <span className="mt-4 font-semibold text-foreground">{item.title}</span>
+                    <span className="mt-2 text-sm text-muted-foreground">{item.description}</span>
+                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                      Start diagnostic
+                      <ArrowRight className="size-4" aria-hidden />
+                    </span>
+                  </button>
                 );
               })}
-            </ul>
+            </MarketingSectionReveal>
           </div>
         </div>
       </MarketingParallaxSection>
       <MarketingParallaxSection
         id="services"
+        reveal={false}
         className="scroll-mt-24 border-y border-border/80 bg-muted/25 px-6 py-20 md:py-28 dark:bg-muted/15"
         speed={-0.1}
       >
         <div className="mx-auto max-w-6xl space-y-16">
           <MarketingSectionHeader
+            reveal
             eyebrow="Engagements"
             title="We provide focused advisory solutions."
             description="Advisory designed for decisions — not endless decks. Start with the diagnostic; we will route you to the right shape of help."
           />
-          <MarketingServiceTabs
-            items={SERVICE_TAB_ITEMS}
-            isNavigating={isNavigating}
-            onStartDiagnostic={() => void navigateToNewQuiz()}
-          />
-          <div className="grid gap-6 lg:grid-cols-2">
+          <MarketingSectionReveal stagger>
+            <MarketingServiceTabs
+              items={SERVICE_TAB_ITEMS}
+              isNavigating={isNavigating}
+              onStartDiagnostic={() => void navigateToNewQuiz()}
+            />
+          </MarketingSectionReveal>
+          <MarketingSectionReveal className="grid gap-6 lg:grid-cols-2" stagger>
             {ENGAGEMENT_MODELS.map((model, index) => (
               <div
                 key={model.title}
-                className="marketing-card-elevated relative flex flex-col overflow-hidden rounded-3xl border border-border/70 p-8 md:p-10"
+                className="marketing-card-elevated relative flex h-full flex-col overflow-hidden rounded-3xl border border-border/70 p-8 md:p-10"
               >
                 <div className="marketing-section-art-layer" aria-hidden>
                   <MarketingSectionArt
@@ -528,16 +557,16 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 </Button>
               </div>
             ))}
-          </div>
+          </MarketingSectionReveal>
           <div>
-            <MarketingSectionHeader eyebrow="Primary benefits" title="Why choose TechMD?" />
-            <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <MarketingSectionHeader reveal eyebrow="Primary benefits" title="Why choose TechMD?" />
+            <MarketingSectionReveal className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4" stagger>
               {VALUE_PROPS.map((item) => {
                 const Icon = item.icon;
                 return (
                   <div
                     key={item.title}
-                    className="marketing-card-elevated rounded-2xl border border-border/70 p-6 transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
+                    className="marketing-card-elevated h-full rounded-2xl border border-border/70 p-6 transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
                   >
                     <Icon className="size-8 text-primary" aria-hidden />
                     <h3 className="mt-4 font-semibold text-foreground">{item.title}</h3>
@@ -545,24 +574,22 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                   </div>
                 );
               })}
-            </div>
+            </MarketingSectionReveal>
           </div>
         </div>
       </MarketingParallaxSection>
-      <section className="marketing-band-dark px-6 py-16 md:py-24">
+      <MarketingParallaxSection reveal={false} className="marketing-band-dark px-6 py-16 md:py-24" speed={0}>
         <div className="mx-auto max-w-6xl space-y-10">
           <MarketingSectionHeader
+            reveal
             eyebrow="Trusted approach"
             title="Teams come back for clarity they can act on."
             inverted
             align="center"
           />
-          <ul className="grid gap-6 md:grid-cols-3">
+          <MarketingSectionReveal as="ul" className="grid gap-6 md:grid-cols-3" stagger>
             {TESTIMONIALS.map((item) => (
-              <li
-                key={item.quote}
-                className="marketing-band-card rounded-2xl p-6 backdrop-blur-sm md:p-8"
-              >
+              <div key={item.quote} className="marketing-band-card rounded-2xl p-6 backdrop-blur-sm md:p-8">
                 <Quote className="size-8 text-marketing-band-subtle" aria-hidden />
                 <blockquote className="mt-4 text-pretty text-base leading-relaxed text-marketing-band-fg/90">
                   {item.quote}
@@ -571,16 +598,17 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                   <p className="font-semibold text-marketing-band-fg">{item.name}</p>
                   <p className="mt-1 text-sm marketing-band-muted">{item.role}</p>
                 </footer>
-              </li>
+              </div>
             ))}
-          </ul>
+          </MarketingSectionReveal>
         </div>
-      </section>
-      <MarketingParallaxSection id="about" className="scroll-mt-24 px-6 py-16 md:py-24" speed={0.12}>
+      </MarketingParallaxSection>
+      <MarketingParallaxSection id="about" reveal={false} className="scroll-mt-24 px-6 py-16 md:py-24" speed={0.12}>
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-6">
               <MarketingSectionHeader
+                reveal
                 eyebrow="Our story"
                 title="Better way to make technology decisions."
                 description="TechMD for Growing Businesses helps founders and operators make pragmatic technology decisions — especially when vendors, timelines, or internal stakeholders disagree."
@@ -593,7 +621,11 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 <Link href="/diagnostic">Learn more via diagnostic</Link>
               </Button>
             </div>
-            <div className="marketing-card-elevated relative overflow-hidden rounded-3xl border border-border/80 p-8 md:p-10">
+            <MarketingSectionReveal
+              direction="right"
+              stagger={false}
+              className="marketing-card-elevated relative overflow-hidden rounded-3xl border border-border/80 p-8 md:p-10"
+            >
               <div className="marketing-section-art-layer" aria-hidden>
                 <MarketingSectionArt variant="story" className="absolute -right-6 -top-4 h-52 w-72 md:h-60 md:w-80" />
               </div>
@@ -623,17 +655,19 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                   </p>
                 </div>
               </div>
-            </div>
+            </MarketingSectionReveal>
           </div>
         </div>
       </MarketingParallaxSection>
       <MarketingParallaxSection
         id="resources"
+        reveal={false}
         className="scroll-mt-24 px-6 py-20 md:py-28"
         speed={-0.09}
       >
         <div className="mx-auto max-w-6xl space-y-16">
           <MarketingSectionHeader
+            reveal
             eyebrow="Resources"
             title="Practical references for technology decisions."
             description="Guides, checklists, and playbooks you can forward to finance, ops, or IT — written for growing teams making vendor, delivery, and automation calls."
@@ -670,7 +704,11 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             </div>
           </div>
           <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-            <div className="marketing-card-elevated relative overflow-hidden rounded-3xl border border-border/80 p-8 md:p-10">
+            <MarketingSectionReveal
+              direction="left"
+              stagger={false}
+              className="marketing-card-elevated relative overflow-hidden rounded-3xl border border-border/80 p-8 md:p-10"
+            >
               <div
                 className="marketing-section-art-layer pointer-events-none absolute -right-4 bottom-0 hidden h-40 w-56 sm:block"
                 aria-hidden
@@ -683,7 +721,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 Focused calls work best when the room shares context. These three beats are enough — you do not need a
                 full requirements document.
               </p>
-              <ol className="relative mt-8 space-y-6">
+              <ol className="relative mt-8 list-none space-y-6 p-0">
                 {RESOURCE_PREP_ITEMS.map((item, index) => (
                   <li key={item.title} className="flex gap-4">
                     <span
@@ -699,7 +737,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                   </li>
                 ))}
               </ol>
-            </div>
+            </MarketingSectionReveal>
             <div className="space-y-6">
               <div className="rounded-2xl border border-border/70 bg-muted/30 p-6 dark:bg-muted/15 md:p-8">
                 <h3 className="text-lg font-semibold text-foreground">What the library covers</h3>
@@ -735,36 +773,37 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           </div>
           <div className="space-y-8">
             <MarketingSectionHeader
+              reveal
               eyebrow="Library"
               title="References you can share internally"
               description="Each piece is vendor-neutral and written for operators — use them in steering committees, vendor reviews, or pre-reads before booking."
             />
-            <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <MarketingSectionReveal className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" stagger>
               {RESOURCE_ITEMS.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <li
+                  <div
                     key={item.title}
                     className="marketing-card-elevated group flex h-full flex-col rounded-2xl border border-border/80 p-6 transition-transform duration-200 motion-safe:hover:-translate-y-0.5"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <Icon className="size-5" aria-hidden />
-                      </span>
-                      <span className="rounded-full border border-border/70 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {item.category}
-                      </span>
-                    </div>
-                    <h3 className="mt-4 font-semibold leading-snug text-foreground">{item.title}</h3>
-                    <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
-                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
-                      <span className="text-xs text-muted-foreground">{item.readLabel}</span>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Icon className="size-5" aria-hidden />
+                        </span>
+                        <span className="rounded-full border border-border/70 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                          {item.category}
+                        </span>
+                      </div>
+                      <h3 className="mt-4 font-semibold leading-snug text-foreground">{item.title}</h3>
+                      <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+                        <span className="text-xs text-muted-foreground">{item.readLabel}</span>
                       <span className="text-xs font-medium text-primary">Coming soon</span>
                     </div>
-                  </li>
+                  </div>
                 );
               })}
-            </ul>
+            </MarketingSectionReveal>
           </div>
         </div>
       </MarketingParallaxSection>

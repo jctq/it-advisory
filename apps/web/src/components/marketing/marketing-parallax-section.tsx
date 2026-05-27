@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactElement, type ReactNode, type Ref } from 'react';
+import { MarketingSectionReveal } from '@/components/marketing/marketing-section-reveal';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +35,9 @@ export type MarketingParallaxSectionProps = {
   readonly speed?: number;
   readonly background?: ReactNode;
   readonly backgroundSpeed?: number;
+  /** In-view stagger reveal. Off when reduced motion is preferred. Default true. */
+  readonly reveal?: boolean;
+  readonly revealStagger?: boolean;
 };
 
 /**
@@ -50,15 +54,20 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
     speed: speedProp,
     background,
     backgroundSpeed: backgroundSpeedProp,
+    reveal: revealProp,
+    revealStagger: revealStaggerProp,
   } = props;
   const speed = speedProp ?? 0.12;
   const backgroundSpeed = backgroundSpeedProp ?? speed * 1.7;
+  const reveal = revealProp ?? true;
+  const revealStagger = revealStaggerProp ?? false;
   const hasBackground = background !== undefined;
   const internalSectionRef = useRef<HTMLElement>(null);
   const sectionRef = mergeRefs(forwardedRef, internalSectionRef);
   const [contentOffset, setContentOffset] = useState(0);
   const [backgroundOffset, setBackgroundOffset] = useState(0);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const isRevealEnabled = reveal && !prefersReducedMotion;
   useEffect(() => {
     if (prefersReducedMotion) {
       return;
@@ -98,6 +107,13 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
     prefersReducedMotion || !hasBackground || backgroundOffset === 0
       ? undefined
       : `translate3d(0, ${backgroundOffset}px, 0)`;
+  const content = isRevealEnabled ? (
+    <MarketingSectionReveal className={contentClassName} stagger={revealStagger}>
+      {children}
+    </MarketingSectionReveal>
+  ) : (
+    <div className={contentClassName}>{children}</div>
+  );
   return (
     <section
       ref={sectionRef as Ref<HTMLElement>}
@@ -117,13 +133,13 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
         </div>
       ) : null}
       <div
-        className={cn('relative z-10', contentClassName)}
+        className={cn('relative z-10', !isRevealEnabled && contentClassName)}
         style={{
           transform: contentTransform,
           willChange: contentTransform === undefined ? undefined : 'transform',
         }}
       >
-        {children}
+        {content}
       </div>
     </section>
   );
