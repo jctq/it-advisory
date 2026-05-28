@@ -4,19 +4,27 @@ import { MarketingRouteScroll } from '@/components/marketing/marketing-route-scr
 import { MarketingSmoothScroll } from '@/components/marketing/marketing-smooth-scroll';
 import { MarketingAppearanceProvider } from '@/components/marketing/marketing-appearance-provider';
 import { MarketingSiteFooter } from '@/components/marketing/marketing-site-footer';
+import { MarketingSupportReport } from '@/components/marketing/support-report/marketing-support-report';
 import { SiteHeader } from '@/components/marketing/site-header';
+import { readSupportModuleEnabled } from '@/lib/marketing/support-module-gate';
 
-export default function MarketingLayout({ children }: { readonly children: ReactNode }) {
+export default async function MarketingLayout({ children }: { readonly children: ReactNode }) {
+  const supportModuleEnabled = await readSupportModuleEnabled();
+  const content = (
+    <>
+      <MarketingSmoothScroll />
+      <MarketingRouteScroll />
+      <SiteHeader supportModuleEnabled={supportModuleEnabled} />
+      <div id="marketing-main-content" className="flex-1">
+        {children}
+      </div>
+      <MarketingSiteFooter />
+    </>
+  );
   return (
     <MarketingAppearanceProvider>
       <MarketingCookieConsent>
-        <div className="flex min-h-dvh flex-col">
-          <MarketingSmoothScroll />
-          <MarketingRouteScroll />
-          <SiteHeader />
-          <div className="flex-1">{children}</div>
-          <MarketingSiteFooter />
-        </div>
+        {supportModuleEnabled ? <MarketingSupportReport>{content}</MarketingSupportReport> : content}
       </MarketingCookieConsent>
     </MarketingAppearanceProvider>
   );

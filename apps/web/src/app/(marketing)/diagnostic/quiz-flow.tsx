@@ -65,6 +65,18 @@ function resolveGuidedPersistCompleted(guided: GuidedDiagnosticV1): boolean {
   return guided.outcome !== null && guided.activeRound === null;
 }
 
+/** Avoid clobbering a terminal recommendation when a stale session hydrate races the summary API. */
+function mergeHydratedGuidedState(
+  current: GuidedDiagnosticV1,
+  parsed: GuidedDiagnosticV1 | null,
+): GuidedDiagnosticV1 {
+  const next = parsed ?? GUIDED_DIAGNOSTIC_EMPTY;
+  if (current.outcome !== null && next.outcome === null) {
+    return current;
+  }
+  return next;
+}
+
 type DiagnosticPublicConfig = {
   readonly diagnosticAiEnabled: boolean;
 };
@@ -340,6 +352,10 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     },
     [capturePersistedSessionRef, persistedSessionRef, sessionReadOnlyRef, sessionTargetId],
   );
+  const persistGuidedRef = useRef(persistGuided);
+  useEffect(() => {
+    persistGuidedRef.current = persistGuided;
+  }, [persistGuided]);
   useEffect(() => {
     if (guided.outcome === null || sessionTargetId !== null || persistedSessionRef === null) {
       return;
@@ -347,8 +363,17 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     if (pathname !== '/diagnostic') {
       return;
     }
-    router.replace(buildMarketingQuizSessionPath(persistedSessionRef));
-  }, [guided.outcome, pathname, persistedSessionRef, router, sessionTargetId]);
+    const nextPath = buildMarketingQuizSessionPath(persistedSessionRef);
+    if (window.location.pathname !== nextPath) {
+      window.history.replaceState(null, '', nextPath);
+    }
+  }, [guided.outcome, pathname, persistedSessionRef, sessionTargetId]);
+  useEffect(() => {
+    if (!isSessionReady || sessionReadOnlyRef.current || guided.outcome === null) {
+      return;
+    }
+    void persistGuidedRef.current(guided, true);
+  }, [guided, isSessionReady, sessionReadOnlyRef]);
   useEffect(() => {
     if (lastSessionInitKeyRef.current === sessionInitKey && hasHydratedRef.current) {
       return;
@@ -366,7 +391,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       }
       if (isRetakeQuery) {
         setIsSessionReady(false);
-        await persistGuided(GUIDED_DIAGNOSTIC_EMPTY, false);
+        await persistGuidedRef.current(GUIDED_DIAGNOSTIC_EMPTY, false);
         if (cancelled) {
           return;
         }
@@ -456,7 +481,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
         const normalized = normalizeGuidedDiagnosticRaw(rawGuided);
         const parsed =
           normalized !== undefined && normalized !== '' ? parseGuidedDiagnosticJson(normalized) : null;
-        setGuided(parsed ?? GUIDED_DIAGNOSTIC_EMPTY);
+        setGuided((current) => mergeHydratedGuidedState(current, parsed));
       } finally {
         if (!cancelled) {
           hasHydratedRef.current = true;
@@ -471,7 +496,6 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   }, [
     isRetakeQuery,
     capturePersistedSessionRef,
-    persistGuided,
     router,
     sessionInitKey,
     sessionReadOnlyRef,

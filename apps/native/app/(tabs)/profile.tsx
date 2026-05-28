@@ -1,4 +1,5 @@
 import { fetchMarketingMyDiagnosticSessions, type MarketingDiagnosticSessionSummary } from '@techmd/api-client/marketing-my-diagnostics-api-client';
+import { fetchMarketingMyReportsUnreadCount } from '@techmd/api-client/marketing-my-reports-api-client';
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import {
   buildPhilippineMobileE164FromNationalDigits,
@@ -6,6 +7,7 @@ import {
   parseNationalDigitsFromStoredPhone,
 } from '@techmd/domain/philippine-mobile-phone';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +23,8 @@ import { AppButton } from '../../src/components/app-button';
 import { AddToCalendarLinkRow } from '../../src/components/add-to-calendar-link-row';
 import { AppCard } from '../../src/components/app-card';
 import { AppScreen } from '../../src/components/app-screen';
+import { ProfileReportsTab } from '../../src/components/profile-reports-tab';
+import { useSupportModuleEnabled } from '../../src/hooks/use-support-module-enabled';
 import { ThemedText } from '../../src/components/themed-text';
 import { readNativeAppConfig } from '../../src/lib/native-app-config';
 import { useMarketingAuth } from '../../src/providers/marketing-auth-provider';
@@ -28,7 +32,7 @@ import { useAppTheme } from '../../src/theme/use-app-theme';
 
 const DIAGNOSTIC_LIST_PAGE_SIZE = 12;
 
-type ProfileTabId = 'profile' | 'diagnostics';
+type ProfileTabId = 'profile' | 'diagnostics' | 'reports';
 
 function formatDiagnosticPrimaryStatus(row: MarketingDiagnosticSessionSummary): string {
   return row.completedAtIso !== null ? 'Completed' : 'In progress';
@@ -93,7 +97,16 @@ export default function ProfileTabScreen() {
   const [sessionsPage, setSessionsPage] = useState<number>(1);
   const [sessionsTotalPages, setSessionsTotalPages] = useState<number>(0);
   const [sessionsTotalCount, setSessionsTotalCount] = useState<number>(0);
+  const [reportsUnreadCount, setReportsUnreadCount] = useState<number>(0);
+  const supportModuleEnabled = useSupportModuleEnabled();
   const diagnosticsAppendInFlightRef = useRef<boolean>(false);
+  const profileTabs = useMemo<readonly ProfileTabId[]>(() => {
+    const tabs: ProfileTabId[] = ['profile', 'diagnostics'];
+    if (supportModuleEnabled) {
+      tabs.push('reports');
+    }
+    return tabs;
+  }, [supportModuleEnabled]);
 
   useEffect(() => {
     if (user === null) {
@@ -103,6 +116,12 @@ export default function ProfileTabScreen() {
     setCompany(user.company ?? '');
     setPhoneNationalDigits(parseNationalDigitsFromStoredPhone(user.phone));
   }, [user]);
+
+  useEffect(() => {
+    if (!supportModuleEnabled && activeTab === 'reports') {
+      setActiveTab('profile');
+    }
+  }, [activeTab, supportModuleEnabled]);
 
   const loadSessions = useCallback(
     async (options: { readonly page: number; readonly append: boolean }): Promise<void> => {
@@ -145,6 +164,29 @@ export default function ProfileTabScreen() {
     diagnosticsAppendInFlightRef.current = false;
     void loadSessions({ page: 1, append: false });
   }, [user, activeTab, loadSessions]);
+
+  const loadReportsUnreadCount = useCallback(async (): Promise<void> => {
+    if (!supportModuleEnabled || user === null || deviceId === null || sessionToken === null) {
+      setReportsUnreadCount(0);
+      return;
+    }
+    try {
+      const unreadCount = await fetchMarketingMyReportsUnreadCount({
+        apiBaseUrl: config.apiBaseUrl,
+        deviceId,
+        marketingSessionToken: sessionToken,
+      });
+      setReportsUnreadCount(unreadCount);
+    } catch {
+      // Ignore badge polling errors.
+    }
+  }, [config.apiBaseUrl, deviceId, sessionToken, supportModuleEnabled, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadReportsUnreadCount();
+    }, [loadReportsUnreadCount]),
+  );
 
   const handleDiagnosticsEndReached = useCallback(() => {
     if (sessionsError !== null) {
@@ -358,8 +400,10 @@ export default function ProfileTabScreen() {
       ) : (
         <View style={styles.signedInFill}>
           <View style={[styles.segmentRow, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
-            {(['profile', 'diagnostics'] as const).map((tabId) => {
+            {profileTabs.map((tabId) => {
               const isActive = activeTab === tabId;
+              const tabLabel =
+                tabId === 'profile' ? 'Account' : tabId === 'diagnostics' ? 'Diagnostics' : 'Reports';
               return (
                 <Pressable
                   key={tabId}
@@ -383,8 +427,15 @@ export default function ProfileTabScreen() {
                       { color: isActive ? theme.text : theme.textMuted },
                     ]}
                   >
-                    {tabId === 'profile' ? 'Account' : 'Diagnostics'}
+                    {tabLabel}
                   </ThemedText>
+                  {tabId === 'reports' && reportsUnreadCount > 0 ? (
+                    <View style={[styles.segmentBadge, { backgroundColor: theme.primary }]}>
+                      <ThemedText style={[styles.segmentBadgeLabel, { color: theme.onPrimary }]}>
+                        {reportsUnreadCount > 9 ? '9+' : String(reportsUnreadCount)}
+                      </ThemedText>
+                    </View>
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -487,6 +538,14 @@ export default function ProfileTabScreen() {
                 </AppButton>
               </View>
             </ScrollView>
+          ) : activeTab === 'reports' ? (
+            deviceId !== null && sessionToken !== null ? (
+              <ProfileReportsTab
+                apiBaseUrl={config.apiBaseUrl}
+                deviceId={deviceId}
+                sessionToken={sessionToken}
+              />
+            ) : null
           ) : (
             <AppCard fillVertical>
               <View style={styles.diagnosticsCardColumn}>
@@ -593,19 +652,35 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   segmentChip: {
-    borderRadius: 10,
-    flex: 1,
-    paddingVertical: 8,
     alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'transparent',
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
     elevation: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    paddingVertical: 8,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
   },
+  segmentBadge: {
+    alignItems: 'center',
+    borderRadius: 999,
+    justifyContent: 'center',
+    minHeight: 18,
+    minWidth: 18,
+    paddingHorizontal: 5,
+  },
+  segmentBadgeLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 12,
+  },
   segmentLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
   fieldLabel: {

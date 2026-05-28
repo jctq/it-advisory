@@ -1,6 +1,6 @@
 'use client';
 
-import { BrainCircuit, CircleDollarSign, Clapperboard, CreditCard, Mail, Video, type LucideIcon } from 'lucide-react';
+import { BrainCircuit, CircleDollarSign, Clapperboard, CreditCard, Headphones, Mail, Video, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
   AdminFormStickyFooter,
@@ -33,6 +33,11 @@ import {
   type AdminRecordingSettingsFormState,
 } from '@/components/admin/admin-recording-settings-form';
 import {
+  AdminSupportSettingsForm,
+  type AdminSupportSettingsFormHandle,
+  type AdminSupportSettingsFormState,
+} from '@/components/admin/admin-support-settings-form';
+import {
   AdminSettingsForm,
   type AdminSettingsFormHandle,
   type AdminSettingsFormState,
@@ -40,7 +45,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
-type SettingsTab = 'general' | 'pricing' | 'payments' | 'email' | 'meetings' | 'recordings';
+type SettingsTab = 'general' | 'pricing' | 'payments' | 'email' | 'support' | 'meetings' | 'recordings';
 
 type SettingsTabConfig = {
   readonly value: SettingsTab;
@@ -53,6 +58,7 @@ const SETTINGS_TABS: readonly SettingsTabConfig[] = [
   { value: 'pricing', label: 'Pricing', icon: CircleDollarSign },
   { value: 'payments', label: 'Payments', icon: CreditCard },
   { value: 'email', label: 'Email', icon: Mail },
+  { value: 'support', label: 'Support', icon: Headphones },
   { value: 'meetings', label: 'Meetings', icon: Video },
   { value: 'recordings', label: 'Recordings', icon: Clapperboard },
 ];
@@ -93,6 +99,12 @@ const EMPTY_RECORDINGS_STATE: AdminRecordingSettingsFormState = {
   isLoading: true,
 };
 
+const EMPTY_SUPPORT_STATE: AdminSupportSettingsFormState = {
+  isDirty: false,
+  isSaving: false,
+  isLoading: true,
+};
+
 function addMountedSettingsTab(
   previous: ReadonlySet<SettingsTab>,
   tab: SettingsTab,
@@ -114,12 +126,14 @@ export function AdminSettingsWorkspace(): ReactElement {
   const [emailState, setEmailState] = useState<AdminEmailSettingsFormState>(EMPTY_EMAIL_STATE);
   const [meetingsState, setMeetingsState] = useState<AdminMeetingSettingsFormState>(EMPTY_MEETINGS_STATE);
   const [recordingsState, setRecordingsState] = useState<AdminRecordingSettingsFormState>(EMPTY_RECORDINGS_STATE);
+  const [supportState, setSupportState] = useState<AdminSupportSettingsFormState>(EMPTY_SUPPORT_STATE);
   const generalFormRef = useRef<AdminSettingsFormHandle>(null);
   const pricingFormRef = useRef<AdminPricingSettingsFormHandle>(null);
   const paymentsFormRef = useRef<AdminPaymentSettingsFormHandle>(null);
   const emailFormRef = useRef<AdminEmailSettingsFormHandle>(null);
   const meetingsFormRef = useRef<AdminMeetingSettingsFormHandle>(null);
   const recordingsFormRef = useRef<AdminRecordingSettingsFormHandle>(null);
+  const supportFormRef = useRef<AdminSupportSettingsFormHandle>(null);
   const tabTriggerRefs = useRef<Partial<Record<SettingsTab, HTMLButtonElement>>>({});
   useEffect(() => {
     const activeTrigger = tabTriggerRefs.current[activeTab];
@@ -137,6 +151,8 @@ export function AdminSettingsWorkspace(): ReactElement {
           ? paymentsState
           : activeTab === 'email'
             ? emailState
+            : activeTab === 'support'
+            ? supportState
             : activeTab === 'meetings'
               ? meetingsState
               : recordingsState;
@@ -155,6 +171,10 @@ export function AdminSettingsWorkspace(): ReactElement {
     }
     if (activeTab === 'email') {
       void emailFormRef.current?.save();
+      return;
+    }
+    if (activeTab === 'support') {
+      void supportFormRef.current?.save();
       return;
     }
     if (activeTab === 'meetings') {
@@ -178,6 +198,10 @@ export function AdminSettingsWorkspace(): ReactElement {
     }
     if (activeTab === 'email') {
       emailFormRef.current?.reset();
+      return;
+    }
+    if (activeTab === 'support') {
+      supportFormRef.current?.reset();
       return;
     }
     if (activeTab === 'meetings') {
@@ -274,6 +298,14 @@ export function AdminSettingsWorkspace(): ReactElement {
           >
             {mountedTabs.has('email') ? (
               <AdminEmailSettingsForm formRef={emailFormRef} onStateChange={setEmailState} />
+            ) : null}
+          </TabsContent>
+          <TabsContent
+            value="support"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+          >
+            {mountedTabs.has('support') ? (
+              <AdminSupportSettingsForm formRef={supportFormRef} onStateChange={setSupportState} />
             ) : null}
           </TabsContent>
           <TabsContent

@@ -1731,3 +1731,53 @@ html:has(.admin-blog-mdx-editor-overlay) [class*='tooltipContent'] {
     transition: none !important;
   }
 }
+
+/* Yet Another React Lightbox — aligned with shadcn / marketing tokens */
+.yarl__root {
+  --yarl__slide_captions_container_padding: 1rem 1.25rem 1.5rem;
+  --yarl__slide_title_font_size: 0.9375rem;
+  --yarl__slide_description_font_size: 0.8125rem;
+  --yarl__color_backdrop: color-mix(in oklch, oklch(0.14 0.02 264) 82%, transparent);
+  --yarl__color_button: var(--foreground);
+  --yarl__color_button_active: var(--primary);
+  --yarl__color_button_disabled: color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+  --yarl__thumbs_container_background_color: color-mix(in oklch, var(--card) 92%, transparent);
+}
+
+.yarl__slide_title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: oklch(0.985 0 0);
+}
+
+.yarl__slide_description {
+  color: oklch(0.85 0 0 / 0.88);
+}
+
+.yarl__button {
+  border-radius: calc(var(--radius) - 2px);
+  filter: none;
+  backdrop-filter: blur(8px);
+  background-color: color-mix(in oklch, var(--card) 88%, transparent);
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.06);
+}
+
+.yarl__button:hover {
+  background-color: color-mix(in oklch, var(--accent) 90%, transparent);
+}
+
+.yarl__toolbar {
+  padding: 0.75rem;
+}
+
+.yarl__carousel {
+  padding: 0 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yarl__portal * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

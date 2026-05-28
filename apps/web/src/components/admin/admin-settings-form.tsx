@@ -1,6 +1,6 @@
 'use client';
 
-import { Bug, Building2, CalendarDays, LayoutTemplate } from 'lucide-react';
+import { Bug, Building2, CalendarDays, Headphones, LayoutTemplate } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -33,6 +33,7 @@ type SettingsPayload = {
   readonly siteNameEnvDefault: string;
   readonly diagnosticAiEnabled: boolean;
   readonly diagnosticManageBookingEnabled: boolean;
+  readonly supportModuleEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;
@@ -60,6 +61,7 @@ function areSettingsEqual(left: SettingsPayload, right: SettingsPayload): boolea
     left.siteName === right.siteName &&
     left.diagnosticAiEnabled === right.diagnosticAiEnabled &&
     left.diagnosticManageBookingEnabled === right.diagnosticManageBookingEnabled &&
+    left.supportModuleEnabled === right.supportModuleEnabled &&
     left.diagnosticMaxRounds === right.diagnosticMaxRounds &&
     left.diagnosticQuestionsPerRound === right.diagnosticQuestionsPerRound &&
     left.diagnosticOptionsPerQuestion === right.diagnosticOptionsPerQuestion &&
@@ -95,6 +97,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   const [siteNameEnvDefault, setSiteNameEnvDefault] = useState<string>('TechMD');
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [diagnosticManageBookingEnabled, setDiagnosticManageBookingEnabled] = useState<boolean>(false);
+  const [supportModuleEnabled, setSupportModuleEnabled] = useState<boolean>(false);
   const [diagnosticMaxRounds, setDiagnosticMaxRounds] = useState<number>(4);
   const [diagnosticQuestionsPerRound, setDiagnosticQuestionsPerRound] = useState<number>(5);
   const [diagnosticOptionsPerQuestion, setDiagnosticOptionsPerQuestion] = useState<number>(4);
@@ -112,6 +115,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       siteNameEnvDefault,
       diagnosticAiEnabled,
       diagnosticManageBookingEnabled,
+      supportModuleEnabled,
       diagnosticMaxRounds,
       diagnosticQuestionsPerRound,
       diagnosticOptionsPerQuestion,
@@ -122,6 +126,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       siteNameEnvDefault,
       diagnosticAiEnabled,
       diagnosticManageBookingEnabled,
+      supportModuleEnabled,
       diagnosticCacheDebugEnabled,
       diagnosticMaxRounds,
       diagnosticOptionsPerQuestion,
@@ -147,6 +152,8 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
             diagnosticAiEnabled: typeof data.diagnosticAiEnabled === 'boolean' ? data.diagnosticAiEnabled : false,
             diagnosticManageBookingEnabled:
               typeof data.diagnosticManageBookingEnabled === 'boolean' ? data.diagnosticManageBookingEnabled : false,
+            supportModuleEnabled:
+              typeof data.supportModuleEnabled === 'boolean' ? data.supportModuleEnabled : false,
             diagnosticMaxRounds: data.diagnosticMaxRounds,
             diagnosticQuestionsPerRound: data.diagnosticQuestionsPerRound,
             diagnosticOptionsPerQuestion:
@@ -157,6 +164,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
           setSiteNameEnvDefault(snapshot.siteNameEnvDefault);
           setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
           setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
+          setSupportModuleEnabled(snapshot.supportModuleEnabled);
           setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
           setDiagnosticQuestionsPerRound(snapshot.diagnosticQuestionsPerRound);
           setDiagnosticOptionsPerQuestion(snapshot.diagnosticOptionsPerQuestion);
@@ -188,6 +196,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
           siteName,
           diagnosticAiEnabled,
           diagnosticManageBookingEnabled,
+          supportModuleEnabled,
           diagnosticMaxRounds,
           diagnosticQuestionsPerRound,
           diagnosticOptionsPerQuestion,
@@ -203,6 +212,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         siteNameEnvDefault: typeof data.siteNameEnvDefault === 'string' ? data.siteNameEnvDefault : siteNameEnvDefault,
         diagnosticAiEnabled: data.diagnosticAiEnabled,
         diagnosticManageBookingEnabled: data.diagnosticManageBookingEnabled,
+        supportModuleEnabled: data.supportModuleEnabled,
         diagnosticMaxRounds: data.diagnosticMaxRounds,
         diagnosticQuestionsPerRound: data.diagnosticQuestionsPerRound,
         diagnosticOptionsPerQuestion: data.diagnosticOptionsPerQuestion,
@@ -212,6 +222,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       setSiteNameEnvDefault(snapshot.siteNameEnvDefault);
       setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
       setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
+      setSupportModuleEnabled(snapshot.supportModuleEnabled);
       setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
       setDiagnosticQuestionsPerRound(snapshot.diagnosticQuestionsPerRound);
       setDiagnosticOptionsPerQuestion(snapshot.diagnosticOptionsPerQuestion);
@@ -227,6 +238,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     diagnosticAiEnabled,
     diagnosticCacheDebugEnabled,
     diagnosticManageBookingEnabled,
+    supportModuleEnabled,
     diagnosticMaxRounds,
     diagnosticOptionsPerQuestion,
     diagnosticQuestionsPerRound,
@@ -241,6 +253,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     setSiteNameEnvDefault(savedSnapshot.siteNameEnvDefault);
     setDiagnosticAiEnabled(savedSnapshot.diagnosticAiEnabled);
     setDiagnosticManageBookingEnabled(savedSnapshot.diagnosticManageBookingEnabled);
+    setSupportModuleEnabled(savedSnapshot.supportModuleEnabled);
     setDiagnosticMaxRounds(savedSnapshot.diagnosticMaxRounds);
     setDiagnosticQuestionsPerRound(savedSnapshot.diagnosticQuestionsPerRound);
     setDiagnosticOptionsPerQuestion(savedSnapshot.diagnosticOptionsPerQuestion);
@@ -429,6 +442,36 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
               }
             >
               Enable manage booking
+            </AdminSettingsLabel>
+          </div>
+        </div>
+      </SettingsCard>
+      <SettingsCard
+        icon={<Headphones className="size-5" aria-hidden />}
+        title="Support reports"
+        description="Control whether users can submit in-app support reports, view My reports, and send follow-up messages."
+      >
+        <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
+          <input
+            id="supportModuleEnabled"
+            type="checkbox"
+            checked={supportModuleEnabled}
+            onChange={(event) => {
+              setSupportModuleEnabled(event.target.checked);
+            }}
+            className="mt-1 size-4 rounded border-input"
+          />
+          <div>
+            <AdminSettingsLabel
+              htmlFor="supportModuleEnabled"
+              hint={
+                <>
+                  When disabled, the Report button, My reports navigation, account report pages, and support APIs are
+                  hidden or rejected. Admin support tools remain available.
+                </>
+              }
+            >
+              Enable support reports
             </AdminSettingsLabel>
           </div>
         </div>

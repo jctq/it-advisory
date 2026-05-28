@@ -17,6 +17,7 @@ export type AppSettingsValues = {
   readonly siteName: string;
   readonly diagnosticAiEnabled: boolean;
   readonly diagnosticManageBookingEnabled: boolean;
+  readonly supportModuleEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;
@@ -43,6 +44,7 @@ function defaultSettings(): AppSettingsValues {
     siteName: '',
     diagnosticAiEnabled: false,
     diagnosticManageBookingEnabled: false,
+    supportModuleEnabled: false,
     diagnosticMaxRounds: 4,
     diagnosticQuestionsPerRound: 5,
     diagnosticOptionsPerQuestion: 4,
@@ -63,6 +65,8 @@ function mergeDocument(doc: AppSettingsDocument | null): AppSettingsValues {
       typeof doc.diagnosticManageBookingEnabled === 'boolean'
         ? doc.diagnosticManageBookingEnabled
         : base.diagnosticManageBookingEnabled,
+    supportModuleEnabled:
+      typeof doc.supportModuleEnabled === 'boolean' ? doc.supportModuleEnabled : base.supportModuleEnabled,
     diagnosticMaxRounds: clampInt(
       doc.diagnosticMaxRounds,
       DIAGNOSTIC_MAX_ROUNDS_MIN,
@@ -128,6 +132,8 @@ export async function updateAppSettings(patch: Partial<AppSettingsValues>): Prom
       patch.diagnosticManageBookingEnabled !== undefined
         ? patch.diagnosticManageBookingEnabled
         : current.diagnosticManageBookingEnabled,
+    supportModuleEnabled:
+      patch.supportModuleEnabled !== undefined ? patch.supportModuleEnabled : current.supportModuleEnabled,
     diagnosticMaxRounds:
       patch.diagnosticMaxRounds !== undefined
         ? clampInt(

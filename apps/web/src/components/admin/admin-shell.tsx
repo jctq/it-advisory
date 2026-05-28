@@ -85,6 +85,9 @@ function resolveAdminTitle(pathname: string): string {
   if (pathname.startsWith('/admin/bookings')) {
     return 'Bookings';
   }
+  if (pathname.startsWith('/admin/support-reports')) {
+    return 'Support reports';
+  }
   if (
     pathname.startsWith('/admin/debug') ||
     pathname.startsWith('/admin/client-diagnostic') ||

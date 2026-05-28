@@ -341,6 +341,8 @@ export type AppSettingsDocument = {
   diagnosticAiEnabled?: boolean;
   /** When false, hides `/book/manage` and disables guest manage-booking APIs. Defaults to false when omitted. */
   diagnosticManageBookingEnabled?: boolean;
+  /** When false, hides support report UI and disables public support APIs. Defaults to false when omitted. */
+  supportModuleEnabled?: boolean;
   /**
    * Public site / brand name override. When empty or omitted, the app uses `SITE_NAME` from the environment.
    */

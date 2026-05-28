@@ -44,4 +44,8 @@ export const COLLECTIONS = {
   cronJobRuns: 'cron_job_runs',
   /** Append-only log of inbound payment gateway events (admin). */
   paymentLogs: 'payment_logs',
+  /** User-submitted support / bug reports with optional screenshots. */
+  supportReports: 'support_reports',
+  /** Singleton `{ _id: 'default' }` — support notification emails and reporter email policy. */
+  supportSettings: 'support_settings',
 } as const;

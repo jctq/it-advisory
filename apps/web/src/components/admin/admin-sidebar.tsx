@@ -13,6 +13,7 @@ import {
   ClipboardList,
   FileStack,
   FileText,
+  Headphones,
   LayoutDashboard,
   LifeBuoy,
   Settings,
@@ -91,6 +92,12 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     label: 'Bookings',
     icon: CalendarDays,
     tourTarget: 'nav-bookings',
+  },
+  {
+    href: '/admin/support-reports',
+    label: 'Support reports',
+    icon: Headphones,
+    tourTarget: 'nav-settings',
   },
   {
     href: '/admin/debug',

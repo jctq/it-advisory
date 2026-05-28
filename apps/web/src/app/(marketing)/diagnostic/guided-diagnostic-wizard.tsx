@@ -2114,6 +2114,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         scheduleScrollQuizWizardToTop();
         return;
       }
+      onGuidedChange((previous) => ({
+        ...previous,
+        completedBundles: nextCompleted,
+      }));
       setIsAwaitingApi(true);
       try {
         const outcome = await executeFetchTemplateSummary(nextCompleted);
@@ -2131,6 +2135,10 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       }
       return;
     }
+    onGuidedChange((previous) => ({
+      ...previous,
+      completedBundles: nextCompleted,
+    }));
     setIsAwaitingApi(true);
     try {
       const didAdvance = await executeFetchRound(nextCompleted);

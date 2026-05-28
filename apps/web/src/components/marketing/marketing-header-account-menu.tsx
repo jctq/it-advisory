@@ -2,6 +2,8 @@
 
 import { ChevronDown } from 'lucide-react';
 import { MarketingHeaderAccountMenuPanel } from '@/components/marketing/marketing-header-account-menu-panel';
+import { SupportReportsUnreadBadge } from '@/components/marketing/support-reports-unread-badge';
+import { useMarketingSupportReportsUnreadCount } from '@/hooks/marketing/use-marketing-support-reports-unread-count';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import type { AuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -10,6 +12,7 @@ import { cn } from '@/lib/utils';
 type MarketingHeaderAccountMenuProps = {
   readonly user: AuthenticatedMarketingUser;
   readonly manageBookingEnabled: boolean;
+  readonly supportModuleEnabled: boolean;
   readonly onSignOut: () => void;
   readonly className?: string;
 };
@@ -67,6 +70,11 @@ export function MarketingHeaderAccountMenu(props: MarketingHeaderAccountMenuProp
   }, [open]);
   const initial = resolveEmailInitial(props.user.email);
   const emailLocalPart = resolveEmailLocalPart(props.user.email);
+  const unreadReportsCount = useMarketingSupportReportsUnreadCount(props.supportModuleEnabled);
+  const accountMenuAriaLabel =
+    unreadReportsCount > 0
+      ? `Account menu for ${props.user.email}, ${unreadReportsCount} unread support ${unreadReportsCount === 1 ? 'reply' : 'replies'}`
+      : `Account menu for ${props.user.email}`;
   return (
     <div ref={rootRef} className={cn('relative', props.className)}>
       <Button
@@ -77,11 +85,15 @@ export function MarketingHeaderAccountMenu(props: MarketingHeaderAccountMenuProp
         aria-expanded={open}
         aria-haspopup="menu"
         aria-controls="marketing-header-account-panel"
-        aria-label={`Account menu for ${props.user.email}`}
+        aria-label={accountMenuAriaLabel}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+        <span className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
           {initial}
+          <SupportReportsUnreadBadge
+            unreadCount={unreadReportsCount}
+            className="absolute -right-1 -top-1 min-h-4 min-w-4 px-1 text-[9px] ring-2 ring-background"
+          />
         </span>
         <span className="hidden max-w-[7.5rem] truncate text-sm font-medium sm:inline lg:max-w-[10rem] xl:max-w-[14rem]">
           {emailLocalPart}
@@ -96,8 +108,10 @@ export function MarketingHeaderAccountMenu(props: MarketingHeaderAccountMenuProp
           <MarketingHeaderAccountMenuPanel
             user={props.user}
             manageBookingEnabled={props.manageBookingEnabled}
+            supportModuleEnabled={props.supportModuleEnabled}
             onSignOut={props.onSignOut}
             onNavigate={() => setOpen(false)}
+            unreadReportsCount={unreadReportsCount}
           />
         </div>
       ) : null}

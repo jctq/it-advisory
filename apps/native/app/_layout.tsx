@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as WebBrowser from 'expo-web-browser';
 import { MarketingAuthProvider } from '../src/providers/marketing-auth-provider';
+import { SupportReportProvider } from '../src/providers/support-report-provider';
 import { DiagnosticFlowProvider } from '../src/providers/diagnostic-flow-provider';
 import { AppTypographyProvider } from '../src/providers/app-typography-provider';
 import { useAppTheme } from '../src/theme/use-app-theme';
@@ -18,12 +19,14 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: theme.background }]}>
       <MarketingAuthProvider>
-        <AppTypographyProvider>
-          <DiagnosticFlowProvider>
-            <StatusBar style="auto" />
-            <Stack screenOptions={{ headerShown: false }} />
-          </DiagnosticFlowProvider>
-        </AppTypographyProvider>
+        <SupportReportProvider>
+          <AppTypographyProvider>
+            <DiagnosticFlowProvider>
+              <StatusBar style="auto" />
+              <Stack screenOptions={{ headerShown: false }} />
+            </DiagnosticFlowProvider>
+          </AppTypographyProvider>
+        </SupportReportProvider>
       </MarketingAuthProvider>
     </GestureHandlerRootView>
   );

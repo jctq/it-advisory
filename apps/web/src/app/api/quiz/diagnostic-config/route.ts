@@ -10,6 +10,7 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({
       diagnosticAiEnabled: settings.diagnosticAiEnabled,
       diagnosticManageBookingEnabled: settings.diagnosticManageBookingEnabled,
+      supportModuleEnabled: settings.supportModuleEnabled,
       diagnosticMaxRounds: settings.diagnosticMaxRounds,
       diagnosticQuestionsPerRound: settings.diagnosticQuestionsPerRound,
       diagnosticOptionsPerQuestion: settings.diagnosticOptionsPerQuestion,
@@ -20,6 +21,7 @@ export async function GET(): Promise<NextResponse> {
       {
         diagnosticAiEnabled: false,
         diagnosticManageBookingEnabled: false,
+        supportModuleEnabled: false,
         diagnosticMaxRounds: 4,
         diagnosticQuestionsPerRound: 5,
         diagnosticOptionsPerQuestion: 4,

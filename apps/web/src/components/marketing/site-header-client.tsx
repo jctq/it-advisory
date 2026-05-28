@@ -15,8 +15,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { MarketingHeaderAccountMenuPanel } from '@/components/marketing/marketing-header-account-menu-panel';
+import { SupportReportsUnreadBadge } from '@/components/marketing/support-reports-unread-badge';
 import type { ReactElement } from 'react';
 import { useCallback } from 'react';
+import { useMarketingSupportReportsUnreadCount } from '@/hooks/marketing/use-marketing-support-reports-unread-count';
 import { useMarketingChromeStore } from '@/store/marketing/marketing-chrome-store';
 import { MarketingHeaderAccountMenu } from '@/components/marketing/marketing-header-account-menu';
 import { MarketingHeaderAppearanceMenu } from '@/components/marketing/marketing-header-appearance-menu';
@@ -59,6 +61,7 @@ const MOBILE_SHEET_NAV_ITEM_CLASS =
 export type SiteHeaderClientProps = {
   readonly marketingUser: AuthenticatedMarketingUser | null;
   readonly manageBookingEnabled: boolean;
+  readonly supportModuleEnabled: boolean;
   readonly className?: string;
 };
 
@@ -89,6 +92,11 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
   const isMobileMenuOpen = useMarketingChromeStore((state) => state.isMobileMenuOpen);
   const setMobileMenuOpen = useMarketingChromeStore((state) => state.setMobileMenuOpen);
   const executeCloseMobileMenu = useMarketingChromeStore((state) => state.executeCloseMobileMenu);
+  const unreadReportsCount = useMarketingSupportReportsUnreadCount(isAuthenticated && props.supportModuleEnabled);
+  const mobileMenuAriaLabel =
+    unreadReportsCount > 0
+      ? `Open menu, ${unreadReportsCount} unread support ${unreadReportsCount === 1 ? 'reply' : 'replies'}`
+      : 'Open menu';
   return (
     <header
       className={cn(
@@ -140,6 +148,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
               <MarketingHeaderAccountMenu
                 user={user}
                 manageBookingEnabled={props.manageBookingEnabled}
+                supportModuleEnabled={props.supportModuleEnabled}
                 onSignOut={() => void executeSignOut()}
               />
             </div>
@@ -158,10 +167,14 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="size-11 shrink-0 xl:hidden"
-                aria-label="Open menu"
+                className="relative size-11 shrink-0 xl:hidden"
+                aria-label={mobileMenuAriaLabel}
               >
                 <Menu className="size-5" aria-hidden />
+                <SupportReportsUnreadBadge
+                  unreadCount={unreadReportsCount}
+                  className="absolute -right-1 -top-1 min-h-4 min-w-4 px-1 text-[9px] ring-2 ring-background"
+                />
               </Button>
             </SheetTrigger>
             <SheetContent
@@ -205,8 +218,10 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                   <MarketingHeaderAccountMenuPanel
                     user={user}
                     manageBookingEnabled={props.manageBookingEnabled}
+                    supportModuleEnabled={props.supportModuleEnabled}
                     onSignOut={() => void executeSignOut()}
                     onNavigate={executeCloseMobileMenu}
+                    unreadReportsCount={unreadReportsCount}
                   />
                 )}
                 <Separator className="my-2" />

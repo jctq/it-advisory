@@ -511,10 +511,14 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     payment: '',
     transactionId: '',
   });
-  checkoutReturnParamsRef.current = {
-    payment: searchParams.get('payment')?.trim() ?? '',
-    transactionId: searchParams.get('transactionId')?.trim() ?? '',
-  };
+  const checkoutReturnPayment = searchParams.get('payment')?.trim() ?? '';
+  const checkoutReturnTransactionId = searchParams.get('transactionId')?.trim() ?? '';
+  useEffect(() => {
+    checkoutReturnParamsRef.current = {
+      payment: checkoutReturnPayment,
+      transactionId: checkoutReturnTransactionId,
+    };
+  }, [checkoutReturnPayment, checkoutReturnTransactionId]);
   const isCheckoutPaymentSuccessReturn = (): boolean => {
     const { payment, transactionId } = checkoutReturnParamsRef.current;
     return payment === 'success' && transactionId.length > 0;
@@ -2640,28 +2644,6 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   </div>
                 </fieldset>
               ) : null}
-              {paymentConfig?.recordingsEnabled === true ? (
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-4">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={recordingOptIn}
-                    onChange={(event) => setRecordingOptIn(event.target.checked)}
-                  />
-                  <span>
-                    <span className="text-sm font-medium text-foreground">
-                      Add AI meeting notes &amp; recording
-                      {paymentConfig.recordingOptInPriceCentavos > 0
-                        ? ` (+${paymentConfig.recordingOptInPriceLabel})`
-                        : ' (included)'}
-                    </span>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      A visible Fathom notetaker may join your video call to capture notes and a summary. By opting in,
-                      you consent to recording and transcription for this consultation.
-                    </span>
-                  </span>
-                </label>
-              ) : null}
               <div className="space-y-2">
                 <label htmlFor="promoCode" className="text-sm font-medium text-foreground">
                   Promo code (optional)
@@ -2739,6 +2721,35 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                 </dl>
                 <p className="mt-2 text-xs text-muted-foreground">Inclusive of VAT</p>
               </div>
+              {paymentConfig?.recordingsEnabled === true ? (
+                <label
+                  className={cn(
+                    'flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-card p-3',
+                    isPaymentHoldBlocked && 'pointer-events-none opacity-60',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-3.5 shrink-0 accent-primary"
+                    checked={recordingOptIn}
+                    onChange={(event) => setRecordingOptIn(event.target.checked)}
+                  />
+                  <span className="min-w-0">
+                    <span className="text-xs font-medium leading-snug text-foreground">
+                      AI meeting notes &amp; recording
+                      {paymentConfig.recordingOptInPriceCentavos > 0
+                        ? ` (+${paymentConfig.recordingOptInPriceLabel})`
+                        : ' (included)'}
+                    </span>
+                    <span
+                      className="mt-0.5 block text-[10px] leading-tight text-muted-foreground"
+                      title="A visible Fathom notetaker may join your video call to capture notes and a summary. By opting in, you consent to recording and transcription for this consultation."
+                    >
+                      Fathom may join your call. Opt-in = recording consent.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
               <div className="hidden gap-3 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 lg:flex">
                 <Lock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
                 <div>

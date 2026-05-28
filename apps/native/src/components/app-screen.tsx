@@ -1,9 +1,11 @@
 import type { PropsWithChildren, ReactNode } from 'react';
+import { useRef } from 'react';
 import { Platform, ScrollView, StyleSheet, useColorScheme, View } from 'react-native';
 import { BlurView, type ExperimentalBlurMethod } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Edge } from 'react-native-safe-area-context';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSupportReportScreenCapture } from '../providers/support-report-provider';
 import { useAppTheme } from '../theme/use-app-theme';
 import { ThemedText } from './themed-text';
 
@@ -77,6 +79,8 @@ function BlurredOrb(props: BlurredOrbProps) {
  */
 export function AppScreen(props: AppScreenProps) {
   const theme = useAppTheme();
+  const screenCaptureRef = useRef<View>(null);
+  useSupportReportScreenCapture(screenCaptureRef);
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const blurTint: 'dark' | 'light' = colorScheme === 'dark' ? 'dark' : 'light';
@@ -105,7 +109,12 @@ export function AppScreen(props: AppScreenProps) {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={safeAreaEdges}>
+    <SafeAreaView
+      ref={screenCaptureRef}
+      collapsable={false}
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
+      edges={safeAreaEdges}
+    >
       <LinearGradient
         colors={[theme.background, theme.backgroundGradientEnd]}
         end={{ x: 0.92, y: 1 }}
