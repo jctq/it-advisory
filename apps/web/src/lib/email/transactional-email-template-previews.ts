@@ -58,6 +58,7 @@ function buildSamplePaymentTransaction(): PaymentTransactionRow {
     paymentMethodLabel: 'GCash',
     startsAtIso: '2026-06-15T02:00:00.000Z',
     expiresAtIso: null,
+    createdAtIso: '2026-06-10T08:00:00.000Z',
     paidAtIso: '2026-06-10T08:30:00.000Z',
   };
 }

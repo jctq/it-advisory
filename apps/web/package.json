@@ -73,7 +73,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.7",
     "@techmd/typescript-config": "workspace:*",
-    "@types/diff": "^8.0.0",
     "@types/node": "^22.15.17",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",

@@ -133,7 +133,13 @@ export default function BookingCheckoutScreen() {
     }
   }, [availableMethods, paymentMethodId]);
   const executePay = async (): Promise<void> => {
-    if (gatewayId === null || paymentMethodId === null || date.length === 0 || time.length === 0) {
+    if (
+      gatewayId === null ||
+      paymentMethodId === null ||
+      deviceId === null ||
+      date.length === 0 ||
+      time.length === 0
+    ) {
       return;
     }
     const methodOption = availableMethods.find((method) => method.id === paymentMethodId);
@@ -141,7 +147,7 @@ export default function BookingCheckoutScreen() {
     setLoadError(null);
     try {
       const diagnosticClient = new DiagnosticApiClient({
-        apiBaseUrl,
+        apiOrigin: apiBaseUrl,
         deviceId,
         marketingSessionToken: sessionToken,
       });

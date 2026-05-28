@@ -1,5 +1,5 @@
 import type { ObjectId } from 'mongodb';
-import type { BlogPostStatus } from './blog-post-types';
+import type { BlogPostStatus } from './blog-post-types.js';
 
 /** Snapshot of editable blog post fields at a point in time (for revision diffs). */
 export type BlogPostRevisionSnapshot = {
