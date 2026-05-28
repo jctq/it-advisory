@@ -1449,16 +1449,6 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     setErrorMessage,
     setPhase,
   ]);
-  useEffect(() => {
-    if (pendingPaymentHoldDialogOpen || !paymentHoldExpired || !isAwaitingPaymentCheckout) {
-      return;
-    }
-    setHoldExpiredRequiresRebook(true);
-    setErrorMessage(
-      'The payment window for this booking has expired and the reservation was released. Pick a new time on the calendar to book again.',
-    );
-    setPhase('error');
-  }, [isAwaitingPaymentCheckout, paymentHoldExpired, pendingPaymentHoldDialogOpen, setErrorMessage, setPhase]);
 
   useEffect(() => {
     if (serverClockOffsetMs === null) {
@@ -1616,6 +1606,22 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     }
     return buildPaymentHoldExpiryLabels(activePaymentHold.expiresAtIso, activePaymentHold.timezone);
   }, [activePaymentHold]);
+  const selectedCheckoutSlotLabels = useMemo(() => {
+    if (selectedDate === null || selectedTime === null) {
+      return null;
+    }
+    const dateParam = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
+    try {
+      const slotUtc = parseBookingSlotToUtc(dateParam, selectedTime);
+      return buildReservedBookingSlotLabels(slotUtc.toISOString(), PRIMARY_TIMEZONE);
+    } catch {
+      return {
+        dateLabel: formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'EEEE, MMMM d, yyyy'),
+        timeLabel: selectedTime,
+        timezoneLabel: PRIMARY_TIMEZONE,
+      };
+    }
+  }, [selectedDate, selectedTime]);
   const displayDateLong =
     selectedDate !== null
       ? formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'EEEE, MMMM d, yyyy')
@@ -2650,6 +2656,18 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                         <span className="mt-0.5 block tabular-nums">{awaitingPaymentReservedSlotLabels.timeLabel}</span>
                         <span className="mt-1 block text-xs font-normal text-muted-foreground">
                           {awaitingPaymentReservedSlotLabels.timezoneLabel}
+                        </span>
+                      </dd>
+                    </div>
+                  ) : null}
+                  {!isAwaitingPaymentCheckout && selectedCheckoutSlotLabels !== null ? (
+                    <div className="col-span-2">
+                      <dt className="text-xs text-muted-foreground">Date &amp; time</dt>
+                      <dd className="mt-1 font-semibold text-foreground">
+                        {selectedCheckoutSlotLabels.dateLabel}
+                        <span className="mt-0.5 block tabular-nums">{selectedCheckoutSlotLabels.timeLabel}</span>
+                        <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                          {selectedCheckoutSlotLabels.timezoneLabel}
                         </span>
                       </dd>
                     </div>
