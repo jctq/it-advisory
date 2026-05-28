@@ -514,6 +514,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     useState<AwaitingPaymentReservedSlotState | null>(null);
   const [paymentHoldExpired, setPaymentHoldExpired] = useState<boolean>(false);
   const [holdExpiredRequiresRebook, setHoldExpiredRequiresRebook] = useState<boolean>(false);
+  const [dateActionsUnpinElement, setDateActionsUnpinElement] = useState<HTMLElement | null>(null);
+  const [detailsActionsUnpinElement, setDetailsActionsUnpinElement] = useState<HTMLElement | null>(null);
   const [paymentActionsUnpinElement, setPaymentActionsUnpinElement] = useState<HTMLElement | null>(null);
   const paymentHoldSyncInFlightRef = useRef<boolean>(false);
   const resumePaymentSelectionPendingRef = useRef<{
@@ -2174,7 +2176,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           </p>
         ) : null}
         {phase === 'date' ? (
-          <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_min(100%,22rem)] lg:items-start lg:gap-x-8 xl:gap-x-10">
+          <div className="mt-10 grid grid-cols-1 gap-8 pb-[calc(11rem+env(safe-area-inset-bottom))] lg:grid-cols-[minmax(0,1fr)_min(100%,22rem)] lg:items-start lg:gap-x-8 lg:pb-0 xl:gap-x-10">
             <div className="min-w-0 space-y-8 lg:space-y-0">
               <section className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
                 <div className="flex items-center justify-between gap-4">
@@ -2309,49 +2311,61 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   </p>
                 </div>
               ) : null}
-              {availabilityStatus === 'ready' && selectedDate !== null && selectedTime !== null ? (
-                <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm">
-                  <p className="font-semibold text-foreground">Your selection</p>
-                  <p className="mt-1 text-muted-foreground">
-                    {displayDateLong} · {selectedTime} · {PRIMARY_TIMEZONE}
-                  </p>
-                </div>
-              ) : null}
-              <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2.5 text-center leading-snug"
-                  asChild
-                >
-                  <Link
-                    href={activeDiagnosticHref}
-                    className="inline-flex items-center justify-center gap-2"
-                  >
-                    <ChevronLeft className="size-4 shrink-0" aria-hidden />
-                    Back
-                  </Link>
-                </Button>
-                <Button
-                  type="button"
-                  className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2.5 text-center leading-snug"
-                  size="lg"
-                  disabled={
-                    !selectedDate ||
-                    !selectedTime ||
-                    availabilityStatus === 'loading' ||
-                    (availabilityStatus === 'ready' && slotsForSelectedDay.length === 0)
+              <div ref={setDateActionsUnpinElement}>
+                <DiagnosticStickyActionBar
+                  unpinWhenElement={dateActionsUnpinElement}
+                  pinnedSpacerClassName={
+                    availabilityStatus === 'ready' && selectedDate !== null && selectedTime !== null
+                      ? 'h-[10.5rem] lg:h-[4.75rem]'
+                      : 'h-[4.75rem]'
                   }
-                  onClick={executeContinueFromDate}
+                  layoutClassName="flex w-full flex-col gap-3"
                 >
-                  Next
-                </Button>
+                  {availabilityStatus === 'ready' && selectedDate !== null && selectedTime !== null ? (
+                    <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm">
+                      <p className="font-semibold text-foreground">Your selection</p>
+                      <p className="mt-1 text-muted-foreground">
+                        {displayDateLong} · {selectedTime} · {PRIMARY_TIMEZONE}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                      asChild
+                    >
+                      <Link
+                        href={activeDiagnosticHref}
+                        className="inline-flex items-center justify-center gap-2"
+                      >
+                        <ChevronLeft className="size-4 shrink-0" aria-hidden />
+                        Back
+                      </Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                      size="lg"
+                      disabled={
+                        !selectedDate ||
+                        !selectedTime ||
+                        availabilityStatus === 'loading' ||
+                        (availabilityStatus === 'ready' && slotsForSelectedDay.length === 0)
+                      }
+                      onClick={executeContinueFromDate}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </DiagnosticStickyActionBar>
               </div>
             </aside>
           </div>
         ) : null}
         {phase === 'details' ? (
-          <div className="mt-10 mx-auto w-full max-w-lg lg:max-w-3xl">
+          <div className="mx-auto mt-10 w-full max-w-lg pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:max-w-3xl lg:pb-0">
             <section
               aria-labelledby="booking-contact-heading"
               className="rounded-2xl border border-border bg-card shadow-xs ring-1 ring-border/40"
@@ -2451,27 +2465,33 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-10 flex flex-col gap-3 border-t border-border/80 pt-8 sm:flex-row sm:items-stretch sm:gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-12 min-h-12 shrink-0 gap-2 sm:w-auto sm:px-6"
-                    onClick={executeBackToDate}
-                  >
-                    <ChevronLeft className="size-4" aria-hidden />
-                    Back
-                  </Button>
-                  <Button
-                    type="button"
-                    className="h-12 min-h-12 flex-1 text-base font-semibold sm:min-w-0"
-                    size="lg"
-                    onClick={executeContinueFromDetails}
-                  >
-                    Next
-                  </Button>
-                </div>
               </div>
             </section>
+            <div ref={setDetailsActionsUnpinElement} className="mt-8">
+              <DiagnosticStickyActionBar
+                unpinWhenElement={detailsActionsUnpinElement}
+                pinnedSpacerClassName="h-[4.75rem]"
+                layoutClassName="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3"
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                  onClick={executeBackToDate}
+                >
+                  <ChevronLeft className="size-4 shrink-0" aria-hidden />
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                  size="lg"
+                  onClick={executeContinueFromDetails}
+                >
+                  Next
+                </Button>
+              </DiagnosticStickyActionBar>
+            </div>
           </div>
         ) : null}
         {phase === 'payment' ? (
