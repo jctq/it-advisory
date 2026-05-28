@@ -5,7 +5,7 @@ import { ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS } from '@/lib/marketing/account-diag
 import type {
   VisitorQuizSessionListStatusFilter,
   VisitorQuizSessionSummary,
-} from '@/lib/data/quiz-sessions';
+} from '@/lib/data/quiz-session-types';
 import { buildStoreFieldPatch } from '@/store/marketing/set-store-field';
 
 export type AccountDiagnosticsDeleteTarget = {

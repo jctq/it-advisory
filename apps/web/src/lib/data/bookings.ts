@@ -36,6 +36,7 @@ export type BookingRow = {
   hasDiagnosticSnapshot: boolean;
   /** Quiz session document id captured at booking time, when Mongo had a session row. */
   quizSessionId: string | null;
+  paymentExpiresAtIso: string | null;
   quotedAmountCentavos: number | null;
   quoteExpiresAtIso: string | null;
   recordingOptIn: boolean;
@@ -90,6 +91,8 @@ function mapBooking(
     hasDiagnosticSnapshot:
       typeof doc.guidedDiagnosticSnapshot === 'string' && doc.guidedDiagnosticSnapshot.trim().length > 0,
     quizSessionId,
+    paymentExpiresAtIso:
+      doc.paymentExpiresAt instanceof Date ? doc.paymentExpiresAt.toISOString() : null,
     quotedAmountCentavos:
       typeof doc.quotedAmountCentavos === 'number' && Number.isFinite(doc.quotedAmountCentavos)
         ? doc.quotedAmountCentavos
@@ -194,6 +197,7 @@ export type AdminBookingCalendarStatusCounts = {
   readonly confirmed: number;
   readonly pending: number;
   readonly cancelled: number;
+  readonly completed: number;
 };
 
 export type ListBookingsForAdminCalendarInRangeInput = {
@@ -333,6 +337,7 @@ function buildAdminBookingStatusCounts(
   let confirmed = 0;
   let pending = 0;
   let cancelled = 0;
+  let completed = 0;
   for (const row of statusCounts) {
     if (row._id === 'confirmed') {
       confirmed = row.count;
@@ -340,10 +345,12 @@ function buildAdminBookingStatusCounts(
       pending = row.count;
     } else if (row._id === 'cancelled') {
       cancelled = row.count;
+    } else if (row._id === 'completed') {
+      completed = row.count;
     }
     all += row.count;
   }
-  return { all, confirmed, pending, cancelled };
+  return { all, confirmed, pending, cancelled, completed };
 }
 
 /**
@@ -357,6 +364,7 @@ export async function listBookingsForAdminCalendarInRange(
     confirmed: 0,
     pending: 0,
     cancelled: 0,
+    completed: 0,
   };
   if (!process.env.MONGODB_URI) {
     return { bookings: [], countsByStatus: emptyCounts };

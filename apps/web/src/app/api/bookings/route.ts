@@ -31,7 +31,9 @@ function resolvePaymentMethodLabel(method: PaymentMethodId): string {
   return labels[method];
 }
 
-async function resolveBookingStatusForId(bookingId: string): Promise<'pending' | 'confirmed' | 'cancelled' | null> {
+async function resolveBookingStatusForId(
+  bookingId: string,
+): Promise<'pending' | 'confirmed' | 'completed' | 'cancelled' | null> {
   const row = await findBookingById(bookingId);
   return row?.status ?? null;
 }

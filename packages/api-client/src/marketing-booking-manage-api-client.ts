@@ -1,6 +1,18 @@
 import type { PaymentGatewayId } from '@techmd/domain/payment-types';
 import type { PaymentConfigPublic } from './marketing-payment-api-client.js';
 
+export type BookingPayGuidanceAction = {
+  readonly label: string;
+  readonly href: string;
+};
+
+export type BookingPayGuidance = {
+  readonly title: string;
+  readonly message: string;
+  readonly steps: readonly string[];
+  readonly actions: readonly BookingPayGuidanceAction[];
+};
+
 export type GuestBookingManageView = {
   readonly bookingReference: string;
   readonly status: 'pending' | 'confirmed' | 'cancelled';
@@ -13,6 +25,11 @@ export type GuestBookingManageView = {
   readonly paymentExpiresAtIso: string | null;
   readonly canPayOnline: boolean;
   readonly payBlockedReason: string | null;
+  readonly payGuidance: BookingPayGuidance | null;
+  readonly profileSyncAvailable: boolean;
+  readonly overduePendingActionsAvailable: boolean;
+  readonly quizSessionMarketingRef: string | null;
+  readonly payabilityCode: string;
   readonly checkoutAmountLabel: string;
   readonly paymentsEnabled: boolean;
   readonly recordingOptIn: boolean;
@@ -47,6 +64,26 @@ export async function lookupGuestBooking(params: {
   const payload = (await response.json()) as { ok?: boolean; booking?: GuestBookingManageView; error?: string };
   if (!response.ok || payload.ok !== true || payload.booking === undefined) {
     throw new Error(typeof payload.error === 'string' ? payload.error : 'Booking lookup failed.');
+  }
+  return payload.booking;
+}
+
+export async function syncAccountProfileToManagedBooking(params: {
+  readonly apiBaseUrl: string;
+  readonly bookingId: string;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/manage/sync-profile-account');
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingId: params.bookingId }),
+    signal: params.signal,
+  });
+  const payload = (await response.json()) as { ok?: boolean; booking?: GuestBookingManageView; error?: string };
+  if (!response.ok || payload.ok !== true || payload.booking === undefined) {
+    throw new Error(typeof payload.error === 'string' ? payload.error : 'Profile sync failed.');
   }
   return payload.booking;
 }
@@ -118,9 +155,18 @@ export async function createGuestBookingManageCheckout(params: {
     bookingId?: string | null;
     mock?: boolean;
     error?: string;
+    payabilityCode?: string;
+    debug?: Record<string, unknown>;
   };
   if (!response.ok || payload.ok !== true) {
-    throw new Error(typeof payload.error === 'string' ? payload.error : 'Checkout failed.');
+    const error = new Error(typeof payload.error === 'string' ? payload.error : 'Checkout failed.');
+    if (typeof payload.payabilityCode === 'string') {
+      (error as Error & { payabilityCode: string }).payabilityCode = payload.payabilityCode;
+    }
+    if (payload.debug !== undefined) {
+      (error as Error & { payabilityDebug: Record<string, unknown> }).payabilityDebug = payload.debug;
+    }
+    throw error;
   }
   return {
     transactionId: payload.transactionId ?? '',
@@ -128,6 +174,98 @@ export async function createGuestBookingManageCheckout(params: {
     bookingId: payload.bookingId ?? null,
     mock: payload.mock,
   };
+}
+
+async function postManageBookingMutation(params: {
+  readonly apiBaseUrl: string;
+  readonly path: string;
+  readonly body: Record<string, string>;
+  readonly signal?: AbortSignal;
+  readonly fallbackError: string;
+}): Promise<GuestBookingManageView> {
+  const url = buildApiUrl(params.apiBaseUrl, params.path);
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params.body),
+    signal: params.signal,
+  });
+  const payload = (await response.json()) as { ok?: boolean; booking?: GuestBookingManageView; error?: string };
+  if (!response.ok || payload.ok !== true || payload.booking === undefined) {
+    throw new Error(typeof payload.error === 'string' ? payload.error : params.fallbackError);
+  }
+  return payload.booking;
+}
+
+export async function rescheduleGuestManagedBooking(params: {
+  readonly apiBaseUrl: string;
+  readonly credentials: GuestBookingManageCredentials;
+  readonly dateYmd: string;
+  readonly timeLabel: string;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  return postManageBookingMutation({
+    apiBaseUrl: params.apiBaseUrl,
+    path: '/api/bookings/manage/reschedule',
+    body: {
+      bookingReference: params.credentials.bookingReference,
+      email: params.credentials.email,
+      phoneLastFour: params.credentials.phoneLastFour,
+      date: params.dateYmd,
+      time: params.timeLabel,
+    },
+    signal: params.signal,
+    fallbackError: 'Could not reschedule this booking.',
+  });
+}
+
+export async function rescheduleAccountManagedBooking(params: {
+  readonly apiBaseUrl: string;
+  readonly bookingId: string;
+  readonly dateYmd: string;
+  readonly timeLabel: string;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  return postManageBookingMutation({
+    apiBaseUrl: params.apiBaseUrl,
+    path: '/api/bookings/manage/reschedule-account',
+    body: { bookingId: params.bookingId, date: params.dateYmd, time: params.timeLabel },
+    signal: params.signal,
+    fallbackError: 'Could not reschedule this booking.',
+  });
+}
+
+export async function abandonGuestManagedBooking(params: {
+  readonly apiBaseUrl: string;
+  readonly credentials: GuestBookingManageCredentials;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  return postManageBookingMutation({
+    apiBaseUrl: params.apiBaseUrl,
+    path: '/api/bookings/manage/abandon',
+    body: {
+      bookingReference: params.credentials.bookingReference,
+      email: params.credentials.email,
+      phoneLastFour: params.credentials.phoneLastFour,
+    },
+    signal: params.signal,
+    fallbackError: 'Could not cancel this booking.',
+  });
+}
+
+export async function abandonAccountManagedBooking(params: {
+  readonly apiBaseUrl: string;
+  readonly bookingId: string;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  return postManageBookingMutation({
+    apiBaseUrl: params.apiBaseUrl,
+    path: '/api/bookings/manage/abandon-account',
+    body: { bookingId: params.bookingId },
+    signal: params.signal,
+    fallbackError: 'Could not cancel this booking.',
+  });
 }
 
 export async function createAccountBookingManageCheckout(params: {
@@ -175,9 +313,18 @@ export async function createAccountBookingManageCheckout(params: {
     bookingId?: string | null;
     mock?: boolean;
     error?: string;
+    payabilityCode?: string;
+    debug?: Record<string, unknown>;
   };
   if (!response.ok || payload.ok !== true) {
-    throw new Error(typeof payload.error === 'string' ? payload.error : 'Checkout failed.');
+    const error = new Error(typeof payload.error === 'string' ? payload.error : 'Checkout failed.');
+    if (typeof payload.payabilityCode === 'string') {
+      (error as Error & { payabilityCode: string }).payabilityCode = payload.payabilityCode;
+    }
+    if (payload.debug !== undefined) {
+      (error as Error & { payabilityDebug: Record<string, unknown> }).payabilityDebug = payload.debug;
+    }
+    throw error;
   }
   return {
     transactionId: payload.transactionId ?? '',

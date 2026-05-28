@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   insertBlankQuizSessionForVisitor,
   listQuizSessionsForVisitorPaginated,
-  type VisitorQuizSessionListStatusFilter,
+  normalizeVisitorQuizSessionListStatusFilter,
 } from '@/lib/data/quiz-sessions';
 import { scheduleVisitorPaymentReconciliationIfNeeded } from '@/lib/payments/reconcile-visitor-payments';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -12,7 +12,10 @@ import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-m
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(8),
-  status: z.enum(['pending', 'confirmed', 'cancelled', 'completed', 'all']).default('pending'),
+  status: z
+    .enum(['pending', 'confirmed', 'cancelled', 'completed', 'all'])
+    .default('pending')
+    .transform(normalizeVisitorQuizSessionListStatusFilter),
   bookingReference: z.string().trim().optional(),
 });
 
@@ -39,7 +42,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     visitorId,
     page: parsed.data.page,
     pageSize: parsed.data.pageSize,
-    status: parsed.data.status as VisitorQuizSessionListStatusFilter,
+    status: parsed.data.status,
     bookingReference: parsed.data.bookingReference,
   });
   scheduleVisitorPaymentReconciliationIfNeeded(visitorId);

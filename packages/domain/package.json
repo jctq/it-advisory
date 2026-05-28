@@ -11,6 +11,7 @@
     "./booking-calendar-links": "./src/booking-calendar-links.ts",
     "./booking-schedule": "./src/booking-schedule.ts",
     "./collections": "./src/collections.ts",
+    "./cron-types": "./src/cron-types.ts",
     "./diagnostic-settings-bounds": "./src/diagnostic-settings-bounds.ts",
     "./email-types": "./src/email-types.ts",
     "./meeting-types": "./src/meeting-types.ts",

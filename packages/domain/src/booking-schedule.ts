@@ -9,6 +9,9 @@ import type {
 export const ADVISOR_BOOKING_SETTINGS_ID = 'default' as const;
 
 /** Matches legacy marketing booking before persisted advisor settings exist. */
+/** How far before the next bookable instant marketing UIs may list same-day slots. */
+export const MARKETING_BOOKING_LIST_WINDOW_BEFORE_NEXT_MS = 60 * 60 * 1000;
+
 export const LEGACY_MARKETING_TIME_LABELS: readonly string[] = [
   '09:00 AM',
   '10:00 AM',
@@ -373,6 +376,22 @@ function addDaysToYmd(ymd: string, days: number, timeZone: string): string {
   return formatInTimeZone(addDays(base, days), timeZone, 'yyyy-MM-dd');
 }
 
+/**
+ * Drops instants at or before `nowUtc`, then keeps slots from one hour before the earliest future slot onward.
+ */
+function filterSlotsByServerTimeAndNextSlotListWindow(slots: readonly Date[], nowUtc: Date): Date[] {
+  const nowMs = nowUtc.getTime();
+  const futureSlots = slots.filter((slot) => slot.getTime() > nowMs);
+  if (futureSlots.length === 0) {
+    return [];
+  }
+  const listFromMs = futureSlots[0]!.getTime() - MARKETING_BOOKING_LIST_WINDOW_BEFORE_NEXT_MS;
+  return slots.filter((slot) => {
+    const slotMs = slot.getTime();
+    return slotMs > nowMs && slotMs >= listFromMs;
+  });
+}
+
 function clampRangeToHorizonAndToday(
   fromYmd: string,
   toYmd: string,
@@ -408,7 +427,8 @@ export function expandAdvisorAvailabilityUtc(params: ExpandAdvisorAvailabilityPa
     }
     candidates.sort((a, b) => a.getTime() - b.getTime());
     const emptyCaps = new Map<string, number>();
-    return filterLegacyByCaps(candidates, tz, taken, dayCounts, weekCounts, emptyCaps, emptyCaps);
+    const legacyBookable = filterLegacyByCaps(candidates, tz, taken, dayCounts, weekCounts, emptyCaps, emptyCaps);
+    return filterSlotsByServerTimeAndNextSlotListWindow(legacyBookable, params.nowUtc);
   }
   const s = params.settings;
   for (const ymd of days) {
@@ -419,7 +439,8 @@ export function expandAdvisorAvailabilityUtc(params: ExpandAdvisorAvailabilityPa
     candidates.push(...emitGridSlotsForDay(ymd, window, s.slotIntervalMinutes, s.timezone));
   }
   candidates.sort((a, b) => a.getTime() - b.getTime());
-  return filterSlotsByCapsAndTaken(candidates, s, taken, dayCounts, weekCounts);
+  const bookable = filterSlotsByCapsAndTaken(candidates, s, taken, dayCounts, weekCounts);
+  return filterSlotsByServerTimeAndNextSlotListWindow(bookable, params.nowUtc);
 }
 
 export function expandPublicAvailabilitySlots(params: ExpandAdvisorAvailabilityParams): readonly PublicAvailabilitySlot[] {

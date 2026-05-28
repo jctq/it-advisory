@@ -50,6 +50,55 @@ const BOOKING_EVENT_MINUTES = 60;
 
 const HOVER_CLOSE_DELAY_MS = 180;
 const HIGHLIGHT_DURATION_MS = 4000;
+const MORE_POPOVER_VIEWPORT_PADDING_PX = 16;
+const MORE_POPOVER_BODY_MIN_HEIGHT_PX = 120;
+
+/** FullCalendar does not keep the "+n more" popover inside the viewport; clamp position and scroll height. */
+function layoutAdminBookingsMorePopoverInViewport(): void {
+  const popover = document.querySelector<HTMLElement>('.fc-admin-bookings .fc-more-popover');
+  if (popover === null) {
+    return;
+  }
+  const header = popover.querySelector<HTMLElement>('.fc-popover-header');
+  const body = popover.querySelector<HTMLElement>('.fc-popover-body');
+  if (body === null) {
+    return;
+  }
+  const padding = MORE_POPOVER_VIEWPORT_PADDING_PX;
+  const originRect =
+    popover.offsetParent instanceof HTMLElement
+      ? popover.offsetParent.getBoundingClientRect()
+      : { top: 0, left: 0 };
+  const headerHeight = header?.offsetHeight ?? 0;
+  let popoverRect = popover.getBoundingClientRect();
+  let viewportLeft = popoverRect.left;
+  if (popoverRect.right > window.innerWidth - padding) {
+    viewportLeft = Math.max(padding, window.innerWidth - padding - popoverRect.width);
+  }
+  viewportLeft = Math.max(padding, viewportLeft);
+  let viewportTop = popoverRect.top;
+  const executeApplyBodyMaxHeight = (): void => {
+    const maxBodyHeight = Math.max(
+      MORE_POPOVER_BODY_MIN_HEIGHT_PX,
+      Math.floor(window.innerHeight - padding - viewportTop - headerHeight),
+    );
+    body.style.maxHeight = `${maxBodyHeight}px`;
+    body.style.overflowY = 'auto';
+  };
+  executeApplyBodyMaxHeight();
+  popoverRect = popover.getBoundingClientRect();
+  if (popoverRect.bottom > window.innerHeight - padding) {
+    viewportTop = Math.max(padding, window.innerHeight - padding - popoverRect.height);
+    executeApplyBodyMaxHeight();
+    popoverRect = popover.getBoundingClientRect();
+    if (popoverRect.top < padding) {
+      viewportTop = padding;
+      executeApplyBodyMaxHeight();
+    }
+  }
+  popover.style.top = `${viewportTop - originRect.top}px`;
+  popover.style.left = `${viewportLeft - originRect.left}px`;
+}
 
 function mapBookingToEvent(
   booking: AdminBookingCalendarRow,
@@ -149,6 +198,28 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
       }
     };
   }, []);
+  useEffect(() => {
+    const executeHandleMoreLinkClick = (event: MouseEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Element) || target.closest('.fc-more-link') === null) {
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(layoutAdminBookingsMorePopoverInViewport);
+      });
+    };
+    const executeHandleResize = (): void => {
+      if (document.querySelector('.fc-admin-bookings .fc-more-popover') !== null) {
+        layoutAdminBookingsMorePopoverInViewport();
+      }
+    };
+    document.addEventListener('click', executeHandleMoreLinkClick);
+    window.addEventListener('resize', executeHandleResize);
+    return () => {
+      document.removeEventListener('click', executeHandleMoreLinkClick);
+      window.removeEventListener('resize', executeHandleResize);
+    };
+  }, []);
   const hoveredBooking =
     hoveredBookingId !== null ? (bookingsById.get(hoveredBookingId) ?? null) : null;
   const clearCloseTimer = useCallback((): void => {
@@ -220,7 +291,7 @@ export function AdminBookingsCalendar(props: AdminBookingsCalendarProps): ReactE
           />
         ) : null}
       </Popover>
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      <div className="relative overflow-visible rounded-2xl border border-border bg-card shadow-xs">
         {isLoading ? (
           <div
             className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-card/50 pt-8"

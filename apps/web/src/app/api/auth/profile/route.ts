@@ -1,7 +1,9 @@
 import { ObjectId } from 'mongodb';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { syncAccountProfileToVisitorLeads } from '@/lib/data/sync-account-profile-to-leads';
 import { findUserByEmailNormalized, findUserById, normalizeAccountEmail, updateUserProfileFields } from '@/lib/data/users';
+import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 import { buildMarketingUserPublicFromDocument } from '@/lib/marketing/marketing-user-public';
 import { parsePhilippineMobileE164 } from '@/lib/marketing/philippine-profile-phone';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -89,5 +91,6 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   if (refreshed === null) {
     return NextResponse.json({ error: 'Account not found' }, { status: 404 });
   }
+  await syncAccountProfileToVisitorLeads(buildAccountVisitorId(userId.toHexString()));
   return NextResponse.json({ user: buildMarketingUserPublicFromDocument(refreshed) });
 }

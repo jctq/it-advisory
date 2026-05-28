@@ -7,7 +7,11 @@ import {
   matchesAccountDiagnosticsListRequest,
   buildDefaultAccountDiagnosticsListRequest,
 } from '@/lib/marketing/account-diagnostics-list';
-import type { VisitorQuizSessionListStatusFilter, VisitorQuizSessionSummary } from '@/lib/data/quiz-sessions';
+import {
+  normalizeVisitorQuizSessionListStatusFilter,
+  type VisitorQuizSessionListStatusFilter,
+  type VisitorQuizSessionSummary,
+} from '@/lib/data/quiz-session-types';
 import {
   useMarketingAccountDiagnosticsStore,
   type AccountDiagnosticsDeleteTarget,
@@ -76,7 +80,8 @@ function buildAccountDiagnosticsSetters(
     setDeleteTarget: (value) => patch({ deleteTarget: value }),
     setBookingReferenceInput: (value) => patch({ bookingReferenceInput: value }),
     setDebouncedBookingReference: (value) => patch({ debouncedBookingReference: value }),
-    setStatusFilter: (value) => patch({ statusFilter: value }),
+    setStatusFilter: (value) =>
+      patch({ statusFilter: normalizeVisitorQuizSessionListStatusFilter(value) }),
     setIsLoadingMore: (value) => patch({ isLoadingMore: value }),
   };
 }

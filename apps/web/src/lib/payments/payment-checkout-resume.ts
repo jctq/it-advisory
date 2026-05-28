@@ -2,11 +2,17 @@ import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import { findPaymentMethodOption, type PaymentGatewayId, type PaymentTransactionDocument } from '@/domain/payment-types';
 import {
+  diagnoseAccountBookingPayability,
+  diagnoseGuestBookingPayability,
   findVerifiedAccountBookingForCheckout,
   findVerifiedGuestBookingForCheckout,
   type GuestBookingManageCredentials,
   type VerifiedGuestBooking,
 } from '@/lib/data/booking-guest-manage';
+import {
+  buildPayabilityApiExtras,
+  evaluateBookingPayability,
+} from '@/lib/payments/evaluate-booking-payability';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
@@ -81,10 +87,22 @@ export async function createPaymentCheckoutForVerifiedBooking(
   const resolvedPaymentMethodLabel = params.paymentMethodLabel ?? methodOption.label;
   const booking = verified.booking;
   const lead = verified.lead;
-  const leadEmail = typeof lead.email === 'string' ? lead.email.trim() : '';
-  if (leadEmail.length === 0) {
-    return { ok: false, code: 'booking_not_payable', error: 'This booking cannot be paid online.' };
+  const payability = evaluateBookingPayability({
+    bookingId: verified.bookingId,
+    booking,
+    lead,
+    paymentPolicy: publicSettings.paymentPolicy,
+    paymentsEnabled: publicSettings.paymentsEnabled,
+  });
+  if (!payability.canPayOnline) {
+    return {
+      ok: false,
+      code: 'booking_not_payable',
+      error: payability.reason ?? 'This booking cannot be paid online.',
+      ...buildPayabilityApiExtras(payability),
+    };
   }
+  const leadEmail = typeof lead.email === 'string' ? lead.email.trim() : '';
   const slotParts = formatBookingSlotPartsFromStartsAt(booking.startsAt, booking.timezone);
   const bookingDraftId = verified.bookingId;
   const holdExpiresAt = booking.paymentExpiresAt ?? null;
@@ -231,10 +249,14 @@ export async function createPaymentCheckoutForExistingBooking(
 ): Promise<CreateCheckoutSessionResult> {
   const verified = await findVerifiedGuestBookingForCheckout(params.credentials);
   if (verified === null) {
+    const diagnosis = await diagnoseGuestBookingPayability(params.credentials);
     return {
       ok: false,
       code: 'booking_not_payable',
-      error: 'This booking cannot be paid online. Check your details or contact support.',
+      error:
+        diagnosis.reason ??
+        'This booking cannot be paid online. Check your details or contact support.',
+      ...buildPayabilityApiExtras(diagnosis),
     };
   }
   return createPaymentCheckoutForVerifiedBooking(verified, {
@@ -262,10 +284,14 @@ export async function createPaymentCheckoutForAccountBooking(params: {
 }): Promise<CreateCheckoutSessionResult> {
   const verified = await findVerifiedAccountBookingForCheckout(params.bookingId, params.visitorId);
   if (verified === null) {
+    const diagnosis = await diagnoseAccountBookingPayability(params.bookingId, params.visitorId);
     return {
       ok: false,
       code: 'booking_not_payable',
-      error: 'This booking cannot be paid online. Check your details or contact support.',
+      error:
+        diagnosis.reason ??
+        'This booking cannot be paid online. Check your details or contact support.',
+      ...buildPayabilityApiExtras(diagnosis),
     };
   }
   return createPaymentCheckoutForVerifiedBooking(verified, {

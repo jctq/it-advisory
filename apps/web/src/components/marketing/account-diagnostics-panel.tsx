@@ -46,7 +46,7 @@ import type {
   PaginatedVisitorQuizSessionsResult,
   VisitorQuizSessionListStatusFilter,
   VisitorQuizSessionSummary,
-} from '@/lib/data/quiz-sessions';
+} from '@/lib/data/quiz-session-types';
 import { cn } from '@/lib/utils';
 
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
@@ -107,7 +107,7 @@ function BookingReferenceCell(props: { readonly row: VisitorQuizSessionSummary }
 }
 
 function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
-  const isComplete = props.row.completedAtIso !== null;
+  const isComplete = props.row.isDiagnosticComplete;
   if (isComplete) {
     return <Badge variant="secondary">Completed</Badge>;
   }
@@ -137,7 +137,11 @@ function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }):
     if (paymentStatus === 'failed' || paymentStatus === 'expired') {
       return <Badge variant="outline">Payment {paymentStatus}</Badge>;
     }
-    return <span className="text-sm text-muted-foreground">—</span>;
+    return (
+      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
+        Pending
+      </Badge>
+    );
   }
   if (props.row.bookingStatus === 'confirmed') {
     return <Badge variant="secondary">Confirmed</Badge>;
@@ -506,11 +510,11 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     setBookingReferenceInput(value);
   };
   const handleLoadMoreSessions = useCallback((): void => {
-    if (isLoading || isLoadingMore || !hasMoreSessions) {
+    if (!isMobileViewport || isLoading || isLoadingMore || !hasMoreSessions) {
       return;
     }
     setPage((current) => current + 1);
-  }, [hasMoreSessions, isLoading, isLoadingMore, setPage]);
+  }, [hasMoreSessions, isLoading, isLoadingMore, isMobileViewport, setPage]);
   return (
     <div className="space-y-6">
       <AlertDialog
@@ -598,6 +602,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                 totalCount={totalCount}
                 manageBookingEnabled={manageBookingEnabled}
                 deletingId={deletingId}
+                enableInfiniteScroll={isMobileViewport}
                 onStatusFilterChange={handleStatusFilterChange}
                 onBookingReferenceInputChange={handleBookingReferenceInputChange}
                 onLoadMore={handleLoadMoreSessions}
@@ -740,7 +745,7 @@ function StatusFilterField(props: {
   return (
     <div className="space-y-1.5">
       <Label htmlFor="diagnostic-status-filter" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Status
+        Booking status
       </Label>
       <NativeSelect
         id="diagnostic-status-filter"
@@ -748,12 +753,11 @@ function StatusFilterField(props: {
         onChange={(event) => props.onChange(event.target.value)}
         className="h-10"
         disabled={props.disabled}
-        aria-label="Filter diagnostics by status"
+        aria-label="Filter by booking status"
       >
         <option value="pending">Pending</option>
         <option value="confirmed">Confirmed</option>
         <option value="cancelled">Cancelled</option>
-        <option value="completed">Completed</option>
         <option value="all">All</option>
       </NativeSelect>
     </div>

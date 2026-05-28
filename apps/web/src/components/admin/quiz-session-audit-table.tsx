@@ -3,7 +3,7 @@
 import { createColumnHelper, flexRender, getCoreRowModel, getPaginationRowModel, useReactTable } from '@tanstack/react-table';
 import { useMemo, useState, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
-import type { QuizAuditAdminRow } from '@/lib/data/quiz-sessions';
+import type { QuizAuditAdminRow } from '@/lib/data/quiz-session-types';
 
 type QuizSessionAuditTableProps = {
   readonly rows: readonly QuizAuditAdminRow[];

@@ -65,7 +65,7 @@ export type BookingDocument = {
   serviceKey: string;
   startsAt: Date;
   timezone: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   /** Human-readable payment method from checkout (e.g. GCash); optional for legacy bookings. */
   paymentMethodLabel?: string | null;
   paymentStatus?: PaymentStatus | null;

@@ -14,7 +14,11 @@ import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentTransactionDocument } from '@/domain/payment-types';
 import { getDb } from '@/lib/mongodb';
 import { countBookingsByQuizSessionId } from '@/lib/data/bookings';
-import { findVerifiedQuizSessionPendingBookingForCheckout } from '@/lib/data/booking-guest-manage';
+import {
+  diagnoseQuizSessionExistingBookingPayability,
+  findVerifiedQuizSessionPendingBookingForCheckout,
+} from '@/lib/data/booking-guest-manage';
+import { buildPayabilityApiExtras } from '@/lib/payments/evaluate-booking-payability';
 import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { createPaymentCheckoutForVerifiedBooking } from '@/lib/payments/payment-checkout-resume';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
@@ -49,7 +53,7 @@ async function updateTransactionProvider(
 
 async function resolveBookingStatusByBookingId(
   bookingId: ObjectId | string | null,
-): Promise<'pending' | 'confirmed' | 'cancelled' | null> {
+): Promise<'pending' | 'confirmed' | 'completed' | 'cancelled' | null> {
   if (bookingId === null) {
     return null;
   }
@@ -107,10 +111,20 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           sessionMarketingRef,
         });
       }
+      const diagnosis = await diagnoseQuizSessionExistingBookingPayability(params.visitorId, ownedQuizSession._id);
+      if (diagnosis !== null && !diagnosis.canPayOnline) {
+        return {
+          ok: false,
+          code: 'booking_not_payable',
+          error: diagnosis.reason ?? 'This booking cannot be paid online.',
+          ...buildPayabilityApiExtras(diagnosis),
+        };
+      }
       return {
         ok: false,
         code: 'quiz_session_already_booked',
         error: 'This diagnostic is already linked to a booking.',
+        ...(diagnosis !== null ? buildPayabilityApiExtras(diagnosis) : {}),
       };
     }
   }

@@ -878,6 +878,11 @@
     --booking-pending-fg: var(--warning-foreground);
     --booking-pending-border: color-mix(in oklch, var(--warning) 32%, transparent);
     --booking-pending-hover-bg: color-mix(in oklch, var(--warning) 18%, var(--warning-soft));
+    --booking-completed-bg: oklch(0.48 0.12 155);
+    --booking-completed-fg: oklch(0.98 0.01 155);
+    --booking-completed-border: color-mix(in oklch, var(--booking-completed-bg) 35%, transparent);
+    --booking-completed-hover-bg: color-mix(in oklch, var(--booking-completed-bg) 88%, var(--card));
+    --booking-completed-hover-fg: var(--booking-completed-fg);
     --booking-cancelled-hover-bg: color-mix(in oklch, var(--foreground) 8%, var(--muted));
     --booking-cancelled-hover-fg: var(--muted-foreground);
   }
@@ -887,6 +892,10 @@
     --booking-pending-fg: oklch(0.93 0.04 85);
     --booking-pending-border: color-mix(in oklch, var(--warning) 38%, var(--border));
     --booking-pending-hover-bg: color-mix(in oklch, var(--warning) 28%, var(--card));
+    --booking-completed-bg: oklch(0.42 0.1 155);
+    --booking-completed-fg: oklch(0.95 0.02 155);
+    --booking-completed-border: color-mix(in oklch, var(--booking-completed-bg) 45%, var(--border));
+    --booking-completed-hover-bg: color-mix(in oklch, var(--booking-completed-bg) 76%, var(--card));
     --booking-cancelled-hover-bg: color-mix(in oklch, var(--foreground) 10%, var(--card));
   }
   .fc-admin-bookings .fc {
@@ -986,6 +995,40 @@
   .fc-admin-bookings .fc-booking-status-confirmed.fc-event-selected .fc-event-time {
     color: var(--booking-confirmed-hover-fg) !important;
   }
+  .fc-admin-bookings .fc-booking-status-completed {
+    --fc-event-bg-color: var(--booking-completed-bg);
+    --fc-event-border-color: var(--booking-completed-border);
+    --fc-event-text-color: var(--booking-completed-fg);
+    background-color: var(--booking-completed-bg);
+    border-color: var(--booking-completed-border);
+    color: var(--booking-completed-fg);
+  }
+  .fc-admin-bookings .fc-booking-status-completed .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-completed .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-completed .fc-event-time,
+  .fc-admin-bookings .fc-booking-status-completed .fc-list-event-title a,
+  .fc-admin-bookings .fc-booking-status-completed .fc-list-event-time {
+    color: var(--booking-completed-fg);
+  }
+  .fc-admin-bookings .fc-booking-status-completed:hover,
+  .fc-admin-bookings .fc-booking-status-completed.fc-event-selected {
+    --fc-event-bg-color: var(--booking-completed-hover-bg);
+    --fc-event-text-color: var(--booking-completed-hover-fg);
+    background-color: var(--booking-completed-hover-bg) !important;
+    border-color: var(--booking-completed-border) !important;
+    color: var(--booking-completed-hover-fg) !important;
+    filter: none !important;
+  }
+  .fc-admin-bookings .fc-booking-status-completed:hover .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-completed:hover .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-completed:hover .fc-event-time,
+  .fc-admin-bookings .fc-booking-status-completed:hover .fc-list-event-title a,
+  .fc-admin-bookings .fc-booking-status-completed:hover .fc-list-event-time,
+  .fc-admin-bookings .fc-booking-status-completed.fc-event-selected .fc-event-main,
+  .fc-admin-bookings .fc-booking-status-completed.fc-event-selected .fc-event-title,
+  .fc-admin-bookings .fc-booking-status-completed.fc-event-selected .fc-event-time {
+    color: var(--booking-completed-hover-fg) !important;
+  }
   .fc-admin-bookings .fc-booking-status-pending {
     --fc-event-bg-color: var(--booking-pending-bg);
     --fc-event-border-color: var(--booking-pending-border);
@@ -1054,6 +1097,29 @@
   .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-confirmed):hover .fc-list-event-time {
     color: var(--booking-confirmed-hover-fg) !important;
   }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-completed td,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-completed) td {
+    background-color: var(--booking-completed-bg) !important;
+    color: var(--booking-completed-fg) !important;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-completed .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-completed .fc-list-event-time,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-completed) .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-completed) .fc-list-event-time {
+    color: var(--booking-completed-fg) !important;
+    text-decoration: none;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-completed:hover td,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-completed):hover td {
+    background-color: var(--booking-completed-hover-bg) !important;
+    color: var(--booking-completed-hover-fg) !important;
+  }
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-completed:hover .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-completed:hover .fc-list-event-time,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-completed):hover .fc-list-event-title a,
+  .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-completed):hover .fc-list-event-time {
+    color: var(--booking-completed-hover-fg) !important;
+  }
   .fc-admin-bookings .fc tr.fc-list-event.fc-booking-status-pending td,
   .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-pending) td {
     background-color: var(--booking-pending-bg) !important;
@@ -1100,6 +1166,44 @@
   .fc-admin-bookings .fc tr.fc-list-event:has(.fc-booking-status-cancelled):hover .fc-list-event-time {
     color: var(--booking-cancelled-hover-fg) !important;
   }
+}
+
+/**
+ * Admin bookings "+n more" popover (FullCalendar): unlayered so it wins over FC’s injected CSS.
+ * Month view can overflow the calendar card; the body scrolls inside the popover.
+ */
+.fc-admin-bookings .fc-view-harness {
+  overflow: visible !important;
+}
+.fc-admin-bookings .fc-more-popover {
+  z-index: 40 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 200px !important;
+  overflow: hidden !important;
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  border-color: var(--border) !important;
+}
+.fc-admin-bookings .fc-more-popover .fc-popover-header {
+  flex-shrink: 0 !important;
+  background-color: var(--muted) !important;
+  color: var(--foreground) !important;
+}
+.fc-admin-bookings .fc-more-popover .fc-popover-body {
+  min-width: 0 !important;
+  max-width: 200px !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.fc-admin-bookings .fc-more-popover .fc-event-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /**

@@ -7,6 +7,7 @@ const LOGIN_PATH = '/admin/login';
 const LOGIN_API_PATH = '/api/admin/login';
 const ADMIN_PREFIX = '/admin';
 const ADMIN_API_PREFIX = '/api/admin';
+const APPEARANCE_SCOPE_HEADER = 'x-techmd-appearance-scope';
 
 function constantTimeEquals(a: string, b: string): boolean {
   const aBuffer = Buffer.from(a, 'utf8');
@@ -32,6 +33,10 @@ function isApiAdminPath(pathname: string): boolean {
   return pathname === ADMIN_API_PREFIX || pathname.startsWith(`${ADMIN_API_PREFIX}/`);
 }
 
+function isAdminPath(pathname: string): boolean {
+  return pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`) || isApiAdminPath(pathname);
+}
+
 function isLoginPath(pathname: string): boolean {
   return pathname === LOGIN_PATH || pathname === LOGIN_API_PATH;
 }
@@ -55,20 +60,31 @@ function allowDevWithoutToken(): boolean {
   return process.env.NODE_ENV !== 'production';
 }
 
+function continueWithAppearanceScope(request: NextRequest): NextResponse {
+  const requestHeaders = new Headers(request.headers);
+  const scope = request.nextUrl.pathname.startsWith('/admin') ? 'admin' : 'marketing';
+  requestHeaders.set(APPEARANCE_SCOPE_HEADER, scope);
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+}
+
 /**
  * Next.js 16+ network boundary (Node runtime).
- * Gates `/admin/...` and `/api/admin/...` behind a single shared `ADMIN_TOKEN`.
- * `/admin/login` and `/api/admin/login` remain reachable without a token.
+ * Sets appearance scope for SSR and gates admin routes behind `ADMIN_TOKEN`.
  */
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
+  if (!isAdminPath(pathname)) {
+    return continueWithAppearanceScope(request);
+  }
   if (isLoginPath(pathname)) {
-    return NextResponse.next();
+    return continueWithAppearanceScope(request);
   }
   const expected = process.env.ADMIN_TOKEN?.trim();
   if (!expected || expected.length === 0) {
     if (allowDevWithoutToken()) {
-      return NextResponse.next();
+      return continueWithAppearanceScope(request);
     }
     if (isApiAdminPath(pathname)) {
       return NextResponse.json(
@@ -84,11 +100,13 @@ export function proxy(request: NextRequest): NextResponse {
   const headerToken = extractBearer(request.headers.get('authorization'));
   const provided = cookieToken ?? headerToken;
   if (provided !== null && constantTimeEquals(provided, expected)) {
-    return NextResponse.next();
+    return continueWithAppearanceScope(request);
   }
   return isApiAdminPath(pathname) ? denyApi() : denyWeb(request);
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/admin/:path*'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|brand/|scripts/).*)',
+  ],
 };

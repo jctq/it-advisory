@@ -1,6 +1,17 @@
 'use client';
 
-import { Calendar, CalendarCheck2, CalendarClock, CalendarX2, Inbox, Search } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarCheck2,
+  CalendarClock,
+  CalendarDays,
+  CalendarX2,
+  CircleCheckBig,
+  CircleHelp,
+  Inbox,
+  Search,
+  Table2,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent, type ReactElement } from 'react';
 import {
@@ -8,9 +19,10 @@ import {
   type AdminBookingsCalendarFocusRequest,
   type AdminBookingsCalendarNavigateRequest,
 } from '@/components/admin/admin-bookings-calendar';
+import { AdminBookingsTable } from '@/components/admin/admin-bookings-table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import {
   resolveManilaTodayYmd,
@@ -26,33 +38,47 @@ import { cn } from '@/lib/utils';
 
 type BookingStatusFilter = 'all' | AdminBookingCalendarRow['status'];
 
+type BookingsViewMode = 'calendar' | 'table';
+
+const HIGHLIGHT_DURATION_MS = 4000;
+
 type StatusFilterOption = {
   readonly id: BookingStatusFilter;
   readonly label: string;
+  readonly shortLabel: string;
   readonly icon: typeof Inbox;
-  readonly swatchClassName: string;
 };
 
 const STATUS_FILTER_OPTIONS: readonly StatusFilterOption[] = [
-  { id: 'all', label: 'All bookings', icon: Inbox, swatchClassName: 'bg-foreground/25' },
+  {
+    id: 'all',
+    label: 'All bookings',
+    shortLabel: 'All',
+    icon: Inbox,
+  },
   {
     id: 'confirmed',
     label: 'Confirmed',
+    shortLabel: 'Confirmed',
     icon: CalendarCheck2,
-    swatchClassName: 'bg-primary',
+  },
+  {
+    id: 'completed',
+    label: 'Completed',
+    shortLabel: 'Completed',
+    icon: CircleCheckBig,
   },
   {
     id: 'pending',
     label: 'Pending',
+    shortLabel: 'Pending',
     icon: CalendarClock,
-    swatchClassName:
-      'border border-[var(--booking-pending-border)] bg-[var(--booking-pending-bg)]',
   },
   {
     id: 'cancelled',
     label: 'Cancelled',
+    shortLabel: 'Cancelled',
     icon: CalendarX2,
-    swatchClassName: 'bg-muted-foreground/50',
   },
 ] as const;
 
@@ -61,6 +87,7 @@ const EMPTY_COUNTS: AdminBookingCalendarStatusCounts = {
   confirmed: 0,
   pending: 0,
   cancelled: 0,
+  completed: 0,
 };
 
 type ReferenceSearchFeedback =
@@ -93,10 +120,11 @@ function resolveStatusCount(
 }
 
 /**
- * Admin bookings page layout: status sidebar, date range filter, API-backed calendar.
+ * Admin bookings page layout: date range, reference search, status filters, API-backed calendar.
  */
 export function AdminBookingsWorkspace(): ReactElement {
   const todayYmd = resolveManilaTodayYmd();
+  const [viewMode, setViewMode] = useState<BookingsViewMode>('table');
   const [statusFilter, setStatusFilter] = useState<BookingStatusFilter>('confirmed');
   const [rangeFromYmd, setRangeFromYmd] = useState(todayYmd);
   const [rangeToYmd, setRangeToYmd] = useState(todayYmd);
@@ -117,8 +145,16 @@ export function AdminBookingsWorkspace(): ReactElement {
   );
   const [focusToken, setFocusToken] = useState(0);
   const [navigateToken, setNavigateToken] = useState(0);
+  const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const activeFilterLabel =
     STATUS_FILTER_OPTIONS.find((option) => option.id === statusFilter)?.label ?? 'All bookings';
+  const hasPendingDateRange = draftFromYmd !== rangeFromYmd || draftToYmd !== rangeToYmd;
+  const dateRangeHint =
+    viewMode === 'calendar'
+      ? 'Defaults to today (Manila). Calendar navigation loads bookings for the visible range.'
+      : 'Defaults to today (Manila). Apply loads all bookings between the selected dates.';
+  const referenceSubmitLabel =
+    isReferenceSearching ? 'Searching…' : viewMode === 'calendar' ? 'Find on calendar' : 'Find booking';
   const executeVisibleRangeChange = useCallback((start: Date, end: Date): void => {
     const { fromYmd, toYmd } = resolveManilaYmdRangeFromCalendarVisibleRange(start, end);
     setRangeFromYmd((previous) => (previous === fromYmd ? previous : fromYmd));
@@ -126,6 +162,17 @@ export function AdminBookingsWorkspace(): ReactElement {
     setDraftFromYmd((previous) => (previous === fromYmd ? previous : fromYmd));
     setDraftToYmd((previous) => (previous === toYmd ? previous : toYmd));
   }, []);
+  useEffect(() => {
+    if (highlightedBookingId === null) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setHighlightedBookingId(null);
+    }, HIGHLIGHT_DURATION_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [highlightedBookingId]);
   useEffect(() => {
     const controller = new AbortController();
     async function loadBookings(): Promise<void> {
@@ -241,23 +288,30 @@ export function AdminBookingsWorkspace(): ReactElement {
       setDraftToYmd(bookingYmd);
       setRangeFromYmd(bookingYmd);
       setRangeToYmd(bookingYmd);
-      const nextNavigateToken = navigateToken + 1;
-      setNavigateToken(nextNavigateToken);
-      setNavigateRequest({ fromYmd: bookingYmd, toYmd: bookingYmd, token: nextNavigateToken });
-      const nextFocusToken = focusToken + 1;
-      setFocusToken(nextFocusToken);
-      setFocusRequest({
-        bookingId: booking.id,
-        startsAtIso: booking.startsAtIso,
-        token: nextFocusToken,
+      setHighlightedBookingId(booking.id);
+      if (viewMode === 'calendar') {
+        const nextNavigateToken = navigateToken + 1;
+        setNavigateToken(nextNavigateToken);
+        setNavigateRequest({ fromYmd: bookingYmd, toYmd: bookingYmd, token: nextNavigateToken });
+        const nextFocusToken = focusToken + 1;
+        setFocusToken(nextFocusToken);
+        setFocusRequest({
+          bookingId: booking.id,
+          startsAtIso: booking.startsAtIso,
+          token: nextFocusToken,
+        });
+      }
+      const startsAtLabel = new Date(booking.startsAtIso).toLocaleString('en-PH', {
+        timeZone: PRIMARY_TIMEZONE,
+        dateStyle: 'medium',
+        timeStyle: 'short',
       });
       setReferenceFeedback({
         kind: 'success',
-        message: `Moved calendar to ${new Date(booking.startsAtIso).toLocaleString('en-PH', {
-          timeZone: PRIMARY_TIMEZONE,
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        })} (Manila).`,
+        message:
+          viewMode === 'calendar'
+            ? `Moved calendar to ${startsAtLabel} (Manila).`
+            : `Found booking at ${startsAtLabel} (Manila).`,
         bookingId: booking.id,
         bookingReference,
       });
@@ -269,127 +323,200 @@ export function AdminBookingsWorkspace(): ReactElement {
     }
   };
   return (
-    <div className="fc-admin-bookings flex flex-col gap-6 lg:flex-row lg:items-start">
-      <aside
-        data-admin-tour="page-bookings-filters"
-        className="w-full shrink-0 lg:sticky lg:top-24 lg:w-60 xl:w-64"
-        aria-label="Booking status filters"
-      >
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
-          <div className="border-b border-border px-4 py-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Calendar className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              Status
+    <div className="fc-admin-bookings flex flex-col gap-6">
+      <div data-admin-tour="page-bookings-calendar" className="min-w-0 space-y-3">
+        <TooltipProvider delayDuration={300}>
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 px-3 py-2">
+              <p className="min-w-0 text-xs text-muted-foreground sm:text-sm">
+                {isLoading ? (
+                  'Loading bookings…'
+                ) : (
+                  <>
+                    <span className="font-medium text-foreground">{bookings.length.toLocaleString()}</span>{' '}
+                    {bookings.length === 1 ? 'booking' : 'bookings'}
+                    {statusFilter === 'all' ? '' : ` · ${activeFilterLabel}`}
+                    <span className="hidden sm:inline">
+                      {' · '}
+                      <span className="tabular-nums">
+                        {rangeFromYmd === rangeToYmd ? rangeFromYmd : `${rangeFromYmd} – ${rangeToYmd}`}
+                      </span>
+                    </span>
+                  </>
+                )}
+              </p>
+              <div
+                className="inline-flex shrink-0 rounded-lg border border-border bg-muted/30 p-0.5"
+                role="group"
+                aria-label="Bookings display"
+              >
+                {(
+                  [
+                    { id: 'table' as const, label: 'Table', icon: Table2 },
+                    { id: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
+                  ] as const
+                ).map((option) => {
+                  const Icon = option.icon;
+                  const isActive = viewMode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setViewMode(option.id)}
+                      aria-pressed={isActive}
+                      className={cn(
+                        'inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
+                        isActive
+                          ? 'bg-primary text-primary-foreground shadow-xs'
+                          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                      )}
+                    >
+                      <Icon className="size-3.5 shrink-0" aria-hidden />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Filter the calendar like mail folders. Counts reflect the selected date range.
-            </p>
-          </div>
-          <nav className="space-y-0.5 p-2" role="navigation">
-            {STATUS_FILTER_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              const isActive = statusFilter === option.id;
-              const count = resolveStatusCount(countsByStatus, option.id);
-              return (
-                <button
-                  key={option.id}
+            <div
+              data-admin-tour="page-bookings-filters"
+              className="border-b border-border/80 px-3 py-2"
+              role="group"
+              aria-label="Filter bookings by status"
+            >
+              <div className="-mx-1 flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {STATUS_FILTER_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  const isActive = statusFilter === option.id;
+                  const count = resolveStatusCount(countsByStatus, option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setStatusFilter(option.id)}
+                      aria-label={`${option.label} (${isLoading ? '…' : count})`}
+                      aria-pressed={isActive}
+                      className={cn(
+                        'inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
+                        isActive
+                          ? 'border-primary/30 bg-primary/10 text-foreground'
+                          : 'border-border bg-background text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                      )}
+                    >
+                      <Icon
+                        className={cn('size-3.5 shrink-0', isActive ? 'text-primary' : 'opacity-70')}
+                        aria-hidden
+                      />
+                      <span>{option.shortLabel}</span>
+                      <span
+                        className={cn(
+                          'rounded px-1.5 py-px text-[0.6875rem] tabular-nums leading-none',
+                          isActive
+                            ? 'bg-primary/15 font-semibold text-foreground'
+                            : 'bg-muted text-muted-foreground',
+                        )}
+                        aria-hidden
+                      >
+                        {isLoading ? '…' : count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center">
+              <div
+                className="flex min-w-0 flex-wrap items-center gap-2"
+                role="group"
+                aria-label="Booking date range"
+              >
+                <Input
+                  id="bookings-range-from"
+                  type="date"
+                  value={draftFromYmd}
+                  onChange={(event) => setDraftFromYmd(event.target.value)}
+                  className="h-9 w-41 shrink-0"
+                  aria-label="From date"
+                />
+                <span className="text-xs text-muted-foreground" aria-hidden>
+                  –
+                </span>
+                <Input
+                  id="bookings-range-to"
+                  type="date"
+                  value={draftToYmd}
+                  onChange={(event) => setDraftToYmd(event.target.value)}
+                  className="h-9 w-41 shrink-0"
+                  aria-label="To date"
+                />
+                <Button
                   type="button"
-                  onClick={() => setStatusFilter(option.id)}
-                  className={cn(
-                    'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
-                    isActive
-                      ? 'bg-primary/10 text-foreground ring-1 ring-primary/25'
-                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                  )}
-                  aria-current={isActive ? 'true' : undefined}
+                  size="sm"
+                  variant={hasPendingDateRange ? 'default' : 'secondary'}
+                  onClick={executeApplyDateRange}
+                  aria-label={hasPendingDateRange ? 'Apply pending date range' : 'Apply date range'}
                 >
-                  <span
-                    className={cn('size-2.5 shrink-0 rounded-sm', option.swatchClassName)}
+                  Apply
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={executeResetDateRangeToToday}>
+                  Today
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                      aria-label="Date range help"
+                    >
+                      <CircleHelp className="size-4" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-left">
+                    {dateRangeHint}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <form
+                onSubmit={executeReferenceSearch}
+                className="flex min-w-0 flex-1 items-center gap-2 lg:ml-auto lg:max-w-md"
+              >
+                <div className="relative min-w-0 flex-1">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden
                   />
-                  <Icon className="size-4 shrink-0 opacity-70" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                  <span
-                    className={cn(
-                      'shrink-0 rounded-md px-2 py-0.5 text-xs tabular-nums',
-                      isActive
-                        ? 'bg-primary/15 font-semibold text-foreground'
-                        : 'bg-muted text-muted-foreground',
-                    )}
-                  >
-                    {isLoading ? '…' : count}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </aside>
-      <div data-admin-tour="page-bookings-calendar" className="min-w-0 flex-1 space-y-3">
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="bookings-range-from" className="text-xs text-muted-foreground">
-                From
-              </Label>
-              <Input
-                id="bookings-range-from"
-                type="date"
-                value={draftFromYmd}
-                onChange={(event) => setDraftFromYmd(event.target.value)}
-                className="w-[11.5rem]"
-              />
+                  <Input
+                    value={referenceQuery}
+                    onChange={(event) => {
+                      setReferenceQuery(event.target.value);
+                      if (referenceFeedback.kind !== 'idle') {
+                        setReferenceFeedback({ kind: 'idle' });
+                      }
+                    }}
+                    placeholder="Reference…"
+                    className="h-9 pl-9"
+                    aria-label="Search booking by reference"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  className="shrink-0 gap-1 px-2.5 sm:px-3"
+                  disabled={isReferenceSearching}
+                  aria-label={referenceSubmitLabel}
+                >
+                  <span className="hidden sm:inline">{referenceSubmitLabel}</span>
+                  <ArrowRight className="size-4 sm:hidden" aria-hidden />
+                </Button>
+              </form>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="bookings-range-to" className="text-xs text-muted-foreground">
-                To
-              </Label>
-              <Input
-                id="bookings-range-to"
-                type="date"
-                value={draftToYmd}
-                onChange={(event) => setDraftToYmd(event.target.value)}
-                className="w-[11.5rem]"
-              />
-            </div>
-            <Button type="button" variant="secondary" onClick={executeApplyDateRange}>
-              Apply range
-            </Button>
-            <Button type="button" variant="ghost" onClick={executeResetDateRangeToToday}>
-              Today
-            </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Date range defaults to today (Manila). Prev/next and view switches load bookings for the
-            visible range.
-          </p>
-        </div>
-        <form onSubmit={executeReferenceSearch} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="relative min-w-0 flex-1 sm:max-w-xs">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              value={referenceQuery}
-              onChange={(event) => {
-                setReferenceQuery(event.target.value);
-                if (referenceFeedback.kind !== 'idle') {
-                  setReferenceFeedback({ kind: 'idle' });
-                }
-              }}
-              placeholder="Search by reference…"
-              className="pl-9"
-              aria-label="Search booking by reference"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </div>
-          <Button type="submit" variant="secondary" className="shrink-0" disabled={isReferenceSearching}>
-            {isReferenceSearching ? 'Searching…' : 'Find on calendar'}
-          </Button>
-        </form>
+        </TooltipProvider>
         {referenceFeedback.kind === 'error' ? (
           <p className="text-sm text-destructive" role="alert">
             {referenceFeedback.message}
@@ -413,30 +540,22 @@ export function AdminBookingsWorkspace(): ReactElement {
             {loadError}
           </p>
         ) : null}
-        <p className="text-sm text-muted-foreground">
-          {isLoading ? (
-            'Loading bookings…'
-          ) : (
-            <>
-              Showing{' '}
-              <span className="font-medium text-foreground">{bookings.length.toLocaleString()}</span>{' '}
-              {bookings.length === 1 ? 'booking' : 'bookings'}
-              {statusFilter === 'all' ? '' : ` · ${activeFilterLabel}`}
-              {' · '}
-              <span className="tabular-nums">
-                {rangeFromYmd === rangeToYmd ? rangeFromYmd : `${rangeFromYmd} – ${rangeToYmd}`}
-              </span>
-            </>
-          )}
-        </p>
-        <AdminBookingsCalendar
-          bookings={bookings}
-          isLoading={isLoading}
-          initialAnchorYmd={todayYmd}
-          focusRequest={focusRequest}
-          navigateRequest={navigateRequest}
-          onVisibleRangeChange={executeVisibleRangeChange}
-        />
+        {viewMode === 'calendar' ? (
+          <AdminBookingsCalendar
+            bookings={bookings}
+            isLoading={isLoading}
+            initialAnchorYmd={todayYmd}
+            focusRequest={focusRequest}
+            navigateRequest={navigateRequest}
+            onVisibleRangeChange={executeVisibleRangeChange}
+          />
+        ) : (
+          <AdminBookingsTable
+            bookings={bookings}
+            isLoading={isLoading}
+            highlightedBookingId={highlightedBookingId}
+          />
+        )}
       </div>
     </div>
   );

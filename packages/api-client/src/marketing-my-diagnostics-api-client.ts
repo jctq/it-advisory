@@ -39,7 +39,7 @@ type FetchMyDiagnosticsParams = {
   readonly marketingSessionToken: string;
   readonly page?: number;
   readonly pageSize?: number;
-  readonly status?: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'all';
+  readonly status?: 'pending' | 'confirmed' | 'cancelled' | 'all';
 };
 
 /**

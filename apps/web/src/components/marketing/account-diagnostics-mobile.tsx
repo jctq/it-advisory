@@ -33,7 +33,7 @@ import {
 import type {
   VisitorQuizSessionListStatusFilter,
   VisitorQuizSessionSummary,
-} from '@/lib/data/quiz-sessions';
+} from '@/lib/data/quiz-session-types';
 import { cn } from '@/lib/utils';
 
 const MOBILE_LIST_ITEM_ESTIMATE_PX = 108;
@@ -49,7 +49,6 @@ const STATUS_TAB_OPTIONS: readonly { readonly id: VisitorQuizSessionListStatusFi
   { id: 'pending', label: 'Pending' },
   { id: 'confirmed', label: 'Confirmed' },
   { id: 'cancelled', label: 'Cancelled' },
-  { id: 'completed', label: 'Completed' },
   { id: 'all', label: 'All' },
 ] as const;
 
@@ -80,14 +79,14 @@ function resolveMobileStatusLine(row: VisitorQuizSessionSummary): string | null 
   if (row.bookingStatus === 'pending') {
     return 'Booking pending confirmation';
   }
-  if (row.completedAtIso === null && !row.isBooked && row.paymentTransactionStatus === null) {
+  if (!row.isDiagnosticComplete && !row.isBooked && row.paymentTransactionStatus === null) {
     return 'Diagnostic in progress';
   }
   return null;
 }
 
 function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
-  const isComplete = props.row.completedAtIso !== null;
+  const isComplete = props.row.isDiagnosticComplete;
   if (isComplete) {
     return <Badge variant="secondary">Completed</Badge>;
   }
@@ -117,7 +116,11 @@ function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }):
     if (paymentStatus === 'failed' || paymentStatus === 'expired') {
       return <Badge variant="outline">Payment {paymentStatus}</Badge>;
     }
-    return <span className="text-xs text-muted-foreground">Not booked</span>;
+    return (
+      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
+        Pending
+      </Badge>
+    );
   }
   if (props.row.bookingStatus === 'confirmed') {
     return <Badge variant="secondary">Confirmed</Badge>;
@@ -142,6 +145,8 @@ export type AccountDiagnosticsMobileProps = {
   readonly totalCount: number;
   readonly manageBookingEnabled: boolean;
   readonly deletingId: string | null;
+  /** When false, infinite-scroll load-more is disabled (desktop table owns pagination). */
+  readonly enableInfiniteScroll: boolean;
   readonly onStatusFilterChange: (value: VisitorQuizSessionListStatusFilter) => void;
   readonly onBookingReferenceInputChange: (value: string) => void;
   readonly onLoadMore: () => void;
@@ -161,6 +166,7 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
     deletingId,
     onStatusFilterChange,
     onBookingReferenceInputChange,
+    enableInfiniteScroll,
     onLoadMore,
     onRequestDelete,
   } = props;
@@ -196,7 +202,7 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
     }
   }, [isLoadingMore]);
   useEffect(() => {
-    if (isLoading || isLoadingMore || !hasMore || sessions.length === 0) {
+    if (!enableInfiniteScroll || isLoading || isLoadingMore || !hasMore || sessions.length === 0) {
       return;
     }
     const lastVirtualItem = virtualItems.at(-1);
@@ -207,7 +213,7 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
       loadMoreRequestedRef.current = true;
       onLoadMore();
     }
-  }, [hasMore, isLoading, isLoadingMore, onLoadMore, sessions.length, virtualItems]);
+  }, [enableInfiniteScroll, hasMore, isLoading, isLoadingMore, onLoadMore, sessions.length, virtualItems]);
   const handleOpenSession = useCallback((row: VisitorQuizSessionSummary): void => {
     setSelectedSession(row);
   }, []);
@@ -239,7 +245,7 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
         <div
           className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
-          aria-label="Filter diagnostics by status"
+          aria-label="Filter by booking status"
         >
           {STATUS_TAB_OPTIONS.map((option) => {
             const isActive = statusFilter === option.id;
@@ -345,7 +351,7 @@ function MobileDiagnosticsListItem(props: {
   const summaryLine = resolveAccountDiagnosticListSummary(props.row);
   const rightLabel =
     props.row.bookingReferenceId ??
-    (props.row.paymentTransactionStatus === 'paid' ? 'Paid' : props.row.completedAtIso !== null ? 'Done' : null);
+    (props.row.paymentTransactionStatus === 'paid' ? 'Paid' : props.row.isDiagnosticComplete ? 'Done' : null);
   return (
     <button
       type="button"

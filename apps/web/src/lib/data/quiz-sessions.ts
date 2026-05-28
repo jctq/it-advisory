@@ -9,13 +9,41 @@ import type {
 } from '@/domain/types';
 import type { PaymentStatus } from '@/domain/payment-types';
 import { fetchLatestPaymentTransactionsByQuizSessionIds } from '@/lib/data/payment-transactions';
+import { resolveQuizSessionDiagnosticCompleted } from '@techmd/diagnostic-core/quiz-session-diagnostic-complete';
 import { resolveQuizSessionDisplayPreview } from '@techmd/diagnostic-core/quiz-session-display-preview';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import { getActiveDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
 import { getDb } from '@/lib/mongodb';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
+import {
+  normalizeVisitorQuizSessionListStatusFilter,
+  type DeleteQuizSessionForVisitorResult,
+  type PaginatedVisitorQuizSessionsResult,
+  type QuizAuditAdminRow,
+  type QuizSessionDetail,
+  type QuizSessionLinkedBooking,
+  type QuizSessionListRow,
+  type UpsertQuizProgressInput,
+  type UpsertQuizProgressResult,
+  type VisitorQuizSessionListStatusFilter,
+  type VisitorQuizSessionSummary,
+} from '@/lib/data/quiz-session-types';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
+
+export type {
+  DeleteQuizSessionForVisitorResult,
+  PaginatedVisitorQuizSessionsResult,
+  QuizAuditAdminRow,
+  QuizSessionDetail,
+  QuizSessionLinkedBooking,
+  QuizSessionListRow,
+  UpsertQuizProgressInput,
+  UpsertQuizProgressResult,
+  VisitorQuizSessionListStatusFilter,
+  VisitorQuizSessionSummary,
+} from '@/lib/data/quiz-session-types';
+export { normalizeVisitorQuizSessionListStatusFilter } from '@/lib/data/quiz-session-types';
 
 const DEFAULT_QUIZ_SESSION_LIST_LIMIT = 500;
 const DEFAULT_QUIZ_AUDIT_LIST_LIMIT = 200;
@@ -25,52 +53,6 @@ const BLANK_QUIZ_ANSWERS: QuizAnswers = {
   situation: '',
   situationAdvisorSummary: '',
   situationDiagnosticThread: buildDiagnosticThreadJson(GUIDED_DIAGNOSTIC_EMPTY),
-};
-
-export type QuizSessionListRow = {
-  readonly id: string;
-  readonly visitorId: string;
-  readonly currentStep: number;
-  readonly updatedAtIso: string;
-  readonly completedAtIso: string | null;
-  readonly hasGuidedDiagnostic: boolean;
-  readonly sessionTitlePreview: string | null;
-  readonly situationPreview: string | null;
-  readonly situationLabel: string | null;
-  /** True when a booking references this session (`bookings.quizSessionId`). */
-  readonly isBooked: boolean;
-  /** First linked booking id for admin, when `isBooked`. */
-  readonly bookingId: string | null;
-};
-
-export type QuizSessionLinkedBooking = {
-  readonly id: string;
-  readonly startsAtIso: string;
-  readonly timezone: string;
-  readonly serviceKey: string;
-  readonly meetingUrl: string | null;
-  readonly status: BookingDocument['status'];
-  readonly recordingOptIn: boolean;
-  readonly fathomShareUrl: string | null;
-};
-
-export type QuizSessionDetail = {
-  readonly id: string;
-  readonly visitorId: string;
-  readonly currentStep: number;
-  readonly createdAtIso: string;
-  readonly updatedAtIso: string;
-  readonly completedAtIso: string | null;
-  readonly guidedDiagnosticRaw: string | null;
-  readonly situationDiagnosticThread: string | null;
-  readonly linkedBookings: readonly QuizSessionLinkedBooking[];
-};
-
-export type QuizAuditAdminRow = {
-  readonly id: string;
-  readonly step: number;
-  readonly createdAtIso: string;
-  readonly answersJson: string;
 };
 
 function readSituationAnswer(answers: QuizAnswers): string | null {
@@ -349,44 +331,6 @@ export async function findQuizSessionForBookingSnapshot(visitorId: string): Prom
   return findLatestQuizSession(visitorId);
 }
 
-export type VisitorQuizSessionListStatusFilter = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'all';
-
-export type PaginatedVisitorQuizSessionsResult = {
-  readonly sessions: readonly VisitorQuizSessionSummary[];
-  readonly totalCount: number;
-  readonly page: number;
-  readonly pageSize: number;
-  readonly totalPages: number;
-  readonly hasAnySessions: boolean;
-};
-
-export type VisitorQuizSessionSummary = {
-  readonly id: string;
-  /** Value for `/diagnostic/[sessionRef]` links and quiz session API calls (opaque when `QUIZ_SESSION_URL_SECRET` is set). */
-  readonly marketingSessionRef: string;
-  readonly currentStep: number;
-  readonly updatedAtIso: string;
-  readonly completedAtIso: string | null;
-  readonly sessionTitlePreview: string | null;
-  readonly situationPreview: string | null;
-  readonly situationLabel: string | null;
-  readonly hasGuidedDiagnostic: boolean;
-  readonly isBooked: boolean;
-  readonly bookingId: string | null;
-  /** Display/search token derived from {@link bookingId} (last 8 hex chars, uppercase). */
-  readonly bookingReferenceId: string | null;
-  readonly bookingStatus: BookingDocument['status'] | null;
-  readonly bookingStartsAtIso: string | null;
-  readonly bookingTimezone: string | null;
-  readonly bookingServiceKey: string | null;
-  readonly bookingMeetingUrl: string | null;
-  readonly paymentTransactionId: string | null;
-  readonly paymentTransactionStatus: PaymentStatus | null;
-  readonly checkoutStartsAtIso: string | null;
-  readonly checkoutTimezone: string | null;
-  readonly checkoutServiceKey: string | null;
-};
-
 type LinkedPaymentSummary = {
   readonly paymentTransactionId: string;
   readonly paymentTransactionStatus: PaymentStatus;
@@ -407,12 +351,18 @@ function mapVisitorQuizSessionSummary(
   });
   const idHex = doc._id.toString();
   const bookingId = linkedBooking?.bookingId ?? null;
+  const completedAtIso = doc.completedAt !== undefined ? doc.completedAt.toISOString() : null;
+  const isDiagnosticComplete = resolveQuizSessionDiagnosticCompleted({
+    completedAtIso,
+    guidedDiagnosticRaw: guidedRaw,
+  });
   return {
     id: idHex,
     marketingSessionRef: encodeQuizSessionRefForMarketingUrl(idHex),
     currentStep: doc.currentStep,
     updatedAtIso: doc.updatedAt.toISOString(),
-    completedAtIso: doc.completedAt !== undefined ? doc.completedAt.toISOString() : null,
+    completedAtIso,
+    isDiagnosticComplete,
     sessionTitlePreview: displayPreview.sessionTitlePreview,
     situationPreview: displayPreview.situationPreview,
     situationLabel: displayPreview.situationLabel,
@@ -478,22 +428,12 @@ function buildVisitorSessionStatusMatch(status: VisitorQuizSessionListStatusFilt
       return {};
     case 'pending':
       return {
-        $or: [
-          { 'linkedBooking.status': 'pending' },
-          {
-            $and: [
-              { linkedBooking: null },
-              { $or: [{ completedAt: { $exists: false } }, { completedAt: null }] },
-            ],
-          },
-        ],
+        $or: [{ linkedBooking: null }, { 'linkedBooking.status': 'pending' }],
       };
     case 'confirmed':
       return { 'linkedBooking.status': 'confirmed' };
     case 'cancelled':
       return { 'linkedBooking.status': 'cancelled' };
-    case 'completed':
-      return { completedAt: { $exists: true, $ne: null } };
     default:
       return {};
   }
@@ -510,6 +450,47 @@ type AggregatedVisitorQuizSessionRow = QuizSessionDocument & {
     meetingUrl?: string;
   } | null;
 };
+
+/**
+ * Backfills `completedAt` for guided sessions that finished but never sent `completed: true`.
+ */
+export async function syncVisitorQuizDiagnosticCompletion(visitorId: string): Promise<number> {
+  if (!hasMongoUri()) {
+    return 0;
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<QuizSessionDocument>(COLLECTIONS.quizSessions)
+    .find({
+      visitorId,
+      completedAt: { $exists: false },
+    })
+    .limit(100)
+    .toArray();
+  let count = 0;
+  const now = new Date();
+  for (const doc of docs) {
+    if (doc._id === undefined) {
+      continue;
+    }
+    const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
+    const completedAtIso = doc.completedAt !== undefined ? doc.completedAt.toISOString() : null;
+    if (
+      !resolveQuizSessionDiagnosticCompleted({
+        completedAtIso,
+        guidedDiagnosticRaw: guidedRaw,
+      })
+    ) {
+      continue;
+    }
+    await db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).updateOne(
+      { _id: doc._id },
+      { $set: { completedAt: doc.updatedAt ?? now, updatedAt: now } },
+    );
+    count += 1;
+  }
+  return count;
+}
 
 /**
  * Paginated account diagnostics list with server-side status and booking-reference filters.
@@ -534,6 +515,13 @@ export async function listQuizSessionsForVisitorPaginated(input: {
   if (!hasMongoUri()) {
     return emptyResult;
   }
+  const { cancelExpiredPaymentWindowBookings } = await import(
+    '@/lib/payments/cancel-expired-payment-window-bookings'
+  );
+  await Promise.all([
+    syncVisitorQuizDiagnosticCompletion(input.visitorId),
+    cancelExpiredPaymentWindowBookings({ visitorId: input.visitorId }),
+  ]);
   const db = await getDb();
   const hasAnySessions =
     (await db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).countDocuments(
@@ -655,10 +643,6 @@ export async function findQuizSessionForVisitor(
   });
 }
 
-export type DeleteQuizSessionForVisitorResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly code: 'not_found' | 'has_booking' };
-
 /**
  * Removes a quiz session and its audit rows when it belongs to the visitor and is not linked from a booking
  * (in-progress or completed).
@@ -759,20 +743,6 @@ async function upsertVisitorSessionPointer(visitorId: string, sessionId: ObjectI
     { upsert: true },
   );
 }
-
-export type UpsertQuizProgressInput = {
-  readonly visitorId: string;
-  readonly answers: QuizAnswers;
-  readonly currentStep: number;
-  readonly isComplete: boolean;
-  /** When set, updates this session row after verifying `visitorId` ownership. */
-  readonly targetSessionId?: string | null;
-};
-
-export type UpsertQuizProgressResult = {
-  readonly persisted: boolean;
-  readonly sessionId?: string;
-};
 
 /**
  * Creates or updates the visitor's in-progress quiz session and writes an audit row.

@@ -52,6 +52,91 @@ async function cancelBookingRow(bookingId: ObjectId): Promise<void> {
   );
 }
 
+export async function cancelBookingById(bookingId: ObjectId): Promise<void> {
+  await cancelBookingRow(bookingId);
+}
+
+export type UpdateBookingStatusByAdminResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly code: 'not_found' | 'invalid_status' | 'database_unavailable' };
+
+export async function updateBookingStatusByAdmin(
+  bookingId: string,
+  status: BookingDocument['status'],
+): Promise<UpdateBookingStatusByAdminResult> {
+  if (!process.env.MONGODB_URI) {
+    return { ok: false, code: 'database_unavailable' };
+  }
+  if (status !== 'pending' && status !== 'confirmed' && status !== 'completed' && status !== 'cancelled') {
+    return { ok: false, code: 'invalid_status' };
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(bookingId);
+  } catch {
+    return { ok: false, code: 'not_found' };
+  }
+  const db = await getDb();
+  const existing = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: objectId });
+  if (existing === null) {
+    return { ok: false, code: 'not_found' };
+  }
+  if (existing.status === status) {
+    return { ok: true };
+  }
+  if (status === 'cancelled') {
+    const paymentTransactionId = existing.paymentTransactionId;
+    if (paymentTransactionId !== undefined && paymentTransactionId !== null) {
+      const transaction = await findPaymentTransactionById(paymentTransactionId.toString());
+      if (
+        transaction !== null &&
+        (transaction.status === 'pending' || transaction.status === 'processing')
+      ) {
+        await applyPaymentStatusToBooking({ transaction, nextStatus: 'expired' });
+        return { ok: true };
+      }
+    }
+    await cancelBookingRow(objectId);
+    return { ok: true };
+  }
+  if (status === 'confirmed') {
+    await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+      { _id: objectId },
+      {
+        $set: {
+          status: 'confirmed',
+          paymentStatus: 'paid',
+          updatedAt: new Date(),
+        },
+      },
+    );
+    await ensureVideoMeetingStoredForBooking(objectId);
+    return { ok: true };
+  }
+  if (status === 'completed') {
+    await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+      { _id: objectId },
+      {
+        $set: {
+          status: 'completed',
+          updatedAt: new Date(),
+        },
+      },
+    );
+    return { ok: true };
+  }
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: objectId },
+    {
+      $set: {
+        status: 'pending',
+        updatedAt: new Date(),
+      },
+    },
+  );
+  return { ok: true };
+}
+
 export type CompletePaymentTransactionResult =
   | { readonly kind: 'updated'; readonly transaction: PaymentTransactionRow }
   | { readonly kind: 'noop'; readonly transaction: PaymentTransactionRow }

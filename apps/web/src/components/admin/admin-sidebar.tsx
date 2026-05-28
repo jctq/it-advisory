@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   CalendarClock,
+  Bug,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -90,6 +91,12 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     label: 'Bookings',
     icon: CalendarDays,
     tourTarget: 'nav-bookings',
+  },
+  {
+    href: '/admin/debug',
+    label: 'Debug',
+    icon: Bug,
+    tourTarget: 'nav-settings',
   },
   {
     href: '/admin/advisor',

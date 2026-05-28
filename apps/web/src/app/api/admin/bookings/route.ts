@@ -13,7 +13,7 @@ import { normalizeBookingReferenceInput } from '@/lib/marketing/booking-referenc
 
 export const dynamic = 'force-dynamic';
 
-const statusFilterSchema = z.enum(['all', 'confirmed', 'pending', 'cancelled']);
+const statusFilterSchema = z.enum(['all', 'confirmed', 'pending', 'cancelled', 'completed']);
 
 const listQuerySchema = z
   .object({

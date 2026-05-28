@@ -4,7 +4,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import Link from 'next/link';
 import { useMemo, type ReactElement } from 'react';
 import { DataTable } from '@/components/admin/data-table';
-import type { QuizSessionListRow } from '@/lib/data/quiz-sessions';
+import type { QuizSessionListRow } from '@/lib/data/quiz-session-types';
 
 type QuizSessionsTableProps = {
   readonly initialData: QuizSessionListRow[];
@@ -88,22 +88,6 @@ export function QuizSessionsTable(props: QuizSessionsTableProps): ReactElement {
           ) : (
             '—'
           );
-        },
-      }),
-      columnHelper.accessor('situationPreview', {
-        header: 'Summary',
-        cell: (info) => {
-          const row = info.row.original;
-          const value = info.getValue();
-          const hasTitle = row.sessionTitlePreview !== null && row.sessionTitlePreview.length > 0;
-          if (value !== null && value.length > 0 && hasTitle) {
-            return (
-              <span className="line-clamp-2 text-muted-foreground" title={value}>
-                {value}
-              </span>
-            );
-          }
-          return '—';
         },
       }),
       columnHelper.display({

@@ -66,7 +66,7 @@ export function AdminBookingEventPreview(props: AdminBookingEventPreviewProps): 
   const bookingReference = formatBookingReferenceId(booking.id);
   return (
     <PopoverContent
-      className="w-80 p-0"
+      className="z-[10050] w-80 p-0"
       side="top"
       align="start"
       sideOffset={8}

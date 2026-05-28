@@ -1,4 +1,4 @@
-import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-sessions';
+import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
 
 type SessionListRow = Pick<
   VisitorQuizSessionSummary,

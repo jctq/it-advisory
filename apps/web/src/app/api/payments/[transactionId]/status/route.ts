@@ -28,7 +28,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
   transaction = await reconcilePaymentTransactionIfPending(transaction);
   transaction = await ensurePaidTransactionFulfilled(transaction);
   let meetingUrl: string | null = null;
-  let bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null = null;
+  let bookingStatus: 'pending' | 'confirmed' | 'completed' | 'cancelled' | null = null;
   const bookingIdHex = transaction.bookingId?.trim() ?? '';
   if (bookingIdHex.length > 0) {
     const booking = await findBookingById(bookingIdHex);

@@ -344,26 +344,29 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
               }}
             />
           </div>
-          {settings.paymentPolicy === 'pay_after_hold' ? (
-            <div className="space-y-2">
-              <label htmlFor="holdExpiresMinutes" className="text-sm font-medium text-foreground">
-                Hold duration (minutes)
-              </label>
-              <Input
-                id="holdExpiresMinutes"
-                type="number"
-                min={5}
-                max={1440}
-                value={settings.holdExpiresMinutes}
-                onChange={(event) => {
-                  setSettings({
-                    ...settings,
-                    holdExpiresMinutes: Number.parseInt(event.target.value, 10) || settings.holdExpiresMinutes,
-                  });
-                }}
-              />
-            </div>
-          ) : null}
+          <div className="space-y-2">
+            <label htmlFor="holdExpiresMinutes" className="text-sm font-medium text-foreground">
+              Payment expiry (minutes)
+            </label>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {settings.paymentPolicy === 'pay_after_hold'
+                ? 'Customers must complete payment within this window after the slot is held.'
+                : 'Used when extending payment deadlines on overdue bookings. For Reserve then pay, this is the hold window before the slot is released.'}
+            </p>
+            <Input
+              id="holdExpiresMinutes"
+              type="number"
+              min={5}
+              max={1440}
+              value={settings.holdExpiresMinutes}
+              onChange={(event) => {
+                setSettings({
+                  ...settings,
+                  holdExpiresMinutes: Number.parseInt(event.target.value, 10) || settings.holdExpiresMinutes,
+                });
+              }}
+            />
+          </div>
         </div>
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium text-foreground">Payment timing</legend>

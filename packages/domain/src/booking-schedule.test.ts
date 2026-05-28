@@ -107,6 +107,57 @@ describe('expandAdvisorAvailabilityUtc', () => {
     expect(slots.length).toBe(0);
   });
 
+  it('hides instants at or before server now on the same calendar day', () => {
+    const doc = baseDoc({ slotIntervalMinutes: 60 });
+    const settings = normalizeAdvisorBookingSettings(doc);
+    const nowUtc = new Date('2025-06-11T02:30:00.000Z');
+    const slots = expandAdvisorAvailabilityUtc({
+      settings,
+      fromYmd: '2025-06-11',
+      toYmd: '2025-06-11',
+      nowUtc,
+      activeBookingStartsUtc: [],
+    });
+    const labels = slots.map((slot) =>
+      slot.toISOString(),
+    );
+    expect(labels.some((iso) => iso.includes('T00:00:00.000Z'))).toBe(false);
+    expect(labels.some((iso) => iso.includes('T01:00:00.000Z'))).toBe(false);
+    expect(labels.some((iso) => iso.includes('T02:00:00.000Z'))).toBe(false);
+    expect(labels.some((iso) => iso.includes('T03:00:00.000Z'))).toBe(true);
+  });
+
+  it('lists from one hour before the next future slot when that anchor is still in the future', () => {
+    const doc = baseDoc({ slotIntervalMinutes: 60 });
+    const settings = normalizeAdvisorBookingSettings(doc);
+    const nowUtc = new Date('2025-06-11T01:45:00.000Z');
+    const slots = expandAdvisorAvailabilityUtc({
+      settings,
+      fromYmd: '2025-06-11',
+      toYmd: '2025-06-11',
+      nowUtc,
+      activeBookingStartsUtc: [],
+    });
+    const first = slots[0]!;
+    expect(first.toISOString()).toBe('2025-06-11T02:00:00.000Z');
+    expect(slots.some((slot) => slot.toISOString() === '2025-06-11T03:00:00.000Z')).toBe(true);
+  });
+
+  it('does not list the hour-before anchor when it is already in the past', () => {
+    const doc = baseDoc({ slotIntervalMinutes: 60 });
+    const settings = normalizeAdvisorBookingSettings(doc);
+    const nowUtc = new Date('2025-06-11T02:30:00.000Z');
+    const slots = expandAdvisorAvailabilityUtc({
+      settings,
+      fromYmd: '2025-06-11',
+      toYmd: '2025-06-11',
+      nowUtc,
+      activeBookingStartsUtc: [],
+    });
+    const first = slots[0]!;
+    expect(first.toISOString()).toBe('2025-06-11T03:00:00.000Z');
+  });
+
   it('removes a single taken instant', () => {
     const doc = baseDoc();
     const settings = normalizeAdvisorBookingSettings(doc);

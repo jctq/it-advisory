@@ -36,3 +36,16 @@ export const accountBookingManageCheckoutSchema = z.object({
   nativeInAppPaymentReturn: z.boolean().optional(),
   promoCode: z.string().max(64).optional(),
 });
+
+const bookingSlotRescheduleFieldsSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  time: z.string().min(1).max(48),
+});
+
+export const guestBookingManageRescheduleSchema = guestBookingManageCredentialsSchema.extend(
+  bookingSlotRescheduleFieldsSchema.shape,
+);
+
+export const accountBookingManageRescheduleSchema = accountBookingManageLookupSchema.extend(
+  bookingSlotRescheduleFieldsSchema.shape,
+);

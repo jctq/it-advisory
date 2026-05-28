@@ -7,6 +7,7 @@ import {
   type AdminColorMode,
   type AdminColorTheme,
 } from '@/lib/admin/admin-appearance';
+import { writeAppearanceCookies } from '@/lib/brand/appearance-cookies';
 import {
   applyDocumentAppearance,
   resolveServerMarketingAppearanceMode,
@@ -71,6 +72,7 @@ export const useMarketingAppearanceStore = create<MarketingAppearanceStore>((set
     const colorTheme = state.colorThemeOverride ?? state.storedColorTheme;
     const nextIsDark = resolveIsDark({ colorMode: nextColorMode, systemPrefersDark: state.systemPrefersDark });
     window.localStorage.setItem(MARKETING_COLOR_MODE_STORAGE_KEY, nextColorMode);
+    writeAppearanceCookies('marketing', nextColorMode, colorTheme);
     set({ colorModeOverride: nextColorMode });
     applyDocumentAppearance({ colorTheme, isDark: nextIsDark });
   },
@@ -79,11 +81,13 @@ export const useMarketingAppearanceStore = create<MarketingAppearanceStore>((set
     const colorMode = state.colorModeOverride ?? state.storedColorMode;
     const isDark = resolveIsDark({ colorMode, systemPrefersDark: state.systemPrefersDark });
     window.localStorage.setItem(MARKETING_COLOR_THEME_STORAGE_KEY, nextColorTheme);
+    writeAppearanceCookies('marketing', colorMode, nextColorTheme);
     set({ colorThemeOverride: nextColorTheme });
     applyDocumentAppearance({ colorTheme: nextColorTheme, isDark });
   },
   applyResolvedAppearance: (): void => {
-    const { colorTheme, isDark } = resolveEffectiveAppearance(get());
+    const { colorMode, colorTheme, isDark } = resolveEffectiveAppearance(get());
+    writeAppearanceCookies('marketing', colorMode, colorTheme);
     applyDocumentAppearance({ colorTheme, isDark });
   },
 }));

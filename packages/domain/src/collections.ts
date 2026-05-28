@@ -40,4 +40,6 @@ export const COLLECTIONS = {
   blogPostRevisions: 'blog_post_revisions',
   /** Uploaded images for blog post markdown (paste / insert in admin editor). */
   blogImages: 'blog_images',
+  /** Append-only log of `/api/cron/*` invocations (admin). */
+  cronJobRuns: 'cron_job_runs',
 } as const;

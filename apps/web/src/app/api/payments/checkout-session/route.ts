@@ -82,7 +82,15 @@ export async function POST(request: Request): Promise<NextResponse> {
             : result.code === 'promo_invalid'
               ? 400
               : 400;
-    return NextResponse.json({ error: result.error, code: result.code }, { status });
+    return NextResponse.json(
+      {
+        error: result.error,
+        code: result.code,
+        ...(result.payabilityCode !== undefined ? { payabilityCode: result.payabilityCode } : {}),
+        ...(result.debug !== undefined ? { debug: result.debug } : {}),
+      },
+      { status },
+    );
   }
   return NextResponse.json(result);
 }

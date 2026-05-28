@@ -19,9 +19,15 @@ type DataTableProps<TData> = {
   columns: ColumnDef<TData, any>[];
   data: TData[];
   emptyMessage?: string;
+  resolveRowClassName?: (row: TData) => string | undefined;
 };
 
-export function DataTable<TData>({ columns, data, emptyMessage }: DataTableProps<TData>) {
+export function DataTable<TData>({
+  columns,
+  data,
+  emptyMessage,
+  resolveRowClassName,
+}: DataTableProps<TData>) {
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: PAGE_SIZE,
@@ -69,7 +75,10 @@ export function DataTable<TData>({ columns, data, emptyMessage }: DataTableProps
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-b border-border transition-colors hover:bg-muted/40"
+                  className={cn(
+                    'border-b border-border transition-colors hover:bg-muted/40',
+                    resolveRowClassName?.(row.original),
+                  )}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="p-4 align-middle">

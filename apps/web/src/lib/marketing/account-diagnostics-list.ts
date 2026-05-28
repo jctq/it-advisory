@@ -1,7 +1,7 @@
 import type {
   PaginatedVisitorQuizSessionsResult,
   VisitorQuizSessionListStatusFilter,
-} from '@/lib/data/quiz-sessions';
+} from '@/lib/data/quiz-session-types';
 
 export const ACCOUNT_DIAGNOSTICS_PAGE_SIZE = 8;
 export const ACCOUNT_DIAGNOSTICS_MOBILE_PAGE_SIZE = 15;

@@ -9,6 +9,7 @@ import {
   type AdminColorMode,
   type AdminColorTheme,
 } from '@/lib/admin/admin-appearance';
+import { writeAppearanceCookies } from '@/lib/brand/appearance-cookies';
 import {
   applyDocumentAppearance,
   resolveClientAdminAppearanceMode,
@@ -84,6 +85,14 @@ function resolveAdminTitle(pathname: string): string {
   if (pathname.startsWith('/admin/bookings')) {
     return 'Bookings';
   }
+  if (
+    pathname.startsWith('/admin/debug') ||
+    pathname.startsWith('/admin/client-diagnostic') ||
+    pathname.startsWith('/admin/cron-logs') ||
+    pathname.startsWith('/admin/booking-payability')
+  ) {
+    return 'Debug';
+  }
   if (pathname.startsWith('/admin/advisor')) {
     return 'Advisor';
   }
@@ -138,11 +147,13 @@ export function AdminShell(props: AdminShellProps) {
   const executeChangeColorMode = (nextColorMode: AdminColorMode): void => {
     const nextIsDark = nextColorMode === 'dark' || (nextColorMode === 'system' && systemPrefersDark);
     window.localStorage.setItem(ADMIN_COLOR_MODE_STORAGE_KEY, nextColorMode);
+    writeAppearanceCookies('admin', nextColorMode, colorTheme);
     setColorModeOverride(nextColorMode);
     applyDocumentAppearance({ colorTheme, isDark: nextIsDark });
   };
   const executeChangeColorTheme = (nextColorTheme: AdminColorTheme): void => {
     window.localStorage.setItem(ADMIN_COLOR_THEME_STORAGE_KEY, nextColorTheme);
+    writeAppearanceCookies('admin', colorMode, nextColorTheme);
     setColorThemeOverride(nextColorTheme);
     applyDocumentAppearance({ colorTheme: nextColorTheme, isDark });
   };

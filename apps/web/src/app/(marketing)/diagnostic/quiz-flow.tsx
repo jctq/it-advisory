@@ -49,6 +49,10 @@ const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const DIAGNOSTIC_CONFIG_API_URL = '/api/quiz/diagnostic-config';
 const DIAGNOSTIC_TEMPLATE_API_URL = '/api/quiz/diagnostic-template';
 
+function resolveGuidedPersistCompleted(guided: GuidedDiagnosticV1): boolean {
+  return guided.outcome !== null && guided.activeRound === null;
+}
+
 type DiagnosticPublicConfig = {
   readonly diagnosticAiEnabled: boolean;
 };
@@ -288,15 +292,16 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   const isRetakeQuery = searchParams.get('retake') === '1';
   const sessionInitKey = `${sessionTargetId ?? 'guest'}:${isRetakeQuery ? 'retake' : 'load'}`;
   const persistGuided = useCallback(
-    async (next: GuidedDiagnosticV1, completed: boolean): Promise<void> => {
+    async (next: GuidedDiagnosticV1, completed?: boolean): Promise<void> => {
       if (sessionReadOnlyRef.current) {
         return;
       }
       const linearStep = computeGuidedLinearStep(next);
+      const isComplete = completed ?? resolveGuidedPersistCompleted(next);
       const body: Record<string, unknown> = {
         answers: buildAnswersPayload(next),
         currentStep: linearStep,
-        completed,
+        completed: isComplete,
       };
       if (sessionTargetId !== null) {
         body.sessionId = sessionTargetId;
@@ -458,7 +463,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       return;
     }
     const handle = setTimeout(() => {
-      void persistGuided(guided, false);
+      void persistGuided(guided);
     }, 280);
     return () => clearTimeout(handle);
   }, [guided, isSessionReady, persistGuided, sessionReadOnlyRef]);
@@ -467,7 +472,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       return;
     }
     function flushBeforeLeave(): void {
-      void persistGuided(guided, false);
+      void persistGuided(guided);
     }
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {

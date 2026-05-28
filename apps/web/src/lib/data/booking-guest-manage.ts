@@ -11,7 +11,28 @@ import {
   normalizeBookingReferenceInput,
   normalizeGuestManageEmail,
 } from '@/lib/marketing/booking-reference';
+import { isOverdueUnpaidPendingBooking } from '@/lib/marketing/overdue-pending-booking';
+import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 import { getDb } from '@/lib/mongodb';
+import { syncAccountProfileToVisitorLeads, isAccountVisitorId } from '@/lib/data/sync-account-profile-to-leads';
+import {
+  buildMarketingLeadContactFromAccountUser,
+  leadNeedsProfileSync,
+} from '@/lib/marketing/account-profile-lead-contact';
+import { findUserById } from '@/lib/data/users';
+import {
+  buildBookingPayGuidance,
+  type BookingPayGuidance,
+} from '@/lib/payments/booking-pay-guidance';
+import { syncBookingIfPaymentWindowExpired } from '@/lib/payments/cancel-expired-payment-window-bookings';
+import {
+  buildBookingNotFoundPayability,
+  buildCredentialsMismatchPayability,
+  buildVisitorMismatchPayability,
+  evaluateBookingPayability,
+  type BookingPayabilityCode,
+  type BookingPayabilityResult,
+} from '@/lib/payments/evaluate-booking-payability';
 
 export type GuestBookingManageCredentials = {
   readonly bookingReference: string;
@@ -31,11 +52,16 @@ export type GuestBookingManageView = {
   readonly paymentExpiresAtIso: string | null;
   readonly canPayOnline: boolean;
   readonly payBlockedReason: string | null;
+  readonly payGuidance: BookingPayGuidance | null;
+  readonly profileSyncAvailable: boolean;
+  readonly payabilityCode: BookingPayabilityCode;
   readonly checkoutAmountLabel: string;
   readonly paymentsEnabled: boolean;
   readonly recordingOptIn: boolean;
   readonly fathomNotesUrl: string | null;
   readonly fathomSummaryPreview: string | null;
+  readonly overduePendingActionsAvailable: boolean;
+  readonly quizSessionMarketingRef: string | null;
 };
 
 export type VerifiedGuestBooking = {
@@ -113,74 +139,138 @@ export async function resolveGuestBookingByCredentials(
   return NOT_FOUND;
 }
 
-function resolvePayBlockedReason(input: {
-  readonly status: BookingDocument['status'];
-  readonly paymentPolicy: PaymentPolicy;
-  readonly paymentsEnabled: boolean;
-  readonly paymentExpiresAt: Date | null | undefined;
-}): string | null {
-  if (input.status === 'confirmed') {
-    return 'This booking is already confirmed.';
+async function reloadLeadForVerified(verified: VerifiedGuestBooking): Promise<LeadDocument & { _id: ObjectId }> {
+  const db = await getDb();
+  const leadDoc = await db.collection<LeadDocument>(COLLECTIONS.leads).findOne({ _id: verified.lead._id });
+  if (leadDoc === null || leadDoc._id === undefined) {
+    return verified.lead;
   }
-  if (input.status === 'cancelled') {
-    return 'This booking was cancelled.';
+  return leadDoc as LeadDocument & { _id: ObjectId };
+}
+
+async function resolveManageBookingPayability(
+  verified: VerifiedGuestBooking,
+  publicSettings: Awaited<ReturnType<typeof getPaymentSettingsPublicView>>,
+  options?: { readonly expectedVisitorId?: string | null; readonly manageKind?: 'account' | 'guest' },
+): Promise<{
+  readonly lead: LeadDocument & { _id: ObjectId };
+  readonly payability: ReturnType<typeof evaluateBookingPayability>;
+  readonly profileSyncAvailable: boolean;
+}> {
+  const manageKind = options?.manageKind ?? 'guest';
+  let lead = verified.lead;
+  let accountProfileCanSync = false;
+  if (manageKind === 'account' && isAccountVisitorId(verified.booking.visitorId)) {
+    const userIdMatch = /^acct:([a-f0-9]{24})$/i.exec(verified.booking.visitorId);
+    const user =
+      userIdMatch?.[1] !== undefined ? await findUserById(new ObjectId(userIdMatch[1])) : null;
+    accountProfileCanSync = buildMarketingLeadContactFromAccountUser(user) !== null;
+    if (accountProfileCanSync && leadNeedsProfileSync(lead)) {
+      await syncAccountProfileToVisitorLeads(verified.booking.visitorId, { leadId: lead._id });
+      lead = await reloadLeadForVerified({ ...verified, lead });
+    }
   }
-  if (!input.paymentsEnabled) {
-    return 'Online payment is not available right now. Contact us if you need help.';
+  const payability = evaluateBookingPayability({
+    bookingId: verified.bookingId,
+    booking: verified.booking,
+    lead,
+    paymentPolicy: publicSettings.paymentPolicy,
+    paymentsEnabled: publicSettings.paymentsEnabled,
+    expectedVisitorId: options?.expectedVisitorId,
+  });
+  const profileSyncAvailable =
+    manageKind === 'account' &&
+    accountProfileCanSync &&
+    !payability.canPayOnline &&
+    (leadNeedsProfileSync(lead) || payability.code === 'lead_email_missing');
+  return { lead, payability, profileSyncAvailable };
+}
+
+async function reloadVerifiedBookingAfterPaymentWindowSync(
+  verified: VerifiedGuestBooking,
+): Promise<VerifiedGuestBooking> {
+  await syncBookingIfPaymentWindowExpired(verified.bookingId);
+  const db = await getDb();
+  const doc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: verified.booking._id });
+  if (doc === null || doc._id === undefined) {
+    return verified;
   }
-  if (input.paymentPolicy === 'manual_confirm') {
-    return 'Your booking is awaiting manual confirmation. We will email you when it is confirmed.';
-  }
-  if (input.paymentExpiresAt !== undefined && input.paymentExpiresAt !== null && input.paymentExpiresAt.getTime() <= Date.now()) {
-    return 'The payment window for this booking has expired. Contact us to rebook.';
-  }
-  return null;
+  return {
+    bookingId: verified.bookingId,
+    booking: doc as BookingDocument & { _id: ObjectId },
+    lead: verified.lead,
+  };
 }
 
 export async function buildGuestBookingManageView(
   verified: VerifiedGuestBooking,
+  options?: { readonly expectedVisitorId?: string | null; readonly manageKind?: 'account' | 'guest' },
 ): Promise<GuestBookingManageView> {
+  const activeVerified = await reloadVerifiedBookingAfterPaymentWindowSync(verified);
   const publicSettings = await getPaymentSettingsPublicView();
-  const paymentExpiresAt = verified.booking.paymentExpiresAt ?? null;
-  const payBlockedReason = resolvePayBlockedReason({
-    status: verified.booking.status,
-    paymentPolicy: publicSettings.paymentPolicy,
-    paymentsEnabled: publicSettings.paymentsEnabled,
-    paymentExpiresAt,
-  });
-  const meetingRaw = verified.booking.meetingUrl;
+  const paymentExpiresAt = activeVerified.booking.paymentExpiresAt ?? null;
+  const { lead, payability, profileSyncAvailable } = await resolveManageBookingPayability(
+    activeVerified,
+    publicSettings,
+    options,
+  );
+  const meetingRaw = activeVerified.booking.meetingUrl;
   const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
-  const recordingOptIn = verified.booking.recordingOptIn === true;
+  const recordingOptIn = activeVerified.booking.recordingOptIn === true;
   const resolvedPricing = await resolveCheckoutAmountCentavos({
-    serviceKey: verified.booking.serviceKey,
-    bookingId: verified.bookingId,
+    serviceKey: activeVerified.booking.serviceKey,
+    bookingId: activeVerified.bookingId,
     recordingOptIn,
   });
-  const fathomShareUrl = verified.booking.fathomShareUrl?.trim() ?? '';
-  const fathomSummaryRaw = verified.booking.fathomSummary?.trim() ?? '';
+  const fathomShareUrl = activeVerified.booking.fathomShareUrl?.trim() ?? '';
+  const fathomSummaryRaw = activeVerified.booking.fathomSummary?.trim() ?? '';
   const fathomSummaryPreview =
     recordingOptIn && fathomSummaryRaw.length > 0
       ? fathomSummaryRaw.length > 280
         ? `${fathomSummaryRaw.slice(0, 279)}…`
         : fathomSummaryRaw
       : null;
+  const manageKind = options?.manageKind ?? 'guest';
+  const overduePendingActionsAvailable = isOverdueUnpaidPendingBooking({
+    status: activeVerified.booking.status,
+    startsAt: activeVerified.booking.startsAt,
+    paymentStatus: activeVerified.booking.paymentStatus,
+  });
+  const quizSessionId = activeVerified.booking.quizSessionId;
+  const quizSessionMarketingRef =
+    overduePendingActionsAvailable && quizSessionId !== undefined && quizSessionId !== null
+      ? encodeQuizSessionRefForMarketingUrl(quizSessionId.toString())
+      : null;
+  const payGuidance = buildBookingPayGuidance({
+    payabilityCode: payability.code,
+    blockedReason: payability.reason,
+    canPayOnline: payability.canPayOnline,
+    status: activeVerified.booking.status,
+    manageKind,
+    profileSyncAvailable,
+  });
   return {
-    bookingReference: formatBookingReferenceId(verified.bookingId),
-    status: verified.booking.status,
-    startsAtIso: verified.booking.startsAt.toISOString(),
-    timezone: verified.booking.timezone,
-    serviceKey: verified.booking.serviceKey,
+    bookingReference: formatBookingReferenceId(activeVerified.bookingId),
+    status: activeVerified.booking.status,
+    startsAtIso: activeVerified.booking.startsAt.toISOString(),
+    timezone: activeVerified.booking.timezone,
+    serviceKey: activeVerified.booking.serviceKey,
     meetingUrl,
-    customerName: verified.lead.name,
+    customerName: lead.name,
     paymentPolicy: publicSettings.paymentPolicy,
     paymentExpiresAtIso: paymentExpiresAt !== null ? paymentExpiresAt.toISOString() : null,
-    canPayOnline: verified.booking.status === 'pending' && payBlockedReason === null,
-    payBlockedReason,
+    canPayOnline: payability.canPayOnline,
+    payBlockedReason: payability.reason,
+    payGuidance,
+    profileSyncAvailable,
+    payabilityCode: payability.code,
     checkoutAmountLabel: resolvedPricing.amountLabel,
     paymentsEnabled: publicSettings.paymentsEnabled,
     recordingOptIn,
     fathomNotesUrl: recordingOptIn && fathomShareUrl.length > 0 ? fathomShareUrl : null,
     fathomSummaryPreview,
+    overduePendingActionsAvailable,
+    quizSessionMarketingRef,
   };
 }
 
@@ -239,7 +329,88 @@ export async function findGuestBookingManageViewForAccountVisitor(
   if (isGuestBookingNotFound(resolved)) {
     return null;
   }
-  return buildGuestBookingManageView(resolved);
+  return buildGuestBookingManageView(resolved, { expectedVisitorId: visitorId, manageKind: 'account' });
+}
+
+/**
+ * Explains why account manage checkout would reject a booking (for API debug responses).
+ */
+export async function diagnoseAccountBookingPayability(
+  bookingId: string,
+  visitorId: string,
+): Promise<BookingPayabilityResult> {
+  const resolved = await resolveBookingOwnedByVisitor(bookingId, visitorId);
+  if (isGuestBookingNotFound(resolved)) {
+    const booking = await findBookingById(bookingId);
+    if (booking === null) {
+      return buildBookingNotFoundPayability({ bookingId, visitorIdExpected: visitorId });
+    }
+    return buildVisitorMismatchPayability({
+      bookingId,
+      visitorIdExpected: visitorId,
+      visitorIdOnBooking: booking.visitorId,
+    });
+  }
+  const publicSettings = await getPaymentSettingsPublicView();
+  return evaluateBookingPayability({
+    bookingId: resolved.bookingId,
+    booking: resolved.booking,
+    lead: resolved.lead,
+    paymentPolicy: publicSettings.paymentPolicy,
+    paymentsEnabled: publicSettings.paymentsEnabled,
+    expectedVisitorId: visitorId,
+  });
+}
+
+/**
+ * Explains why guest manage checkout would reject a booking (for API debug responses).
+ */
+export async function diagnoseGuestBookingPayability(
+  credentials: GuestBookingManageCredentials,
+): Promise<BookingPayabilityResult> {
+  const resolved = await resolveGuestBookingByCredentials(credentials);
+  if (isGuestBookingNotFound(resolved)) {
+    return buildCredentialsMismatchPayability({
+      bookingReference: credentials.bookingReference.trim(),
+    });
+  }
+  const publicSettings = await getPaymentSettingsPublicView();
+  return evaluateBookingPayability({
+    bookingId: resolved.bookingId,
+    booking: resolved.booking,
+    lead: resolved.lead,
+    paymentPolicy: publicSettings.paymentPolicy,
+    paymentsEnabled: publicSettings.paymentsEnabled,
+  });
+}
+
+export type { BookingPayabilityResult };
+
+/**
+ * Syncs the signed-in account profile onto the booking lead, then returns an updated manage view.
+ */
+export type SyncAccountProfileForManagedBookingResult =
+  | { readonly ok: true; readonly booking: GuestBookingManageView }
+  | { readonly ok: false; readonly code: string; readonly message: string };
+
+export async function syncAccountProfileForManagedBooking(
+  bookingId: string,
+  accountVisitorId: string,
+): Promise<SyncAccountProfileForManagedBookingResult> {
+  const resolved = await resolveBookingOwnedByVisitor(bookingId, accountVisitorId);
+  if (isGuestBookingNotFound(resolved)) {
+    return { ok: false, code: 'booking_not_found', message: 'We could not find that booking for your account.' };
+  }
+  const syncResult = await syncAccountProfileToVisitorLeads(accountVisitorId, { leadId: resolved.lead._id });
+  if (!syncResult.ok) {
+    return { ok: false, code: syncResult.code, message: syncResult.message };
+  }
+  const refreshedLead = await reloadLeadForVerified(resolved);
+  const booking = await buildGuestBookingManageView(
+    { ...resolved, lead: refreshedLead },
+    { expectedVisitorId: accountVisitorId, manageKind: 'account' },
+  );
+  return { ok: true, booking };
 }
 
 export async function findVerifiedAccountBookingForCheckout(
@@ -250,7 +421,7 @@ export async function findVerifiedAccountBookingForCheckout(
   if (isGuestBookingNotFound(resolved)) {
     return null;
   }
-  const view = await buildGuestBookingManageView(resolved);
+  const view = await buildGuestBookingManageView(resolved, { expectedVisitorId: visitorId });
   if (!view.canPayOnline) {
     return null;
   }
@@ -306,9 +477,42 @@ export async function findVerifiedQuizSessionPendingBookingForCheckout(
     booking: bookingDoc as BookingDocument & { _id: ObjectId },
     lead: leadDoc as LeadDocument & { _id: ObjectId },
   };
-  const view = await buildGuestBookingManageView(verified);
+  const view = await buildGuestBookingManageView(verified, { expectedVisitorId: visitorId });
   if (!view.canPayOnline) {
     return null;
   }
   return verified;
+}
+
+/**
+ * When a quiz session already has a booking that cannot pay online, returns the payability diagnosis.
+ */
+export async function diagnoseQuizSessionExistingBookingPayability(
+  visitorId: string,
+  quizSessionId: ObjectId,
+): Promise<BookingPayabilityResult | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const db = await getDb();
+  const bookingDoc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
+    { quizSessionId, visitorId },
+    { sort: { createdAt: 1 } },
+  );
+  if (bookingDoc === null || bookingDoc._id === undefined) {
+    return null;
+  }
+  const leadDoc =
+    bookingDoc.leadId !== undefined
+      ? await db.collection<LeadDocument>(COLLECTIONS.leads).findOne({ _id: bookingDoc.leadId })
+      : null;
+  const publicSettings = await getPaymentSettingsPublicView();
+  return evaluateBookingPayability({
+    bookingId: bookingDoc._id.toString(),
+    booking: bookingDoc,
+    lead: leadDoc,
+    paymentPolicy: publicSettings.paymentPolicy,
+    paymentsEnabled: publicSettings.paymentsEnabled,
+    expectedVisitorId: visitorId,
+  });
 }

@@ -182,9 +182,18 @@ export async function createPaymentCheckoutSession(
     ok?: boolean;
     error?: string;
     code?: string;
+    payabilityCode?: string;
+    debug?: Record<string, unknown>;
   };
   if (!response.ok || payload.ok !== true) {
-    throw new Error(typeof payload.error === 'string' ? payload.error : 'Checkout session failed');
+    const error = new Error(typeof payload.error === 'string' ? payload.error : 'Checkout session failed');
+    if (typeof payload.payabilityCode === 'string') {
+      (error as Error & { payabilityCode: string }).payabilityCode = payload.payabilityCode;
+    }
+    if (payload.debug !== undefined) {
+      (error as Error & { payabilityDebug: Record<string, unknown> }).payabilityDebug = payload.debug;
+    }
+    throw error;
   }
   const rawBookingStatus = (payload as { bookingStatus?: unknown }).bookingStatus;
   const bookingStatus =

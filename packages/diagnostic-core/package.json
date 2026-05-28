@@ -12,7 +12,8 @@
     "./situation-options": "./src/situation-options.ts",
     "./template-diagnostic-flow": "./src/template-diagnostic-flow.ts",
     "./project-rescue-service-context": "./src/project-rescue-service-context.ts",
-    "./quiz-session-display-preview": "./src/quiz-session-display-preview.ts"
+    "./quiz-session-display-preview": "./src/quiz-session-display-preview.ts",
+    "./quiz-session-diagnostic-complete": "./src/quiz-session-diagnostic-complete.ts"
   },
   "dependencies": {
     "@techmd/domain": "workspace:*"

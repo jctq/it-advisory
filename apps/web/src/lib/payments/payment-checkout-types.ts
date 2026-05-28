@@ -1,4 +1,5 @@
 import type { PaymentGatewayId } from '@/domain/payment-types';
+import type { BookingPayabilityCode } from '@/lib/payments/evaluate-booking-payability';
 
 export type CreateCheckoutSessionParams = {
   readonly gatewayId: PaymentGatewayId;
@@ -29,10 +30,12 @@ export type CreateCheckoutSessionResult =
       readonly bookingId: string | null;
       readonly manualConfirm: boolean;
       readonly mock?: boolean;
-      readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null;
+      readonly bookingStatus: 'pending' | 'confirmed' | 'completed' | 'cancelled' | null;
     }
   | {
       readonly ok: false;
       readonly code: string;
       readonly error: string;
+      readonly payabilityCode?: BookingPayabilityCode;
+      readonly debug?: Record<string, unknown>;
     };
