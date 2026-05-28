@@ -2186,6 +2186,20 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     const hasMoreQuestionsInRound: boolean = nextVisibleQuestionIndex !== null;
     const advanceLabel =
       hasMoreQuestionsInRound || !diagnosticAiEnabled ? 'Next' : 'Submit round';
+    const questionValidation =
+      question === undefined
+        ? { isValid: false, message: 'Question not found.' }
+        : validateGuidedQuestionResponse({
+            baseAnswers: buildActiveRoundAnswerLookup({
+              activeRound,
+              completedBundles: guided.completedBundles,
+            }),
+            question,
+            selection: activeRound.answers[question.id],
+            detailNote: activeRound.answerNotes[question.id] ?? '',
+          });
+    const isAdvanceDisabled: boolean =
+      question === undefined || (sessionReadOnly ? false : !questionValidation.isValid);
     const isFirstVisibleQuestionInRound: boolean = positionInRound === 1;
     const shouldShowDetailNoteTextbox =
       question !== undefined &&
@@ -2309,7 +2323,11 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
                 </Button>
               ) : null}
             </div>
-            <Button type="button" onClick={() => void executeAdvanceOrSubmitRound()}>
+            <Button
+              type="button"
+              onClick={() => void executeAdvanceOrSubmitRound()}
+              disabled={isAdvanceDisabled}
+            >
               <span className="sm:hidden">Next</span>
               <span className="hidden sm:inline">{advanceLabel}</span>
             </Button>
