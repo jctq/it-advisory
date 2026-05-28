@@ -97,6 +97,8 @@ export type BookingDocument = {
   fathomMatchStatus?: FathomMatchStatus;
   fathomProcessedAt?: Date;
   fathomNotesEmailSentAt?: Date;
+  /** Set when the unpaid-booking payment reminder email has been sent (once per pending booking). */
+  paymentReminderEmailSentAt?: Date;
   /** Raw guided diagnostic JSON (string or legacy object stringified) at booking time — full rounds, questions, options. */
   guidedDiagnosticSnapshot?: string | null;
   quizSessionId?: ObjectId | null;
@@ -157,8 +159,10 @@ export type EmailSendDocument = {
   to: string;
   templateKey: string;
   payload: Readonly<Record<string, unknown>>;
-  /** `mock_sent` when no provider API key (audit-only). */
-  status: 'mock_sent' | 'sent' | 'failed';
+  /** Stable idempotency key for booking payment reminder sends. */
+  paymentReminderDedupKey?: string;
+  /** `mock_sent` when no provider API key (audit-only). `sending` is a short-lived checkout claim. */
+  status: 'mock_sent' | 'sent' | 'failed' | 'sending';
   /** Resend (or other provider) message id when `status` is `sent`. */
   providerMessageId?: string;
   createdAt: Date;

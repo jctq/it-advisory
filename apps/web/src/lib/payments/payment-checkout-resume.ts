@@ -14,7 +14,7 @@ import {
   evaluateBookingPayability,
 } from '@/lib/payments/evaluate-booking-payability';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
-import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
+import { findOpenPaymentTransactionForBooking, findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
@@ -23,6 +23,8 @@ import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkou
 import { getDb } from '@/lib/mongodb';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
+import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
+import { resumeOpenPaymentTransactionCheckout } from '@/lib/payments/payment-checkout-resume-open';
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 
 type ResumeCheckoutParams = {
@@ -106,11 +108,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
   const leadEmail = typeof lead.email === 'string' ? lead.email.trim() : '';
   const slotParts = formatBookingSlotPartsFromStartsAt(booking.startsAt, booking.timezone);
   const bookingDraftId = verified.bookingId;
-  const holdExpiresAt = booking.paymentExpiresAt ?? null;
-  const expiresAt =
-    settings.paymentPolicy === 'pay_after_hold'
-      ? holdExpiresAt ?? new Date(Date.now() + settings.holdExpiresMinutes * 60_000)
-      : null;
+  const existingOpenTransaction = await findOpenPaymentTransactionForBooking(verified.bookingId);
   let resolvedPricing;
   try {
     resolvedPricing = await resolveCheckoutAmountCentavos({
@@ -126,6 +124,52 @@ export async function createPaymentCheckoutForVerifiedBooking(
       error: error instanceof Error ? error.message : 'Invalid promo code.',
     };
   }
+  const sessionMarketingRefFromParams = params.sessionMarketingRef?.trim() ?? '';
+  const sessionMarketingRefFromBooking =
+    booking.quizSessionId !== undefined && booking.quizSessionId !== null
+      ? encodeQuizSessionRefForMarketingUrl(booking.quizSessionId.toString())
+      : '';
+  const sessionMarketingRef =
+    sessionMarketingRefFromParams.length > 0 ? sessionMarketingRefFromParams : sessionMarketingRefFromBooking;
+  if (existingOpenTransaction !== null && isOpenPaymentTransactionHoldActive(existingOpenTransaction)) {
+    return resumeOpenPaymentTransactionCheckout({
+      transaction: existingOpenTransaction,
+      visitorId: booking.visitorId,
+      gatewayId: params.gatewayId,
+      paymentMethodId: params.paymentMethodId,
+      paymentMethodLabel: resolvedPaymentMethodLabel,
+      appBaseUrl: params.appBaseUrl,
+      nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
+      sessionMarketingRef: sessionMarketingRef.length > 0 ? sessionMarketingRef : verified.bookingId,
+      amountCentavos: resolvedPricing.amountCentavos,
+      metadata: {
+        bookingDraftId,
+        paymentMethodId: params.paymentMethodId,
+        resumeBookingId: verified.bookingId,
+        pricingSource: resolvedPricing.source,
+        ...(resolvedPricing.appliedPromoCode !== undefined
+          ? { promoCode: resolvedPricing.appliedPromoCode }
+          : {}),
+        ...(resolvedPricing.catalogServiceKey !== undefined
+          ? { catalogServiceKey: resolvedPricing.catalogServiceKey }
+          : {}),
+        recordingOptIn: resolvedPricing.recordingOptIn ? 'true' : 'false',
+        ...(resolvedPricing.recordingSurchargeCentavos > 0
+          ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
+          : {}),
+      },
+      customerName: lead.name,
+      customerEmail: leadEmail,
+      customerCompany: typeof lead.company === 'string' && lead.company.trim().length > 0 ? lead.company.trim() : null,
+      customerPhone: typeof lead.phone === 'string' ? lead.phone.trim() : '',
+      bookingStatus: verified.booking.status,
+    });
+  }
+  const holdExpiresAt = booking.paymentExpiresAt ?? null;
+  const expiresAt =
+    settings.paymentPolicy === 'pay_after_hold' || settings.paymentPolicy === 'pay_before_booking'
+      ? holdExpiresAt ?? new Date(Date.now() + settings.holdExpiresMinutes * 60_000)
+      : null;
   const insertedId = await insertPaymentTransaction({
     gatewayId: params.gatewayId,
     providerRef: bookingDraftId,
@@ -173,13 +217,6 @@ export async function createPaymentCheckoutForVerifiedBooking(
   }
   const gatewayCredentials = await getGatewayCredentials(params.gatewayId);
   const useMock = gatewayCredentials === null && process.env.NODE_ENV === 'development';
-  const sessionMarketingRefFromParams = params.sessionMarketingRef?.trim() ?? '';
-  const sessionMarketingRefFromBooking =
-    booking.quizSessionId !== undefined && booking.quizSessionId !== null
-      ? encodeQuizSessionRefForMarketingUrl(booking.quizSessionId.toString())
-      : '';
-  const sessionMarketingRef =
-    sessionMarketingRefFromParams.length > 0 ? sessionMarketingRefFromParams : sessionMarketingRefFromBooking;
   const cancelRelativeUrl =
     sessionMarketingRef.length > 0
       ? `${buildMarketingBookSessionPath(sessionMarketingRef)}?payment=cancelled`
@@ -235,7 +272,6 @@ export async function createPaymentCheckoutForVerifiedBooking(
   const refreshed = await findPaymentTransactionById(transactionId);
   if (refreshed !== null) {
     void executeSendBookingPaymentReminderEmail({
-      bookingId: verified.bookingId,
       transaction: refreshed,
     });
   }

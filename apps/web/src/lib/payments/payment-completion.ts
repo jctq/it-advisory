@@ -394,6 +394,14 @@ export async function createPendingBookingForHoldPolicy(input: {
     return null;
   }
   const db = await getDb();
+  const existingBooking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
+    { _id: bookingId },
+    { projection: { paymentExpiresAt: 1 } },
+  );
+  const existingExpiresAt =
+    existingBooking?.paymentExpiresAt instanceof Date ? existingBooking.paymentExpiresAt : null;
+  const resolvedExpiresAt =
+    existingExpiresAt !== null && existingExpiresAt.getTime() > Date.now() ? existingExpiresAt : expiresAt;
   await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
     { _id: bookingId },
     {
@@ -403,10 +411,14 @@ export async function createPendingBookingForHoldPolicy(input: {
         paymentGatewayId: transaction.gatewayId,
         paymentTransactionId: new ObjectId(transaction.id),
         paymentProviderRef: transaction.providerRef,
-        paymentExpiresAt: expiresAt,
+        paymentExpiresAt: resolvedExpiresAt,
         updatedAt: new Date(),
       },
     },
+  );
+  await db.collection(COLLECTIONS.paymentTransactions).updateOne(
+    { _id: new ObjectId(transaction.id) },
+    { $set: { expiresAt: resolvedExpiresAt, updatedAt: new Date() } },
   );
   await updatePaymentTransactionStatus({
     transactionId: transaction.id,

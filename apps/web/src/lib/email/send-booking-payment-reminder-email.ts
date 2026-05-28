@@ -1,20 +1,22 @@
 import { COLLECTIONS } from '@/domain/collections';
-import type { EmailSendDocument } from '@/domain/types';
+import type { PaymentPolicy, PaymentStatus } from '@/domain/payment-types';
+import type { BookingDocument, EmailSendDocument } from '@/domain/types';
 import { findBookingById } from '@/lib/data/bookings';
 import { getResolvedSiteName } from '@/lib/data/app-settings';
 import { findLeadById } from '@/lib/data/leads';
-import { findPaymentTransactionById, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
+import { type PaymentTransactionRow } from '@/lib/data/payment-transactions';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
-import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
 import {
   buildTransactionalEmailBrandNameRow,
   resolveAbsoluteSiteOrigin,
 } from '@/lib/email/email-brand';
+import { buildPaymentReminderDedupKey } from '@/lib/email/payment-reminder-dedup-key';
 import { executeDispatchTransactionalEmail } from '@/lib/email/send-transactional-email';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 import { getDb } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 import { formatInTimeZone } from 'date-fns-tz';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
@@ -66,7 +68,7 @@ function formatPaymentDeadlineLabel(expiresAt: Date, timezone: string): string {
 export function buildBookingPaymentReminderEmailHtml(input: {
   readonly brandName: string;
   readonly customerName: string;
-  readonly bookingReference: string;
+  readonly bookingReference: string | null;
   readonly dateLong: string;
   readonly timeLabel: string;
   readonly paymentDeadlineLabel: string;
@@ -97,13 +99,24 @@ export function buildBookingPaymentReminderEmailHtml(input: {
     brandName: input.brandName,
     fontStack: EMAIL_FONT_STACK,
   });
-  const preheader = `Complete payment for booking ${input.bookingReference} on or before ${input.paymentDeadlineLabel}.`;
+  const preheader =
+    input.bookingReference !== null
+      ? `Complete payment for booking ${input.bookingReference} on or before ${input.paymentDeadlineLabel}.`
+      : `Complete payment for your consultation on or before ${input.paymentDeadlineLabel}.`;
+  const bookingReferenceRow =
+    input.bookingReference !== null
+      ? `<tr><td style="padding:0 0 16px 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#71717a;">Booking reference: <strong style="color:#18181b;">${escapeHtml(input.bookingReference)}</strong></td></tr>`
+      : '';
+  const emailTitle =
+    input.bookingReference !== null
+      ? escapeHtml(`Complete your payment — ${input.bookingReference}`)
+      : 'Complete your payment';
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>${escapeHtml(`Complete your payment — ${input.bookingReference}`)}</title>
+<title>${emailTitle}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f5;">
 <div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#f4f4f5;">${escapeHtml(preheader)}</div>
@@ -116,7 +129,7 @@ export function buildBookingPaymentReminderEmailHtml(input: {
 <tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:20px;font-weight:600;line-height:28px;color:#18181b;">Complete your payment</td></tr>
 <tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:15px;line-height:24px;color:#3f3f46;">Hi ${escapeHtml(input.customerName)}, your consultation slot is held, but we have not received payment yet. Please pay on or before <strong style="color:#18181b;">${escapeHtml(input.paymentDeadlineLabel)}</strong>.</td></tr>
 <tr><td>${continueButton}</td></tr>
-<tr><td style="padding:0 0 16px 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#71717a;">Booking reference: <strong style="color:#18181b;">${escapeHtml(input.bookingReference)}</strong></td></tr>
+${bookingReferenceRow}
 <tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">Your reservation</td></tr>
 <tr><td style="padding:0 0 20px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#3f3f46;">${escapeHtml(input.dateLong)} · ${escapeHtml(input.timeLabel)}</td></tr>
 <tr><td style="padding:0 0 8px 0;font-family:${EMAIL_FONT_STACK};font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">Contact on file</td></tr>
@@ -134,7 +147,7 @@ export function buildBookingPaymentReminderEmailHtml(input: {
 function buildPaymentReminderPlainText(input: {
   readonly brandName: string;
   readonly customerName: string;
-  readonly bookingReference: string;
+  readonly bookingReference: string | null;
   readonly dateLong: string;
   readonly timeLabel: string;
   readonly paymentDeadlineLabel: string;
@@ -150,8 +163,11 @@ function buildPaymentReminderPlainText(input: {
     '',
     `Your consultation slot is held, but we have not received payment yet. Please pay on or before ${input.paymentDeadlineLabel}.`,
     '',
-    `Booking reference: ${input.bookingReference}`,
-    '',
+  ];
+  if (input.bookingReference !== null) {
+    lines.push(`Booking reference: ${input.bookingReference}`, '');
+  }
+  lines.push(
     'YOUR RESERVATION',
     `${input.dateLong} · ${input.timeLabel}`,
     '',
@@ -159,7 +175,7 @@ function buildPaymentReminderPlainText(input: {
     `Name: ${input.contactName}`,
     `Email: ${input.contactEmail}`,
     `Phone: ${input.contactPhone}`,
-  ];
+  );
   if (input.contactCompany !== null && input.contactCompany.trim().length > 0) {
     lines.push(`Company: ${input.contactCompany.trim()}`);
   }
@@ -187,14 +203,135 @@ async function persistEmailSend(doc: Omit<EmailSendDocument, '_id'>): Promise<vo
   await db.collection<EmailSendDocument>(COLLECTIONS.emailSends).insertOne(doc);
 }
 
-async function hasPaymentReminderEmailBeenSent(bookingId: string): Promise<boolean> {
+async function finalizePaymentReminderEmailSend(input: {
+  readonly dedupKey: string;
+  readonly to: string;
+  readonly payload: Record<string, unknown>;
+  readonly status: Exclude<EmailSendDocument['status'], 'sending'>;
+  readonly providerMessageId?: string;
+}): Promise<void> {
   const db = await getDb();
-  const existing = await db.collection<EmailSendDocument>(COLLECTIONS.emailSends).findOne({
+  const doc: Omit<EmailSendDocument, '_id'> = {
+    to: input.to,
     templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
-    'payload.bookingId': bookingId,
-    status: { $in: ['sent', 'mock_sent'] },
+    paymentReminderDedupKey: input.dedupKey,
+    payload: input.payload,
+    status: input.status,
+    createdAt: new Date(),
+    ...(input.providerMessageId !== undefined ? { providerMessageId: input.providerMessageId } : {}),
+  };
+  const updated = await db.collection<EmailSendDocument>(COLLECTIONS.emailSends).updateOne(
+    {
+      templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
+      paymentReminderDedupKey: input.dedupKey,
+    },
+    { $set: doc },
+  );
+  if (updated.matchedCount === 0) {
+    await persistEmailSend(doc);
+  }
+}
+
+function isPaymentReminderPolicy(policy: PaymentPolicy): boolean {
+  return policy === 'pay_before_booking' || policy === 'pay_after_hold';
+}
+
+function isTransactionAwaitingPayment(status: PaymentStatus): boolean {
+  return status === 'pending' || status === 'processing';
+}
+
+async function isPaymentReminderAlreadySent(input: {
+  readonly dedupKey: string;
+  readonly bookingId: string | null;
+}): Promise<boolean> {
+  const db = await getDb();
+  const dedupeFilters: Record<string, unknown>[] = [
+    { paymentReminderDedupKey: input.dedupKey },
+    { 'payload.paymentReminderDedupKey': input.dedupKey },
+  ];
+  if (input.bookingId !== null) {
+    dedupeFilters.push({ 'payload.bookingId': input.bookingId });
+  }
+  const existingEmail = await db.collection<EmailSendDocument>(COLLECTIONS.emailSends).findOne({
+    templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
+    status: { $in: ['sent', 'mock_sent', 'sending'] },
+    $or: dedupeFilters,
   });
-  return existing !== null;
+  if (existingEmail !== null) {
+    return true;
+  }
+  if (input.bookingId === null) {
+    return false;
+  }
+  const booking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
+    { _id: new ObjectId(input.bookingId), paymentReminderEmailSentAt: { $exists: true } },
+    { projection: { _id: 1 } },
+  );
+  return booking !== null;
+}
+
+async function tryClaimPaymentReminderSend(input: {
+  readonly dedupKey: string;
+  readonly bookingId: string | null;
+}): Promise<boolean> {
+  if (await isPaymentReminderAlreadySent(input)) {
+    return false;
+  }
+  const db = await getDb();
+  if (input.bookingId !== null) {
+    const claimNow = new Date();
+    const claimResult = await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+      {
+        _id: new ObjectId(input.bookingId),
+        status: 'pending',
+        paymentReminderEmailSentAt: { $exists: false },
+        $or: [
+          { paymentStatus: { $exists: false } },
+          { paymentStatus: null },
+          { paymentStatus: { $nin: ['paid'] } },
+        ],
+      },
+      { $set: { paymentReminderEmailSentAt: claimNow, updatedAt: claimNow } },
+    );
+    return claimResult.modifiedCount === 1;
+  }
+  const claimResult = await db.collection<EmailSendDocument>(COLLECTIONS.emailSends).findOneAndUpdate(
+    {
+      templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
+      paymentReminderDedupKey: input.dedupKey,
+    },
+    {
+      $setOnInsert: {
+        templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
+        paymentReminderDedupKey: input.dedupKey,
+        payload: { paymentReminderDedupKey: input.dedupKey },
+        status: 'sending',
+        to: '',
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true, returnDocument: 'before' },
+  );
+  return claimResult === null;
+}
+
+async function releasePaymentReminderClaim(input: {
+  readonly dedupKey: string;
+  readonly bookingId: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (input.bookingId !== null) {
+    await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+      { _id: new ObjectId(input.bookingId) },
+      { $unset: { paymentReminderEmailSentAt: '' }, $set: { updatedAt: new Date() } },
+    );
+    return;
+  }
+  await db.collection<EmailSendDocument>(COLLECTIONS.emailSends).deleteOne({
+    templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
+    paymentReminderDedupKey: input.dedupKey,
+    status: 'sending',
+  });
 }
 
 /**
@@ -202,8 +339,7 @@ async function hasPaymentReminderEmailBeenSent(bookingId: string): Promise<boole
  * Does not block checkout when email delivery fails.
  */
 export async function executeSendBookingPaymentReminderEmail(input: {
-  readonly bookingId: string;
-  readonly transaction: PaymentTransactionRow | null;
+  readonly transaction: PaymentTransactionRow;
 }): Promise<void> {
   if (!process.env.MONGODB_URI) {
     return;
@@ -216,24 +352,27 @@ export async function executeSendBookingPaymentReminderEmail(input: {
 }
 
 async function runSendBookingPaymentReminderEmail(input: {
-  readonly bookingId: string;
-  readonly transaction: PaymentTransactionRow | null;
+  readonly transaction: PaymentTransactionRow;
 }): Promise<void> {
-  if (await hasPaymentReminderEmailBeenSent(input.bookingId)) {
+  const transaction = input.transaction;
+  if (!isPaymentReminderPolicy(transaction.paymentPolicy)) {
     return;
   }
-  const booking = await findBookingById(input.bookingId);
-  if (booking === null || booking.status !== 'pending' || booking.paymentStatus === 'paid') {
+  if (!isTransactionAwaitingPayment(transaction.status)) {
     return;
   }
-  const transaction =
-    input.transaction ??
-    (booking.paymentTransactionId !== null
-      ? await findPaymentTransactionById(booking.paymentTransactionId)
-      : null);
-  const transactionExpiresAtIso = transaction?.expiresAtIso ?? null;
+  const resolvedBookingId = transaction.bookingId;
+  const booking = resolvedBookingId !== null ? await findBookingById(resolvedBookingId) : null;
+  if (resolvedBookingId !== null) {
+    if (booking === null || booking.status !== 'pending' || booking.paymentStatus === 'paid') {
+      return;
+    }
+  } else if (transaction.paymentPolicy !== 'pay_before_booking') {
+    return;
+  }
+  const transactionExpiresAtIso = transaction.expiresAtIso ?? null;
   const expiresAt =
-    booking.paymentExpiresAtIso !== null
+    booking?.paymentExpiresAtIso !== null && booking?.paymentExpiresAtIso !== undefined
       ? new Date(booking.paymentExpiresAtIso)
       : transactionExpiresAtIso !== null
         ? new Date(transactionExpiresAtIso)
@@ -241,7 +380,12 @@ async function runSendBookingPaymentReminderEmail(input: {
   if (expiresAt === null || !Number.isFinite(expiresAt.getTime())) {
     return;
   }
-  const lead = await findLeadById(booking.leadId);
+  const lead =
+    booking !== null
+      ? await findLeadById(booking.leadId)
+      : transaction.leadId !== null
+        ? await findLeadById(transaction.leadId)
+        : null;
   const to = resolveRecipientEmail(lead, transaction);
   if (to === null) {
     return;
@@ -249,32 +393,67 @@ async function runSendBookingPaymentReminderEmail(input: {
   const contactName =
     (lead?.name?.trim().length ?? 0) > 0
       ? lead!.name.trim()
-      : (transaction?.customerName?.trim() ?? 'Guest');
+      : (transaction.customerName?.trim() ?? 'Guest');
   const contactEmail =
-    (lead?.email?.trim().length ?? 0) > 0 ? lead!.email.trim() : (transaction?.customerEmail?.trim() ?? '');
-  const contactPhone = transaction?.customerPhone?.trim() ?? '';
+    (lead?.email?.trim().length ?? 0) > 0 && lead!.email.trim() !== '—'
+      ? lead!.email.trim()
+      : (transaction.customerEmail?.trim() ?? '');
+  const contactPhone = transaction.customerPhone?.trim() ?? '';
   if (contactEmail.length === 0 || contactPhone.length === 0) {
     return;
   }
-  const contactCompanyRaw = transaction?.customerCompany?.trim() ?? '';
+  const dedupKey = buildPaymentReminderDedupKey({
+    bookingId: booking?.id ?? resolvedBookingId,
+    transaction,
+  });
+  const claimed = await tryClaimPaymentReminderSend({
+    dedupKey,
+    bookingId: booking?.id ?? resolvedBookingId,
+  });
+  if (!claimed) {
+    return;
+  }
+  const releaseClaim = async (): Promise<void> => {
+    await releasePaymentReminderClaim({
+      dedupKey,
+      bookingId: booking?.id ?? resolvedBookingId,
+    });
+  };
+  const contactCompanyRaw = transaction.customerCompany?.trim() ?? '';
   const contactCompany = contactCompanyRaw.length > 0 ? contactCompanyRaw : null;
   const customerName = contactName.length > 0 ? contactName : 'there';
-  const startsAt = new Date(booking.startsAtIso);
-  const timezone = booking.timezone.trim().length > 0 ? booking.timezone : PRIMARY_TIMEZONE;
+  const startsAtIso = booking?.startsAtIso ?? transaction.startsAtIso;
+  const timezone =
+    booking !== null && booking.timezone.trim().length > 0
+      ? booking.timezone
+      : transaction.timezone.trim().length > 0
+        ? transaction.timezone
+        : PRIMARY_TIMEZONE;
+  const startsAt = new Date(startsAtIso);
   const dateLong = formatInTimeZone(startsAt, timezone, 'EEEE, MMMM d, yyyy');
   const timeLabel = formatInTimeZone(startsAt, timezone, 'h:mm a');
-  const bookingReference = formatBookingReferenceId(booking.id);
+  const bookingReference = booking !== null ? formatBookingReferenceId(booking.id) : null;
   const brandName = await getResolvedSiteName();
   const siteOrigin = resolveAbsoluteSiteOrigin();
   const manageBookingEnabled = await readManageBookingEnabled();
-  const manageUrl = manageBookingEnabled && siteOrigin.length > 0 ? `${siteOrigin}/book/manage` : '';
-  const sessionMarketingRef =
-    booking.quizSessionId !== undefined && booking.quizSessionId !== null
-      ? encodeQuizSessionRefForMarketingUrl(booking.quizSessionId)
+  const manageUrl =
+    manageBookingEnabled && siteOrigin.length > 0
+      ? bookingReference !== null
+        ? `${siteOrigin}/book/manage?bookingReference=${encodeURIComponent(bookingReference)}`
+        : `${siteOrigin}/book/manage`
       : '';
+  const quizSessionIdHex =
+    booking?.quizSessionId !== undefined && booking?.quizSessionId !== null
+      ? booking.quizSessionId
+      : transaction.quizSessionIdHex;
+  const sessionMarketingRef =
+    quizSessionIdHex !== null && quizSessionIdHex.trim().length > 0
+      ? encodeQuizSessionRefForMarketingUrl(quizSessionIdHex.trim())
+      : '';
+  const serviceKey = booking?.serviceKey ?? transaction.serviceKey;
   const continueCheckoutUrl =
     siteOrigin.length > 0 && sessionMarketingRef.length > 0
-      ? `${siteOrigin}${buildMarketingBookSessionPath(sessionMarketingRef, booking.serviceKey)}`
+      ? `${siteOrigin}${buildMarketingBookSessionPath(sessionMarketingRef, serviceKey)}`
       : '';
   const paymentDeadlineLabel = formatPaymentDeadlineLabel(expiresAt, timezone);
   const html = buildBookingPaymentReminderEmailHtml({
@@ -305,20 +484,23 @@ async function runSendBookingPaymentReminderEmail(input: {
     continueCheckoutUrl,
     manageUrl,
   });
-  const subject = `Complete your payment — ${bookingReference}`;
+  const subject =
+    bookingReference !== null
+      ? buildBookingPaymentReminderSubject(bookingReference)
+      : 'Complete your payment for your consultation booking';
   const basePayload: Record<string, unknown> = {
-    bookingId: booking.id,
-    transactionId: transaction?.id ?? null,
-    bookingReference,
+    bookingId: booking?.id ?? null,
+    transactionId: transaction.id,
+    paymentReminderDedupKey: dedupKey,
+    ...(bookingReference !== null ? { bookingReference } : {}),
   };
   const outcome = await executeDispatchTransactionalEmail({ to, subject, html, text });
   if (outcome.kind === 'audit_only') {
-    await persistEmailSend({
+    await finalizePaymentReminderEmailSend({
+      dedupKey,
       to,
-      templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
       payload: { ...basePayload, channel: 'audit_only' },
       status: 'mock_sent',
-      createdAt: new Date(),
     });
     return;
   }
@@ -329,9 +511,9 @@ async function runSendBookingPaymentReminderEmail(input: {
       : {}),
   };
   if (outcome.kind === 'failed') {
-    await persistEmailSend({
+    await finalizePaymentReminderEmailSend({
+      dedupKey,
       to: outcome.persistTo,
-      templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
       payload: {
         ...persistPayload,
         errorMessage: outcome.errorMessage,
@@ -339,17 +521,16 @@ async function runSendBookingPaymentReminderEmail(input: {
         statusCode: outcome.statusCode,
       },
       status: 'failed',
-      createdAt: new Date(),
     });
+    await releaseClaim();
     return;
   }
-  await persistEmailSend({
+  await finalizePaymentReminderEmailSend({
+    dedupKey,
     to: outcome.persistTo,
-    templateKey: BOOKING_PAYMENT_REMINDER_TEMPLATE_KEY,
     payload: { ...persistPayload, provider: outcome.provider },
     status: 'sent',
     providerMessageId: outcome.providerMessageId,
-    createdAt: new Date(),
   });
 }
 

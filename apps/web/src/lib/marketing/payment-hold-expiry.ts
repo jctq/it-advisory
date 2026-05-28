@@ -1,4 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
+import type { PaymentTransactionRow } from '@/lib/data/payment-transactions';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
 export type PaymentHoldExpiryLabels = {
@@ -104,4 +105,18 @@ export function resolvePaymentHoldExpiresAtIso(input: {
     }
   }
   return null;
+}
+
+export function isOpenPaymentTransactionHoldActive(
+  transaction: PaymentTransactionRow,
+  nowMs: number = Date.now(),
+): boolean {
+  if (transaction.status !== 'pending' && transaction.status !== 'processing') {
+    return false;
+  }
+  const expiresAtMs = parsePaymentHoldExpiresAtMs(transaction.expiresAtIso);
+  if (expiresAtMs === null) {
+    return true;
+  }
+  return expiresAtMs > nowMs;
 }

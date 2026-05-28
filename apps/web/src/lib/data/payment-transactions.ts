@@ -344,6 +344,69 @@ export async function fetchLatestPaymentTransactionsByQuizSessionIds(
   return bySession;
 }
 
+const OPEN_PAYMENT_TRANSACTION_STATUSES: readonly PaymentStatus[] = ['pending', 'processing'];
+
+export async function findOpenPaymentTransactionForBooking(
+  bookingId: string,
+): Promise<PaymentTransactionRow | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  let bookingObjectId: ObjectId;
+  try {
+    bookingObjectId = new ObjectId(bookingId);
+  } catch {
+    return null;
+  }
+  const db = await getDb();
+  const doc = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find({
+      bookingId: bookingObjectId,
+      status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
+    })
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .next();
+  if (doc === null) {
+    return null;
+  }
+  return mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } });
+}
+
+export async function findOpenPaymentTransactionForCheckoutSlot(input: {
+  readonly visitorId: string;
+  readonly quizSessionIdHex: string;
+  readonly serviceKey: string;
+  readonly startsAtUtc: Date;
+}): Promise<PaymentTransactionRow | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const sessionHex = input.quizSessionIdHex.trim();
+  if (sessionHex.length === 0) {
+    return null;
+  }
+  const db = await getDb();
+  const doc = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find({
+      visitorId: input.visitorId,
+      quizSessionIdHex: sessionHex,
+      serviceKey: input.serviceKey,
+      startsAt: input.startsAtUtc,
+      status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
+      $or: [{ bookingId: { $exists: false } }, { bookingId: null }],
+    })
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .next();
+  if (doc === null) {
+    return null;
+  }
+  return mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } });
+}
+
 export async function findLatestPaymentTransactionByQuizSessionIdHex(
   quizSessionIdHex: string,
 ): Promise<PaymentTransactionRow | null> {

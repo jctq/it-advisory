@@ -4,9 +4,11 @@ import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-avail
 import { findBookingById } from '@/lib/data/bookings';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
-import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
+import { findPaymentTransactionById, findOpenPaymentTransactionForCheckoutSlot, insertPaymentTransaction, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
 import { createManualConfirmBooking, createPendingBookingForHoldPolicy } from '@/lib/payments/payment-completion';
+import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
+import { resumeOpenPaymentTransactionCheckout } from '@/lib/payments/payment-checkout-resume-open';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
@@ -31,16 +33,10 @@ import type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@
 export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
 async function dispatchPaymentReminderEmailAfterCheckout(input: {
-  readonly transactionId: string;
-  readonly visitorId: string;
+  readonly transaction: PaymentTransactionRow;
 }): Promise<void> {
-  const refreshed = await findPaymentTransactionById(input.transactionId, input.visitorId);
-  if (refreshed === null || refreshed.bookingId === null) {
-    return;
-  }
   void executeSendBookingPaymentReminderEmail({
-    bookingId: refreshed.bookingId,
-    transaction: refreshed,
+    transaction: input.transaction,
   });
 }
 
@@ -181,6 +177,45 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     };
   }
   const bookingDraftId = randomUUID();
+  const existingOpenTransaction = await findOpenPaymentTransactionForCheckoutSlot({
+    visitorId: params.visitorId,
+    quizSessionIdHex: resolvedQuizSessionHex,
+    serviceKey: params.serviceKey,
+    startsAtUtc: startsAt,
+  });
+  if (existingOpenTransaction !== null && isOpenPaymentTransactionHoldActive(existingOpenTransaction)) {
+    return resumeOpenPaymentTransactionCheckout({
+      transaction: existingOpenTransaction,
+      visitorId: params.visitorId,
+      gatewayId: params.gatewayId,
+      paymentMethodId: params.paymentMethodId,
+      paymentMethodLabel: resolvedPaymentMethodLabel,
+      appBaseUrl: params.appBaseUrl,
+      nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
+      sessionMarketingRef,
+      amountCentavos: resolvedPricing.amountCentavos,
+      metadata: {
+        bookingDraftId: existingOpenTransaction.bookingDraftId,
+        paymentMethodId: params.paymentMethodId,
+        pricingSource: resolvedPricing.source,
+        ...(resolvedPricing.appliedPromoCode !== undefined
+          ? { promoCode: resolvedPricing.appliedPromoCode }
+          : {}),
+        ...(resolvedPricing.catalogServiceKey !== undefined
+          ? { catalogServiceKey: resolvedPricing.catalogServiceKey }
+          : {}),
+        recordingOptIn: resolvedPricing.recordingOptIn ? 'true' : 'false',
+        ...(resolvedPricing.recordingSurchargeCentavos > 0
+          ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
+          : {}),
+      },
+      customerName: contact.name,
+      customerEmail: contact.email,
+      customerCompany: contact.company.length > 0 ? contact.company : null,
+      customerPhone: contact.phone,
+      bookingStatus: null,
+    });
+  }
   const expiresAt =
     settings.paymentPolicy === 'pay_after_hold' || settings.paymentPolicy === 'pay_before_booking'
       ? new Date(Date.now() + settings.holdExpiresMinutes * 60_000)
@@ -291,10 +326,12 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     };
   }
   await updateTransactionProvider(insertedId, providerSession);
-  await dispatchPaymentReminderEmailAfterCheckout({
-    transactionId,
-    visitorId: params.visitorId,
-  });
+  const refreshedForReminder = await findPaymentTransactionById(transactionId, params.visitorId);
+  if (refreshedForReminder !== null) {
+    await dispatchPaymentReminderEmailAfterCheckout({
+      transaction: refreshedForReminder,
+    });
+  }
   const bookingStatus = await resolveBookingStatusByBookingId(row.bookingId);
   return {
     ok: true,
