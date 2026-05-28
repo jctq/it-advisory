@@ -49,6 +49,18 @@ const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const DIAGNOSTIC_CONFIG_API_URL = '/api/quiz/diagnostic-config';
 const DIAGNOSTIC_TEMPLATE_API_URL = '/api/quiz/diagnostic-template';
 
+function parseQuizSessionIdFromApiPayload(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) {
+    return null;
+  }
+  const raw = (payload as { sessionId?: unknown }).sessionId;
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  return isPlausibleMarketingQuizSessionRef(trimmed) ? trimmed : null;
+}
+
 function resolveGuidedPersistCompleted(guided: GuidedDiagnosticV1): boolean {
   return guided.outcome !== null && guided.activeRound === null;
 }
@@ -286,11 +298,20 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   } = useMarketingDiagnosticQuiz();
   const [showBookingActions, setShowBookingActions] = useState<boolean>(true);
   const [linkedBookingSlot, setLinkedBookingSlot] = useState<LinkedBookingSlotSnapshot | null>(null);
+  /** Session ref returned by PATCH/GET when the visitor uses bare `/diagnostic` (no `[sessionRef]` in the URL). */
+  const [persistedSessionRef, setPersistedSessionRef] = useState<string | null>(null);
+  const marketingSessionRef = sessionTargetId ?? persistedSessionRef;
   const hasHydratedRef = useRef<boolean>(false);
   const lastSessionInitKeyRef = useRef<string | null>(null);
   const skipNextSessionHydrationRef = useRef<boolean>(false);
   const isRetakeQuery = searchParams.get('retake') === '1';
   const sessionInitKey = `${sessionTargetId ?? 'guest'}:${isRetakeQuery ? 'retake' : 'load'}`;
+  const capturePersistedSessionRef = useCallback((sessionId: string | null): void => {
+    if (sessionId === null) {
+      return;
+    }
+    setPersistedSessionRef((current) => current ?? sessionId);
+  }, []);
   const persistGuided = useCallback(
     async (next: GuidedDiagnosticV1, completed?: boolean): Promise<void> => {
       if (sessionReadOnlyRef.current) {
@@ -303,17 +324,31 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
         currentStep: linearStep,
         completed: isComplete,
       };
-      if (sessionTargetId !== null) {
-        body.sessionId = sessionTargetId;
+      const activeSessionRef = sessionTargetId ?? persistedSessionRef;
+      if (activeSessionRef !== null) {
+        body.sessionId = activeSessionRef;
       }
-      await fetch(QUIZ_SESSION_API_URL, {
+      const response = await fetch(QUIZ_SESSION_API_URL, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      if (response.ok) {
+        const payload: unknown = await response.json().catch(() => ({}));
+        capturePersistedSessionRef(parseQuizSessionIdFromApiPayload(payload));
+      }
     },
-    [sessionReadOnlyRef, sessionTargetId],
+    [capturePersistedSessionRef, persistedSessionRef, sessionReadOnlyRef, sessionTargetId],
   );
+  useEffect(() => {
+    if (guided.outcome === null || sessionTargetId !== null || persistedSessionRef === null) {
+      return;
+    }
+    if (pathname !== '/diagnostic') {
+      return;
+    }
+    router.replace(buildMarketingQuizSessionPath(persistedSessionRef));
+  }, [guided.outcome, pathname, persistedSessionRef, router, sessionTargetId]);
   useEffect(() => {
     if (lastSessionInitKeyRef.current === sessionInitKey && hasHydratedRef.current) {
       return;
@@ -326,6 +361,9 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
       setSessionReadOnly(false);
       setShowBookingActions(true);
       setLinkedBookingSlot(null);
+      if (sessionTargetId === null) {
+        setPersistedSessionRef(null);
+      }
       if (isRetakeQuery) {
         setIsSessionReady(false);
         await persistGuided(GUIDED_DIAGNOSTIC_EMPTY, false);
@@ -371,7 +409,9 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           session: { answers: Record<string, string | string[] | number | boolean>; currentStep: number } | null;
           readOnly?: boolean;
           linkedBookingSlot?: unknown;
+          sessionId?: string;
         };
+        capturePersistedSessionRef(parseQuizSessionIdFromApiPayload(data));
         if (cancelled || !data.session) {
           sessionReadOnlyRef.current = false;
           setSessionReadOnly(false);
@@ -410,6 +450,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     };
   }, [
     isRetakeQuery,
+    capturePersistedSessionRef,
     persistGuided,
     router,
     sessionInitKey,
@@ -437,8 +478,8 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           return;
         }
         const templateUrl =
-          sessionTargetId !== null
-            ? `${DIAGNOSTIC_TEMPLATE_API_URL}?sessionId=${encodeURIComponent(sessionTargetId)}`
+          marketingSessionRef !== null
+            ? `${DIAGNOSTIC_TEMPLATE_API_URL}?sessionId=${encodeURIComponent(marketingSessionRef)}`
             : DIAGNOSTIC_TEMPLATE_API_URL;
         const templateResponse = await fetch(templateUrl);
         const templateData = (await templateResponse.json()) as DiagnosticTemplateApiBody;
@@ -457,7 +498,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [sessionTargetId, setActiveTemplate, setDiagnosticAiEnabled]);
+  }, [marketingSessionRef, setActiveTemplate, setDiagnosticAiEnabled]);
   useEffect(() => {
     if (!isSessionReady || !hasHydratedRef.current || sessionReadOnlyRef.current) {
       return;
@@ -812,11 +853,11 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           backLabel={backLabel}
           canGoBack={canGoBack}
           guided={guided}
-          templateSessionMarketingRef={sessionTargetId}
-          suppressEmptyTemplateBootstrap={sessionTargetId !== null && !isSessionReady}
+          templateSessionMarketingRef={marketingSessionRef}
+          suppressEmptyTemplateBootstrap={marketingSessionRef !== null && !isSessionReady}
           sessionReadOnly={sessionReadOnly}
           showBookingActions={showBookingActions}
-          marketingBookSessionRef={sessionTargetId}
+          marketingBookSessionRef={marketingSessionRef}
           footerUnpinWhenElement={diagnosticActionsElement}
           onGoBack={executeGoBack}
           onGuidedChange={setGuided}
@@ -835,7 +876,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
             {showRetakeLink && !sessionReadOnly ? (
               <>
                 <Button type="button" variant="outline" asChild>
-                  <Link href={buildMarketingQuizRetakePath(sessionTargetId)}>Retake diagnostic</Link>
+                  <Link href={buildMarketingQuizRetakePath(marketingSessionRef)}>Retake diagnostic</Link>
                 </Button>
                 <Button
                   type="button"
