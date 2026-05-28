@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { fetchPaymentTransactionStatus } from '@techmd/api-client/marketing-payment-api-client';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,6 @@ type ReturnStatus = 'loading' | 'paid' | 'failed' | 'timed_out';
 
 export function PaymentReturnClient(): ReactElement {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const transactionId = searchParams.get('transactionId')?.trim() ?? '';
   const sessionRef = searchParams.get('sessionRef')?.trim() ?? '';
   const isMock = searchParams.get('mock') === '1';
@@ -74,7 +73,7 @@ export function PaymentReturnClient(): ReactElement {
         }
         if (result.status === 'paid' && result.bookingId !== null) {
           setStatus('paid');
-          router.replace(buildPaidRedirectPath(result.serviceKey));
+          window.location.replace(buildPaidRedirectPath(result.serviceKey));
           return;
         }
         if (result.status === 'failed' || result.status === 'expired') {
@@ -98,7 +97,7 @@ export function PaymentReturnClient(): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [hasValidSessionRef, isMock, pollGeneration, router, sessionRef, transactionId]);
+  }, [hasValidSessionRef, isMock, pollGeneration, sessionRef, transactionId]);
   if (displayStatus === 'loading') {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 text-center">

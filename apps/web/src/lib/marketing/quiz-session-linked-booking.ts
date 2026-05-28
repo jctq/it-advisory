@@ -163,7 +163,7 @@ export function isLinkedBookingCancelled(linked: LinkedBookingSlotSnapshot): boo
 }
 
 function isTerminalPaymentStatus(status: PaymentStatus | null | undefined): boolean {
-  return status === 'expired' || status === 'failed';
+  return status === 'expired' || status === 'failed' || status === 'paid';
 }
 
 export function isPaymentHoldWindowClosed(input: {

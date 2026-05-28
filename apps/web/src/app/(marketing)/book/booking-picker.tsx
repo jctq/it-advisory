@@ -507,6 +507,18 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const sessionGateResolvedRef = useRef<string | null>(null);
   const checkoutResumeHandledRef = useRef<string | null>(null);
   const catalogUrlNormalizedRef = useRef(false);
+  const checkoutReturnParamsRef = useRef<{ readonly payment: string; readonly transactionId: string }>({
+    payment: '',
+    transactionId: '',
+  });
+  checkoutReturnParamsRef.current = {
+    payment: searchParams.get('payment')?.trim() ?? '',
+    transactionId: searchParams.get('transactionId')?.trim() ?? '',
+  };
+  const isCheckoutPaymentSuccessReturn = (): boolean => {
+    const { payment, transactionId } = checkoutReturnParamsRef.current;
+    return payment === 'success' && transactionId.length > 0;
+  };
   const [activePaymentHold, setActivePaymentHold] = useState<ActivePaymentHoldState | null>(null);
   const [pendingPaymentHoldDialogOpen, setPendingPaymentHoldDialogOpen] = useState<boolean>(false);
   const [isAwaitingPaymentCheckout, setIsAwaitingPaymentCheckout] = useState<boolean>(false);
@@ -712,6 +724,90 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     setSuccessBookingStatus,
     setSuccessPaymentLabel,
   ]);
+  const finalizePaidCheckoutFromTransaction = useCallback(
+    (transactionId: string, signal: AbortSignal): void => {
+      paymentReturnHandledRef.current = transactionId;
+      queueMicrotask(() => {
+        setPhase('processing');
+      });
+      void fetchPaymentTransactionStatus({
+        apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+        transactionId,
+        signal,
+      })
+        .then((result) => {
+          if (signal.aborted) {
+            return;
+          }
+          if (result.status !== 'paid' || result.bookingId === null) {
+            paymentReturnHandledRef.current = null;
+            notifyError('Your payment is still processing. If you were charged, check your email shortly.');
+            setErrorMessage('Your payment is still processing. If you were charged, check your email shortly.');
+            setPhase('error');
+            return;
+          }
+          linkedConfirmationHandledRef.current = quizSessionRef;
+          const meetingTrimmed = result.meetingUrl?.trim() ?? '';
+          setConfirmedMeetingUrl(meetingTrimmed.length > 0 ? meetingTrimmed : null);
+          setSuccessBookingStatus(result.bookingStatus);
+          if (result.startsAtIso !== null) {
+            setConfirmedSlotDisplay(
+              formatConfirmedSlotFromStartsAt(result.startsAtIso, result.timezone ?? PRIMARY_TIMEZONE),
+            );
+            setConfirmedCalendarSlot({
+              startsAtIso: result.startsAtIso,
+              timezone: result.timezone ?? PRIMARY_TIMEZONE,
+            });
+          }
+          setSuccessPaymentLabel(result.paymentMethodLabel ?? result.gatewayId);
+          setPaidAmountLabel(result.amountLabel);
+          setShowPaidSummary(true);
+          setConfirmedServiceKey(result.serviceKey ?? bookingServiceKey);
+          if (result.bookingId !== null) {
+            setConfirmedBookingReference(formatBookingReferenceId(result.bookingId));
+          }
+          clearCheckoutDraftFromSessionStorage(quizSessionRef);
+          setPhase('success');
+          const paidServiceKey = result.serviceKey ?? bookingServiceKey;
+          const shouldNormalizeUrl =
+            checkoutReturnParamsRef.current.payment.length > 0 ||
+            checkoutReturnParamsRef.current.transactionId.length > 0 ||
+            (searchParams.get('serviceKey')?.trim() ?? '') !== paidServiceKey;
+          if (shouldNormalizeUrl) {
+            router.replace(buildMarketingBookSessionPath(quizSessionRef, paidServiceKey));
+          }
+        })
+        .catch((error: unknown) => {
+          if (signal.aborted) {
+            return;
+          }
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return;
+          }
+          paymentReturnHandledRef.current = null;
+          notifyError('Could not load your booking confirmation. Please check your email.');
+          setErrorMessage('Could not load your booking confirmation. Please check your email.');
+          setPhase('error');
+        });
+    },
+    [
+      bookingServiceKey,
+      quizSessionRef,
+      router,
+      searchParams,
+      setConfirmedBookingReference,
+      setConfirmedCalendarSlot,
+      setConfirmedMeetingUrl,
+      setConfirmedServiceKey,
+      setConfirmedSlotDisplay,
+      setErrorMessage,
+      setPaidAmountLabel,
+      setPhase,
+      setShowPaidSummary,
+      setSuccessBookingStatus,
+      setSuccessPaymentLabel,
+    ],
+  );
   useEffect(() => {
     if (phase !== 'success') {
       confirmedCatalogLoadedKeyRef.current = null;
@@ -852,16 +948,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       });
       return;
     }
-    if (sessionGateResolvedRef.current === ref) {
+    if (sessionGateResolvedRef.current === ref && !isCheckoutPaymentSuccessReturn()) {
       return;
     }
     let cancelled = false;
+    const controller = new AbortController();
     queueMicrotask(() => {
       setSessionGateStatus('loading');
     });
     const sessionUrl = `${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(ref)}`;
     const gateRequestStartedAtMs = Date.now();
-    void fetch(sessionUrl, { credentials: 'include' })
+    void fetch(sessionUrl, { credentials: 'include', signal: controller.signal })
       .then(async (response) => {
         if (cancelled) {
           return;
@@ -893,9 +990,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           setSessionGateStatus('not_found');
           return;
         }
-        const paymentResult = searchParams.get('payment')?.trim() ?? '';
-        const returnTransactionId = searchParams.get('transactionId')?.trim() ?? '';
-        const isPaymentSuccessReturn = paymentResult === 'success' && returnTransactionId.length > 0;
+        const paymentResult = checkoutReturnParamsRef.current.payment;
+        const returnTransactionId = checkoutReturnParamsRef.current.transactionId;
+        const isPaymentSuccessReturn = isCheckoutPaymentSuccessReturn();
+        if (isPaymentSuccessReturn) {
+          sessionGateResolvedRef.current = ref;
+          setSessionGateStatus('ready');
+          if (paymentReturnHandledRef.current !== returnTransactionId) {
+            finalizePaidCheckoutFromTransaction(returnTransactionId, new AbortController().signal);
+          }
+          return;
+        }
         const linkedBooking = parseLinkedBookingSlotSnapshot(data.linkedBookingSlot);
         const pendingCheckout = parsePendingCheckoutSnapshot(data.pendingCheckout);
         const paymentHoldExpiresAtIso =
@@ -924,8 +1029,21 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             methodId: resumePaymentSelection.paymentMethodId,
           };
         };
-        if (data.readOnly === true && !isPaymentSuccessReturn) {
+        if (data.readOnly === true) {
           if (linkedBooking !== null) {
+            if (latestPaymentStatus === 'paid') {
+              const paidTransactionId = linkedBooking.paymentTransactionId?.trim() ?? '';
+              if (paidTransactionId.length > 0 && paymentReturnHandledRef.current !== paidTransactionId) {
+                linkedConfirmationHandledRef.current = ref;
+                finalizePaidCheckoutFromTransaction(paidTransactionId, new AbortController().signal);
+              } else if (linkedConfirmationHandledRef.current !== ref) {
+                linkedConfirmationHandledRef.current = ref;
+                hydrateConfirmationFromLinkedBooking(linkedBooking);
+              }
+              sessionGateResolvedRef.current = ref;
+              setSessionGateStatus('ready');
+              return;
+            }
             if (isLinkedBookingCancelled(linkedBooking)) {
               setPaymentHoldExpired(true);
               setHoldExpiredRequiresRebook(true);
@@ -963,6 +1081,11 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               return;
             }
             if (linkedCheckoutResumable) {
+              if (isCheckoutPaymentSuccessReturn()) {
+                sessionGateResolvedRef.current = ref;
+                setSessionGateStatus('ready');
+                return;
+              }
               checkoutResumeHandledRef.current = ref;
               applyResumePaymentSelection();
               restoreCheckoutDraftFromSnapshot(linkedBookingToCheckoutDraft(linkedBooking));
@@ -1002,6 +1125,15 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             return;
           }
           if (pendingCheckout !== null) {
+            if (latestPaymentStatus === 'paid') {
+              const paidTransactionId = pendingCheckout.transactionId?.trim() ?? '';
+              if (paidTransactionId.length > 0 && paymentReturnHandledRef.current !== paidTransactionId) {
+                finalizePaidCheckoutFromTransaction(paidTransactionId, new AbortController().signal);
+              }
+              sessionGateResolvedRef.current = ref;
+              setSessionGateStatus('ready');
+              return;
+            }
             const pendingCheckoutResumable =
               canResumePaymentCheckout &&
               isPendingCheckoutResumable(pendingCheckout, {
@@ -1020,6 +1152,11 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                 'The payment window has expired. Pick a new time on the calendar to start checkout again.',
               );
               setPhase('error');
+              sessionGateResolvedRef.current = ref;
+              setSessionGateStatus('ready');
+              return;
+            }
+            if (isCheckoutPaymentSuccessReturn()) {
               sessionGateResolvedRef.current = ref;
               setSessionGateStatus('ready');
               return;
@@ -1063,9 +1200,11 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [
     hasPathSegment,
+    finalizePaidCheckoutFromTransaction,
     hydrateConfirmationFromLinkedBooking,
     resumeAwaitingPaymentCheckout,
     setActivePaymentHold,
@@ -1258,105 +1397,25 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     };
   }, [setCompany, setEmail, setFullName, setPhone]);
   useLayoutEffect(() => {
-    const paymentResult = searchParams.get('payment')?.trim() ?? '';
-    const returnTransactionId = searchParams.get('transactionId')?.trim() ?? '';
-    if (paymentResult !== 'success' || returnTransactionId.length === 0) {
+    if (!isCheckoutPaymentSuccessReturn()) {
       return;
     }
     if (!hasValidQuizSessionParam) {
       return;
     }
+    const returnTransactionId = checkoutReturnParamsRef.current.transactionId;
     if (paymentReturnHandledRef.current === returnTransactionId) {
       return;
     }
-    if (sessionGateResolvedRef.current !== quizSessionRef) {
+    if (sessionGateStatus !== 'ready') {
       return;
     }
-    paymentReturnHandledRef.current = returnTransactionId;
     const controller = new AbortController();
-    queueMicrotask(() => {
-      setPhase('processing');
-    });
-    void fetchPaymentTransactionStatus({
-      apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
-      transactionId: returnTransactionId,
-      signal: controller.signal,
-    })
-      .then((result) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        if (result.status !== 'paid' || result.bookingId === null) {
-          paymentReturnHandledRef.current = null;
-          notifyError('Your payment is still processing. If you were charged, check your email shortly.');
-          setErrorMessage('Your payment is still processing. If you were charged, check your email shortly.');
-          setPhase('error');
-          return;
-        }
-        linkedConfirmationHandledRef.current = quizSessionRef;
-        const meetingTrimmed = result.meetingUrl?.trim() ?? '';
-        setConfirmedMeetingUrl(meetingTrimmed.length > 0 ? meetingTrimmed : null);
-        setSuccessBookingStatus(result.bookingStatus);
-        if (result.startsAtIso !== null) {
-          setConfirmedSlotDisplay(
-            formatConfirmedSlotFromStartsAt(result.startsAtIso, result.timezone ?? PRIMARY_TIMEZONE),
-          );
-          setConfirmedCalendarSlot({
-            startsAtIso: result.startsAtIso,
-            timezone: result.timezone ?? PRIMARY_TIMEZONE,
-          });
-        }
-        setSuccessPaymentLabel(result.paymentMethodLabel ?? result.gatewayId);
-        setPaidAmountLabel(result.amountLabel);
-        setShowPaidSummary(true);
-        setConfirmedServiceKey(result.serviceKey ?? bookingServiceKey);
-        if (result.bookingId !== null) {
-          setConfirmedBookingReference(formatBookingReferenceId(result.bookingId));
-        }
-        clearCheckoutDraftFromSessionStorage(quizSessionRef);
-        setPhase('success');
-        const paidServiceKey = result.serviceKey ?? bookingServiceKey;
-        const shouldNormalizeUrl =
-          searchParams.has('payment') ||
-          searchParams.has('transactionId') ||
-          (searchParams.get('serviceKey')?.trim() ?? '') !== paidServiceKey;
-        if (shouldNormalizeUrl) {
-          router.replace(buildMarketingBookSessionPath(quizSessionRef, paidServiceKey));
-        }
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return;
-        }
-        paymentReturnHandledRef.current = null;
-        notifyError('Could not load your booking confirmation. Please check your email.');
-        setErrorMessage('Could not load your booking confirmation. Please check your email.');
-        setPhase('error');
-      });
+    finalizePaidCheckoutFromTransaction(returnTransactionId, controller.signal);
     return () => {
       controller.abort();
     };
-  }, [
-    bookingServiceKey,
-    hasValidQuizSessionParam,
-    quizSessionRef,
-    router,
-    searchParams,
-    setConfirmedBookingReference,
-    setConfirmedCalendarSlot,
-    setConfirmedMeetingUrl,
-    setConfirmedServiceKey,
-    setConfirmedSlotDisplay,
-    setErrorMessage,
-    setPaidAmountLabel,
-    setPhase,
-    setShowPaidSummary,
-    setSuccessBookingStatus,
-    setSuccessPaymentLabel,
-  ]);
+  }, [finalizePaidCheckoutFromTransaction, hasValidQuizSessionParam, searchParams, sessionGateStatus]);
   const selectedGateway = useMemo(() => {
     if (paymentConfig === null || selectedGatewayId === null) {
       return null;

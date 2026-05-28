@@ -63,6 +63,15 @@ describe('isLinkedBookingCheckoutResumable', () => {
       }),
     ).toBe(true);
   });
+
+  it('returns false when the latest payment is already paid', () => {
+    expect(
+      isLinkedBookingCheckoutResumable(linkedPending, {
+        latestPaymentStatus: 'paid',
+        serverNowMs: Date.parse('2026-06-01T02:30:00.000Z'),
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('isPendingCheckoutResumable', () => {

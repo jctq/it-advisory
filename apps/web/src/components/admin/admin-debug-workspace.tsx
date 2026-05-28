@@ -1,15 +1,17 @@
 'use client';
 
-import { Bug, Timer, type LucideIcon } from 'lucide-react';
+import { Bug, CreditCard, Timer, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminClientDiagnosticWorkspace } from '@/components/admin/admin-client-diagnostic-workspace';
 import { AdminCronLogsTable } from '@/components/admin/admin-cron-logs-table';
+import { AdminPaymentLogsTable } from '@/components/admin/admin-payment-logs-table';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { CronJobRunAdminRow } from '@/lib/data/cron-job-runs';
+import type { PaymentLogAdminRow } from '@/lib/data/payment-logs';
 
-export type DebugTab = 'client-diagnostic' | 'cron-logs';
+export type DebugTab = 'client-diagnostic' | 'cron-logs' | 'payment-logs';
 
 type DebugTabConfig = {
   readonly value: DebugTab;
@@ -20,6 +22,7 @@ type DebugTabConfig = {
 const DEBUG_TABS: readonly DebugTabConfig[] = [
   { value: 'client-diagnostic', label: 'Client diagnostic', icon: Bug },
   { value: 'cron-logs', label: 'Cron logs', icon: Timer },
+  { value: 'payment-logs', label: 'Payment logs', icon: CreditCard },
 ];
 
 type AdminDebugWorkspaceProps = {
@@ -27,6 +30,7 @@ type AdminDebugWorkspaceProps = {
   readonly initialDiagnostic: string;
   readonly initialReference: string;
   readonly cronRuns: readonly CronJobRunAdminRow[];
+  readonly paymentLogs: readonly PaymentLogAdminRow[];
 };
 
 function addMountedDebugTab(previous: ReadonlySet<DebugTab>, tab: DebugTab): ReadonlySet<DebugTab> {
@@ -41,6 +45,9 @@ function addMountedDebugTab(previous: ReadonlySet<DebugTab>, tab: DebugTab): Rea
 function resolveDebugTab(value: string | undefined): DebugTab {
   if (value === 'cron-logs') {
     return 'cron-logs';
+  }
+  if (value === 'payment-logs') {
+    return 'payment-logs';
   }
   return 'client-diagnostic';
 }
@@ -82,7 +89,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
         <AdminPageHeader
           eyebrow="Operations"
           title="Debug"
-          description="Troubleshoot client diagnostic and booking flows, and inspect protected cron job runs."
+          description="Troubleshoot client diagnostic and booking flows, inspect cron job runs, and review payment logs."
         />
         <Tabs
           value={activeTab}
@@ -153,6 +160,21 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
                   unknown), duration, and result counts or errors. Unauthorized attempts are logged too.
                 </p>
                 <AdminCronLogsTable initialData={props.cronRuns} />
+              </div>
+            ) : null}
+          </TabsContent>
+          <TabsContent
+            value="payment-logs"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+          >
+            {mountedTabs.has('payment-logs') ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Each POST to /api/webhooks/* is recorded as a payment log with gateway, parsed status, matched
+                  transaction and booking context, HTTP response, timing, header summary, and a raw payload snippet for
+                  debugging stuck or unprocessed payments.
+                </p>
+                <AdminPaymentLogsTable initialData={props.paymentLogs} />
               </div>
             ) : null}
           </TabsContent>

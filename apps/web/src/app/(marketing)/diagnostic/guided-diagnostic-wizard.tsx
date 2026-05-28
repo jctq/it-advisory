@@ -43,6 +43,13 @@ import {
 import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sticky-action-bar';
 import { DiagnosticOutcomePanel } from '@/components/marketing/diagnostic-outcome-panel';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { inferRecommendedServiceKeyFromContext } from '@/lib/marketing/resolve-recommended-service-key';
 import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
@@ -1351,6 +1358,42 @@ type DiagnosticTemplateSummaryApiBody = {
   readonly details?: string;
 };
 
+type DiagnosticApiLoadingDialogProps = {
+  readonly open: boolean;
+  readonly title: string;
+  readonly description: string;
+};
+
+function DiagnosticApiLoadingDialog(props: DiagnosticApiLoadingDialogProps): ReactElement {
+  const { open, title, description } = props;
+  return (
+    <Dialog open={open}>
+      <DialogContent
+        className="gap-0 sm:max-w-md"
+        showCloseButton={false}
+        onPointerDownOutside={(event) => {
+          event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+        }}
+      >
+        <DialogHeader className="space-y-2 text-center sm:text-left">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <div
+          className="mt-6 flex flex-col items-center rounded-2xl border border-border bg-primary/5 px-6 py-10"
+          aria-busy={open}
+          aria-live="polite"
+        >
+          <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): ReactElement {
   const {
     backLabel,
@@ -2305,12 +2348,16 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             ) : null}
           </>
         ) : null}
-        {isAwaitingApi ? (
-          <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground md:mt-8">
-            <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
-            {diagnosticAiEnabled ? 'Updating your diagnostic…' : 'Preparing your advisor summary…'}
-          </div>
-        ) : (
+        <DiagnosticApiLoadingDialog
+          open={isAwaitingApi}
+          title={diagnosticAiEnabled ? 'Updating your diagnostic' : 'Preparing your advisor summary'}
+          description={
+            diagnosticAiEnabled
+              ? 'Saving your answers and preparing the next step. This usually takes a few seconds.'
+              : 'Building your advisor summary from your template answers. This usually takes a few seconds.'
+          }
+        />
+        {!isAwaitingApi ? (
           <DiagnosticStickyActionBar
             unpinWhenElement={footerUnpinWhenElement}
             wrapperClassName={WIZARD_UI.footerMt}
@@ -2332,7 +2379,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
               <span className="hidden sm:inline">{advanceLabel}</span>
             </Button>
           </DiagnosticStickyActionBar>
-        )}
+        ) : null}
       </div>
     );
   }
@@ -2445,16 +2492,20 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           })}
         </div>
       </div>
-      {isAwaitingApi ? (
-        <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
-          {diagnosticAiEnabled ? 'Preparing your first questions…' : 'Preparing your first template round…'}
-        </div>
-      ) : sessionReadOnly ? (
+      <DiagnosticApiLoadingDialog
+        open={isAwaitingApi}
+        title={diagnosticAiEnabled ? 'Preparing your first questions' : 'Preparing your first template round'}
+        description={
+          diagnosticAiEnabled
+            ? 'Analyzing your situation to generate personalized questions. This usually takes a few seconds.'
+            : 'Loading the first round from your active template. This usually takes a few seconds.'
+        }
+      />
+      {!isAwaitingApi && sessionReadOnly ? (
         <p className="mt-6 text-sm text-muted-foreground">
           Use the step indicators above to open saved rounds. You cannot start a new run from this booked copy.
         </p>
-      ) : (
+      ) : !isAwaitingApi ? (
         <div className="mt-6">
           <Button
             type="button"
@@ -2468,7 +2519,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             {diagnosticAiEnabled ? 'Start guided questions' : 'Start diagnostic template'}
           </Button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   type DebugTab,
 } from '@/components/admin/admin-debug-workspace';
 import { listCronJobRunsForAdmin } from '@/lib/data/cron-job-runs';
+import { listPaymentLogsForAdmin } from '@/lib/data/payment-logs';
 
 export const metadata = {
   title: 'Debug — TechMD Admin',
@@ -25,6 +26,9 @@ function resolveInitialTab(tab: string | undefined): DebugTab {
   if (tab === 'cron-logs') {
     return 'cron-logs';
   }
+  if (tab === 'payment-logs') {
+    return 'payment-logs';
+  }
   return 'client-diagnostic';
 }
 
@@ -36,6 +40,7 @@ export default async function AdminDebugPage(props: AdminDebugPageProps): Promis
   const initialReference =
     searchParams.reference?.trim() ?? searchParams.bookingReference?.trim() ?? '';
   const cronRuns = await listCronJobRunsForAdmin();
+  const paymentLogs = await listPaymentLogsForAdmin();
   return (
     <Suspense fallback={<p className="text-sm text-muted-foreground">Loading debug tools…</p>}>
       <AdminDebugWorkspace
@@ -43,6 +48,7 @@ export default async function AdminDebugPage(props: AdminDebugPageProps): Promis
         initialDiagnostic={initialDiagnostic}
         initialReference={initialReference}
         cronRuns={cronRuns}
+        paymentLogs={paymentLogs}
       />
     </Suspense>
   );

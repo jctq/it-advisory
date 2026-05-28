@@ -42,4 +42,6 @@ export const COLLECTIONS = {
   blogImages: 'blog_images',
   /** Append-only log of `/api/cron/*` invocations (admin). */
   cronJobRuns: 'cron_job_runs',
+  /** Append-only log of inbound payment gateway events (admin). */
+  paymentLogs: 'payment_logs',
 } as const;
