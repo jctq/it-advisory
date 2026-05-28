@@ -11,6 +11,8 @@ export type DiagnosticStickyActionBarProps = {
   readonly unpinWhenElement: HTMLElement | null;
   readonly wrapperClassName?: string;
   readonly layoutClassName?: string;
+  /** Placeholder height while pinned so content below does not jump. Defaults to button-only height. */
+  readonly pinnedSpacerClassName?: string;
   readonly children: ReactNode;
 };
 
@@ -22,10 +24,11 @@ export function DiagnosticStickyActionBar(props: DiagnosticStickyActionBarProps)
   const isPinned = props.unpinWhenElement !== null && !isUnpinSectionVisible;
   const layoutClassName =
     props.layoutClassName ?? 'flex flex-wrap items-center justify-between gap-3';
+  const pinnedSpacerClassName = props.pinnedSpacerClassName ?? 'h-[4.75rem]';
   return (
     <>
       {isPinned ? (
-        <div className={cn(props.wrapperClassName, 'h-[4.75rem] shrink-0')} aria-hidden />
+        <div className={cn(props.wrapperClassName, pinnedSpacerClassName, 'shrink-0')} aria-hidden />
       ) : null}
       <div
         className={cn(
