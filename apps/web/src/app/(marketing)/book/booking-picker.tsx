@@ -1919,36 +1919,6 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return <BookSessionGateError reason="not_found" sessionRef={quizSessionRef} />;
   }
 
-  if (phase === 'processing') {
-    return (
-      <div className="mx-auto max-w-lg px-6 py-16 md:py-24">
-        <div className="flex items-start gap-4">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-            4
-          </span>
-          <div>
-            <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground">Confirming your booking</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Please wait while we confirm your booking.</p>
-          </div>
-        </div>
-        <div className="mt-10 flex flex-col items-center rounded-3xl border border-border bg-primary/5 px-6 py-12">
-          <div className="flex size-28 items-center justify-center rounded-full bg-primary/10">
-            <Lock className="size-12 text-primary" aria-hidden />
-          </div>
-          <Loader2 className="mt-8 size-8 animate-spin text-primary" aria-hidden />
-          <p className="mt-6 text-center text-sm font-semibold text-foreground">Processing your payment…</p>
-          <p className="mt-2 text-center text-sm text-muted-foreground">This will only take a few seconds.</p>
-        </div>
-        <div className="mt-8 flex gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
-          <Shield className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-          <p>
-            <span className="font-semibold">Do not close this window or refresh the page.</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   if (phase === 'error') {
     return (
       <div className="mx-auto max-w-lg px-6 py-16 md:py-24">
@@ -2086,8 +2056,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     );
   }
 
-  const activeSlotPhase: BookingSlotPhase =
-    phase === 'date' || phase === 'details' || phase === 'payment' ? phase : 'date';
+  const visibleCheckoutPhase: BookingSlotPhase =
+    phase === 'processing'
+      ? 'payment'
+      : phase === 'date' || phase === 'details' || phase === 'payment'
+        ? phase
+        : 'date';
+  const activeSlotPhase: BookingSlotPhase = visibleCheckoutPhase;
   return (
     <div className="mx-auto px-6 py-12">
       <Dialog
@@ -2148,18 +2123,18 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       <div className="max-w-6xl mx-auto">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary mt-8">Booking</p>
         <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          {phase === 'date' && 'Choose Date & Time'}
-          {phase === 'details' && 'Your Details'}
-          {phase === 'payment' && 'Payment'}
+          {visibleCheckoutPhase === 'date' && 'Choose Date & Time'}
+          {visibleCheckoutPhase === 'details' && 'Your Details'}
+          {visibleCheckoutPhase === 'payment' && 'Payment'}
         </h1>
         <p className="mt-2 text-pretty text-muted-foreground">
-          {phase === 'date' &&
+          {visibleCheckoutPhase === 'date' &&
             `Select a slot in Philippine Time (${PRIMARY_TIMEZONE}). You can add calendar sync later — this flow captures your preference now.`}
-          {phase === 'details' &&
+          {visibleCheckoutPhase === 'details' &&
             'We use this information only to confirm your reservation and to send your calendar invite and meeting link.'}
-          {phase === 'payment' && 'Choose a payment method to secure your booking.'}
+          {visibleCheckoutPhase === 'payment' && 'Choose a payment method to secure your booking.'}
         </p>
-        {paymentCancelledNotice && phase === 'payment' ? (
+        {paymentCancelledNotice && visibleCheckoutPhase === 'payment' ? (
           <div
             className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground"
             role="status"
@@ -2168,14 +2143,14 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             <p className="mt-1 text-muted-foreground">Choose a payment method below to try again.</p>
           </div>
         ) : null}
-        {phase === 'date' && manageBookingEnabled ? (
+        {visibleCheckoutPhase === 'date' && manageBookingEnabled ? (
           <p className="mt-2 text-sm text-muted-foreground">
             <Link href="/book/manage" className="font-medium text-primary underline-offset-4 hover:underline">
               Already booked? Manage your booking
             </Link>
           </p>
         ) : null}
-        {phase === 'date' ? (
+        {visibleCheckoutPhase === 'date' ? (
           <div className="mt-10 grid grid-cols-1 gap-8 pb-[calc(11rem+env(safe-area-inset-bottom))] lg:grid-cols-[minmax(0,1fr)_min(100%,22rem)] lg:items-start lg:gap-x-8 lg:pb-0 xl:gap-x-10">
             <div className="min-w-0 space-y-8 lg:space-y-0">
               <section className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
@@ -2364,7 +2339,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             </aside>
           </div>
         ) : null}
-        {phase === 'details' ? (
+        {visibleCheckoutPhase === 'details' ? (
           <div className="mx-auto mt-10 w-full max-w-lg pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:max-w-3xl lg:pb-0">
             <section
               aria-labelledby="booking-contact-heading"
@@ -2494,7 +2469,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             </div>
           </div>
         ) : null}
-        {phase === 'payment' ? (
+        {visibleCheckoutPhase === 'payment' ? (
           <div className="mt-10 grid gap-10 pb-[calc(12rem+env(safe-area-inset-bottom))] lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0">
             <div className={cn('space-y-6', isPaymentHoldBlocked && 'pointer-events-none opacity-60')}>
               {isLivePaymentsCheckout && hasMultiplePaymentGateways && paymentConfig !== null ? (
@@ -2793,6 +2768,37 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           </div>
         ) : null}
       </div>
+      <Dialog open={phase === 'processing'}>
+        <DialogContent
+          className="gap-0 sm:max-w-md"
+          showCloseButton={false}
+          onPointerDownOutside={(event) => {
+            event.preventDefault();
+          }}
+          onEscapeKeyDown={(event) => {
+            event.preventDefault();
+          }}
+        >
+          <DialogHeader className="space-y-2 text-center sm:text-left">
+            <DialogTitle>Confirming your booking</DialogTitle>
+            <DialogDescription>Please wait while we confirm your booking.</DialogDescription>
+          </DialogHeader>
+          <div className="mt-6 flex flex-col items-center rounded-2xl border border-border bg-primary/5 px-6 py-10">
+            <div className="flex size-24 items-center justify-center rounded-full bg-primary/10">
+              <Lock className="size-11 text-primary" aria-hidden />
+            </div>
+            <Loader2 className="mt-6 size-8 animate-spin text-primary" aria-hidden />
+            <p className="mt-5 text-center text-sm font-semibold text-foreground">Processing your payment…</p>
+            <p className="mt-2 text-center text-sm text-muted-foreground">This will only take a few seconds.</p>
+          </div>
+          <div className="mt-5 flex gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
+            <Shield className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+            <p>
+              <span className="font-semibold">Do not close this window or refresh the page.</span>
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
