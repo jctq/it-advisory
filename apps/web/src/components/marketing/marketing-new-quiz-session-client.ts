@@ -7,10 +7,21 @@ import { isPlausibleMarketingQuizSessionRef, buildMarketingQuizSessionPath } fro
 const MY_SESSIONS_API_URL = '/api/quiz/my-sessions';
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
 
+function parseQuizSessionIdFromGuestFreshStartPayload(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) {
+    return null;
+  }
+  const raw = (payload as { sessionId?: unknown }).sessionId;
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  return isPlausibleMarketingQuizSessionRef(trimmed) ? trimmed : null;
+}
+
 /**
- * When the visitor's latest quiz row is read-only (linked to a booking), `DELETE /api/quiz/session` forks a new
- * blank row. Call this before navigating to `/diagnostic` for an explicit “new diagnostic” so guests do not reopen the
- * booked snapshot as an editable session.
+ * Clears the visitor's latest quiz row before an explicit “new diagnostic”. Booked sessions are forked to a new blank
+ * row; in-progress rows are deleted. Call before navigating to `/diagnostic` so guests do not reopen a prior snapshot.
  */
 export async function ensureGuestQuizFreshStart(): Promise<void> {
   const response = await fetch(QUIZ_SESSION_API_URL, { credentials: 'include' });
@@ -18,12 +29,8 @@ export async function ensureGuestQuizFreshStart(): Promise<void> {
     return;
   }
   const payload: unknown = await response.json().catch(() => ({}));
-  const readOnly =
-    typeof payload === 'object' &&
-    payload !== null &&
-    'readOnly' in payload &&
-    (payload as { readOnly?: unknown }).readOnly === true;
-  if (!readOnly) {
+  const sessionId = parseQuizSessionIdFromGuestFreshStartPayload(payload);
+  if (sessionId === null) {
     return;
   }
   await fetch(QUIZ_SESSION_API_URL, { method: 'DELETE', credentials: 'include' });

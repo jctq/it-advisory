@@ -144,20 +144,14 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
               />
             </div>
           )}
-          {isAuthenticated ? (
-            <Button
-              type="button"
-              className="hidden h-10 xl:inline-flex"
-              disabled={isNavigating}
-              onClick={() => void navigateToNewQuiz()}
-            >
-              {isNavigating ? 'Starting…' : 'Get Started'}
-            </Button>
-          ) : (
-            <Button asChild className="hidden h-10 xl:inline-flex">
-              <Link href="/diagnostic">Get Started</Link>
-            </Button>
-          )}
+          <Button
+            type="button"
+            className="hidden h-10 xl:inline-flex"
+            disabled={isNavigating}
+            onClick={() => void navigateToNewQuiz()}
+          >
+            {isNavigating ? 'Starting…' : 'Get Started'}
+          </Button>
           <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button
@@ -217,27 +211,18 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                 )}
                 <Separator className="my-2" />
                 <div className="px-2">
-                  {isAuthenticated ? (
-                    <Button
-                      type="button"
-                      className="h-10 w-full gap-2"
-                      disabled={isNavigating}
-                      onClick={() => {
-                        executeCloseMobileMenu();
-                        void navigateToNewQuiz();
-                      }}
-                    >
-                      <Rocket className="size-4 shrink-0" aria-hidden />
-                      {isNavigating ? 'Starting…' : 'Get Started'}
-                    </Button>
-                  ) : (
-                    <Button asChild className="h-10 w-full gap-2" onClick={executeCloseMobileMenu}>
-                      <Link href="/diagnostic">
-                        <Rocket className="size-4 shrink-0" aria-hidden />
-                        Get Started
-                      </Link>
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    className="h-10 w-full gap-2"
+                    disabled={isNavigating}
+                    onClick={() => {
+                      executeCloseMobileMenu();
+                      void navigateToNewQuiz();
+                    }}
+                  >
+                    <Rocket className="size-4 shrink-0" aria-hidden />
+                    {isNavigating ? 'Starting…' : 'Get Started'}
+                  </Button>
                 </div>
               </nav>
             </SheetContent>

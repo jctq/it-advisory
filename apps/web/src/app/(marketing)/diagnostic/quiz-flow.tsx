@@ -388,7 +388,27 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           sessionTargetId !== null
             ? `${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(sessionTargetId)}`
             : QUIZ_SESSION_API_URL;
-        const response = await fetch(sessionUrl);
+        let response = await fetch(sessionUrl, { credentials: 'include' });
+        if (cancelled) {
+          return;
+        }
+        if (response.ok && sessionTargetId === null) {
+          const peekPayload: unknown = await response.clone().json().catch(() => ({}));
+          const peekReadOnly =
+            typeof peekPayload === 'object' &&
+            peekPayload !== null &&
+            'readOnly' in peekPayload &&
+            (peekPayload as { readOnly?: unknown }).readOnly === true;
+          if (peekReadOnly) {
+            const forkResponse = await fetch(QUIZ_SESSION_API_URL, {
+              method: 'DELETE',
+              credentials: 'include',
+            });
+            if (forkResponse.ok) {
+              response = await fetch(sessionUrl, { credentials: 'include' });
+            }
+          }
+        }
         if (cancelled) {
           return;
         }
