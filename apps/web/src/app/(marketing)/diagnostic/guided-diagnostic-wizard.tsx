@@ -321,7 +321,7 @@ const WIZARD_UI = {
   gridGap: 'gap-2.5 md:gap-4',
   gridGapLg: 'gap-3 md:gap-5',
   footerMt: 'mt-6 md:mt-8',
-  selectIndicator: 'flex size-5 shrink-0 items-center justify-center rounded-md border md:size-6',
+  selectIndicator: 'inline-flex size-5 shrink-0 items-center justify-center rounded-md border leading-none md:size-6',
   viewOnlyOption: 'cursor-not-allowed opacity-60',
 } as const;
 
@@ -482,7 +482,7 @@ function MultipleChoiceRoundRenderer(props: {
                         {option.presentation.eyebrow}
                       </p>
                     ) : null}
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2">
                         <h3 className={WIZARD_UI.optionTitle}>{getDisplayOptionTitle(option)}</h3>
                         {option.presentation.badgeText !== null ? (
@@ -708,7 +708,7 @@ function NestedOptionsRoundRenderer(props: {
                 <div className="flex w-full items-start gap-3 md:gap-4">
                   <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
                   <div className="min-w-0 flex-1 space-y-1.5 md:space-y-2">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <p className={cn(WIZARD_UI.optionTitle, 'min-w-0')}>{getDisplayOptionTitle(option)}</p>
                       <span
                         className={cn(
@@ -1051,7 +1051,7 @@ function RankedOptionsRoundRenderer(props: {
                   ) : null}
                   <DiagnosticOptionIcon iconName={option.presentation.icon} optionIndex={optionIndex} />
                   <div className="min-w-0 flex-1 space-y-1.5 md:space-y-2">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2">
                         <p className={WIZARD_UI.optionTitle}>
                           {isSelected

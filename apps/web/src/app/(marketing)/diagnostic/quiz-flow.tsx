@@ -126,6 +126,31 @@ function summarizeCurrentRoundProgress(
   };
 }
 
+function hasPreviousGuidedStep(guided: GuidedDiagnosticV1): boolean {
+  if (guided.outcome !== null && guided.activeRound === null) {
+    return guided.completedBundles.length > 0;
+  }
+  if (guided.activeRound === null) {
+    return false;
+  }
+  const activeRound = guided.activeRound;
+  const previousVisibleQuestionIndex = findPreviousVisibleQuestionIndex({
+    questions: activeRound.questions,
+    baseAnswers: buildDiagnosticAnswerLookup({
+      completedBundles: guided.completedBundles,
+    }),
+    answers: activeRound.answers,
+    currentIndex: activeRound.stepIndex,
+  });
+  if (previousVisibleQuestionIndex !== null) {
+    return true;
+  }
+  if (activeRound.roundIndex === 0) {
+    return false;
+  }
+  return guided.completedBundles.some((bundle) => bundle.roundIndex < activeRound.roundIndex);
+}
+
 function computeRoundProgressCurrentIndex(params: {
   readonly guided: GuidedDiagnosticV1;
   readonly roundSummaries: readonly {
@@ -490,7 +515,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     () => summarizeCurrentRoundProgress(roundProgressSteps),
     [roundProgressSteps],
   );
-  const canGoBack = computeGuidedLinearStep(guided) > 1;
+  const canGoBack = useMemo(() => hasPreviousGuidedStep(guided), [guided]);
   const previousRoundLabel = useMemo(() => buildPreviousRoundLabel(guided), [guided]);
   const backLabel: string = previousRoundLabel !== null ? `Back: ${previousRoundLabel}` : 'Back';
   const showRetakeLink =

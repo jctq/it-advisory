@@ -1599,18 +1599,21 @@ export function applyGuidedGoBackReadOnly(state: GuidedDiagnosticV1): GuidedDiag
       activeRound: null,
     };
   }
-  const bundleIndex = state.completedBundles.findIndex((bundle) => bundle.roundIndex === activeRound.roundIndex);
-  if (bundleIndex <= 0) {
+  const sortedCompletedBundles = [...state.completedBundles].sort((left, right) => left.roundIndex - right.roundIndex);
+  const activeBundleIndex = sortedCompletedBundles.findIndex((bundle) => bundle.roundIndex === activeRound.roundIndex);
+  const previousBundle =
+    activeBundleIndex > 0
+      ? sortedCompletedBundles[activeBundleIndex - 1]
+      : sortedCompletedBundles
+          .filter((bundle) => bundle.roundIndex < activeRound.roundIndex)
+          .at(-1);
+  if (previousBundle === undefined) {
     return {
       ...state,
       activeRound: null,
     };
   }
-  const previousBundle = state.completedBundles[bundleIndex - 1];
-  if (previousBundle === undefined) {
-    return state;
-  }
-  const priorBundles = state.completedBundles.slice(0, bundleIndex - 1);
+  const priorBundles = sortedCompletedBundles.filter((bundle) => bundle.roundIndex < previousBundle.roundIndex);
   const lastStep = resolveVisibleStepIndex({
     questions: previousBundle.questions,
     baseAnswers: buildBundleAnswerLookup(priorBundles),
