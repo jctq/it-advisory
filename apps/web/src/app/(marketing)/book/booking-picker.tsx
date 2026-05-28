@@ -1653,7 +1653,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     phase === 'date' || phase === 'details' || phase === 'payment' ? phase : 'date';
   return (
     <div className="mx-auto px-6 py-12">
-      <div className="mb-8 space-y-3 lg:sticky lg:top-16 lg:z-50 lg:-mx-6 lg:border-b lg:border-border lg:bg-background lg:px-6 lg:py-2 lg:shadow-md lg:backdrop-blur lg:supports-backdrop-filter:bg-background/92">
+      <div className="mb-8 space-y-3 lg:sticky lg:top-16 lg:z-40 lg:-mx-6 lg:border-b lg:border-border lg:bg-background lg:px-6 lg:py-2 lg:shadow-md lg:backdrop-blur lg:supports-backdrop-filter:bg-background/92">
         <BookingStepper activePhase={activeSlotPhase} />
       </div>
       <div className="max-w-6xl mx-auto">
@@ -1802,7 +1802,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             </div>
             <aside
               aria-label="Booking selection"
-              className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:mx-0 lg:max-w-none lg:sticky lg:top-44 lg:z-45 lg:self-start lg:min-h-0 lg:rounded-2xl lg:border lg:border-border lg:bg-card lg:p-5 lg:shadow-xs xl:p-6"
+              className="mx-auto flex w-full max-w-lg flex-col gap-4 lg:mx-0 lg:max-w-none lg:sticky lg:top-44 lg:z-30 lg:self-start lg:min-h-0 lg:rounded-2xl lg:border lg:border-border lg:bg-card lg:p-5 lg:shadow-xs xl:p-6"
             >
               {availabilityStatus === 'loading' ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">

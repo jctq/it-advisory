@@ -30,8 +30,10 @@ export function AdminBookingStatusForm(props: AdminBookingStatusFormProps): Reac
     props.paymentExpiresAtIso !== null
       ? new Date(props.paymentExpiresAtIso).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
       : null;
+  const [evaluatedAtMs] = useState(() => Date.now());
   const isPaymentWindowExpired =
-    props.paymentExpiresAtIso !== null && new Date(props.paymentExpiresAtIso).getTime() <= Date.now();
+    props.paymentExpiresAtIso !== null &&
+    new Date(props.paymentExpiresAtIso).getTime() <= evaluatedAtMs;
   return (
     <div className="space-y-4">
       {paymentWindowLabel !== null ? (

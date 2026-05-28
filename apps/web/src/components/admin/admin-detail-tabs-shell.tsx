@@ -38,13 +38,14 @@ export function AdminDetailTabsShell<TTab extends string>(
   props: AdminDetailTabsShellProps<TTab>,
 ): ReactElement {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TTab>(props.initialTab);
-  const [mountedTabs, setMountedTabs] = useState<ReadonlySet<TTab>>(() => new Set([props.initialTab]));
+  const { tabs, initialTab, resolveTab, ariaLabel, basePath, shouldOmitTabFromUrl, renderPanel } = props;
+  const [activeTab, setActiveTab] = useState<TTab>(initialTab);
+  const [mountedTabs, setMountedTabs] = useState<ReadonlySet<TTab>>(() => new Set([initialTab]));
   const tabTriggerRefs = useRef<Partial<Record<TTab, HTMLButtonElement>>>({});
-  useEffect(() => {
-    setActiveTab(props.initialTab);
-    setMountedTabs((previous) => addMountedTab(previous, props.initialTab));
-  }, [props.initialTab]);
+  if (initialTab !== activeTab) {
+    setActiveTab(initialTab);
+    setMountedTabs((previous) => addMountedTab(previous, initialTab));
+  }
   useEffect(() => {
     const activeTrigger = tabTriggerRefs.current[activeTab];
     if (!activeTrigger) {
@@ -57,21 +58,21 @@ export function AdminDetailTabsShell<TTab extends string>(
       setActiveTab(nextTab);
       setMountedTabs((previous) => addMountedTab(previous, nextTab));
       const nextParams = new URLSearchParams(window.location.search);
-      if (props.shouldOmitTabFromUrl(nextTab)) {
+      if (shouldOmitTabFromUrl(nextTab)) {
         nextParams.delete('tab');
       } else {
         nextParams.set('tab', nextTab);
       }
       const query = nextParams.toString();
-      router.replace(query.length > 0 ? `${props.basePath}?${query}` : props.basePath, { scroll: false });
+      router.replace(query.length > 0 ? `${basePath}?${query}` : basePath, { scroll: false });
     },
-    [props.basePath, props.shouldOmitTabFromUrl, router],
+    [basePath, shouldOmitTabFromUrl, router],
   );
   return (
     <Tabs
       value={activeTab}
       onValueChange={(value) => {
-        executeChangeTab(props.resolveTab(value));
+        executeChangeTab(resolveTab(value));
       }}
       className="space-y-6"
     >
@@ -81,10 +82,10 @@ export function AdminDetailTabsShell<TTab extends string>(
           role="presentation"
         >
           <TabsList
-            aria-label={props.ariaLabel}
+            aria-label={ariaLabel}
             className="inline-flex h-auto w-max max-w-none flex-nowrap justify-start gap-1 rounded-xl border border-border/70 bg-muted/50 p-1.5 shadow-sm"
           >
-            {props.tabs.map((tab) => {
+            {tabs.map((tab) => {
               const TabIcon = tab.icon;
               return (
                 <TabsTrigger
@@ -115,13 +116,13 @@ export function AdminDetailTabsShell<TTab extends string>(
           className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-linear-to-l from-background to-transparent sm:hidden"
         />
       </div>
-      {props.tabs.map((tab) => (
+      {tabs.map((tab) => (
         <TabsContent
           key={tab.value}
           value={tab.value}
           className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
         >
-          {mountedTabs.has(tab.value) ? props.renderPanel(tab.value) : null}
+          {mountedTabs.has(tab.value) ? renderPanel(tab.value) : null}
         </TabsContent>
       ))}
     </Tabs>

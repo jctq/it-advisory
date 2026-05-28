@@ -50,10 +50,10 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
   const [activeTab, setActiveTab] = useState<DebugTab>(props.initialTab);
   const [mountedTabs, setMountedTabs] = useState<ReadonlySet<DebugTab>>(() => new Set([props.initialTab]));
   const tabTriggerRefs = useRef<Partial<Record<DebugTab, HTMLButtonElement>>>({});
-  useEffect(() => {
+  if (props.initialTab !== activeTab) {
     setActiveTab(props.initialTab);
     setMountedTabs((previous) => addMountedDebugTab(previous, props.initialTab));
-  }, [props.initialTab]);
+  }
   useEffect(() => {
     const activeTrigger = tabTriggerRefs.current[activeTab];
     if (!activeTrigger) {

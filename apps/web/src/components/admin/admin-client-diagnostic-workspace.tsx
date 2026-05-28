@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState, type FormEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { AlertCircle, AlertTriangle, ExternalLink, Info, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,17 @@ export function AdminClientDiagnosticWorkspace(props: AdminClientDiagnosticWorks
   const router = useRouter();
   const [diagnosticInput, setDiagnosticInput] = useState(props.initialDiagnostic);
   const [referenceInput, setReferenceInput] = useState(props.initialReference);
+  const [syncedInitialDiagnostic, setSyncedInitialDiagnostic] = useState(props.initialDiagnostic);
+  const [syncedInitialReference, setSyncedInitialReference] = useState(props.initialReference);
+  if (
+    props.initialDiagnostic !== syncedInitialDiagnostic ||
+    props.initialReference !== syncedInitialReference
+  ) {
+    setSyncedInitialDiagnostic(props.initialDiagnostic);
+    setSyncedInitialReference(props.initialReference);
+    setDiagnosticInput(props.initialDiagnostic);
+    setReferenceInput(props.initialReference);
+  }
   const [report, setReport] = useState<AdminClientDiagnosticReport | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,14 +78,19 @@ export function AdminClientDiagnosticWorkspace(props: AdminClientDiagnosticWorks
       setIsLoading(false);
     }
   }, []);
+  const lastAutoLookupKeyRef = useRef<string | null>(null);
   useEffect(() => {
     const diagnostic = props.initialDiagnostic.trim();
     const reference = props.initialReference.trim();
-    if (diagnostic.length > 0 || reference.length >= 4) {
-      setDiagnosticInput(diagnostic);
-      setReferenceInput(reference);
-      void executeLookup(diagnostic, reference);
+    if (diagnostic.length === 0 && reference.length < 4) {
+      return;
     }
+    const lookupKey = `${diagnostic}|${reference}`;
+    if (lastAutoLookupKeyRef.current === lookupKey) {
+      return;
+    }
+    lastAutoLookupKeyRef.current = lookupKey;
+    void executeLookup(diagnostic, reference);
   }, [props.initialDiagnostic, props.initialReference, executeLookup]);
   const executeSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();

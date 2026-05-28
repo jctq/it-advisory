@@ -83,8 +83,10 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
   );
   useEffect(() => {
     const controller = new AbortController();
-    setAvailabilityStatus('loading');
-    setAvailabilityError(null);
+    queueMicrotask(() => {
+      setAvailabilityStatus('loading');
+      setAvailabilityError(null);
+    });
     void getBookingAvailabilitySlots({
       apiBaseUrl: props.apiBaseUrl,
       serviceKey: props.booking.serviceKey,
