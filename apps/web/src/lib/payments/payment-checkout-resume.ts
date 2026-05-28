@@ -22,6 +22,7 @@ import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payment
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { getDb } from '@/lib/mongodb';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
+import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 
 type ResumeCheckoutParams = {
@@ -146,6 +147,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
     redirectUrl: null,
     metadata: {
       bookingDraftId,
+      paymentMethodId: params.paymentMethodId,
       resumeBookingId: verified.bookingId,
       pricingSource: resolvedPricing.source,
       ...(resolvedPricing.appliedPromoCode !== undefined
@@ -230,6 +232,13 @@ export async function createPaymentCheckoutForVerifiedBooking(
     };
   }
   await updateTransactionProvider(insertedId, providerSession);
+  const refreshed = await findPaymentTransactionById(transactionId);
+  if (refreshed !== null) {
+    void executeSendBookingPaymentReminderEmail({
+      bookingId: verified.bookingId,
+      transaction: refreshed,
+    });
+  }
   return {
     ok: true,
     transactionId,

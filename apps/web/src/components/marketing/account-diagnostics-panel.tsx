@@ -40,6 +40,11 @@ import {
   matchesAccountDiagnosticsListRequest,
   type AccountDiagnosticsInitialList,
 } from '@/lib/marketing/account-diagnostics-list';
+import {
+  buildSessionAwaitingPaymentBookHref,
+  isSessionAwaitingPayment,
+  isSessionConfirmedForManage,
+} from '@/lib/marketing/account-diagnostics-session-actions';
 import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/quiz-session-list-display';
 import type {
@@ -149,6 +154,13 @@ function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }):
   if (props.row.bookingStatus === 'cancelled') {
     return <Badge variant="outline">Cancelled</Badge>;
   }
+  if (props.row.bookingStatus === 'pending') {
+    return (
+      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
+        Awaiting payment
+      </Badge>
+    );
+  }
   return (
     <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
       Pending
@@ -177,11 +189,21 @@ function SessionActions(props: {
   readonly manageBookingEnabled: boolean;
   readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
 }): ReactElement {
-  const showBookedActions = props.row.isBooked || props.row.paymentTransactionStatus === 'paid';
+  const awaitingPayment = isSessionAwaitingPayment(props.row);
+  const showConfirmedActions = isSessionConfirmedForManage(props.row);
   const canDelete = !props.row.isBooked && !hasActiveCheckout(props.row);
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      {showBookedActions ? (
+      {awaitingPayment ? (
+        <>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
+          </Button>
+          <Button type="button" variant="secondary" size="sm" asChild>
+            <Link href={buildSessionAwaitingPaymentBookHref(props.row)}>Manage</Link>
+          </Button>
+        </>
+      ) : showConfirmedActions ? (
         <>
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>

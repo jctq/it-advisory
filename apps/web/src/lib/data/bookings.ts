@@ -692,6 +692,7 @@ export type PrimaryBookingSlotRow = {
   readonly customerEmail: string | null;
   readonly customerCompany: string | null;
   readonly customerPhone: string | null;
+  readonly paymentExpiresAtIso: string | null;
 };
 
 /**
@@ -715,6 +716,7 @@ export async function findPrimaryBookingSlotByQuizSessionId(quizSessionId: Objec
         paymentTransactionId: 1,
         paymentMethodLabel: 1,
         paymentStatus: 1,
+        paymentExpiresAt: 1,
         leadId: 1,
       },
     },
@@ -764,6 +766,8 @@ export async function findPrimaryBookingSlotByQuizSessionId(quizSessionId: Objec
     customerEmail,
     customerCompany,
     customerPhone,
+    paymentExpiresAtIso:
+      doc.paymentExpiresAt instanceof Date ? doc.paymentExpiresAt.toISOString() : null,
   };
 }
 

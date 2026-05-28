@@ -5,6 +5,7 @@
   "scripts": {
     "generate:appearance-bootstrap": "npx --yes tsx scripts/write-appearance-bootstrap.ts",
     "sign:fathom-webhook": "npx --yes tsx --env-file=.env.local scripts/sign-fathom-webhook.ts",
+    "cron:payment-holds": "npx --yes tsx scripts/run-payment-holds-cron.ts",
     "predev": "pnpm generate:appearance-bootstrap",
     "prebuild": "pnpm generate:appearance-bootstrap",
     "dev": "next dev --turbo",

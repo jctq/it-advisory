@@ -5,6 +5,7 @@ import { findBookingById } from '@/lib/data/bookings';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
+import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
 import { createManualConfirmBooking, createPendingBookingForHoldPolicy } from '@/lib/payments/payment-completion';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
@@ -28,6 +29,20 @@ import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz
 import type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
 export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
+
+async function dispatchPaymentReminderEmailAfterCheckout(input: {
+  readonly transactionId: string;
+  readonly visitorId: string;
+}): Promise<void> {
+  const refreshed = await findPaymentTransactionById(input.transactionId, input.visitorId);
+  if (refreshed === null || refreshed.bookingId === null) {
+    return;
+  }
+  void executeSendBookingPaymentReminderEmail({
+    bookingId: refreshed.bookingId,
+    transaction: refreshed,
+  });
+}
 
 async function updateTransactionProvider(
   transactionId: ObjectId,
@@ -167,7 +182,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   }
   const bookingDraftId = randomUUID();
   const expiresAt =
-    settings.paymentPolicy === 'pay_after_hold'
+    settings.paymentPolicy === 'pay_after_hold' || settings.paymentPolicy === 'pay_before_booking'
       ? new Date(Date.now() + settings.holdExpiresMinutes * 60_000)
       : null;
   const insertedId = await insertPaymentTransaction({
@@ -191,6 +206,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     redirectUrl: null,
     metadata: {
       bookingDraftId,
+      paymentMethodId: params.paymentMethodId,
       pricingSource: resolvedPricing.source,
       ...(resolvedPricing.appliedPromoCode !== undefined
         ? { promoCode: resolvedPricing.appliedPromoCode }
@@ -275,6 +291,10 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     };
   }
   await updateTransactionProvider(insertedId, providerSession);
+  await dispatchPaymentReminderEmailAfterCheckout({
+    transactionId,
+    visitorId: params.visitorId,
+  });
   const bookingStatus = await resolveBookingStatusByBookingId(row.bookingId);
   return {
     ok: true,

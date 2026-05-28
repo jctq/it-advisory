@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { countBookingsByQuizSessionId, findPrimaryBookingSlotByQuizSessionId } from '@/lib/data/bookings';
+import { findLatestPaymentTransactionByQuizSessionIdHex } from '@/lib/data/payment-transactions';
+import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
+import { resolvePaymentHoldExpiresAtIso } from '@/lib/marketing/payment-hold-expiry';
+import { resolvePaymentSelectionFromTransaction } from '@/lib/marketing/resolve-payment-selection-from-transaction';
+import { syncQuizSessionPaymentHold } from '@/lib/payments/sync-quiz-session-payment-hold';
 import {
   deleteQuizSessionForVisitor,
   findLatestQuizSession,
@@ -67,16 +72,62 @@ export async function GET(request: Request): Promise<NextResponse> {
       sessionId: null,
     });
   }
+  const sessionIdHex = session._id.toString();
+  await syncQuizSessionPaymentHold({ quizSessionIdHex: sessionIdHex, visitorId });
   const bookedCount = await countBookingsByQuizSessionId(session._id);
   const linkedBookingSlot =
     bookedCount > 0 ? await findPrimaryBookingSlotByQuizSessionId(session._id) : null;
+  const latestPayment = await findLatestPaymentTransactionByQuizSessionIdHex(sessionIdHex);
+  const hasPendingCheckout =
+    latestPayment !== null &&
+    (latestPayment.status === 'pending' || latestPayment.status === 'processing');
+  const pendingCheckout =
+    hasPendingCheckout && linkedBookingSlot === null
+      ? {
+          transactionId: latestPayment.id,
+          startsAtIso: latestPayment.startsAtIso,
+          timezone: latestPayment.timezone,
+          serviceKey: latestPayment.serviceKey,
+          customerName: latestPayment.customerName,
+          customerEmail: latestPayment.customerEmail,
+          customerCompany: latestPayment.customerCompany,
+          customerPhone: latestPayment.customerPhone,
+          expiresAtIso: latestPayment.expiresAtIso,
+          bookingId: latestPayment.bookingId,
+        }
+      : null;
+  const serverNowIso = new Date().toISOString();
+  const paymentSettings = await getPaymentSettingsPublicView();
+  const paymentHoldExpiresAtIso =
+    hasPendingCheckout || (linkedBookingSlot !== null && linkedBookingSlot.status === 'pending')
+      ? resolvePaymentHoldExpiresAtIso({
+          bookingPaymentExpiresAtIso: linkedBookingSlot?.paymentExpiresAtIso ?? null,
+          transactionExpiresAtIso: latestPayment?.expiresAtIso ?? null,
+          transactionCreatedAtIso: latestPayment?.createdAtIso ?? null,
+          holdExpiresMinutes: paymentSettings.holdExpiresMinutes,
+        })
+      : null;
+  const isAwaitingPaymentResume =
+    latestPayment !== null &&
+    (latestPayment.status === 'pending' || latestPayment.status === 'processing') &&
+    ((hasPendingCheckout && linkedBookingSlot === null) ||
+      (linkedBookingSlot !== null &&
+        linkedBookingSlot.status === 'pending' &&
+        linkedBookingSlot.paymentStatus !== 'paid'));
+  const resumePaymentSelection = isAwaitingPaymentResume
+    ? resolvePaymentSelectionFromTransaction(latestPayment)
+    : null;
   return NextResponse.json({
     session: {
       answers: session.answers,
       currentStep: session.currentStep,
     },
-    readOnly: bookedCount > 0,
-    sessionId: encodeQuizSessionRefForMarketingUrl(session._id.toString()),
+    readOnly: bookedCount > 0 || hasPendingCheckout,
+    serverNowIso,
+    paymentHoldExpiresAtIso,
+    resumePaymentSelection,
+    sessionId: encodeQuizSessionRefForMarketingUrl(sessionIdHex),
+    pendingCheckout,
     linkedBookingSlot:
       linkedBookingSlot === null
         ? null
@@ -94,6 +145,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             customerEmail: linkedBookingSlot.customerEmail,
             customerCompany: linkedBookingSlot.customerCompany,
             customerPhone: linkedBookingSlot.customerPhone,
+            paymentExpiresAtIso: linkedBookingSlot.paymentExpiresAtIso,
           },
   });
 }

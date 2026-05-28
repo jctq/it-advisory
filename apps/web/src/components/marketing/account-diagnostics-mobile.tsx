@@ -25,6 +25,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  buildSessionAwaitingPaymentBookHref,
+  isSessionAwaitingPayment,
+  isSessionConfirmedForManage,
+} from '@/lib/marketing/account-diagnostics-session-actions';
 import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import {
   resolveAccountDiagnosticListSummary,
@@ -127,6 +132,13 @@ function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }):
   }
   if (props.row.bookingStatus === 'cancelled') {
     return <Badge variant="outline">Cancelled</Badge>;
+  }
+  if (props.row.bookingStatus === 'pending') {
+    return (
+      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
+        Awaiting payment
+      </Badge>
+    );
   }
   return (
     <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
@@ -445,7 +457,8 @@ type MobileDiagnosticsSessionDialogProps = {
 
 function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogProps): ReactElement {
   const session = props.session;
-  const showBookedActions = session !== null && (session.isBooked || session.paymentTransactionStatus === 'paid');
+  const awaitingPayment = session !== null && isSessionAwaitingPayment(session);
+  const showConfirmedActions = session !== null && isSessionConfirmedForManage(session);
   const canDelete = session !== null && !session.isBooked && !hasActiveCheckout(session);
   const bookingTitle = useMemo(() => {
     if (session === null) {
@@ -537,7 +550,16 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                   ) : null}
                 </dl>
                 <div className="flex flex-wrap gap-2">
-                  {showBookedActions ? (
+                  {awaitingPayment ? (
+                    <>
+                      <Button type="button" variant="outline" size="sm" asChild>
+                        <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>View</Link>
+                      </Button>
+                      <Button type="button" variant="secondary" size="sm" asChild>
+                        <Link href={buildSessionAwaitingPaymentBookHref(session)}>Manage</Link>
+                      </Button>
+                    </>
+                  ) : showConfirmedActions ? (
                     <Button type="button" variant="outline" size="sm" asChild>
                       <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>View diagnostic</Link>
                     </Button>
@@ -619,7 +641,11 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                   <p className="text-xs text-muted-foreground">Booking confirmation in progress</p>
                 ) : null}
                 <div className="flex flex-wrap gap-2">
-                  {props.manageBookingEnabled && session.bookingId !== null ? (
+                  {awaitingPayment ? (
+                    <Button type="button" variant="secondary" size="sm" asChild>
+                      <Link href={buildSessionAwaitingPaymentBookHref(session)}>Complete payment</Link>
+                    </Button>
+                  ) : props.manageBookingEnabled && session.bookingId !== null ? (
                     <Button type="button" variant="secondary" size="sm" asChild>
                       <Link href={buildBookManageHref(session.bookingId)}>Manage booking</Link>
                     </Button>

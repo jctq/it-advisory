@@ -27,6 +27,7 @@ export type PaymentTransactionRow = {
   readonly paymentMethodLabel: string | null;
   readonly startsAtIso: string;
   readonly expiresAtIso: string | null;
+  readonly createdAtIso: string;
   readonly paidAtIso: string | null;
   readonly metadata?: Record<string, string>;
 };
@@ -58,6 +59,7 @@ function mapTransaction(
     paymentMethodLabel: doc.paymentMethodLabel ?? null,
     startsAtIso: doc.startsAt.toISOString(),
     expiresAtIso: doc.expiresAt ? doc.expiresAt.toISOString() : null,
+    createdAtIso: doc.createdAt.toISOString(),
     paidAtIso: doc.paidAt ? doc.paidAt.toISOString() : null,
     metadata: doc.metadata,
   };

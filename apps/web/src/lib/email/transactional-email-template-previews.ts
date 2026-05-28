@@ -8,6 +8,10 @@ import {
   buildBookingConfirmationEmailHtml,
   buildBookingPaymentSectionHtml,
 } from '@/lib/email/send-booking-confirmation-email';
+import {
+  buildBookingPaymentReminderEmailHtml,
+  buildBookingPaymentReminderSubject,
+} from '@/lib/email/send-booking-payment-reminder-email';
 import { buildBookingFathomNotesEmailHtml } from '@/lib/email/send-booking-fathom-notes-email';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import {
@@ -108,6 +112,20 @@ export async function buildTransactionalEmailTemplatePreviews(
     catalogSectionHtml,
     paymentSectionHtml,
   });
+  const paymentReminderHtml = buildBookingPaymentReminderEmailHtml({
+    brandName,
+    customerName: 'Alex Rivera',
+    bookingReference: SAMPLE_BOOKING_REFERENCE,
+    dateLong,
+    timeLabel,
+    paymentDeadlineLabel: 'Monday, June 15, 2026 at 10:30 AM (Asia/Manila)',
+    contactName: 'Alex Rivera',
+    contactEmail: 'alex@example.com',
+    contactPhone: '+639171234567',
+    contactCompany: 'Acme Corp',
+    continueCheckoutUrl: siteOrigin.length > 0 ? `${siteOrigin}/book/preview-session` : '',
+    manageUrl,
+  });
   const fathomNotesHtml = buildBookingFathomNotesEmailHtml({
     brandName,
     siteOrigin,
@@ -130,6 +148,13 @@ export async function buildTransactionalEmailTemplatePreviews(
       description: 'Sent after payment succeeds and a booking is confirmed.',
       subject: bookingConfirmationSubject,
       html: bookingConfirmationHtml,
+    },
+    {
+      id: 'booking_payment_reminder',
+      label: 'Payment reminder',
+      description: 'Sent when checkout starts so guests can pay later with their booking reference.',
+      subject: buildBookingPaymentReminderSubject(SAMPLE_BOOKING_REFERENCE),
+      html: paymentReminderHtml,
     },
     {
       id: 'booking_fathom_notes',

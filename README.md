@@ -57,6 +57,27 @@ Suggested indexes (create in Atlas when you begin writing documents):
 
 Node **>= 22** matches `package.json` engines.
 
+### Payment-hold cron (`/api/cron/payment-holds`)
+
+The route expires stale checkout holds, reconciles stuck payments, and cancels unpaid bookings past their hold window.
+
+**Railway Cron (recommended):** use a dedicated short-lived service (not your web server) with the same env vars as `web` (`MONGODB_URI`, etc.) and a cron schedule. **Start command:**
+
+```bash
+pnpm --filter web cron:payment-holds
+```
+
+The process must exit when finished (the script above does). Do not point cron at `http://api/...` — that hostname only exists in some local Docker Compose setups and causes `getaddrinfo ENOTFOUND api` in production.
+
+**HTTP trigger (optional):** if you call the route from another scheduler instead, use your public app URL, for example:
+
+```bash
+curl -sS -X POST "https://YOUR_APP.up.railway.app/api/cron/payment-holds" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+Set `CRON_SECRET` in production when using the HTTP route; when unset, the route accepts any caller (dev only).
+
 ## Native app
 
 `apps/native` is the real React Native / Expo client for iOS and Android.
