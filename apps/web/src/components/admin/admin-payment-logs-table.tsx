@@ -1,8 +1,9 @@
 'use client';
 
-import { createColumnHelper } from '@tanstack/react-table';
+import { createColumnHelper, type PaginationState } from '@tanstack/react-table';
 import Link from 'next/link';
-import { useMemo, useState, type ReactElement } from 'react';
+import { Search } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { DataTable } from '@/components/admin/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,11 +14,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { PaymentLogAdminRow } from '@/lib/data/payment-logs';
-import type { PaymentLogOutcome } from '@/domain/payment-log-types';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
+import { PAYMENT_GATEWAY_IDS, type PaymentGatewayId } from '@/domain/payment-types';
+import { PAYMENT_LOG_OUTCOMES, type PaymentLogOutcome } from '@/domain/payment-log-types';
+import { useAdminPaymentLogsQuery } from '@/hooks/admin/use-admin-payment-logs-query';
+import {
+  ADMIN_DEBUG_SEARCH_DEBOUNCE_MS,
+  ADMIN_DEBUG_TABLE_PAGE_SIZE,
+} from '@/lib/admin/admin-paginated-list';
+import type {
+  PaymentLogAdminRow,
+  PaymentLogListGatewayFilter,
+  PaymentLogListOutcomeFilter,
+} from '@/lib/data/payment-logs';
 
 type AdminPaymentLogsTableProps = {
-  readonly initialData: readonly PaymentLogAdminRow[];
+  readonly isActive: boolean;
 };
 
 const columnHelper = createColumnHelper<PaymentLogAdminRow>();
@@ -27,6 +41,13 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
   timeStyle: 'short',
   timeZone: 'Asia/Manila',
 });
+
+const GATEWAY_LABELS: Record<PaymentGatewayId, string> = {
+  paymongo: 'PayMongo',
+  xendit: 'Xendit',
+  hitpay: 'HitPay',
+  paypal: 'PayPal',
+};
 
 function resolveOutcomeBadgeVariant(
   outcome: PaymentLogOutcome,
@@ -215,6 +236,42 @@ function PaymentLogDetailDialog(props: {
 
 export function AdminPaymentLogsTable(props: AdminPaymentLogsTableProps): ReactElement {
   const [selectedRow, setSelectedRow] = useState<PaymentLogAdminRow | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [outcomeFilter, setOutcomeFilter] = useState<PaymentLogListOutcomeFilter>('all');
+  const [gatewayFilter, setGatewayFilter] = useState<PaymentLogListGatewayFilter>('all');
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: ADMIN_DEBUG_TABLE_PAGE_SIZE,
+  });
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, ADMIN_DEBUG_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
+  useEffect(() => {
+    setPagination((previous) => ({ ...previous, pageIndex: 0 }));
+  }, [debouncedSearch, gatewayFilter, outcomeFilter]);
+  const queryFilters = useMemo(
+    () => ({
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+      search: debouncedSearch,
+      outcome: outcomeFilter,
+      gatewayId: gatewayFilter,
+    }),
+    [debouncedSearch, gatewayFilter, outcomeFilter, pagination.pageIndex, pagination.pageSize],
+  );
+  const query = useAdminPaymentLogsQuery(queryFilters, props.isActive);
+  const rows = query.data?.rows ?? [];
+  const totalCount = query.data?.totalCount ?? 0;
+  const totalPages = query.data?.totalPages ?? 0;
+  useEffect(() => {
+    if (totalPages > 0 && pagination.pageIndex >= totalPages) {
+      setPagination((previous) => ({ ...previous, pageIndex: totalPages - 1 }));
+    }
+  }, [pagination.pageIndex, totalPages]);
   const columns = useMemo(
     () => [
       columnHelper.accessor('receivedAtIso', {
@@ -286,14 +343,73 @@ export function AdminPaymentLogsTable(props: AdminPaymentLogsTableProps): ReactE
   );
   return (
     <>
-      <DataTable
-        columns={columns}
-        data={[...props.initialData]}
-        emptyMessage="No payment logs yet. Entries appear here after gateways POST to /api/webhooks/*."
-        resolveRowClassName={(row) =>
-          row.outcome === 'updated' || row.outcome === 'noop' ? undefined : 'bg-destructive/5'
-        }
-      />
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem_10rem]">
+          <div className="space-y-2">
+            <Label htmlFor="admin-payment-logs-search">Search</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                id="admin-payment-logs-search"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Email, session id, transaction, booking"
+                className="pl-9"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="admin-payment-logs-outcome">Outcome</Label>
+            <NativeSelect
+              id="admin-payment-logs-outcome"
+              value={outcomeFilter}
+              onChange={(event) => setOutcomeFilter(event.target.value as PaymentLogListOutcomeFilter)}
+            >
+              <option value="all">All outcomes</option>
+              {PAYMENT_LOG_OUTCOMES.map((outcome) => (
+                <option key={outcome} value={outcome}>
+                  {formatOutcomeLabel(outcome)}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="admin-payment-logs-gateway">Gateway</Label>
+            <NativeSelect
+              id="admin-payment-logs-gateway"
+              value={gatewayFilter}
+              onChange={(event) => setGatewayFilter(event.target.value as PaymentLogListGatewayFilter)}
+            >
+              <option value="all">All gateways</option>
+              {PAYMENT_GATEWAY_IDS.map((gatewayId) => (
+                <option key={gatewayId} value={gatewayId}>
+                  {GATEWAY_LABELS[gatewayId]}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+        </div>
+        {query.error !== null ? (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {query.error.message}
+          </p>
+        ) : null}
+        <DataTable
+          columns={columns}
+          data={[...rows]}
+          emptyMessage="No payment logs matched your filters."
+          resolveRowClassName={(row) =>
+            row.outcome === 'updated' || row.outcome === 'noop' ? undefined : 'bg-destructive/5'
+          }
+          manualPagination
+          pageCount={Math.max(1, totalPages)}
+          totalCount={totalCount}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          isLoading={query.isLoading}
+        />
+      </div>
       <PaymentLogDetailDialog row={selectedRow} onClose={() => setSelectedRow(null)} />
     </>
   );

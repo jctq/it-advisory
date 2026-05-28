@@ -1,10 +1,17 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId, type Filter } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import type { PaymentLogDocument, PaymentLogOutcome } from '@/domain/payment-log-types';
+import type { AdminPaginatedList } from '@/lib/admin/admin-paginated-list';
 import { getDb } from '@/lib/mongodb';
 
 const DEFAULT_PAYMENT_LOG_LIST_LIMIT = 150 as const;
+
+export type PaymentLogListOutcomeFilter = PaymentLogOutcome | 'all';
+
+export type PaymentLogListGatewayFilter = PaymentGatewayId | 'all';
+
+export type PaymentLogAdminPage = AdminPaginatedList<PaymentLogAdminRow>;
 
 export type PaymentLogAdminRow = {
   readonly id: string;
@@ -71,17 +78,88 @@ function mapPaymentLog(doc: PaymentLogDocument & { _id: ObjectId }): PaymentLogA
   };
 }
 
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildPaymentLogListFilter(input: {
+  readonly outcome: PaymentLogListOutcomeFilter;
+  readonly gatewayId: PaymentLogListGatewayFilter;
+  readonly search: string;
+}): Filter<PaymentLogDocument> {
+  const filters: Filter<PaymentLogDocument>[] = [];
+  if (input.outcome !== 'all') {
+    filters.push({ outcome: input.outcome });
+  }
+  if (input.gatewayId !== 'all') {
+    filters.push({ gatewayId: input.gatewayId });
+  }
+  const trimmedSearch = input.search.trim();
+  if (trimmedSearch.length > 0) {
+    const escapedSearch = escapeRegexLiteral(trimmedSearch);
+    const searchRegex = { $regex: escapedSearch, $options: 'i' };
+    filters.push({
+      $or: [
+        { customerEmail: searchRegex },
+        { customerName: searchRegex },
+        { providerSessionId: searchRegex },
+        { providerRef: searchRegex },
+        { transactionId: searchRegex },
+        { bookingId: searchRegex },
+        { visitorId: searchRegex },
+        { errorMessage: searchRegex },
+      ],
+    });
+  }
+  if (filters.length === 0) {
+    return {};
+  }
+  if (filters.length === 1) {
+    return filters[0]!;
+  }
+  return { $and: filters };
+}
+
 export async function listPaymentLogsForAdmin(
   limit: number = DEFAULT_PAYMENT_LOG_LIST_LIMIT,
 ): Promise<readonly PaymentLogAdminRow[]> {
+  const page = await listPaymentLogsForAdminPage({ page: 1, pageSize: limit });
+  return page.rows;
+}
+
+export async function listPaymentLogsForAdminPage(input: {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly outcome?: PaymentLogListOutcomeFilter;
+  readonly gatewayId?: PaymentLogListGatewayFilter;
+  readonly search?: string;
+}): Promise<PaymentLogAdminPage> {
+  const page = Math.max(1, input.page);
+  const pageSize = Math.min(100, Math.max(1, input.pageSize));
+  const outcome = input.outcome ?? 'all';
+  const gatewayId = input.gatewayId ?? 'all';
+  const search = input.search?.trim() ?? '';
+  const filter = buildPaymentLogListFilter({ outcome, gatewayId, search });
   const db = await getDb();
-  const docs = await db
-    .collection<PaymentLogDocument>(COLLECTIONS.paymentLogs)
-    .find({})
-    .sort({ receivedAt: -1 })
-    .limit(limit)
-    .toArray();
-  return docs
+  const collection = db.collection<PaymentLogDocument>(COLLECTIONS.paymentLogs);
+  const [totalCount, docs] = await Promise.all([
+    collection.countDocuments(filter),
+    collection
+      .find(filter)
+      .sort({ receivedAt: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .toArray(),
+  ]);
+  const rows = docs
     .filter((doc): doc is PaymentLogDocument & { _id: ObjectId } => doc._id !== undefined)
     .map(mapPaymentLog);
+  const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / pageSize);
+  return {
+    rows,
+    totalCount,
+    page,
+    pageSize,
+    totalPages,
+  };
 }

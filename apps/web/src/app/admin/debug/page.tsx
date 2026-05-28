@@ -3,8 +3,6 @@ import {
   AdminDebugWorkspace,
   type DebugTab,
 } from '@/components/admin/admin-debug-workspace';
-import { listCronJobRunsForAdmin } from '@/lib/data/cron-job-runs';
-import { listPaymentLogsForAdmin } from '@/lib/data/payment-logs';
 
 export const metadata = {
   title: 'Debug — TechMD Admin',
@@ -39,16 +37,12 @@ export default async function AdminDebugPage(props: AdminDebugPageProps): Promis
     searchParams.diagnostic?.trim() ?? searchParams.sessionId?.trim() ?? '';
   const initialReference =
     searchParams.reference?.trim() ?? searchParams.bookingReference?.trim() ?? '';
-  const cronRuns = await listCronJobRunsForAdmin();
-  const paymentLogs = await listPaymentLogsForAdmin();
   return (
     <Suspense fallback={<p className="text-sm text-muted-foreground">Loading debug tools…</p>}>
       <AdminDebugWorkspace
         initialTab={initialTab}
         initialDiagnostic={initialDiagnostic}
         initialReference={initialReference}
-        cronRuns={cronRuns}
-        paymentLogs={paymentLogs}
       />
     </Suspense>
   );

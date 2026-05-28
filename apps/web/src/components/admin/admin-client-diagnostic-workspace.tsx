@@ -2,20 +2,22 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
+import { useCallback, useState, type FormEvent, type ReactElement } from 'react';
 import { AlertCircle, AlertTriangle, ExternalLink, Info, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { buildApiUrl } from '@/lib/config/build-api-url';
+import {
+  resolveAdminClientDiagnosticValidationError,
+  useAdminClientDiagnosticQuery,
+} from '@/hooks/admin/use-admin-client-diagnostic-query';
 import type { AdminClientDiagnosticReport, AdminDiagnosticIssue } from '@/lib/data/admin-client-diagnostic';
 import { cn } from '@/lib/utils';
-
-const CLIENT_DIAGNOSTIC_API_URL = buildApiUrl('/api/admin/client-diagnostic');
 
 type AdminClientDiagnosticWorkspaceProps = {
   readonly initialDiagnostic: string;
   readonly initialReference: string;
+  readonly isActive: boolean;
 };
 
 export function AdminClientDiagnosticWorkspace(props: AdminClientDiagnosticWorkspaceProps): ReactElement {
@@ -24,6 +26,13 @@ export function AdminClientDiagnosticWorkspace(props: AdminClientDiagnosticWorks
   const [referenceInput, setReferenceInput] = useState(props.initialReference);
   const [syncedInitialDiagnostic, setSyncedInitialDiagnostic] = useState(props.initialDiagnostic);
   const [syncedInitialReference, setSyncedInitialReference] = useState(props.initialReference);
+  const [submittedDiagnostic, setSubmittedDiagnostic] = useState(props.initialDiagnostic);
+  const [submittedReference, setSubmittedReference] = useState(props.initialReference);
+  const [hasAttemptedLookup, setHasAttemptedLookup] = useState(() => {
+    const diagnostic = props.initialDiagnostic.trim();
+    const reference = props.initialReference.trim();
+    return diagnostic.length > 0 || reference.length >= 4;
+  });
   if (
     props.initialDiagnostic !== syncedInitialDiagnostic ||
     props.initialReference !== syncedInitialReference
@@ -32,81 +41,51 @@ export function AdminClientDiagnosticWorkspace(props: AdminClientDiagnosticWorks
     setSyncedInitialReference(props.initialReference);
     setDiagnosticInput(props.initialDiagnostic);
     setReferenceInput(props.initialReference);
-  }
-  const [report, setReport] = useState<AdminClientDiagnosticReport | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const executeLookup = useCallback(async (diagnostic: string, reference: string): Promise<void> => {
-    const diagnosticTrimmed = diagnostic.trim();
-    const referenceTrimmed = reference.trim();
-    if (diagnosticTrimmed.length === 0 && referenceTrimmed.length === 0) {
-      setErrorMessage('Enter a diagnostic session id/ref and/or a booking reference.');
-      setReport(null);
-      return;
-    }
-    if (referenceTrimmed.length > 0 && referenceTrimmed.length < 4) {
-      setErrorMessage('Booking reference must be at least four characters.');
-      setReport(null);
-      return;
-    }
-    setIsLoading(true);
-    setErrorMessage(null);
-    setReport(null);
-    try {
-      const params = new URLSearchParams();
-      if (diagnosticTrimmed.length > 0) {
-        params.set('diagnostic', diagnosticTrimmed);
-      }
-      if (referenceTrimmed.length > 0) {
-        params.set('reference', referenceTrimmed);
-      }
-      const response = await fetch(`${CLIENT_DIAGNOSTIC_API_URL}?${params.toString()}`, { cache: 'no-store' });
-      const payload = (await response.json()) as {
-        ok?: boolean;
-        report?: AdminClientDiagnosticReport;
-        error?: string;
-      };
-      if (payload.report !== undefined) {
-        setReport(payload.report);
-      }
-      if (!response.ok || payload.ok !== true) {
-        throw new Error(typeof payload.error === 'string' ? payload.error : 'Diagnostic failed.');
-      }
-    } catch (error: unknown) {
-      setErrorMessage(error instanceof Error ? error.message : 'Diagnostic failed.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-  const lastAutoLookupKeyRef = useRef<string | null>(null);
-  useEffect(() => {
+    setSubmittedDiagnostic(props.initialDiagnostic);
+    setSubmittedReference(props.initialReference);
     const diagnostic = props.initialDiagnostic.trim();
     const reference = props.initialReference.trim();
-    if (diagnostic.length === 0 && reference.length < 4) {
-      return;
+    if (diagnostic.length > 0 || reference.length >= 4) {
+      setHasAttemptedLookup(true);
     }
-    const lookupKey = `${diagnostic}|${reference}`;
-    if (lastAutoLookupKeyRef.current === lookupKey) {
-      return;
-    }
-    lastAutoLookupKeyRef.current = lookupKey;
-    void executeLookup(diagnostic, reference);
-  }, [props.initialDiagnostic, props.initialReference, executeLookup]);
+  }
+  const query = useAdminClientDiagnosticQuery(
+    { diagnostic: submittedDiagnostic, reference: submittedReference },
+    props.isActive,
+  );
+  const validationError = resolveAdminClientDiagnosticValidationError({
+    diagnostic: submittedDiagnostic,
+    reference: submittedReference,
+  });
   const executeSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const nextParams = new URLSearchParams();
     const diagnosticTrimmed = diagnosticInput.trim();
     const referenceTrimmed = referenceInput.trim();
+    const nextValidationError = resolveAdminClientDiagnosticValidationError({
+      diagnostic: diagnosticTrimmed,
+      reference: referenceTrimmed,
+    });
+    setHasAttemptedLookup(true);
+    if (nextValidationError !== null) {
+      return;
+    }
+    const nextParams = new URLSearchParams();
     if (diagnosticTrimmed.length > 0) {
       nextParams.set('diagnostic', diagnosticTrimmed);
     }
     if (referenceTrimmed.length > 0) {
       nextParams.set('reference', referenceTrimmed);
     }
-    const query = nextParams.toString();
-    router.replace(query.length > 0 ? `/admin/debug?${query}` : '/admin/debug');
-    void executeLookup(diagnosticTrimmed, referenceTrimmed);
+    const queryString = nextParams.toString();
+    router.replace(queryString.length > 0 ? `/admin/debug?${queryString}` : '/admin/debug');
+    setSubmittedDiagnostic(diagnosticTrimmed);
+    setSubmittedReference(referenceTrimmed);
   };
+  const isLoading = query.isLoading;
+  const report = query.data?.report ?? null;
+  const errorMessage = hasAttemptedLookup
+    ? validationError ?? (query.error !== null ? query.error.message : null)
+    : null;
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">

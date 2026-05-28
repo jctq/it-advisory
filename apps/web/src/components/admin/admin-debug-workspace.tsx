@@ -8,8 +8,6 @@ import { AdminCronLogsTable } from '@/components/admin/admin-cron-logs-table';
 import { AdminPaymentLogsTable } from '@/components/admin/admin-payment-logs-table';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { CronJobRunAdminRow } from '@/lib/data/cron-job-runs';
-import type { PaymentLogAdminRow } from '@/lib/data/payment-logs';
 
 export type DebugTab = 'client-diagnostic' | 'cron-logs' | 'payment-logs';
 
@@ -29,8 +27,6 @@ type AdminDebugWorkspaceProps = {
   readonly initialTab: DebugTab;
   readonly initialDiagnostic: string;
   readonly initialReference: string;
-  readonly cronRuns: readonly CronJobRunAdminRow[];
-  readonly paymentLogs: readonly PaymentLogAdminRow[];
 };
 
 function addMountedDebugTab(previous: ReadonlySet<DebugTab>, tab: DebugTab): ReadonlySet<DebugTab> {
@@ -146,6 +142,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
               <AdminClientDiagnosticWorkspace
                 initialDiagnostic={props.initialDiagnostic}
                 initialReference={props.initialReference}
+                isActive={activeTab === 'client-diagnostic'}
               />
             ) : null}
           </TabsContent>
@@ -159,7 +156,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
                   Each POST to a protected /api/cron/* route is recorded when it runs: job name, trigger (scheduler vs
                   unknown), duration, and result counts or errors. Unauthorized attempts are logged too.
                 </p>
-                <AdminCronLogsTable initialData={props.cronRuns} />
+                <AdminCronLogsTable isActive={activeTab === 'cron-logs'} />
               </div>
             ) : null}
           </TabsContent>
@@ -174,7 +171,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
                   transaction and booking context, HTTP response, timing, header summary, and a raw payload snippet for
                   debugging stuck or unprocessed payments.
                 </p>
-                <AdminPaymentLogsTable initialData={props.paymentLogs} />
+                <AdminPaymentLogsTable isActive={activeTab === 'payment-logs'} />
               </div>
             ) : null}
           </TabsContent>
