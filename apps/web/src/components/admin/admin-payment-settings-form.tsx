@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { PAYMENT_POLICIES, type PaymentGatewayId, type PaymentPolicy } from '@/domain/payment-types';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
+import { AdminSettingsHint, AdminSettingsLabel, AdminSettingsOptionTitle } from '@/components/admin/admin-settings-hint';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
@@ -293,12 +294,12 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
               className="mt-1 size-4 rounded border-input"
             />
             <div>
-              <label htmlFor="paymentsEnabled" className="text-sm font-medium text-foreground">
+              <AdminSettingsLabel
+                htmlFor="paymentsEnabled"
+                hint="When off, checkout uses the legacy mock flow (no gateway charge)."
+              >
                 Enable online payments
-              </label>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                When off, checkout uses the legacy mock flow (no gateway charge).
-              </p>
+              </AdminSettingsLabel>
             </div>
           </div>
           <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
@@ -312,23 +313,23 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
               className="mt-1 size-4 rounded border-input"
             />
             <div>
-              <label htmlFor="sandboxMode" className="text-sm font-medium text-foreground">
+              <AdminSettingsLabel
+                htmlFor="sandboxMode"
+                hint="Use test keys where providers support separate test credentials."
+              >
                 Sandbox mode
-              </label>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Use test keys where providers support separate test credentials.
-              </p>
+              </AdminSettingsLabel>
             </div>
           </div>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="checkoutAmountPesos" className="text-sm font-medium text-foreground">
+            <AdminSettingsLabel
+              htmlFor="checkoutAmountPesos"
+              hint="Used when no enabled catalog price matches the booking service. Per-service prices are configured in Settings → Pricing."
+            >
               Fallback checkout amount (PHP)
-            </label>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Used when no enabled catalog price matches the booking service. Per-service prices are configured in Settings → Pricing.
-            </p>
+            </AdminSettingsLabel>
             <Input
               id="checkoutAmountPesos"
               type="number"
@@ -345,14 +346,16 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="holdExpiresMinutes" className="text-sm font-medium text-foreground">
+            <AdminSettingsLabel
+              htmlFor="holdExpiresMinutes"
+              hint={
+                settings.paymentPolicy === 'pay_after_hold'
+                  ? 'Customers must complete payment within this window after the slot is held.'
+                  : 'Used when extending payment deadlines on overdue bookings. For Reserve then pay, this is the hold window before the slot is released.'
+              }
+            >
               Payment expiry (minutes)
-            </label>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {settings.paymentPolicy === 'pay_after_hold'
-                ? 'Customers must complete payment within this window after the slot is held.'
-                : 'Used when extending payment deadlines on overdue bookings. For Reserve then pay, this is the hold window before the slot is released.'}
-            </p>
+            </AdminSettingsLabel>
             <Input
               id="holdExpiresMinutes"
               type="number"
@@ -388,8 +391,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
                     className="mt-1"
                   />
                   <div>
-                    <p className="text-sm font-medium text-foreground">{meta.title}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{meta.description}</p>
+                    <AdminSettingsOptionTitle hint={meta.description}>{meta.title}</AdminSettingsOptionTitle>
                   </div>
                 </label>
               );
@@ -424,8 +426,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
                   className="mt-1 size-4 rounded border-input"
                 />
                 <div>
-                  <p className="text-sm font-medium text-foreground">{gateway.label}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{gateway.description}</p>
+                  <AdminSettingsOptionTitle hint={gateway.description}>{gateway.label}</AdminSettingsOptionTitle>
                   <p className="mt-1 text-xs text-muted-foreground">{gateway.methodLabels.join(' · ')}</p>
                 </div>
               </label>
@@ -441,8 +442,10 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
               <div key={gateway.id} className="space-y-4 rounded-2xl border border-border bg-background p-4">
                 <div className="space-y-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{gateway.label}</p>
-                    <p className="text-xs text-muted-foreground">{gateway.description}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold text-foreground">{gateway.label}</p>
+                      <AdminSettingsHint>{gateway.description}</AdminSettingsHint>
+                    </div>
                     {gateway.configured && gateway.credentialHint !== null ? (
                       <p className="mt-2 text-xs text-muted-foreground">
                         Stored credentials: <span className="font-mono text-foreground">{gateway.credentialHint}</span>

@@ -44,6 +44,7 @@ import {
   buildSessionAwaitingPaymentBookHref,
   isSessionAwaitingPayment,
   isSessionConfirmedForManage,
+  isSessionPaymentExpiredForManage,
 } from '@/lib/marketing/account-diagnostics-session-actions';
 import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/quiz-session-list-display';
@@ -155,6 +156,9 @@ function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }):
     return <Badge variant="outline">Cancelled</Badge>;
   }
   if (props.row.bookingStatus === 'pending') {
+    if (paymentStatus === 'expired' || paymentStatus === 'failed') {
+      return <Badge variant="outline">Payment {paymentStatus}</Badge>;
+    }
     return (
       <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
         Awaiting payment
@@ -190,6 +194,7 @@ function SessionActions(props: {
   readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
 }): ReactElement {
   const awaitingPayment = isSessionAwaitingPayment(props.row);
+  const paymentExpiredManage = isSessionPaymentExpiredForManage(props.row);
   const showConfirmedActions = isSessionConfirmedForManage(props.row);
   const canDelete = !props.row.isBooked && !hasActiveCheckout(props.row);
   return (
@@ -202,6 +207,21 @@ function SessionActions(props: {
           <Button type="button" variant="secondary" size="sm" asChild>
             <Link href={buildSessionAwaitingPaymentBookHref(props.row)}>Manage</Link>
           </Button>
+        </>
+      ) : paymentExpiredManage ? (
+        <>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
+          </Button>
+          {props.manageBookingEnabled && props.row.bookingId !== null ? (
+            <Button type="button" variant="secondary" size="sm" asChild>
+              <Link href={buildBookManageHref(props.row.bookingId)}>Manage</Link>
+            </Button>
+          ) : (
+            <Button type="button" variant="secondary" size="sm" asChild>
+              <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>Manage</Link>
+            </Button>
+          )}
         </>
       ) : showConfirmedActions ? (
         <>

@@ -13,6 +13,7 @@ import {
 } from 'react';
 import type { RecordingActiveProvider } from '@/domain/recording-types';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
+import { AdminSettingsHint, AdminSettingsLabel } from '@/components/admin/admin-settings-hint';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
@@ -244,18 +245,21 @@ export function AdminRecordingSettingsForm(props: AdminRecordingSettingsFormProp
             }}
             className="mt-1"
           />
-          <span>
+          <span className="flex items-center gap-1.5">
             <span className="text-sm font-medium text-foreground">Enable consultation recordings</span>
-            <span className="mt-1 block text-xs text-muted-foreground">
+            <AdminSettingsHint>
               Shows an opt-in checkbox during booking checkout. Webhooks and customer note emails run only for opted-in
               bookings.
-            </span>
+            </AdminSettingsHint>
           </span>
         </label>
-        <div className="mt-4 max-w-xs">
-          <label className="text-sm font-medium text-foreground" htmlFor="recording-opt-in-price">
+        <div className="mt-4 max-w-xs space-y-2">
+          <AdminSettingsLabel
+            htmlFor="recording-opt-in-price"
+            hint="Added to the consultation price when the customer opts in. Use 0 for free opt-in."
+          >
             Opt-in price (PHP)
-          </label>
+          </AdminSettingsLabel>
           <Input
             id="recording-opt-in-price"
             type="number"
@@ -263,12 +267,8 @@ export function AdminRecordingSettingsForm(props: AdminRecordingSettingsFormProp
             step={0.01}
             value={optInPricePesos}
             onChange={(event) => setOptInPricePesos(event.target.value)}
-            className="mt-2"
             disabled={!settings.recordingsEnabled}
           />
-          <p className="mt-2 text-xs text-muted-foreground">
-            Added to the consultation price when the customer opts in. Use 0 for free opt-in.
-          </p>
         </div>
       </SettingsCard>
       <SettingsCard
@@ -292,9 +292,12 @@ export function AdminRecordingSettingsForm(props: AdminRecordingSettingsFormProp
         <p className="mt-3 text-sm text-muted-foreground">
           Webhook URL: <code className="break-all font-mono text-xs">{settings.webhookDestinationUrl}</code>
         </p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Setup steps are documented in <span className="font-mono">docs/fathom-setup.md</span> in the repository.
-        </p>
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Setup documentation</span>
+          <AdminSettingsHint>
+            Setup steps are documented in <span className="font-mono">docs/fathom-setup.md</span> in the repository.
+          </AdminSettingsHint>
+        </div>
         {fathomRow?.credentialHint !== null && fathomRow?.credentialHint !== undefined ? (
           <p className="mt-3 text-xs text-muted-foreground">Stored API key: {fathomRow.credentialHint}</p>
         ) : null}

@@ -1,7 +1,9 @@
 import { formatInTimeZone } from 'date-fns-tz';
+import type { PaymentStatus } from '@/domain/payment-types';
 import { DEFAULT_BOOKING_SERVICE_KEY } from '@/store/marketing';
 import { hasCheckoutManageContact } from '@/lib/marketing/checkout-contact';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
+import { isPaymentHoldExpiredByServerClock } from '@/lib/marketing/payment-hold-expiry';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
 const DEFAULT_SERVICE_KEY = DEFAULT_BOOKING_SERVICE_KEY;
@@ -160,6 +162,65 @@ export function isLinkedBookingCancelled(linked: LinkedBookingSlotSnapshot): boo
   return linked.status === 'cancelled';
 }
 
+function isTerminalPaymentStatus(status: PaymentStatus | null | undefined): boolean {
+  return status === 'expired' || status === 'failed';
+}
+
+export function isPaymentHoldWindowClosed(input: {
+  readonly paymentExpiresAtIso: string | null | undefined;
+  readonly serverNowMs: number;
+}): boolean {
+  return isPaymentHoldExpiredByServerClock({
+    serverNowMs: input.serverNowMs,
+    expiresAtIso: input.paymentExpiresAtIso,
+  });
+}
+
+/** True when checkout can resume for a linked pending booking (hold open, payment not terminal). */
+export function isLinkedBookingCheckoutResumable(
+  linked: LinkedBookingSlotSnapshot,
+  input: {
+    readonly latestPaymentStatus: PaymentStatus | null;
+    readonly serverNowMs: number;
+  },
+): boolean {
+  if (isLinkedBookingCancelled(linked)) {
+    return false;
+  }
+  if (!isLinkedBookingPendingPayment(linked)) {
+    return false;
+  }
+  if (isTerminalPaymentStatus(input.latestPaymentStatus)) {
+    return false;
+  }
+  if (isTerminalPaymentStatus(linked.paymentStatus as PaymentStatus | null)) {
+    return false;
+  }
+  if (isPaymentHoldWindowClosed({ paymentExpiresAtIso: linked.paymentExpiresAtIso, serverNowMs: input.serverNowMs })) {
+    return false;
+  }
+  return true;
+}
+
+/** True when a pay-before-booking checkout row can still be resumed. */
+export function isPendingCheckoutResumable(
+  pending: PendingCheckoutSnapshot,
+  input: {
+    readonly latestPaymentStatus: PaymentStatus | null;
+    readonly paymentHoldExpiresAtIso: string | null | undefined;
+    readonly serverNowMs: number;
+  },
+): boolean {
+  if (isTerminalPaymentStatus(input.latestPaymentStatus)) {
+    return false;
+  }
+  const expiresAtIso = pending.expiresAtIso ?? input.paymentHoldExpiresAtIso;
+  if (isPaymentHoldWindowClosed({ paymentExpiresAtIso: expiresAtIso, serverNowMs: input.serverNowMs })) {
+    return false;
+  }
+  return true;
+}
+
 export function parseLinkedBookingSlotSnapshot(value: unknown): LinkedBookingSlotSnapshot | null {
   if (value === null || value === undefined || typeof value !== 'object') {
     return null;
@@ -223,5 +284,8 @@ export function resolveDiagnosticShowBookingActions(params: {
   if (isLinkedBookingCancelled(params.linkedBookingSlot)) {
     return false;
   }
-  return isLinkedBookingPendingPayment(params.linkedBookingSlot);
+  return isLinkedBookingCheckoutResumable(params.linkedBookingSlot, {
+    latestPaymentStatus: null,
+    serverNowMs: Date.now(),
+  });
 }

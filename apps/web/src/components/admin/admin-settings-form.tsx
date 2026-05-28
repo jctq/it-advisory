@@ -13,6 +13,7 @@ import {
   type Ref,
 } from 'react';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
+import { AdminSettingsHint, AdminSettingsLabel } from '@/components/admin/admin-settings-hint';
 import { Input } from '@/components/ui/input';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -271,9 +272,12 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         description="Public brand name used in transactional email sender names, message copy, and related customer-facing content."
       >
         <div className="space-y-2">
-          <label htmlFor="siteName" className="text-sm font-medium text-foreground">
+          <AdminSettingsLabel
+            htmlFor="siteName"
+            hint="Leave blank to use the environment default. Email From headers use this as the display name."
+          >
             Site name
-          </label>
+          </AdminSettingsLabel>
           <Input
             id="siteName"
             type="text"
@@ -284,9 +288,6 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
               setSiteName(event.target.value);
             }}
           />
-          <p className="text-xs text-muted-foreground">
-            Leave blank to use the environment default . Email From headers use this as the display name.
-          </p>
         </div>
       </SettingsCard>
       <SettingsCard
@@ -306,32 +307,38 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
               className="mt-1 size-4 rounded border-input"
             />
             <div>
-              <label htmlFor="diagnosticAiEnabled" className="text-sm font-medium text-foreground">
+              <AdminSettingsLabel
+                htmlFor="diagnosticAiEnabled"
+                hint={
+                  <>
+                    When enabled, the quiz generates question blocks with AI. When disabled, customers use the active
+                    diagnostic template from Templates.
+                  </>
+                }
+              >
                 AI diagnostic
-              </label>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                When enabled, the quiz generates question blocks with AI. When disabled, customers use the active
-                diagnostic template from Templates.
-              </p>
+              </AdminSettingsLabel>
             </div>
           </div>
           {diagnosticAiEnabled ? (
             <div className="space-y-4 rounded-2xl border border-border bg-background p-4">
-              <div className="space-y-1">
+              <div className="flex items-center gap-1.5">
                 <h3 className="text-sm font-medium text-foreground">AI generation limits</h3>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Defaults: 4 rounds, 5 questions per round, 4 options per question.
-                </p>
+                <AdminSettingsHint>Defaults: 4 rounds, 5 questions per round, 4 options per question.</AdminSettingsHint>
               </div>
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                  <label htmlFor="diagnosticMaxRounds" className="text-sm font-medium text-foreground">
+                  <AdminSettingsLabel
+                    htmlFor="diagnosticMaxRounds"
+                    hint={
+                      <>
+                        Completion required after this many rounds ({DIAGNOSTIC_MAX_ROUNDS_MIN}–
+                        {DIAGNOSTIC_MAX_ROUNDS_MAX}).
+                      </>
+                    }
+                  >
                     Maximum rounds
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Completion required after this many rounds ({DIAGNOSTIC_MAX_ROUNDS_MIN}–
-                    {DIAGNOSTIC_MAX_ROUNDS_MAX}).
-                  </p>
+                  </AdminSettingsLabel>
                   <Input
                     id="diagnosticMaxRounds"
                     type="number"
@@ -344,12 +351,16 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="diagnosticQuestionsPerRound" className="text-sm font-medium text-foreground">
+                  <AdminSettingsLabel
+                    htmlFor="diagnosticQuestionsPerRound"
+                    hint={
+                      <>
+                        Range {DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN}–{DIAGNOSTIC_QUESTIONS_PER_ROUND_MAX}.
+                      </>
+                    }
+                  >
                     Questions per round
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Range {DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN}–{DIAGNOSTIC_QUESTIONS_PER_ROUND_MAX}.
-                  </p>
+                  </AdminSettingsLabel>
                   <Input
                     id="diagnosticQuestionsPerRound"
                     type="number"
@@ -364,12 +375,16 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="diagnosticOptionsPerQuestion" className="text-sm font-medium text-foreground">
+                  <AdminSettingsLabel
+                    htmlFor="diagnosticOptionsPerQuestion"
+                    hint={
+                      <>
+                        Range {DIAGNOSTIC_OPTIONS_PER_QUESTION_MIN}–{DIAGNOSTIC_OPTIONS_PER_QUESTION_MAX}.
+                      </>
+                    }
+                  >
                     Options per question
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Range {DIAGNOSTIC_OPTIONS_PER_QUESTION_MIN}–{DIAGNOSTIC_OPTIONS_PER_QUESTION_MAX}.
-                  </p>
+                  </AdminSettingsLabel>
                   <Input
                     id="diagnosticOptionsPerQuestion"
                     type="number"
@@ -404,13 +419,17 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
             className="mt-1 size-4 rounded border-input"
           />
           <div>
-            <label htmlFor="diagnosticManageBookingEnabled" className="text-sm font-medium text-foreground">
+            <AdminSettingsLabel
+              htmlFor="diagnosticManageBookingEnabled"
+              hint={
+                <>
+                  When disabled, the manage-booking page returns 404, navigation links are hidden, and manage-booking
+                  APIs reject requests.
+                </>
+              }
+            >
               Enable manage booking
-            </label>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              When disabled, the manage-booking page returns 404, navigation links are hidden, and manage-booking APIs
-              reject requests.
-            </p>
+            </AdminSettingsLabel>
           </div>
         </div>
       </SettingsCard>
@@ -430,13 +449,17 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
             className="mt-1 size-4 rounded border-input"
           />
           <div>
-            <label htmlFor="diagnosticCacheDebugEnabled" className="text-sm font-medium text-foreground">
+            <AdminSettingsLabel
+              htmlFor="diagnosticCacheDebugEnabled"
+              hint={
+                <>
+                  Shows cache vs AI provenance on the public quiz. Successful API responses may include{' '}
+                  <span className="font-mono text-[11px]">_diagnosticDebug</span>; headers always include tier/source.
+                </>
+              }
+            >
               Diagnostic cache debug
-            </label>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Shows cache vs AI provenance on the public quiz. Successful API responses may include{' '}
-              <span className="font-mono text-[11px]">_diagnosticDebug</span>; headers always include tier/source.
-            </p>
+            </AdminSettingsLabel>
           </div>
         </div>
       </SettingsCard>

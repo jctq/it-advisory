@@ -73,14 +73,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
   }
   const sessionIdHex = session._id.toString();
-  await syncQuizSessionPaymentHold({ quizSessionIdHex: sessionIdHex, visitorId });
+  const serverNow = new Date();
+  await syncQuizSessionPaymentHold({ quizSessionIdHex: sessionIdHex, visitorId, now: serverNow });
   const bookedCount = await countBookingsByQuizSessionId(session._id);
   const linkedBookingSlot =
     bookedCount > 0 ? await findPrimaryBookingSlotByQuizSessionId(session._id) : null;
   const latestPayment = await findLatestPaymentTransactionByQuizSessionIdHex(sessionIdHex);
-  const hasPendingCheckout =
+  const hasOpenPaymentTransaction =
     latestPayment !== null &&
     (latestPayment.status === 'pending' || latestPayment.status === 'processing');
+  const hasPendingCheckout = hasOpenPaymentTransaction && linkedBookingSlot === null;
   const pendingCheckout =
     hasPendingCheckout && linkedBookingSlot === null
       ? {
@@ -96,10 +98,10 @@ export async function GET(request: Request): Promise<NextResponse> {
           bookingId: latestPayment.bookingId,
         }
       : null;
-  const serverNowIso = new Date().toISOString();
+  const serverNowIso = serverNow.toISOString();
   const paymentSettings = await getPaymentSettingsPublicView();
   const paymentHoldExpiresAtIso =
-    hasPendingCheckout || (linkedBookingSlot !== null && linkedBookingSlot.status === 'pending')
+    hasOpenPaymentTransaction || (linkedBookingSlot !== null && linkedBookingSlot.status === 'pending')
       ? resolvePaymentHoldExpiresAtIso({
           bookingPaymentExpiresAtIso: linkedBookingSlot?.paymentExpiresAtIso ?? null,
           transactionExpiresAtIso: latestPayment?.expiresAtIso ?? null,
@@ -107,24 +109,29 @@ export async function GET(request: Request): Promise<NextResponse> {
           holdExpiresMinutes: paymentSettings.holdExpiresMinutes,
         })
       : null;
+  const paymentHoldClosed =
+    paymentHoldExpiresAtIso !== null && Date.parse(paymentHoldExpiresAtIso) <= serverNow.getTime();
   const isAwaitingPaymentResume =
-    latestPayment !== null &&
-    (latestPayment.status === 'pending' || latestPayment.status === 'processing') &&
-    ((hasPendingCheckout && linkedBookingSlot === null) ||
+    hasOpenPaymentTransaction &&
+    !paymentHoldClosed &&
+    (hasPendingCheckout ||
       (linkedBookingSlot !== null &&
         linkedBookingSlot.status === 'pending' &&
         linkedBookingSlot.paymentStatus !== 'paid'));
   const resumePaymentSelection = isAwaitingPaymentResume
     ? resolvePaymentSelectionFromTransaction(latestPayment)
     : null;
+  const latestPaymentTransactionStatus = latestPayment?.status ?? null;
   return NextResponse.json({
     session: {
       answers: session.answers,
       currentStep: session.currentStep,
     },
-    readOnly: bookedCount > 0 || hasPendingCheckout,
+    readOnly: bookedCount > 0 || hasOpenPaymentTransaction,
     serverNowIso,
     paymentHoldExpiresAtIso,
+    canResumePaymentCheckout: isAwaitingPaymentResume,
+    latestPaymentTransactionStatus,
     resumePaymentSelection,
     sessionId: encodeQuizSessionRefForMarketingUrl(sessionIdHex),
     pendingCheckout,

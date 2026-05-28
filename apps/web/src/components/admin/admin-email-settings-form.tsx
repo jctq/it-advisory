@@ -15,6 +15,7 @@ import {
 import type { TransactionalEmailActiveProvider, TransactionalEmailProviderId } from '@/domain/email-types';
 import { AdminEmailTemplatePreviewDialog } from '@/components/admin/admin-email-template-preview-dialog';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
+import { AdminSettingsHint, AdminSettingsLabel, AdminSettingsOptionTitle } from '@/components/admin/admin-settings-hint';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
@@ -336,8 +337,7 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                   className="mt-1"
                 />
                 <div>
-                  <p className="text-sm font-medium text-foreground">{option.title}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{option.description}</p>
+                  <AdminSettingsOptionTitle hint={option.description}>{option.title}</AdminSettingsOptionTitle>
                 </div>
               </label>
             ))}
@@ -354,22 +354,36 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
             className="mt-1 size-4 rounded border-input"
           />
           <div>
-            <label htmlFor="emailSandboxMode" className="text-sm font-medium text-foreground">
+            <AdminSettingsLabel
+              htmlFor="emailSandboxMode"
+              hint={
+                <>
+                  When on, the transactional <strong>To</strong> address is replaced with a safe test inbox so messages
+                  are not delivered to customers. Set <code className="font-mono text-[11px]">EMAIL_SANDBOX_TO</code> to
+                  choose that inbox; if unset, the app uses its default safe address. BCC is skipped in sandbox. The
+                  original recipient is still stored on <code className="font-mono text-[11px]">email_sends</code> as{' '}
+                  <code className="font-mono text-[11px]">sandboxIntendedTo</code> for auditing.
+                </>
+              }
+            >
               Sandbox mode (safe test delivery)
-            </label>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              When on, the transactional <strong>To</strong> address is replaced with a safe test inbox so messages are not delivered to customers. Set{' '}
-              <code className="font-mono text-[11px]">EMAIL_SANDBOX_TO</code> to choose that inbox; if unset, the app uses its default safe address. BCC is skipped in
-              sandbox. The original recipient is still stored on <code className="font-mono text-[11px]">email_sends</code> as{' '}
-              <code className="font-mono text-[11px]">sandboxIntendedTo</code> for auditing.
-            </p>
+            </AdminSettingsLabel>
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="transactionalFromDisplayName" className="text-sm font-medium text-foreground">
+            <AdminSettingsLabel
+              htmlFor="transactionalFromDisplayName"
+              hint={
+                <>
+                  Shown in the inbox as the sender. Leave blank to use{' '}
+                  <strong className="font-medium text-foreground">General → Site name</strong> (
+                  {settings.defaultFromDisplayName}).
+                </>
+              }
+            >
               From display name (optional)
-            </label>
+            </AdminSettingsLabel>
             <Input
               id="transactionalFromDisplayName"
               type="text"
@@ -380,16 +394,14 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                 setSettings({ ...settings, fromDisplayName: event.target.value });
               }}
             />
-            <p className="text-xs text-muted-foreground">
-              Shown in the inbox as the sender. Leave blank to use{' '}
-              <strong className="font-medium text-foreground">General → Site name</strong> (
-              {settings.defaultFromDisplayName}).
-            </p>
           </div>
           <div className="space-y-2">
-            <label htmlFor="transactionalFromEmail" className="text-sm font-medium text-foreground">
+            <AdminSettingsLabel
+              htmlFor="transactionalFromEmail"
+              hint="When set, overrides the per-provider From address. Combined with the display name above."
+            >
               From email (optional)
-            </label>
+            </AdminSettingsLabel>
             <Input
               id="transactionalFromEmail"
               type="text"
@@ -400,17 +412,22 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                 setSettings({ ...settings, fromEmail: event.target.value });
               }}
             />
-            <p className="text-xs text-muted-foreground">
-              When set, overrides the per-provider From address. Combined with the display name above.
-            </p>
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <label htmlFor="bookingConfirmationSubject" className="text-sm font-medium text-foreground">
+              <AdminSettingsLabel
+                htmlFor="bookingConfirmationSubject"
+                hint={
+                  <>
+                    Use <code className="font-mono text-[11px]">{'{{bookingReference}}'}</code> for the booking reference.
+                    Leave blank for the default.
+                  </>
+                }
+              >
                 Booking confirmation subject
-              </label>
+              </AdminSettingsLabel>
               <AdminEmailTemplatePreviewDialog bookingConfirmationSubject={settings.bookingConfirmationSubject} />
             </div>
             <Input
@@ -423,15 +440,15 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
                 setSettings({ ...settings, bookingConfirmationSubject: event.target.value });
               }}
             />
-            <p className="text-xs text-muted-foreground">
-              Use <code className="font-mono text-[11px]">{'{{bookingReference}}'}</code> for the booking reference. Leave blank for the default.
-            </p>
           </div>
         </div>
         <div className="space-y-2">
-          <label htmlFor="bookingConfirmationBcc" className="text-sm font-medium text-foreground">
+          <AdminSettingsLabel
+            htmlFor="bookingConfirmationBcc"
+            hint="Comma-separated addresses copied on every booking confirmation send."
+          >
             Booking confirmation BCC (optional)
-          </label>
+          </AdminSettingsLabel>
           <Input
             id="bookingConfirmationBcc"
             type="text"
@@ -442,7 +459,6 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
               setSettings({ ...settings, bookingConfirmationBcc: event.target.value });
             }}
           />
-          <p className="text-xs text-muted-foreground">Comma-separated addresses copied on every booking confirmation send.</p>
         </div>
       </SettingsCard>
       <SettingsCard
@@ -464,8 +480,10 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
               <div key={provider.id} className="space-y-4 rounded-2xl border border-border bg-background p-4">
                 <div className="space-y-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{provider.label}</p>
-                    <p className="text-xs text-muted-foreground">{provider.description}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold text-foreground">{provider.label}</p>
+                      <AdminSettingsHint>{provider.description}</AdminSettingsHint>
+                    </div>
                     {provider.configured && provider.credentialHint !== null ? (
                       <p className="mt-2 text-xs text-muted-foreground">
                         Stored credentials: <span className="font-mono text-foreground">{provider.credentialHint}</span>

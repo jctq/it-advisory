@@ -29,6 +29,7 @@ import {
   buildSessionAwaitingPaymentBookHref,
   isSessionAwaitingPayment,
   isSessionConfirmedForManage,
+  isSessionPaymentExpiredForManage,
 } from '@/lib/marketing/account-diagnostics-session-actions';
 import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import {
@@ -134,6 +135,9 @@ function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }):
     return <Badge variant="outline">Cancelled</Badge>;
   }
   if (props.row.bookingStatus === 'pending') {
+    if (paymentStatus === 'expired' || paymentStatus === 'failed') {
+      return <Badge variant="outline">Payment {paymentStatus}</Badge>;
+    }
     return (
       <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
         Awaiting payment
@@ -458,6 +462,7 @@ type MobileDiagnosticsSessionDialogProps = {
 function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogProps): ReactElement {
   const session = props.session;
   const awaitingPayment = session !== null && isSessionAwaitingPayment(session);
+  const paymentExpiredManage = session !== null && isSessionPaymentExpiredForManage(session);
   const showConfirmedActions = session !== null && isSessionConfirmedForManage(session);
   const canDelete = session !== null && !session.isBooked && !hasActiveCheckout(session);
   const bookingTitle = useMemo(() => {
@@ -559,6 +564,21 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                         <Link href={buildSessionAwaitingPaymentBookHref(session)}>Manage</Link>
                       </Button>
                     </>
+                  ) : paymentExpiredManage ? (
+                    <>
+                      <Button type="button" variant="outline" size="sm" asChild>
+                        <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>View</Link>
+                      </Button>
+                      {props.manageBookingEnabled && session.bookingId !== null ? (
+                        <Button type="button" variant="secondary" size="sm" asChild>
+                          <Link href={buildBookManageHref(session.bookingId)}>Manage</Link>
+                        </Button>
+                      ) : (
+                        <Button type="button" variant="secondary" size="sm" asChild>
+                          <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>Manage</Link>
+                        </Button>
+                      )}
+                    </>
                   ) : showConfirmedActions ? (
                     <Button type="button" variant="outline" size="sm" asChild>
                       <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>View diagnostic</Link>
@@ -645,7 +665,11 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                     <Button type="button" variant="secondary" size="sm" asChild>
                       <Link href={buildSessionAwaitingPaymentBookHref(session)}>Complete payment</Link>
                     </Button>
-                  ) : props.manageBookingEnabled && session.bookingId !== null ? (
+                  ) : paymentExpiredManage && props.manageBookingEnabled && session.bookingId !== null ? (
+                    <Button type="button" variant="secondary" size="sm" asChild>
+                      <Link href={buildBookManageHref(session.bookingId)}>Manage booking</Link>
+                    </Button>
+                  ) : showConfirmedActions && props.manageBookingEnabled && session.bookingId !== null ? (
                     <Button type="button" variant="secondary" size="sm" asChild>
                       <Link href={buildBookManageHref(session.bookingId)}>Manage booking</Link>
                     </Button>

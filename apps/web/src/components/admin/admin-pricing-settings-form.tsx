@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
+import { AdminSettingsHint } from '@/components/admin/admin-settings-hint';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -889,15 +890,17 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
             <CircleDollarSign className="size-5" aria-hidden />
           </span>
           <div>
-            <h3 className="text-base font-semibold text-foreground">Custom quotes</h3>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Set a per-booking amount on the booking detail page (CRM → Bookings). Overrides catalog for that booking
-              until expiry. Open a pending booking in{' '}
-              <Link href="/admin/bookings" className="font-medium text-primary underline-offset-4 hover:underline">
-                Admin → Bookings
-              </Link>{' '}
-              to set or clear a custom quote.
-            </p>
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-base font-semibold text-foreground">Custom quotes</h3>
+              <AdminSettingsHint>
+                Set a per-booking amount on the booking detail page (CRM → Bookings). Overrides catalog for that booking
+                until expiry. Open a pending booking in{' '}
+                <Link href="/admin/bookings" className="font-medium text-primary underline-offset-4 hover:underline">
+                  Admin → Bookings
+                </Link>{' '}
+                to set or clear a custom quote.
+              </AdminSettingsHint>
+            </div>
           </div>
         </div>
       </div>
@@ -943,7 +946,15 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="catalog-description">What&apos;s included</Label>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="catalog-description">What&apos;s included</Label>
+                  <AdminSettingsHint>
+                    Shown to customers on diagnostic pricing and booking flows.
+                  </AdminSettingsHint>
+                </div>
+                <span className="text-xs text-muted-foreground">{catalogDraft.description.length}/1000</span>
+              </div>
               <Textarea
                 id="catalog-description"
                 rows={4}
@@ -954,9 +965,6 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
                   setCatalogDraft((draft) => ({ ...draft, description: event.target.value }));
                 }}
               />
-              <p className="text-xs text-muted-foreground">
-                Shown to customers on diagnostic pricing and booking flows. {catalogDraft.description.length}/1000
-              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="catalog-price">Price (PHP)</Label>

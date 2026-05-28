@@ -73,7 +73,9 @@ import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-
 import { hasCheckoutManageContact } from '@/lib/marketing/checkout-contact';
 import {
   isLinkedBookingCancelled,
+  isLinkedBookingCheckoutResumable,
   isLinkedBookingPendingPayment,
+  isPendingCheckoutResumable,
   linkedBookingHasManageContact,
   linkedBookingToCheckoutDraft,
   parseLinkedBookingSlotSnapshot,
@@ -241,9 +243,11 @@ type QuizSessionGateApiPayload = {
   readonly readOnly?: boolean;
   readonly serverNowIso?: string;
   readonly paymentHoldExpiresAtIso?: string | null;
+  readonly canResumePaymentCheckout?: boolean;
+  readonly latestPaymentTransactionStatus?: string | null;
   readonly resumePaymentSelection?: unknown;
-  readonly linkedBookingSlot?: LinkedBookingSlotSnapshot | null;
-  readonly pendingCheckout?: PendingCheckoutSnapshot | null;
+  readonly linkedBookingSlot?: unknown;
+  readonly pendingCheckout?: unknown;
 };
 
 const PAYMENT_HOLD_SYNC_API_URL = buildApiUrl('/api/bookings/payment-hold/sync');
@@ -508,6 +512,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [awaitingPaymentReservedSlot, setAwaitingPaymentReservedSlot] =
     useState<AwaitingPaymentReservedSlotState | null>(null);
   const [paymentHoldExpired, setPaymentHoldExpired] = useState<boolean>(false);
+  const [holdExpiredRequiresRebook, setHoldExpiredRequiresRebook] = useState<boolean>(false);
   const paymentHoldSyncInFlightRef = useRef<boolean>(false);
   const resumePaymentSelectionPendingRef = useRef<{
     readonly gatewayId: PaymentGatewayId;
@@ -891,6 +896,18 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         const pendingCheckout = parsePendingCheckoutSnapshot(data.pendingCheckout);
         const paymentHoldExpiresAtIso =
           typeof data.paymentHoldExpiresAtIso === 'string' ? data.paymentHoldExpiresAtIso.trim() : '';
+        const gateServerNowMs = Date.parse(typeof data.serverNowIso === 'string' ? data.serverNowIso : '');
+        const resolvedGateServerNowMs = Number.isFinite(gateServerNowMs) ? gateServerNowMs : Date.now();
+        const latestPaymentStatusRaw = data.latestPaymentTransactionStatus?.trim() ?? '';
+        const latestPaymentStatus =
+          latestPaymentStatusRaw === 'pending' ||
+          latestPaymentStatusRaw === 'processing' ||
+          latestPaymentStatusRaw === 'paid' ||
+          latestPaymentStatusRaw === 'failed' ||
+          latestPaymentStatusRaw === 'expired'
+            ? latestPaymentStatusRaw
+            : null;
+        const canResumePaymentCheckout = data.canResumePaymentCheckout === true;
         const resumePaymentSelection = parseResumePaymentSelection(data.resumePaymentSelection);
         const paymentCancelledReturn = searchParams.get('payment')?.trim() === 'cancelled';
         const applyResumePaymentSelection = (): void => {
@@ -907,18 +924,41 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           if (linkedBooking !== null) {
             if (isLinkedBookingCancelled(linkedBooking)) {
               setPaymentHoldExpired(true);
+              setHoldExpiredRequiresRebook(true);
               setActivePaymentHold(null);
+              setIsAwaitingPaymentCheckout(false);
               setAwaitingPaymentReservedSlot(null);
               setPendingPaymentHoldDialogOpen(false);
               setErrorMessage(
-                'The payment window for this booking has expired and the reservation was cancelled.',
+                'The payment window for this booking has expired and the reservation was cancelled. Pick a new time on the calendar to book again.',
               );
               setPhase('error');
               sessionGateResolvedRef.current = ref;
               setSessionGateStatus('ready');
               return;
             }
-            if (isLinkedBookingPendingPayment(linkedBooking)) {
+            const linkedCheckoutResumable =
+              canResumePaymentCheckout &&
+              isLinkedBookingCheckoutResumable(linkedBooking, {
+                latestPaymentStatus,
+                serverNowMs: resolvedGateServerNowMs,
+              });
+            if (isLinkedBookingPendingPayment(linkedBooking) && !linkedCheckoutResumable) {
+              setPaymentHoldExpired(true);
+              setHoldExpiredRequiresRebook(true);
+              setActivePaymentHold(null);
+              setIsAwaitingPaymentCheckout(false);
+              setAwaitingPaymentReservedSlot(null);
+              setPendingPaymentHoldDialogOpen(false);
+              setErrorMessage(
+                'The payment window for this booking has expired and the reservation was released. Pick a new time on the calendar to book again.',
+              );
+              setPhase('error');
+              sessionGateResolvedRef.current = ref;
+              setSessionGateStatus('ready');
+              return;
+            }
+            if (linkedCheckoutResumable) {
               checkoutResumeHandledRef.current = ref;
               applyResumePaymentSelection();
               restoreCheckoutDraftFromSnapshot(linkedBookingToCheckoutDraft(linkedBooking));
@@ -958,6 +998,28 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             return;
           }
           if (pendingCheckout !== null) {
+            const pendingCheckoutResumable =
+              canResumePaymentCheckout &&
+              isPendingCheckoutResumable(pendingCheckout, {
+                latestPaymentStatus,
+                paymentHoldExpiresAtIso,
+                serverNowMs: resolvedGateServerNowMs,
+              });
+            if (!pendingCheckoutResumable) {
+              setPaymentHoldExpired(true);
+              setHoldExpiredRequiresRebook(true);
+              setActivePaymentHold(null);
+              setIsAwaitingPaymentCheckout(false);
+              setAwaitingPaymentReservedSlot(null);
+              setPendingPaymentHoldDialogOpen(false);
+              setErrorMessage(
+                'The payment window has expired. Pick a new time on the calendar to start checkout again.',
+              );
+              setPhase('error');
+              sessionGateResolvedRef.current = ref;
+              setSessionGateStatus('ready');
+              return;
+            }
             checkoutResumeHandledRef.current = ref;
             applyResumePaymentSelection();
             restoreCheckoutDraftFromSnapshot(pendingCheckoutToCheckoutDraft(pendingCheckout));
@@ -1366,10 +1428,14 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           return;
         }
         setPaymentHoldExpired(true);
+        setHoldExpiredRequiresRebook(true);
         setPendingPaymentHoldDialogOpen(false);
         setIsAwaitingPaymentCheckout(false);
         setAwaitingPaymentReservedSlot(null);
-        setErrorMessage('The payment window has expired. This booking has been cancelled.');
+        setActivePaymentHold(null);
+        setErrorMessage(
+          'The payment window for this booking has expired and the reservation was released. Pick a new time on the calendar to book again.',
+        );
         setPhase('error');
       })
       .finally(() => {
@@ -1387,7 +1453,10 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (pendingPaymentHoldDialogOpen || !paymentHoldExpired || !isAwaitingPaymentCheckout) {
       return;
     }
-    setErrorMessage('The payment window has expired. This booking has been cancelled.');
+    setHoldExpiredRequiresRebook(true);
+    setErrorMessage(
+      'The payment window for this booking has expired and the reservation was released. Pick a new time on the calendar to book again.',
+    );
     setPhase('error');
   }, [isAwaitingPaymentCheckout, paymentHoldExpired, pendingPaymentHoldDialogOpen, setErrorMessage, setPhase]);
 
@@ -1799,8 +1868,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   };
 
   const executeRetryFromError = (): void => {
-    setPhase('payment');
     setErrorMessage(null);
+    setPaymentHoldExpired(false);
+    setActivePaymentHold(null);
+    setIsAwaitingPaymentCheckout(false);
+    setAwaitingPaymentReservedSlot(null);
+    if (holdExpiredRequiresRebook) {
+      setHoldExpiredRequiresRebook(false);
+      setPhase('date');
+      return;
+    }
+    setPhase('payment');
   };
 
   const showSessionGateBlock =
@@ -1868,7 +1946,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         <p className="mt-3 text-muted-foreground">{errorMessage ?? 'Something went wrong.'}</p>
         <div className="mt-10 flex flex-wrap gap-3">
           <Button type="button" size="lg" onClick={executeRetryFromError}>
-            Try again
+            {holdExpiredRequiresRebook ? 'Pick a new time' : 'Try again'}
           </Button>
           <Button type="button" size="lg" variant="outline" asChild>
             <Link href={activeDiagnosticHref}>Back to diagnostic</Link>

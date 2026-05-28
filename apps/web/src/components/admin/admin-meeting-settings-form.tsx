@@ -17,6 +17,7 @@ import {
   type VideoMeetingProviderId,
 } from '@/domain/meeting-types';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
+import { AdminSettingsOptionTitle } from '@/components/admin/admin-settings-hint';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -396,8 +397,7 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
                   className="mt-1"
                 />
                 <div>
-                  <p className="text-sm font-medium text-foreground">{option.title}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{option.description}</p>
+                  <AdminSettingsOptionTitle hint={option.description}>{option.title}</AdminSettingsOptionTitle>
                 </div>
               </label>
             ))}
