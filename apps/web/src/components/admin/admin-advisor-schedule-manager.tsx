@@ -17,7 +17,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import {
   applyAdvisorSlotIntervalToBookingSettings,
   buildFullCalendarBusinessHourSegments,
@@ -326,8 +326,6 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
     window.history.replaceState(window.history.state, '', buildScheduleTabUrl(nextTab));
   }, []);
   const [settings, setSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
-  const settingsRef = useRef<AdvisorBookingSettingsDocument | null>(null);
-  settingsRef.current = settings;
   const [lastSavedSettings, setLastSavedSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -447,8 +445,7 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
     });
   }, []);
   const executeSave = useCallback(async (): Promise<void> => {
-    const currentSettings = settingsRef.current;
-    if (currentSettings === null) {
+    if (settings === null) {
       return;
     }
     setIsSaving(true);
@@ -458,16 +455,16 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           timezone: PRIMARY_TIMEZONE,
-          weekendDayIndices: currentSettings.weekendDayIndices,
-          defaultWeekdayWindow: currentSettings.defaultWeekdayWindow,
+          weekendDayIndices: settings.weekendDayIndices,
+          defaultWeekdayWindow: settings.defaultWeekdayWindow,
           // Empty maps must be sent as `{}` — `undefined` is omitted by JSON.stringify and the API
           // would otherwise keep previously saved overrides.
-          weekdayOverrides: currentSettings.weekdayOverrides ?? {},
-          dateWindowOverrides: currentSettings.dateWindowOverrides ?? {},
-          slotIntervalMinutes: currentSettings.slotIntervalMinutes,
-          dailyBookingCapOverrides: currentSettings.dailyBookingCapOverrides ?? {},
-          weeklyBookingCapOverrides: currentSettings.weeklyBookingCapOverrides ?? {},
-          bookingHorizonDays: currentSettings.bookingHorizonDays,
+          weekdayOverrides: settings.weekdayOverrides ?? {},
+          dateWindowOverrides: settings.dateWindowOverrides ?? {},
+          slotIntervalMinutes: settings.slotIntervalMinutes,
+          dailyBookingCapOverrides: settings.dailyBookingCapOverrides ?? {},
+          weeklyBookingCapOverrides: settings.weeklyBookingCapOverrides ?? {},
+          bookingHorizonDays: settings.bookingHorizonDays,
         }),
       });
       const data = (await response.json()) as { settings?: AdvisorBookingSettingsDocument; error?: string };
@@ -486,7 +483,7 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
     } finally {
       setIsSaving(false);
     }
-  }, []);
+  }, [settings]);
   const executeResetToSaved = useCallback((): void => {
     if (lastSavedSettings === null) {
       return;
