@@ -17,7 +17,6 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import {
   buildFullCalendarBusinessHourSegments,
@@ -282,30 +281,40 @@ function resolveOverrideRow(dow: number, doc: AdvisorBookingSettingsDocument): {
   return { mode: 'window', start: raw.start, end: raw.end };
 }
 
+function buildScheduleTabUrl(tab: ScheduleTab): string {
+  const nextParams = new URLSearchParams(window.location.search);
+  if (tab === 'hours-grid') {
+    nextParams.delete('tab');
+  } else {
+    nextParams.set('tab', tab);
+  }
+  const query = nextParams.toString();
+  return query.length > 0 ? `/admin/schedule?${query}` : '/admin/schedule';
+}
+
 type AdminAdvisorScheduleManagerProps = {
   readonly initialTab: ScheduleTab;
 };
 
 export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerProps): ReactElement {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ScheduleTab>(props.initialTab);
-  if (props.initialTab !== activeTab) {
+  useEffect(() => {
     setActiveTab(props.initialTab);
-  }
-  const executeChangeTab = useCallback(
-    (nextTab: ScheduleTab): void => {
-      setActiveTab(nextTab);
-      const nextParams = new URLSearchParams(window.location.search);
-      if (nextTab === 'hours-grid') {
-        nextParams.delete('tab');
-      } else {
-        nextParams.set('tab', nextTab);
-      }
-      const query = nextParams.toString();
-      router.replace(query.length > 0 ? `/admin/schedule?${query}` : '/admin/schedule', { scroll: false });
-    },
-    [router],
-  );
+  }, [props.initialTab]);
+  useEffect(() => {
+    const handlePopState = (): void => {
+      const tabParam = new URLSearchParams(window.location.search).get('tab');
+      setActiveTab(resolveScheduleTab(tabParam ?? undefined));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+  const executeChangeTab = useCallback((nextTab: ScheduleTab): void => {
+    setActiveTab(nextTab);
+    window.history.replaceState(window.history.state, '', buildScheduleTabUrl(nextTab));
+  }, []);
   const [settings, setSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
   const [lastSavedSettings, setLastSavedSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
