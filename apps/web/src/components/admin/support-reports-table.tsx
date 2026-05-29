@@ -54,10 +54,12 @@ export function SupportReportsTable(props: SupportReportsTableProps): ReactEleme
     [],
   );
   return (
+    <div data-admin-tour="page-support-reports-table">
     <DataTable
       columns={columns}
       data={[...props.initialData]}
       emptyMessage="No support reports yet."
     />
+    </div>
   );
 }

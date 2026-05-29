@@ -18,6 +18,8 @@ export type AdminOnboardingShellTarget =
   | 'nav-users'
   | 'nav-schedule'
   | 'nav-bookings'
+  | 'nav-support-reports'
+  | 'nav-debug'
   | 'nav-advisor'
   | 'nav-settings'
   | 'admin-header'
@@ -32,12 +34,30 @@ export type AdminOnboardingPageTarget =
   | 'page-sessions-table'
   | 'page-leads-table'
   | 'page-users-table'
-  | 'page-schedule-calendar'
+  | 'page-schedule-tabs'
+  | 'page-schedule-hours-grid'
+  | 'page-schedule-weekdays'
+  | 'page-schedule-dates'
+  | 'page-schedule-caps'
+  | 'page-schedule-preview'
+  | 'page-bookings-view-toggle'
   | 'page-bookings-filters'
+  | 'page-bookings-table'
   | 'page-bookings-calendar'
+  | 'page-support-reports-table'
+  | 'page-debug-tabs'
+  | 'page-debug-client-diagnostic'
+  | 'page-debug-cron-logs'
+  | 'page-debug-payment-logs'
   | 'page-advisor-chat'
   | 'page-settings-tabs'
-  | 'page-settings-content';
+  | 'page-settings-general'
+  | 'page-settings-pricing'
+  | 'page-settings-payments'
+  | 'page-settings-email'
+  | 'page-settings-support'
+  | 'page-settings-meetings'
+  | 'page-settings-recordings';
 
 export type AdminOnboardingTourTarget = AdminOnboardingShellTarget | AdminOnboardingPageTarget;
 
@@ -47,6 +67,8 @@ export type AdminOnboardingStepDefinition = {
   readonly description: string;
   readonly side?: 'top' | 'right' | 'bottom' | 'left';
   readonly routePath?: string;
+  /** Full path + query for router.push when a page has tabs or search-driven state. */
+  readonly routeHref?: string;
 };
 
 export function buildAdminTourSelector(target: AdminOnboardingTourTarget): string {
@@ -64,12 +86,30 @@ const ADMIN_ONBOARDING_MOBILE_SIDEBAR_CLOSED_TARGETS: ReadonlySet<AdminOnboardin
   'page-sessions-table',
   'page-leads-table',
   'page-users-table',
-  'page-schedule-calendar',
+  'page-schedule-tabs',
+  'page-schedule-hours-grid',
+  'page-schedule-weekdays',
+  'page-schedule-dates',
+  'page-schedule-caps',
+  'page-schedule-preview',
+  'page-bookings-view-toggle',
   'page-bookings-filters',
+  'page-bookings-table',
   'page-bookings-calendar',
+  'page-support-reports-table',
+  'page-debug-tabs',
+  'page-debug-client-diagnostic',
+  'page-debug-cron-logs',
+  'page-debug-payment-logs',
   'page-advisor-chat',
   'page-settings-tabs',
-  'page-settings-content',
+  'page-settings-general',
+  'page-settings-pricing',
+  'page-settings-payments',
+  'page-settings-email',
+  'page-settings-support',
+  'page-settings-meetings',
+  'page-settings-recordings',
 ]);
 
 export function shouldCloseMobileSidebarForOnboardingStep(
@@ -93,7 +133,7 @@ const ADMIN_ONBOARDING_SHELL_STEP_DEFINITIONS: readonly AdminOnboardingStepDefin
     target: 'sidebar-workspace',
     title: 'Workspace overview',
     description:
-      'This card summarizes what the admin console covers: diagnostics, leads, bookings, advisor tools, and configuration.',
+      'This card summarizes customer operations: diagnostics, leads, bookings, payments, support, debug tools, advisor, and settings.',
     side: 'right',
   },
   {
@@ -141,7 +181,19 @@ const ADMIN_ONBOARDING_SHELL_STEP_DEFINITIONS: readonly AdminOnboardingStepDefin
   {
     target: 'nav-bookings',
     title: 'Bookings',
-    description: 'Confirmed sessions with payment status and calendar views.',
+    description: 'Scheduled sessions with payment holds, gateway status, and calendar views.',
+    side: 'right',
+  },
+  {
+    target: 'nav-support-reports',
+    title: 'Support reports',
+    description: 'In-app and web support tickets with screenshots and threaded admin replies.',
+    side: 'right',
+  },
+  {
+    target: 'nav-debug',
+    title: 'Debug',
+    description: 'Client diagnostic lookup, cron logs, and payment webhook traces for operations.',
     side: 'right',
   },
   {
@@ -153,7 +205,7 @@ const ADMIN_ONBOARDING_SHELL_STEP_DEFINITIONS: readonly AdminOnboardingStepDefin
   {
     target: 'nav-settings',
     title: 'Settings',
-    description: 'Site config, pricing, payments, email, and meeting integrations.',
+    description: 'General, pricing, payments & holds, email, support inbox, meetings, and Fathom recordings.',
     side: 'right',
   },
   {
@@ -191,10 +243,12 @@ const ADMIN_ONBOARDING_PAGE_SEGMENTS: readonly AdminOnboardingPageSegment[] = [
   { navTarget: 'nav-sessions', pageSteps: [ADMIN_ONBOARDING_PAGE_STEPS[4]!] },
   { navTarget: 'nav-leads', pageSteps: [ADMIN_ONBOARDING_PAGE_STEPS[5]!] },
   { navTarget: 'nav-users', pageSteps: [ADMIN_ONBOARDING_PAGE_STEPS[6]!] },
-  { navTarget: 'nav-schedule', pageSteps: [ADMIN_ONBOARDING_PAGE_STEPS[7]!] },
-  { navTarget: 'nav-bookings', pageSteps: ADMIN_ONBOARDING_PAGE_STEPS.slice(8, 10) },
-  { navTarget: 'nav-advisor', pageSteps: [ADMIN_ONBOARDING_PAGE_STEPS[10]!] },
-  { navTarget: 'nav-settings', pageSteps: ADMIN_ONBOARDING_PAGE_STEPS.slice(11, 13) },
+  { navTarget: 'nav-schedule', pageSteps: ADMIN_ONBOARDING_PAGE_STEPS.slice(7, 13) },
+  { navTarget: 'nav-bookings', pageSteps: ADMIN_ONBOARDING_PAGE_STEPS.slice(13, 17) },
+  { navTarget: 'nav-support-reports', pageSteps: [ADMIN_ONBOARDING_PAGE_STEPS[17]!] },
+  { navTarget: 'nav-debug', pageSteps: ADMIN_ONBOARDING_PAGE_STEPS.slice(18, 22) },
+  { navTarget: 'nav-advisor', pageSteps: [ADMIN_ONBOARDING_PAGE_STEPS[22]!] },
+  { navTarget: 'nav-settings', pageSteps: ADMIN_ONBOARDING_PAGE_STEPS.slice(23, 31) },
 ] as const;
 
 function buildAdminOnboardingFullStepDefinitions(): readonly AdminOnboardingStepDefinition[] {
@@ -240,6 +294,32 @@ type AdminOnboardingRouter = {
   readonly push: (href: string) => void;
 };
 
+function resolveAdminOnboardingStepHref(definition: AdminOnboardingStepDefinition): string | undefined {
+  if (definition.routeHref !== undefined) {
+    return definition.routeHref;
+  }
+  return definition.routePath;
+}
+
+function isOnAdminOnboardingStepRoute(
+  pathname: string,
+  search: string,
+  definition: AdminOnboardingStepDefinition,
+): boolean {
+  if (definition.routePath === undefined) {
+    return true;
+  }
+  if (!matchesAdminRoute(pathname, definition.routePath)) {
+    return false;
+  }
+  const expectedHref = resolveAdminOnboardingStepHref(definition);
+  if (expectedHref === undefined) {
+    return true;
+  }
+  const currentHref = search.length > 0 ? `${pathname}${search}` : pathname;
+  return currentHref === expectedHref;
+}
+
 function createRouteNavigationHook(
   definition: AdminOnboardingStepDefinition,
   router: AdminOnboardingRouter,
@@ -248,12 +328,14 @@ function createRouteNavigationHook(
   if (definition.routePath === undefined || definition.target === null) {
     return undefined;
   }
+  const expectedHref = resolveAdminOnboardingStepHref(definition) ?? definition.routePath;
   return (_element, _step, { driver, state }) => {
     const pathname = resolvePathname();
-    if (matchesAdminRoute(pathname, definition.routePath!)) {
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    if (isOnAdminOnboardingStepRoute(pathname, search, definition)) {
       return;
     }
-    router.push(definition.routePath!);
+    router.push(expectedHref);
     void waitForAdminTourElement(definition.target!).then((element) => {
       const stepIndex = state.activeIndex;
       if (element === null) {
@@ -285,6 +367,7 @@ export function buildAdminOnboardingDriveSteps(
     }
     return {
       element: buildAdminTourSelector(step.target),
+      disableActiveInteraction: true,
       onHighlightStarted: routeHook,
       popover: {
         title: step.title,

@@ -13,6 +13,7 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { driver, type Driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
+import '@/components/admin/admin-driver-popover.css';
 import {
   buildAdminOnboardingDriveSteps,
   hasSeenAdminOnboardingWelcome,
@@ -53,6 +54,23 @@ function resolvePrefersReducedMotion(): boolean {
     return false;
   }
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** Overlay clicks must not dismiss the tour; use the popover close (X) only. */
+function ignoreDriverOverlayClick(): void {
+  return;
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return (
+    target.isContentEditable ||
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT'
+  );
 }
 
 export function AdminOnboardingProvider(props: AdminOnboardingProviderProps) {
@@ -101,6 +119,9 @@ export function AdminOnboardingProvider(props: AdminOnboardingProviderProps) {
       animate: !prefersReducedMotion,
       smoothScroll: !prefersReducedMotion,
       allowClose: true,
+      allowKeyboardControl: false,
+      overlayClickBehavior: ignoreDriverOverlayClick,
+      disableActiveInteraction: true,
       overlayOpacity: 0.55,
       stagePadding: 8,
       stageRadius: 12,
@@ -160,6 +181,29 @@ export function AdminOnboardingProvider(props: AdminOnboardingProviderProps) {
       executeDestroyDriver();
     };
   }, [executeDestroyDriver]);
+  useEffect(() => {
+    if (!isTourActive) {
+      return;
+    }
+    const executeHandleTourKeyDown = (event: KeyboardEvent): void => {
+      if (isEditableKeyboardTarget(event.target)) {
+        return;
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        driverRef.current?.moveNext();
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        driverRef.current?.movePrevious();
+      }
+    };
+    window.addEventListener('keydown', executeHandleTourKeyDown);
+    return () => {
+      window.removeEventListener('keydown', executeHandleTourKeyDown);
+    };
+  }, [isTourActive]);
   const contextValue = useMemo<AdminOnboardingContextValue>(
     () => ({
       isWelcomeOpen,

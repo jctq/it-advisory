@@ -97,13 +97,13 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     href: '/admin/support-reports',
     label: 'Support reports',
     icon: Headphones,
-    tourTarget: 'nav-settings',
+    tourTarget: 'nav-support-reports',
   },
   {
     href: '/admin/debug',
     label: 'Debug',
     icon: Bug,
-    tourTarget: 'nav-settings',
+    tourTarget: 'nav-debug',
   },
   {
     href: '/admin/advisor',
@@ -209,7 +209,7 @@ export function AdminSidebar(props: AdminSidebarProps) {
               >
                 <p className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/60">Workspace</p>
                 <p className="mt-1 text-sm font-semibold text-sidebar-foreground">Customer operations</p>
-                <p className="mt-1 text-xs text-sidebar-foreground/68">Templates, sessions, leads, marketing users, bookings, advisor, and settings.</p>
+                <p className="mt-1 text-xs text-sidebar-foreground/68">Templates, sessions, leads, bookings, payments, support, debug, advisor, and settings.</p>
               </div>
             ) : null}
           </div>

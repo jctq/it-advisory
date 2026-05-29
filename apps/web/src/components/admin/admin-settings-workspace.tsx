@@ -1,6 +1,7 @@
 'use client';
 
 import { BrainCircuit, CircleDollarSign, Clapperboard, CreditCard, Headphones, Mail, Video, type LucideIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
   AdminFormStickyFooter,
@@ -43,9 +44,8 @@ import {
   type AdminSettingsFormState,
 } from '@/components/admin/admin-settings-form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { resolveSettingsTab, type SettingsTab } from '@/lib/admin/admin-settings-tabs';
 import { cn } from '@/lib/utils';
-
-type SettingsTab = 'general' | 'pricing' | 'payments' | 'email' | 'support' | 'meetings' | 'recordings';
 
 type SettingsTabConfig = {
   readonly value: SettingsTab;
@@ -117,9 +117,33 @@ function addMountedSettingsTab(
   return next;
 }
 
-export function AdminSettingsWorkspace(): ReactElement {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
-  const [mountedTabs, setMountedTabs] = useState<ReadonlySet<SettingsTab>>(() => new Set(['general']));
+type AdminSettingsWorkspaceProps = {
+  readonly initialTab: SettingsTab;
+};
+
+export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): ReactElement {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<SettingsTab>(props.initialTab);
+  const [mountedTabs, setMountedTabs] = useState<ReadonlySet<SettingsTab>>(() => new Set([props.initialTab]));
+  if (props.initialTab !== activeTab) {
+    setActiveTab(props.initialTab);
+    setMountedTabs((previous) => addMountedSettingsTab(previous, props.initialTab));
+  }
+  const executeChangeTab = useCallback(
+    (nextTab: SettingsTab): void => {
+      setActiveTab(nextTab);
+      setMountedTabs((previous) => addMountedSettingsTab(previous, nextTab));
+      const nextParams = new URLSearchParams(window.location.search);
+      if (nextTab === 'general') {
+        nextParams.delete('tab');
+      } else {
+        nextParams.set('tab', nextTab);
+      }
+      const query = nextParams.toString();
+      router.replace(query.length > 0 ? `/admin/settings?${query}` : '/admin/settings', { scroll: false });
+    },
+    [router],
+  );
   const [generalState, setGeneralState] = useState<AdminSettingsFormState>(EMPTY_GENERAL_STATE);
   const [pricingState, setPricingState] = useState<AdminPricingSettingsFormState>(EMPTY_PRICING_STATE);
   const [paymentsState, setPaymentsState] = useState<AdminPaymentSettingsFormState>(EMPTY_PAYMENTS_STATE);
@@ -221,9 +245,7 @@ export function AdminSettingsWorkspace(): ReactElement {
         <Tabs
           value={activeTab}
           onValueChange={(value) => {
-            const nextTab = value as SettingsTab;
-            setActiveTab(nextTab);
-            setMountedTabs((previous) => addMountedSettingsTab(previous, nextTab));
+            executeChangeTab(resolveSettingsTab(value));
           }}
           className="space-y-6"
         >
@@ -267,13 +289,14 @@ export function AdminSettingsWorkspace(): ReactElement {
               className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-linear-to-l from-background to-transparent sm:hidden"
             />
           </div>
-          <div data-admin-tour="page-settings-content">
           <TabsContent
             value="general"
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('general') ? (
-              <AdminSettingsForm formRef={generalFormRef} onStateChange={setGeneralState} />
+              <div data-admin-tour="page-settings-general">
+                <AdminSettingsForm formRef={generalFormRef} onStateChange={setGeneralState} />
+              </div>
             ) : null}
           </TabsContent>
           <TabsContent
@@ -281,7 +304,9 @@ export function AdminSettingsWorkspace(): ReactElement {
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('pricing') ? (
-              <AdminPricingSettingsForm formRef={pricingFormRef} onStateChange={setPricingState} />
+              <div data-admin-tour="page-settings-pricing">
+                <AdminPricingSettingsForm formRef={pricingFormRef} onStateChange={setPricingState} />
+              </div>
             ) : null}
           </TabsContent>
           <TabsContent
@@ -289,7 +314,9 @@ export function AdminSettingsWorkspace(): ReactElement {
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('payments') ? (
-              <AdminPaymentSettingsForm formRef={paymentsFormRef} onStateChange={setPaymentsState} />
+              <div data-admin-tour="page-settings-payments">
+                <AdminPaymentSettingsForm formRef={paymentsFormRef} onStateChange={setPaymentsState} />
+              </div>
             ) : null}
           </TabsContent>
           <TabsContent
@@ -297,7 +324,9 @@ export function AdminSettingsWorkspace(): ReactElement {
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('email') ? (
-              <AdminEmailSettingsForm formRef={emailFormRef} onStateChange={setEmailState} />
+              <div data-admin-tour="page-settings-email">
+                <AdminEmailSettingsForm formRef={emailFormRef} onStateChange={setEmailState} />
+              </div>
             ) : null}
           </TabsContent>
           <TabsContent
@@ -305,7 +334,9 @@ export function AdminSettingsWorkspace(): ReactElement {
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('support') ? (
-              <AdminSupportSettingsForm formRef={supportFormRef} onStateChange={setSupportState} />
+              <div data-admin-tour="page-settings-support">
+                <AdminSupportSettingsForm formRef={supportFormRef} onStateChange={setSupportState} />
+              </div>
             ) : null}
           </TabsContent>
           <TabsContent
@@ -313,7 +344,9 @@ export function AdminSettingsWorkspace(): ReactElement {
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('meetings') ? (
-              <AdminMeetingSettingsForm formRef={meetingsFormRef} onStateChange={setMeetingsState} />
+              <div data-admin-tour="page-settings-meetings">
+                <AdminMeetingSettingsForm formRef={meetingsFormRef} onStateChange={setMeetingsState} />
+              </div>
             ) : null}
           </TabsContent>
           <TabsContent
@@ -321,10 +354,11 @@ export function AdminSettingsWorkspace(): ReactElement {
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('recordings') ? (
-              <AdminRecordingSettingsForm formRef={recordingsFormRef} onStateChange={setRecordingsState} />
+              <div data-admin-tour="page-settings-recordings">
+                <AdminRecordingSettingsForm formRef={recordingsFormRef} onStateChange={setRecordingsState} />
+              </div>
             ) : null}
           </TabsContent>
-          </div>
         </Tabs>
       </div>
       <AdminFormStickyFooter

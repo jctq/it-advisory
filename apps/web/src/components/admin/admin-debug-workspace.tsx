@@ -94,7 +94,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
           }}
           className="space-y-6"
         >
-          <div className="relative -mx-3 sm:mx-0">
+          <div className="relative -mx-3 sm:mx-0" data-admin-tour="page-debug-tabs">
             <div
               className="overflow-x-auto overscroll-x-contain scroll-smooth pb-0.5 scrollbar-none sm:overflow-visible"
               role="presentation"
@@ -139,11 +139,13 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('client-diagnostic') ? (
+              <div data-admin-tour="page-debug-client-diagnostic">
               <AdminClientDiagnosticWorkspace
                 initialDiagnostic={props.initialDiagnostic}
                 initialReference={props.initialReference}
                 isActive={activeTab === 'client-diagnostic'}
               />
+              </div>
             ) : null}
           </TabsContent>
           <TabsContent
@@ -151,7 +153,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('cron-logs') ? (
-              <div className="space-y-4">
+              <div data-admin-tour="page-debug-cron-logs" className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Each POST to a protected /api/cron/* route is recorded when it runs: job name, trigger (scheduler vs
                   unknown), duration, and result counts or errors. Unauthorized attempts are logged too.
@@ -165,7 +167,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
             className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
           >
             {mountedTabs.has('payment-logs') ? (
-              <div className="space-y-4">
+              <div data-admin-tour="page-debug-payment-logs" className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Each POST to /api/webhooks/* is recorded as a payment log with gateway, parsed status, matched
                   transaction and booking context, HTTP response, timing, header summary, and a raw payload snippet for

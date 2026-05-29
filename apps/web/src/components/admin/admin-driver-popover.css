@@ -1,0 +1,38 @@
+/* Loaded after driver.js/dist/driver.css — tour popover theme overrides */
+
+.admin-driver-popover.driver-popover .driver-popover-close-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: calc(var(--radius) - 4px);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  opacity: 0.75;
+  color: var(--popover-foreground) !important;
+  background-color: transparent !important;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.admin-driver-popover.driver-popover .driver-popover-close-btn:hover,
+.admin-driver-popover.driver-popover .driver-popover-close-btn:focus-visible {
+  opacity: 1 !important;
+  color: var(--popover-foreground) !important;
+  background-color: var(--secondary) !important;
+}
+
+.admin-driver-popover .driver-popover-title {
+  padding-right: 2.25rem;
+}

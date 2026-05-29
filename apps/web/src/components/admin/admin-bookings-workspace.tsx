@@ -13,6 +13,7 @@ import {
   Table2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent, type ReactElement } from 'react';
 import {
   AdminBookingsCalendar,
@@ -39,11 +40,10 @@ import {
   type BookingListStatusFilter,
 } from '@/lib/marketing/account-booking-status';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
+import { resolveBookingsViewMode, type BookingsViewMode } from '@/lib/admin/admin-bookings-view';
 import { cn } from '@/lib/utils';
 
 type BookingStatusFilter = BookingListStatusFilter;
-
-type BookingsViewMode = 'calendar' | 'table';
 
 const HIGHLIGHT_DURATION_MS = 4000;
 
@@ -110,12 +110,34 @@ function resolveStatusCount(
   return counts[filter];
 }
 
+type AdminBookingsWorkspaceProps = {
+  readonly initialViewMode: BookingsViewMode;
+};
+
 /**
  * Admin bookings page layout: date range, reference search, status filters, API-backed calendar.
  */
-export function AdminBookingsWorkspace(): ReactElement {
+export function AdminBookingsWorkspace(props: AdminBookingsWorkspaceProps): ReactElement {
+  const router = useRouter();
   const todayYmd = resolveManilaTodayYmd();
-  const [viewMode, setViewMode] = useState<BookingsViewMode>('table');
+  const [viewMode, setViewMode] = useState<BookingsViewMode>(props.initialViewMode);
+  if (props.initialViewMode !== viewMode) {
+    setViewMode(props.initialViewMode);
+  }
+  const executeChangeViewMode = useCallback(
+    (nextViewMode: BookingsViewMode): void => {
+      setViewMode(nextViewMode);
+      const nextParams = new URLSearchParams(window.location.search);
+      if (nextViewMode === 'table') {
+        nextParams.delete('view');
+      } else {
+        nextParams.set('view', nextViewMode);
+      }
+      const query = nextParams.toString();
+      router.replace(query.length > 0 ? `/admin/bookings?${query}` : '/admin/bookings', { scroll: false });
+    },
+    [router],
+  );
   const [statusFilter, setStatusFilter] = useState<BookingStatusFilter>('confirmed');
   const [rangeFromYmd, setRangeFromYmd] = useState(todayYmd);
   const [rangeToYmd, setRangeToYmd] = useState(todayYmd);
@@ -322,7 +344,7 @@ export function AdminBookingsWorkspace(): ReactElement {
   };
   return (
     <div className="fc-admin-bookings flex flex-col gap-6">
-      <div data-admin-tour="page-bookings-calendar" className="min-w-0 space-y-3">
+      <div className="min-w-0 space-y-3">
         <TooltipProvider delayDuration={300}>
           <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 px-3 py-2">
@@ -344,6 +366,7 @@ export function AdminBookingsWorkspace(): ReactElement {
                 )}
               </p>
               <div
+                data-admin-tour="page-bookings-view-toggle"
                 className="inline-flex shrink-0 rounded-lg border border-border bg-muted/30 p-0.5"
                 role="group"
                 aria-label="Bookings display"
@@ -360,7 +383,7 @@ export function AdminBookingsWorkspace(): ReactElement {
                     <button
                       key={option.id}
                       type="button"
-                      onClick={() => setViewMode(option.id)}
+                      onClick={() => executeChangeViewMode(option.id)}
                       aria-pressed={isActive}
                       className={cn(
                         'inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
@@ -539,20 +562,24 @@ export function AdminBookingsWorkspace(): ReactElement {
           </p>
         ) : null}
         {viewMode === 'calendar' ? (
-          <AdminBookingsCalendar
-            bookings={bookings}
-            isLoading={isLoading}
-            initialAnchorYmd={todayYmd}
-            focusRequest={focusRequest}
-            navigateRequest={navigateRequest}
-            onVisibleRangeChange={executeVisibleRangeChange}
-          />
+          <div data-admin-tour="page-bookings-calendar">
+            <AdminBookingsCalendar
+              bookings={bookings}
+              isLoading={isLoading}
+              initialAnchorYmd={todayYmd}
+              focusRequest={focusRequest}
+              navigateRequest={navigateRequest}
+              onVisibleRangeChange={executeVisibleRangeChange}
+            />
+          </div>
         ) : (
-          <AdminBookingsTable
-            bookings={bookings}
-            isLoading={isLoading}
-            highlightedBookingId={highlightedBookingId}
-          />
+          <div data-admin-tour="page-bookings-table">
+            <AdminBookingsTable
+              bookings={bookings}
+              isLoading={isLoading}
+              highlightedBookingId={highlightedBookingId}
+            />
+          </div>
         )}
       </div>
     </div>

@@ -1692,10 +1692,6 @@ html:has(.admin-blog-mdx-editor-overlay) [class*='tooltipContent'] {
   color: var(--primary-foreground);
 }
 
-.admin-driver-popover .driver-popover-close-btn {
-  color: var(--muted-foreground);
-}
-
 /* Preserve driver.js transparent borders per side — a single border-color makes a square */
 .admin-driver-popover .driver-popover-arrow-side-left {
   border-color: var(--popover);
@@ -1723,6 +1719,13 @@ html:has(.admin-blog-mdx-editor-overlay) [class*='tooltipContent'] {
   border-left-color: transparent;
   border-top-color: transparent;
   border-right-color: transparent;
+}
+
+/* Admin tour: highlighted UI is view-only (driver.js disableActiveInteraction + CSS fallback) */
+.driver-active-element,
+.driver-active-element * {
+  pointer-events: none !important;
+  user-select: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -135,7 +135,7 @@ export function AdminBookingsTable(props: AdminBookingsTableProps): ReactElement
     [],
   );
   return (
-    <div className="relative space-y-4" data-admin-tour="page-bookings-table">
+    <div className="relative space-y-4">
       {props.isLoading ? (
         <div
           className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center rounded-2xl bg-card/50 pt-8"

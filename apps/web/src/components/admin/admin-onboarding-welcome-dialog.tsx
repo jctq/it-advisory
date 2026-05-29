@@ -21,15 +21,16 @@ type AdminOnboardingWelcomeDialogProps = {
 const WELCOME_TIPS: readonly { readonly title: string; readonly description: string }[] = [
   {
     title: 'Every workspace page',
-    description: 'The tour navigates to each admin route and highlights tables, calendars, and settings in context.',
+    description:
+      'The tour visits dashboard, templates, bookings, support reports, debug tools, payments settings, and more—with highlights you can view but not click.',
   },
   {
-    title: 'Appearance controls',
-    description: 'Light, dark, or system mode plus accent colors in the top bar.',
+    title: 'Payments & operations',
+    description: 'Bookings with payment holds, gateway settings, cron logs, and webhook traces are covered in the tour.',
   },
   {
     title: 'Replay anytime',
-    description: 'Use the guide button next to appearance settings to run the tour again.',
+    description: 'Use the Guide button next to appearance settings to run the tour again.',
   },
 ] as const;
 
@@ -43,7 +44,16 @@ export function AdminOnboardingWelcomeDialog(props: AdminOnboardingWelcomeDialog
   };
   return (
     <Dialog open={props.open} onOpenChange={executeOpenChange}>
-      <DialogContent className="max-w-lg gap-0 p-0 overflow-hidden" showCloseButton>
+      <DialogContent
+        className="max-w-lg gap-0 p-0 overflow-hidden"
+        showCloseButton
+        onInteractOutside={(event) => {
+          event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+        }}
+      >
         <div className="border-b border-border/80 bg-muted/40 px-6 py-5">
           <DialogHeader className="space-y-3 text-left">
             <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -51,8 +61,8 @@ export function AdminOnboardingWelcomeDialog(props: AdminOnboardingWelcomeDialog
             </div>
             <DialogTitle className="text-xl">Welcome to the admin console</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed">
-              A guided tour walks through the sidebar, then visits each workspace page—dashboard, templates, blog,
-              sessions, and settings—with tips on the key controls in each area.
+              A guided tour walks through the sidebar, then visits each workspace—dashboard, templates, bookings,
+              support, debug, payments settings, and more—with tips on the key controls in each area.
             </DialogDescription>
           </DialogHeader>
         </div>

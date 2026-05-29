@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import {
   buildFullCalendarBusinessHourSegments,
@@ -52,8 +53,12 @@ import { AdminSkeleton } from '@/components/admin/admin-skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { resolveScheduleTab, type ScheduleTab } from '@/lib/admin/admin-schedule-tabs';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+
+export type { ScheduleTab } from '@/lib/admin/admin-schedule-tabs';
+export { resolveScheduleTab } from '@/lib/admin/admin-schedule-tabs';
 
 const BOOKING_SCHEDULE_API_URL: string = buildApiUrl('/api/admin/booking-schedule');
 
@@ -277,7 +282,30 @@ function resolveOverrideRow(dow: number, doc: AdvisorBookingSettingsDocument): {
   return { mode: 'window', start: raw.start, end: raw.end };
 }
 
-export function AdminAdvisorScheduleManager(): ReactElement {
+type AdminAdvisorScheduleManagerProps = {
+  readonly initialTab: ScheduleTab;
+};
+
+export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerProps): ReactElement {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<ScheduleTab>(props.initialTab);
+  if (props.initialTab !== activeTab) {
+    setActiveTab(props.initialTab);
+  }
+  const executeChangeTab = useCallback(
+    (nextTab: ScheduleTab): void => {
+      setActiveTab(nextTab);
+      const nextParams = new URLSearchParams(window.location.search);
+      if (nextTab === 'hours-grid') {
+        nextParams.delete('tab');
+      } else {
+        nextParams.set('tab', nextTab);
+      }
+      const query = nextParams.toString();
+      router.replace(query.length > 0 ? `/admin/schedule?${query}` : '/admin/schedule', { scroll: false });
+    },
+    [router],
+  );
   const [settings, setSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
   const [lastSavedSettings, setLastSavedSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -463,9 +491,16 @@ export function AdminAdvisorScheduleManager(): ReactElement {
         <ScheduleLoadFailurePanel errorMessage={loadErrorMessage} onRetry={executeRetryLoad} />
       ) : null}
       {!isLoading && settings !== null ? (
-        <div data-admin-tour="page-schedule-calendar" className="space-y-6">
-          <Tabs defaultValue="hours-grid" className="w-full">
+        <div className="space-y-6">
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              executeChangeTab(resolveScheduleTab(value));
+            }}
+            className="w-full"
+          >
             <TabsList
+              data-admin-tour="page-schedule-tabs"
               aria-label="Schedule sections"
               className="flex h-auto min-h-11 w-full flex-wrap justify-start gap-1 rounded-xl border border-border/70 bg-muted/50 p-1.5 shadow-sm"
             >
@@ -491,7 +526,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="hours-grid" className="mt-6 outline-none">
-              <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+              <Card data-admin-tour="page-schedule-hours-grid" className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
               <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="flex min-w-0 gap-3">
@@ -644,7 +679,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
             </Card>
             </TabsContent>
             <TabsContent value="weekdays" className="mt-6 outline-none">
-            <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+            <Card data-admin-tour="page-schedule-weekdays" className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
               <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex min-w-0 gap-3">
                   <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
@@ -719,7 +754,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
             </Card>
             </TabsContent>
             <TabsContent value="dates" className="mt-6 outline-none">
-            <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+            <Card data-admin-tour="page-schedule-dates" className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
               <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex min-w-0 gap-3">
                   <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
@@ -749,7 +784,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
             </Card>
             </TabsContent>
             <TabsContent value="caps" className="mt-6 outline-none">
-            <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+            <Card data-admin-tour="page-schedule-caps" className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
               <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex min-w-0 gap-3">
                   <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
@@ -793,7 +828,7 @@ export function AdminAdvisorScheduleManager(): ReactElement {
             </Card>
             </TabsContent>
             <TabsContent value="preview" className="mt-6 outline-none">
-            <Card className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
+            <Card data-admin-tour="page-schedule-preview" className="overflow-hidden border-border/90 shadow-sm py-0 pb-6">
               <CardHeader className="border-b border-border/80 bg-muted/25 p-6">
                 <div className="flex min-w-0 gap-3">
                   <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
@@ -1393,10 +1428,14 @@ function WeeklyCapEditor(props: WeeklyCapEditorProps): ReactElement {
   );
 }
 
-export function AdminAdvisorSchedulePageContent(): ReactElement {
+type AdminAdvisorSchedulePageContentProps = {
+  readonly initialTab: ScheduleTab;
+};
+
+export function AdminAdvisorSchedulePageContent(props: AdminAdvisorSchedulePageContentProps): ReactElement {
   return (
     <section className="mx-auto space-y-8 w-full">
-      <AdminAdvisorScheduleManager />
+      <AdminAdvisorScheduleManager initialTab={props.initialTab} />
     </section>
   );
 }
