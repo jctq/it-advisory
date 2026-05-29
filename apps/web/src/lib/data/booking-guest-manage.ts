@@ -26,6 +26,7 @@ import {
   type BookingPayGuidance,
 } from '@/lib/payments/booking-pay-guidance';
 import { syncBookingIfPaymentWindowExpired } from '@/lib/payments/cancel-expired-payment-window-bookings';
+import { resolveBookingSessionDisplayTitles } from '@/lib/marketing/resolve-booking-session-display-titles';
 import {
   buildBookingNotFoundPayability,
   buildCredentialsMismatchPayability,
@@ -64,6 +65,8 @@ export type GuestBookingManageView = {
   readonly sessionEndedAtIso: string | null;
   readonly overduePendingActionsAvailable: boolean;
   readonly quizSessionMarketingRef: string | null;
+  readonly sessionTitle: string | null;
+  readonly serviceTitle: string;
 };
 
 export type VerifiedGuestBooking = {
@@ -267,6 +270,7 @@ export async function buildGuestBookingManageView(
     manageKind,
     profileSyncAvailable,
   });
+  const displayTitles = await resolveBookingSessionDisplayTitles(activeVerified.booking);
   return {
     bookingReference: formatBookingReferenceId(activeVerified.bookingId),
     status: activeVerified.booking.status,
@@ -290,6 +294,8 @@ export async function buildGuestBookingManageView(
     sessionEndedAtIso,
     overduePendingActionsAvailable,
     quizSessionMarketingRef,
+    sessionTitle: displayTitles.sessionTitle,
+    serviceTitle: displayTitles.serviceTitle,
   };
 }
 

@@ -28,7 +28,11 @@ import {
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
 } from '@techmd/api-client/marketing-booking-manage-api-client';
-import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TAGLINE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import {
+  resolveBookingSessionRoomHeadline,
+  shouldShowBookingSessionServiceSubtitle,
+} from '@/lib/marketing/booking-session-display-titles';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -76,10 +80,6 @@ const sessionCardClass = cn(
 );
 
 type SessionRoomPhase = 'lookup' | 'room';
-
-function resolveServiceTitle(serviceKey: string): string {
-  return serviceKey === 'project-rescue' ? PROJECT_RESCUE_SERVICE_TITLE : serviceKey;
-}
 
 function resolvePhaseLabel(phase: BookingSessionPhase): string {
   if (phase === 'upcoming') {
@@ -440,7 +440,14 @@ type BookingSessionRoomViewProps = {
 
 function BookingSessionRoomView(props: BookingSessionRoomViewProps): ReactElement {
   const { booking, serverNowMs } = props;
-  const serviceTitle = resolveServiceTitle(booking.serviceKey);
+  const sessionHeadline = resolveBookingSessionRoomHeadline({
+    sessionTitle: booking.sessionTitle,
+    serviceTitle: booking.serviceTitle,
+  });
+  const showServiceSubtitle = shouldShowBookingSessionServiceSubtitle({
+    sessionTitle: booking.sessionTitle,
+    serviceTitle: booking.serviceTitle,
+  });
   const slotDisplay = formatSlotDisplay(booking.startsAtIso, booking.timezone);
   const timing = useMemo(() => {
     if (serverNowMs === null) {
@@ -504,8 +511,11 @@ function BookingSessionRoomView(props: BookingSessionRoomViewProps): ReactElemen
             ) : null}
           </div>
           <h2 id="session-room-heading" className="mt-4 text-balance text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-            {serviceTitle}
+            {sessionHeadline}
           </h2>
+          {showServiceSubtitle ? (
+            <p className="mt-2 text-sm font-medium text-muted-foreground">{booking.serviceTitle}</p>
+          ) : null}
           <p className="mt-2 text-sm text-muted-foreground">Hi {booking.customerName.split(' ')[0] ?? booking.customerName}, your consultation is almost ready.</p>
           {booking.status === 'pending' ? (
             <div className="mx-auto mt-6 max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
@@ -602,7 +612,7 @@ function BookingSessionRoomView(props: BookingSessionRoomViewProps): ReactElemen
                 <AddToCalendarButtons
                   className="mt-3"
                   startsAtIso={booking.startsAtIso}
-                  title={`${serviceTitle} · TechMD`}
+                  title={`${sessionHeadline} · TechMD`}
                   description={calendarDescription}
                   location={resolveBookingJoinCalendarLocation({
                     useSessionRoomLinks: props.bookingSessionRoomLinksEnabled,

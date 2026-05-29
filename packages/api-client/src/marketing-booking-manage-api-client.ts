@@ -36,6 +36,8 @@ export type GuestBookingManageView = {
   readonly fathomNotesUrl: string | null;
   readonly fathomSummaryPreview: string | null;
   readonly sessionEndedAtIso: string | null;
+  readonly sessionTitle: string | null;
+  readonly serviceTitle: string;
 };
 
 export type GuestBookingManageCredentials = {
