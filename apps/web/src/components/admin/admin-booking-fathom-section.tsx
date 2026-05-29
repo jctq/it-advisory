@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
 import { AdminFathomNotesLink } from '@/components/admin/admin-fathom-notes-link';
+import { MarketingBlogProse } from '@/components/marketing/blog/marketing-blog-prose';
 
 type AdminBookingFathomSectionProps = {
   readonly booking: BookingDetailRow;
@@ -109,7 +110,9 @@ export function AdminBookingFathomSection(props: AdminBookingFathomSectionProps)
         <p className="mt-4 text-sm text-muted-foreground">Notes pending</p>
       ) : null}
       {props.booking.fathomSummary !== undefined && props.booking.fathomSummary.trim().length > 0 ? (
-        <p className="mt-4 whitespace-pre-wrap text-sm text-muted-foreground">{props.booking.fathomSummary}</p>
+        <div className="mt-4 max-h-128 overflow-y-auto rounded-lg border border-border bg-muted/30 p-4">
+          <MarketingBlogProse contentMarkdown={props.booking.fathomSummary} />
+        </div>
       ) : null}
       {props.booking.fathomActionItems !== undefined && props.booking.fathomActionItems.length > 0 ? (
         <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
