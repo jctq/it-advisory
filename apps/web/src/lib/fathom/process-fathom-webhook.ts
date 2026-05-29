@@ -101,6 +101,7 @@ export async function processFathomWebhook(input: {
     bookingId: match.bookingId,
     parsed: enriched,
     matchStatus: 'linked',
+    markSessionCompleted: true,
   });
   if (!applied) {
     return { handled: true, status: 200 };

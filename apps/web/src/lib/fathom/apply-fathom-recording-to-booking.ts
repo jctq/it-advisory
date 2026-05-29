@@ -9,6 +9,8 @@ export async function applyFathomRecordingToBooking(input: {
   readonly bookingId: string;
   readonly parsed: ParsedFathomWebhook;
   readonly matchStatus: FathomMatchStatus;
+  /** When true, marks the consultation session completed (e.g. Fathom webhook after call ends). */
+  readonly markSessionCompleted?: boolean;
 }): Promise<boolean> {
   if (!process.env.MONGODB_URI) {
     return false;
@@ -34,6 +36,9 @@ export async function applyFathomRecordingToBooking(input: {
   }
   if (input.parsed.actionItems.length > 0) {
     setDoc.fathomActionItems = [...input.parsed.actionItems];
+  }
+  if (input.markSessionCompleted !== false) {
+    setDoc.status = 'completed';
   }
   const db = await getDb();
   const result = await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne({ _id: objectId }, { $set: setDoc });

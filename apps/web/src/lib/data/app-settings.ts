@@ -18,6 +18,7 @@ export type AppSettingsValues = {
   readonly diagnosticAiEnabled: boolean;
   readonly diagnosticManageBookingEnabled: boolean;
   readonly supportModuleEnabled: boolean;
+  readonly bookingSessionRoomLinksEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;
@@ -45,6 +46,7 @@ function defaultSettings(): AppSettingsValues {
     diagnosticAiEnabled: false,
     diagnosticManageBookingEnabled: false,
     supportModuleEnabled: false,
+    bookingSessionRoomLinksEnabled: true,
     diagnosticMaxRounds: 4,
     diagnosticQuestionsPerRound: 5,
     diagnosticOptionsPerQuestion: 4,
@@ -67,6 +69,10 @@ function mergeDocument(doc: AppSettingsDocument | null): AppSettingsValues {
         : base.diagnosticManageBookingEnabled,
     supportModuleEnabled:
       typeof doc.supportModuleEnabled === 'boolean' ? doc.supportModuleEnabled : base.supportModuleEnabled,
+    bookingSessionRoomLinksEnabled:
+      typeof doc.bookingSessionRoomLinksEnabled === 'boolean'
+        ? doc.bookingSessionRoomLinksEnabled
+        : base.bookingSessionRoomLinksEnabled,
     diagnosticMaxRounds: clampInt(
       doc.diagnosticMaxRounds,
       DIAGNOSTIC_MAX_ROUNDS_MIN,
@@ -134,6 +140,10 @@ export async function updateAppSettings(patch: Partial<AppSettingsValues>): Prom
         : current.diagnosticManageBookingEnabled,
     supportModuleEnabled:
       patch.supportModuleEnabled !== undefined ? patch.supportModuleEnabled : current.supportModuleEnabled,
+    bookingSessionRoomLinksEnabled:
+      patch.bookingSessionRoomLinksEnabled !== undefined
+        ? patch.bookingSessionRoomLinksEnabled
+        : current.bookingSessionRoomLinksEnabled,
     diagnosticMaxRounds:
       patch.diagnosticMaxRounds !== undefined
         ? clampInt(

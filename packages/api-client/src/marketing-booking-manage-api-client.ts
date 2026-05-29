@@ -15,7 +15,7 @@ export type BookingPayGuidance = {
 
 export type GuestBookingManageView = {
   readonly bookingReference: string;
-  readonly status: 'pending' | 'confirmed' | 'cancelled';
+  readonly status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   readonly startsAtIso: string;
   readonly timezone: string;
   readonly serviceKey: string;
@@ -35,6 +35,7 @@ export type GuestBookingManageView = {
   readonly recordingOptIn: boolean;
   readonly fathomNotesUrl: string | null;
   readonly fathomSummaryPreview: string | null;
+  readonly sessionEndedAtIso: string | null;
 };
 
 export type GuestBookingManageCredentials = {
@@ -46,6 +47,35 @@ export type GuestBookingManageCredentials = {
 function buildApiUrl(apiBaseUrl: string, path: string): string {
   const base = apiBaseUrl.replace(/\/$/, '');
   return base.length === 0 ? path : `${base}${path}`;
+}
+
+type SessionLookupPayload = {
+  readonly ok?: boolean;
+  readonly booking?: GuestBookingManageView;
+  readonly error?: string;
+  readonly code?: string;
+};
+
+export class BookingSessionLookupError extends Error {
+  readonly statusCode: number;
+  readonly code: string | null;
+
+  constructor(message: string, statusCode: number, code: string | null) {
+    super(message);
+    this.name = 'BookingSessionLookupError';
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
+
+async function parseSessionLookupResponse(response: Response): Promise<GuestBookingManageView> {
+  const payload = (await response.json()) as SessionLookupPayload;
+  if (response.ok && payload.ok === true && payload.booking !== undefined) {
+    return payload.booking;
+  }
+  const message = typeof payload.error === 'string' ? payload.error : 'Booking lookup failed.';
+  const code = typeof payload.code === 'string' ? payload.code : null;
+  throw new BookingSessionLookupError(message, response.status, code);
 }
 
 export async function lookupGuestBooking(params: {
@@ -66,6 +96,54 @@ export async function lookupGuestBooking(params: {
     throw new Error(typeof payload.error === 'string' ? payload.error : 'Booking lookup failed.');
   }
   return payload.booking;
+}
+
+export async function lookupGuestBookingSession(params: {
+  readonly apiBaseUrl: string;
+  readonly credentials: GuestBookingManageCredentials;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/session/lookup');
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params.credentials),
+    signal: params.signal,
+  });
+  return parseSessionLookupResponse(response);
+}
+
+export async function lookupAccountBookingSession(params: {
+  readonly apiBaseUrl: string;
+  readonly bookingId: string;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/session/lookup-account');
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingId: params.bookingId }),
+    signal: params.signal,
+  });
+  return parseSessionLookupResponse(response);
+}
+
+export async function lookupAccountBookingSessionByReference(params: {
+  readonly apiBaseUrl: string;
+  readonly bookingReference: string;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/session/lookup-account-by-reference');
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingReference: params.bookingReference }),
+    signal: params.signal,
+  });
+  return parseSessionLookupResponse(response);
 }
 
 export async function syncAccountProfileToManagedBooking(params: {

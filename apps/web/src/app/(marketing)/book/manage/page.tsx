@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Suspense } from 'react';
 import { GuestBookingManageFlow } from '@/components/marketing/guest-booking-manage-flow';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
+import { readBookingSessionRoomLinksEnabled } from '@/lib/marketing/booking-session-room-gate';
 import { BookRouteLoadingFallback } from '../book-route-loading-fallback';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
@@ -15,6 +16,7 @@ export default async function BookManagePage(): Promise<ReactNode> {
   if (!(await readManageBookingEnabled())) {
     notFound();
   }
+  const bookingSessionRoomLinksEnabled = await readBookingSessionRoomLinksEnabled();
   return (
     <main className="mx-auto max-w-6xl px-0 py-0 md:px-6 md:py-12">
       <div className="mb-8 hidden md:block">
@@ -25,7 +27,7 @@ export default async function BookManagePage(): Promise<ReactNode> {
         </p>
       </div>
       <Suspense fallback={<BookRouteLoadingFallback />}>
-        <GuestBookingManageFlow />
+        <GuestBookingManageFlow bookingSessionRoomLinksEnabled={bookingSessionRoomLinksEnabled} />
       </Suspense>
     </main>
   );

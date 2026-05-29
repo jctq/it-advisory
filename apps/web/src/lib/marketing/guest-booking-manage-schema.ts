@@ -27,6 +27,10 @@ export const accountBookingManageLookupSchema = z.object({
   bookingId: mongoObjectIdHexSchema,
 });
 
+export const accountBookingSessionReferenceLookupSchema = z.object({
+  bookingReference: z.string().trim().min(4).max(12),
+});
+
 export const accountBookingManageCheckoutSchema = z.object({
   bookingId: mongoObjectIdHexSchema,
   gatewayId: z.enum(PAYMENT_GATEWAY_IDS),

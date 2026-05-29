@@ -3,6 +3,7 @@ import {
   bookingIdMatchesReferenceInput,
   filterBookingsByReferenceInput,
   formatBookingReferenceId,
+  matchesGuestManageContact,
 } from './booking-reference';
 
 describe('bookingIdMatchesReferenceInput', () => {
@@ -40,5 +41,46 @@ describe('filterBookingsByReferenceInput', () => {
 
   it('returns empty for short input', () => {
     expect(filterBookingsByReferenceInput(bookings, '12')).toEqual([]);
+  });
+});
+
+describe('matchesGuestManageContact', () => {
+  it('matches lead email and phone', () => {
+    expect(
+      matchesGuestManageContact({
+        email: 'guest@example.com',
+        phoneLastFour: '4761',
+        leadEmail: 'guest@example.com',
+        leadPhone: '+639171234761',
+        transactionEmail: null,
+        transactionPhone: null,
+      }),
+    ).toBe(true);
+  });
+
+  it('falls back to checkout transaction contact when lead phone is missing', () => {
+    expect(
+      matchesGuestManageContact({
+        email: 'jhaycquilala@gmail.com',
+        phoneLastFour: '4761',
+        leadEmail: '—',
+        leadPhone: '—',
+        transactionEmail: 'jhaycquilala@gmail.com',
+        transactionPhone: '09171234761',
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects when email matches but phone does not', () => {
+    expect(
+      matchesGuestManageContact({
+        email: 'guest@example.com',
+        phoneLastFour: '4761',
+        leadEmail: 'guest@example.com',
+        leadPhone: '+639171234567',
+        transactionEmail: 'guest@example.com',
+        transactionPhone: '+639171234567',
+      }),
+    ).toBe(false);
   });
 });

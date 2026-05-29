@@ -34,6 +34,7 @@ import {
   type OverduePendingManageContext,
 } from '@/components/marketing/overdue-pending-booking-panel';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { resolveBookingJoinCalendarLocation, resolveBookingSessionRoomHref } from '@/lib/marketing/booking-session-room-path';
 import { cn } from '@/lib/utils';
 
 function resolveMarketingClientApiBaseUrl(): string {
@@ -68,6 +69,13 @@ function StatusBadge(props: { readonly status: GuestBookingManageView['status'] 
   if (props.status === 'confirmed') {
     return (
       <Badge className="bg-emerald-600/15 text-emerald-800 hover:bg-emerald-600/15 dark:text-emerald-200">Confirmed</Badge>
+    );
+  }
+  if (props.status === 'completed') {
+    return (
+      <Badge variant="outline" className="border-border/60 bg-muted/40 text-muted-foreground">
+        Completed
+      </Badge>
     );
   }
   if (props.status === 'cancelled') {
@@ -105,7 +113,10 @@ function ManageBookingShell(props: ManageBookingShellProps): ReactElement {
   );
 }
 
-export function GuestBookingManageFlow(): ReactElement {
+export function GuestBookingManageFlow(props: {
+  readonly bookingSessionRoomLinksEnabled?: boolean;
+}): ReactElement {
+  const bookingSessionRoomLinksEnabled = props.bookingSessionRoomLinksEnabled ?? true;
   const searchParams = useSearchParams();
   const {
     phase,
@@ -351,6 +362,7 @@ export function GuestBookingManageFlow(): ReactElement {
   return (
     <ResultView
       booking={booking}
+      bookingSessionRoomLinksEnabled={bookingSessionRoomLinksEnabled}
       payGuidance={payGuidance}
       slotDisplay={slotDisplay}
       isSubmitting={isSubmitting}
@@ -556,6 +568,7 @@ function ManageField(props: ManageFieldProps): ReactElement {
 
 type ResultViewProps = {
   readonly booking: GuestBookingManageView;
+  readonly bookingSessionRoomLinksEnabled: boolean;
   readonly payGuidance: BookingPayGuidance | null;
   readonly slotDisplay: { readonly date: string; readonly time: string };
   readonly isSubmitting: boolean;
@@ -579,6 +592,10 @@ type ResultViewProps = {
 
 function ResultView(props: ResultViewProps): ReactElement {
   const hasMultipleGateways = (props.paymentConfig?.gateways.length ?? 0) > 1;
+  const sessionRoomHref = resolveBookingSessionRoomHref(
+    props.booking.bookingReference,
+    props.bookingSessionRoomLinksEnabled,
+  );
   const bookingTitle =
     props.booking.serviceKey === 'project-rescue' ? PROJECT_RESCUE_SERVICE_TITLE : props.booking.serviceKey;
   const manageBase = typeof window !== 'undefined' ? window.location.origin : '';
@@ -710,16 +727,26 @@ function ResultView(props: ResultViewProps): ReactElement {
               <CheckCircle2 className="size-4 shrink-0" aria-hidden />
               <div className="min-w-0 space-y-2">
                 <p>Your booking is confirmed. Check your email for meeting details.</p>
+                {sessionRoomHref !== null ? (
+                  <p>
+                    <Link
+                      href={sessionRoomHref}
+                      className="inline-flex items-center gap-1.5 font-semibold text-emerald-900 underline-offset-4 hover:underline dark:text-emerald-200"
+                    >
+                      <Video className="size-4 shrink-0" aria-hidden />
+                      Open session room
+                    </Link>
+                  </p>
+                ) : null}
                 {props.booking.meetingUrl !== null ? (
                   <p className="flex flex-wrap items-center gap-2">
-                    <Video className="size-4 shrink-0" aria-hidden />
                     <a
                       href={props.booking.meetingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-semibold text-emerald-900 underline-offset-4 hover:underline dark:text-emerald-200"
+                      className="font-medium text-emerald-900/90 underline-offset-4 hover:underline dark:text-emerald-200/90"
                     >
-                      Join video meeting
+                      {sessionRoomHref !== null ? 'Direct meeting link' : 'Join video meeting'}
                     </a>
                   </p>
                 ) : null}
@@ -771,7 +798,11 @@ function ResultView(props: ResultViewProps): ReactElement {
                     startsAtIso={props.booking.startsAtIso}
                     title={bookingTitle}
                     description={calendarDescription}
-                    location={props.booking.meetingUrl ?? undefined}
+                    location={resolveBookingJoinCalendarLocation({
+                      useSessionRoomLinks: props.bookingSessionRoomLinksEnabled,
+                      bookingReference: props.booking.bookingReference,
+                      meetingUrl: props.booking.meetingUrl,
+                    })}
                     icsUidSeed={props.booking.bookingReference}
                   />
                 </dd>

@@ -101,14 +101,12 @@ export function AdminBookingFathomSection(props: AdminBookingFathomSectionProps)
           </div>
         ) : null}
       </dl>
-      {props.booking.recordingOptIn ||
-      (props.booking.fathomShareUrl !== undefined && props.booking.fathomShareUrl.trim().length > 0) ? (
+      {props.booking.fathomShareUrl !== undefined && props.booking.fathomShareUrl.trim().length > 0 ? (
         <p className="mt-4 text-sm">
-          <AdminFathomNotesLink
-            fathomShareUrl={props.booking.fathomShareUrl}
-            recordingOptIn={props.booking.recordingOptIn}
-          />
+          <AdminFathomNotesLink fathomShareUrl={props.booking.fathomShareUrl} />
         </p>
+      ) : props.booking.recordingOptIn ? (
+        <p className="mt-4 text-sm text-muted-foreground">Notes pending</p>
       ) : null}
       {props.booking.fathomSummary !== undefined && props.booking.fathomSummary.trim().length > 0 ? (
         <p className="mt-4 whitespace-pre-wrap text-sm text-muted-foreground">{props.booking.fathomSummary}</p>

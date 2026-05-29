@@ -59,6 +59,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
     bookingId: booking.id,
     parsed: parsedRecording,
     matchStatus: 'manual',
+    markSessionCompleted: false,
   });
   if (!applied) {
     return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 });

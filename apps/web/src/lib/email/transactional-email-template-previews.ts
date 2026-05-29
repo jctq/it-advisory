@@ -14,6 +14,8 @@ import {
 } from '@/lib/email/send-booking-payment-reminder-email';
 import { buildBookingFathomNotesEmailHtml } from '@/lib/email/send-booking-fathom-notes-email';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
+import { readBookingSessionRoomLinksEnabled } from '@/lib/marketing/booking-session-room-gate';
+import { resolveBookingJoinPrimaryUrl } from '@/lib/marketing/booking-session-room-path';
 import {
   BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
   buildBookingCalendarLinkBundle,
@@ -69,17 +71,24 @@ export async function buildTransactionalEmailTemplatePreviews(
   const brandName = await getResolvedSiteName();
   const siteOrigin = resolveAbsoluteSiteOrigin();
   const manageBookingEnabled = await readManageBookingEnabled();
+  const useSessionRoomLinks = await readBookingSessionRoomLinksEnabled();
   const manageUrl = manageBookingEnabled && siteOrigin.length > 0 ? `${siteOrigin}/book/manage` : '';
   const meetingUrl =
     siteOrigin.length > 0 ? `${siteOrigin}/meet/preview-strategy-session` : 'https://meet.google.com/abc-defg-hij';
+  const primaryJoinUrl = resolveBookingJoinPrimaryUrl({
+    useSessionRoomLinks,
+    bookingReference: SAMPLE_BOOKING_REFERENCE,
+    meetingUrl,
+    siteOrigin,
+  });
   const sampleStartsAt = new Date('2026-06-15T02:00:00.000Z');
   const dateLong = 'Monday, June 15, 2026';
   const timeLabel = '10:00 AM';
   const serviceTitle = 'Strategy session';
   const calendarBundle = buildBookingCalendarLinkBundle({
     title: `${serviceTitle} — ${SAMPLE_BOOKING_REFERENCE}`,
-    description: `Booking reference ${SAMPLE_BOOKING_REFERENCE}. ${manageUrl.length > 0 ? `Manage: ${manageUrl}` : `Manage on ${brandName}.`}`,
-    location: meetingUrl,
+    description: `Booking reference ${SAMPLE_BOOKING_REFERENCE}. ${useSessionRoomLinks ? `Session room: ${primaryJoinUrl}` : `Join: ${primaryJoinUrl}`}. ${useSessionRoomLinks ? `Direct meeting link: ${meetingUrl}. ` : ''}${manageUrl.length > 0 ? `Manage: ${manageUrl}` : `Manage on ${brandName}.`}`,
+    location: primaryJoinUrl.length > 0 ? primaryJoinUrl : meetingUrl,
     startsAtUtc: sampleStartsAt,
     durationMinutes: BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
     icsUidSeed: SAMPLE_BOOKING_REFERENCE,
@@ -106,6 +115,8 @@ export async function buildTransactionalEmailTemplatePreviews(
     dateLong,
     timeLabel,
     manageUrl,
+    primaryJoinUrl,
+    primaryJoinUsesSessionRoom: useSessionRoomLinks,
     meetingUrl,
     includeRecordingDisclosure: true,
     siteOrigin,

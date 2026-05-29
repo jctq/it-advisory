@@ -1,6 +1,6 @@
 'use client';
 
-import { Bug, Building2, CalendarDays, Headphones, LayoutTemplate } from 'lucide-react';
+import { Bug, Building2, CalendarDays, Headphones, LayoutTemplate, Video } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -34,6 +34,7 @@ type SettingsPayload = {
   readonly diagnosticAiEnabled: boolean;
   readonly diagnosticManageBookingEnabled: boolean;
   readonly supportModuleEnabled: boolean;
+  readonly bookingSessionRoomLinksEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
   readonly diagnosticOptionsPerQuestion: number;
@@ -62,6 +63,7 @@ function areSettingsEqual(left: SettingsPayload, right: SettingsPayload): boolea
     left.diagnosticAiEnabled === right.diagnosticAiEnabled &&
     left.diagnosticManageBookingEnabled === right.diagnosticManageBookingEnabled &&
     left.supportModuleEnabled === right.supportModuleEnabled &&
+    left.bookingSessionRoomLinksEnabled === right.bookingSessionRoomLinksEnabled &&
     left.diagnosticMaxRounds === right.diagnosticMaxRounds &&
     left.diagnosticQuestionsPerRound === right.diagnosticQuestionsPerRound &&
     left.diagnosticOptionsPerQuestion === right.diagnosticOptionsPerQuestion &&
@@ -98,6 +100,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [diagnosticManageBookingEnabled, setDiagnosticManageBookingEnabled] = useState<boolean>(false);
   const [supportModuleEnabled, setSupportModuleEnabled] = useState<boolean>(false);
+  const [bookingSessionRoomLinksEnabled, setBookingSessionRoomLinksEnabled] = useState<boolean>(true);
   const [diagnosticMaxRounds, setDiagnosticMaxRounds] = useState<number>(4);
   const [diagnosticQuestionsPerRound, setDiagnosticQuestionsPerRound] = useState<number>(5);
   const [diagnosticOptionsPerQuestion, setDiagnosticOptionsPerQuestion] = useState<number>(4);
@@ -116,6 +119,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       diagnosticAiEnabled,
       diagnosticManageBookingEnabled,
       supportModuleEnabled,
+      bookingSessionRoomLinksEnabled,
       diagnosticMaxRounds,
       diagnosticQuestionsPerRound,
       diagnosticOptionsPerQuestion,
@@ -154,6 +158,10 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
               typeof data.diagnosticManageBookingEnabled === 'boolean' ? data.diagnosticManageBookingEnabled : false,
             supportModuleEnabled:
               typeof data.supportModuleEnabled === 'boolean' ? data.supportModuleEnabled : false,
+            bookingSessionRoomLinksEnabled:
+              typeof data.bookingSessionRoomLinksEnabled === 'boolean'
+                ? data.bookingSessionRoomLinksEnabled
+                : true,
             diagnosticMaxRounds: data.diagnosticMaxRounds,
             diagnosticQuestionsPerRound: data.diagnosticQuestionsPerRound,
             diagnosticOptionsPerQuestion:
@@ -165,6 +173,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
           setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
           setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
           setSupportModuleEnabled(snapshot.supportModuleEnabled);
+          setBookingSessionRoomLinksEnabled(snapshot.bookingSessionRoomLinksEnabled);
           setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
           setDiagnosticQuestionsPerRound(snapshot.diagnosticQuestionsPerRound);
           setDiagnosticOptionsPerQuestion(snapshot.diagnosticOptionsPerQuestion);
@@ -197,6 +206,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
           diagnosticAiEnabled,
           diagnosticManageBookingEnabled,
           supportModuleEnabled,
+          bookingSessionRoomLinksEnabled,
           diagnosticMaxRounds,
           diagnosticQuestionsPerRound,
           diagnosticOptionsPerQuestion,
@@ -213,6 +223,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         diagnosticAiEnabled: data.diagnosticAiEnabled,
         diagnosticManageBookingEnabled: data.diagnosticManageBookingEnabled,
         supportModuleEnabled: data.supportModuleEnabled,
+        bookingSessionRoomLinksEnabled: data.bookingSessionRoomLinksEnabled,
         diagnosticMaxRounds: data.diagnosticMaxRounds,
         diagnosticQuestionsPerRound: data.diagnosticQuestionsPerRound,
         diagnosticOptionsPerQuestion: data.diagnosticOptionsPerQuestion,
@@ -223,6 +234,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
       setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
       setSupportModuleEnabled(snapshot.supportModuleEnabled);
+      setBookingSessionRoomLinksEnabled(snapshot.bookingSessionRoomLinksEnabled);
       setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
       setDiagnosticQuestionsPerRound(snapshot.diagnosticQuestionsPerRound);
       setDiagnosticOptionsPerQuestion(snapshot.diagnosticOptionsPerQuestion);
@@ -239,6 +251,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     diagnosticCacheDebugEnabled,
     diagnosticManageBookingEnabled,
     supportModuleEnabled,
+    bookingSessionRoomLinksEnabled,
     diagnosticMaxRounds,
     diagnosticOptionsPerQuestion,
     diagnosticQuestionsPerRound,
@@ -254,6 +267,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     setDiagnosticAiEnabled(savedSnapshot.diagnosticAiEnabled);
     setDiagnosticManageBookingEnabled(savedSnapshot.diagnosticManageBookingEnabled);
     setSupportModuleEnabled(savedSnapshot.supportModuleEnabled);
+    setBookingSessionRoomLinksEnabled(savedSnapshot.bookingSessionRoomLinksEnabled);
     setDiagnosticMaxRounds(savedSnapshot.diagnosticMaxRounds);
     setDiagnosticQuestionsPerRound(savedSnapshot.diagnosticQuestionsPerRound);
     setDiagnosticOptionsPerQuestion(savedSnapshot.diagnosticOptionsPerQuestion);
@@ -442,6 +456,37 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
               }
             >
               Enable manage booking
+            </AdminSettingsLabel>
+          </div>
+        </div>
+      </SettingsCard>
+      <SettingsCard
+        icon={<Video className="size-5" aria-hidden />}
+        title="Video meeting links"
+        description="Choose whether clients join through your branded session room or a direct Google Meet / Zoom / Teams link."
+      >
+        <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
+          <input
+            id="bookingSessionRoomLinksEnabled"
+            type="checkbox"
+            checked={bookingSessionRoomLinksEnabled}
+            onChange={(event) => {
+              setBookingSessionRoomLinksEnabled(event.target.checked);
+            }}
+            className="mt-1 size-4 rounded border-input"
+          />
+          <div>
+            <AdminSettingsLabel
+              htmlFor="bookingSessionRoomLinksEnabled"
+              hint={
+                <>
+                  When enabled, confirmation emails, calendar invites, and booking success screens link to{' '}
+                  <code className="text-xs">/book/session</code> so clients verify setup before joining. When disabled,
+                  those links use the direct video meeting URL from Google Meet, Zoom, or Teams.
+                </>
+              }
+            >
+              Use session room for join links
             </AdminSettingsLabel>
           </div>
         </div>

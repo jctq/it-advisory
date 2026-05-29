@@ -56,3 +56,45 @@ export function matchesPhoneLastFour(phone: string, lastFourInput: string): bool
   }
   return digits.length >= 4 && digits.endsWith(suffix);
 }
+
+function isUsableGuestManageEmail(raw: string | null | undefined): boolean {
+  if (typeof raw !== 'string') {
+    return false;
+  }
+  const normalized = normalizeGuestManageEmail(raw);
+  return normalized.length > 0 && normalized !== '—';
+}
+
+/**
+ * True when email + phone last four match either the lead or the checkout payment transaction.
+ */
+export function matchesGuestManageContact(input: {
+  readonly email: string;
+  readonly phoneLastFour: string;
+  readonly leadEmail: string | null | undefined;
+  readonly leadPhone: string | null | undefined;
+  readonly transactionEmail: string | null | undefined;
+  readonly transactionPhone: string | null | undefined;
+}): boolean {
+  const normalizedEmail = normalizeGuestManageEmail(input.email);
+  if (normalizedEmail.length === 0) {
+    return false;
+  }
+  const contactSources: ReadonlyArray<{ readonly email: string | null | undefined; readonly phone: string | null | undefined }> = [
+    { email: input.leadEmail, phone: input.leadPhone },
+    { email: input.transactionEmail, phone: input.transactionPhone },
+  ];
+  for (const source of contactSources) {
+    if (!isUsableGuestManageEmail(source.email)) {
+      continue;
+    }
+    if (normalizeGuestManageEmail(source.email!) !== normalizedEmail) {
+      continue;
+    }
+    const phone = typeof source.phone === 'string' ? source.phone : '';
+    if (matchesPhoneLastFour(phone, input.phoneLastFour)) {
+      return true;
+    }
+  }
+  return false;
+}

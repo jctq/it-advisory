@@ -7,6 +7,8 @@ import { findPaymentTransactionById, type PaymentTransactionRow } from '@/lib/da
 import { getDb } from '@/lib/mongodb';
 import { getCatalogServiceByKey } from '@/lib/data/public-catalog-services';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
+import { resolveBookingJoinPrimaryUrl } from '@/lib/marketing/booking-session-room-path';
+import { readBookingSessionRoomLinksEnabled } from '@/lib/marketing/booking-session-room-gate';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import type { CatalogServiceKind } from '@/domain/monetization-types';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -139,6 +141,8 @@ function buildConfirmationPlainText(input: {
   readonly dateLong: string;
   readonly timeLabel: string;
   readonly manageUrl: string;
+  readonly primaryJoinUrl: string;
+  readonly primaryJoinUsesSessionRoom: boolean;
   readonly meetingUrl: string | null;
   readonly includeRecordingDisclosure: boolean;
   readonly calendarBundle: BookingCalendarLinkBundle;
@@ -166,11 +170,22 @@ function buildConfirmationPlainText(input: {
   lines.push(`Outlook: ${input.calendarBundle.outlookCalendarUrl}`);
   lines.push(`Apple (.ics): ${input.calendarBundle.icsDataUrl}`);
   lines.push('');
-  if (input.meetingUrl !== null && input.meetingUrl.trim().length > 0) {
-    lines.push('VIDEO MEETING');
+  if (input.primaryJoinUrl.length > 0) {
+    if (input.primaryJoinUsesSessionRoom) {
+      lines.push('SESSION ROOM');
+      lines.push('Open your session room to verify your setup and join the video call when it is time.');
+    } else {
+      lines.push('VIDEO MEETING');
+    }
+    lines.push(input.primaryJoinUrl);
+    lines.push('');
+  }
+  if (input.primaryJoinUsesSessionRoom && input.meetingUrl !== null && input.meetingUrl.trim().length > 0) {
+    lines.push('DIRECT VIDEO LINK');
+    lines.push('If the session room does not open your call, use this direct meeting link:');
     lines.push(input.meetingUrl.trim());
     lines.push('');
-  } else {
+  } else if (input.primaryJoinUrl.length === 0) {
     lines.push('Your meeting link will follow in a separate message if your advisor attaches one to this booking.');
     lines.push('');
   }
@@ -222,6 +237,8 @@ export function buildBookingConfirmationEmailHtml(input: {
   readonly dateLong: string;
   readonly timeLabel: string;
   readonly manageUrl: string;
+  readonly primaryJoinUrl: string;
+  readonly primaryJoinUsesSessionRoom: boolean;
   readonly meetingUrl: string | null;
   readonly includeRecordingDisclosure: boolean;
   readonly siteOrigin: string;
@@ -248,10 +265,20 @@ export function buildBookingConfirmationEmailHtml(input: {
   const recordingDisclosureBlock = input.includeRecordingDisclosure
     ? `<p style="margin:12px 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;">This consultation includes a visible AI notetaker (Fathom) to capture notes and summaries. By joining, you consent to recording and transcription for service delivery.</p>`
     : '';
-  const meetingSection =
-    trimmedMeeting.length > 0
-      ? `${buildEmailSectionHeading('Video meeting')}${buildBulletproofButton('Join video meeting', trimmedMeeting)}<p style="margin:0 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;word-break:break-word;">If the button above does not open your call, copy this link into your browser:<br /><a href="${escapeHtml(trimmedMeeting)}" style="color:#1d4ed8;text-decoration:underline;">${escapeHtml(trimmedMeeting)}</a></p>${recordingDisclosureBlock}<p style="margin:0 0 28px 0;"></p>`
-      : `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">Your meeting link will follow in a separate message if your advisor attaches one to this booking.</p>${recordingDisclosureBlock}`;
+  const trimmedPrimaryJoin = input.primaryJoinUrl.trim();
+  const primaryJoinSection =
+    trimmedPrimaryJoin.length > 0
+      ? input.primaryJoinUsesSessionRoom
+        ? `${buildEmailSectionHeading('Session room')}${buildBulletproofButton('Open session room', trimmedPrimaryJoin)}<p style="margin:0 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;">From the session room you can verify your connection and join the video call when the window opens.</p>${recordingDisclosureBlock}<p style="margin:0 0 28px 0;"></p>`
+        : `${buildEmailSectionHeading('Video meeting')}${buildBulletproofButton('Join video meeting', trimmedPrimaryJoin)}<p style="margin:0 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;word-break:break-word;">If the button above does not open your call, copy this link into your browser:<br /><a href="${escapeHtml(trimmedPrimaryJoin)}" style="color:#1d4ed8;text-decoration:underline;">${escapeHtml(trimmedPrimaryJoin)}</a></p>${recordingDisclosureBlock}<p style="margin:0 0 28px 0;"></p>`
+      : '';
+  const directMeetingBlock =
+    input.primaryJoinUsesSessionRoom && trimmedMeeting.length > 0
+      ? `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;word-break:break-word;">Direct meeting link (backup):<br /><a href="${escapeHtml(trimmedMeeting)}" style="color:#1d4ed8;text-decoration:underline;">${escapeHtml(trimmedMeeting)}</a></p>`
+      : trimmedPrimaryJoin.length === 0
+        ? `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">Your meeting link will follow in a separate message if your advisor attaches one to this booking.</p>${recordingDisclosureBlock}`
+        : '';
+  const meetingSection = `${primaryJoinSection}${directMeetingBlock}`;
   const manageSection =
     input.manageUrl.length > 0
       ? `${buildEmailSectionHeading('Manage booking')}<p style="margin:0 0 12px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">You will need your booking reference, email, and the last four digits of your phone number.</p>${buildBulletproofButton('View or manage booking', input.manageUrl)}`
@@ -417,10 +444,32 @@ async function runSendBookingConfirmationEmail(input: {
   const paymentSectionHtml = transaction !== null ? buildBookingPaymentSectionHtml(transaction) : null;
   const paymentPlainLines = transaction !== null ? buildPaymentSectionPlainLines(transaction) : null;
   const brandName = await getResolvedSiteName();
+  const useSessionRoomLinks = await readBookingSessionRoomLinksEnabled();
+  const primaryJoinUrl = resolveBookingJoinPrimaryUrl({
+    useSessionRoomLinks,
+    bookingReference,
+    meetingUrl,
+    siteOrigin,
+  });
+  const calendarLocation = primaryJoinUrl.length > 0 ? primaryJoinUrl : meetingUrl ?? '';
+  const calendarDescriptionParts = [`Booking reference ${bookingReference}.`];
+  if (primaryJoinUrl.length > 0) {
+    calendarDescriptionParts.push(
+      useSessionRoomLinks ? `Session room: ${primaryJoinUrl}` : `Join: ${primaryJoinUrl}`,
+    );
+  }
+  if (useSessionRoomLinks && meetingUrl !== null && meetingUrl.length > 0) {
+    calendarDescriptionParts.push(`Direct meeting link: ${meetingUrl}`);
+  }
+  if (manageUrl.length > 0) {
+    calendarDescriptionParts.push(`Manage: ${manageUrl}`);
+  } else {
+    calendarDescriptionParts.push(`Manage on ${brandName}.`);
+  }
   const calendarBundle = buildBookingCalendarLinkBundle({
     title: `${serviceTitle} — ${bookingReference}`,
-    description: `Booking reference ${bookingReference}. ${manageUrl.length > 0 ? `Manage: ${manageUrl}` : `Manage on ${brandName}.`}`,
-    location: meetingUrl ?? '',
+    description: calendarDescriptionParts.join(' '),
+    location: calendarLocation,
     startsAtUtc: startsAt,
     durationMinutes: BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
     icsUidSeed: bookingReference,
@@ -434,6 +483,8 @@ async function runSendBookingConfirmationEmail(input: {
     dateLong,
     timeLabel,
     manageUrl,
+    primaryJoinUrl,
+    primaryJoinUsesSessionRoom: useSessionRoomLinks,
     meetingUrl,
     includeRecordingDisclosure,
     siteOrigin,
@@ -449,6 +500,8 @@ async function runSendBookingConfirmationEmail(input: {
     dateLong,
     timeLabel,
     manageUrl,
+    primaryJoinUrl,
+    primaryJoinUsesSessionRoom: useSessionRoomLinks,
     meetingUrl,
     includeRecordingDisclosure,
     calendarBundle,

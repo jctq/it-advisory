@@ -60,7 +60,7 @@ export function BookingMonthDayList(props: BookingMonthFullCalendarProps): React
   if (props.availabilityReady && visibleDayYmds.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-        No open days this month. Try another month.
+        We&apos;re fully booked this month. Try another month.
       </p>
     );
   }

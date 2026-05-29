@@ -69,6 +69,7 @@ import type {
   PublicCatalogServicesView,
 } from '@/lib/data/public-catalog-services';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
+import { resolveBookingJoinCalendarLocation, resolveBookingSessionRoomHref } from '@/lib/marketing/booking-session-room-path';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
 import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-slot-times-for-manila-date';
@@ -370,13 +371,15 @@ export type BookingPickerProps = {
   readonly pathSessionRef?: string | null;
   /** When false, manage-booking links are hidden (admin diagnostic setting). */
   readonly manageBookingEnabled?: boolean;
+  /** When true, join links use `/book/session` instead of direct video URLs. */
+  readonly bookingSessionRoomLinksEnabled?: boolean;
 };
 
 /**
  * Multi-step marketing checkout: slot selection, contact capture, mock payment choice, then booking persistence.
  */
 export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
-  const { pathSessionRef, manageBookingEnabled = false } = props;
+  const { pathSessionRef, manageBookingEnabled = false, bookingSessionRoomLinksEnabled = true } = props;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -533,6 +536,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     readonly paymentMethodId: string;
   } | null>(null);
   const serverNowMs = useServerSyncedNow(serverClockOffsetMs);
+  const confirmedSessionRoomHref = useMemo(
+    () =>
+      confirmedBookingReference !== null
+        ? resolveBookingSessionRoomHref(confirmedBookingReference, bookingSessionRoomLinksEnabled)
+        : null,
+    [confirmedBookingReference, bookingSessionRoomLinksEnabled],
+  );
   const isPaymentHoldBlocked =
     paymentHoldExpired ||
     (activePaymentHold !== null &&
@@ -2036,7 +2046,15 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                       : PROJECT_RESCUE_SERVICE_TAGLINE
                   }
                   icsUidSeed={confirmedBookingReference ?? confirmedCalendarSlot.startsAtIso}
-                  location={confirmedMeetingUrl ?? undefined}
+                  location={
+                    confirmedBookingReference !== null
+                      ? resolveBookingJoinCalendarLocation({
+                          useSessionRoomLinks: bookingSessionRoomLinksEnabled,
+                          bookingReference: confirmedBookingReference,
+                          meetingUrl: confirmedMeetingUrl,
+                        })
+                      : confirmedMeetingUrl ?? undefined
+                  }
                 />
               ) : null}
             </div>
@@ -2050,8 +2068,19 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               {confirmedMeetingUrl !== null ? (
                 <>
                   <p className="text-sm font-semibold text-foreground">Video call</p>
+                  {confirmedSessionRoomHref !== null ? (
+                    <p className="mt-2">
+                      <Link
+                        href={confirmedSessionRoomHref}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                      >
+                        <Video className="size-4" aria-hidden />
+                        Open session room
+                      </Link>
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Join link:{' '}
+                    {confirmedSessionRoomHref !== null ? 'Direct link: ' : 'Join link: '}
                     <a
                       href={confirmedMeetingUrl}
                       target="_blank"
@@ -2066,6 +2095,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               ) : (
                 <>
                   <p className="text-sm font-semibold text-foreground">Video meeting</p>
+                  {confirmedSessionRoomHref !== null ? (
+                    <p className="mt-2">
+                      <Link
+                        href={confirmedSessionRoomHref}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                      >
+                        <Video className="size-4" aria-hidden />
+                        Open session room
+                      </Link>
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
                     Your confirmation email will include the join link once the meeting is provisioned.
                   </p>

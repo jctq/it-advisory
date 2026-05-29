@@ -12,6 +12,8 @@ const DEFAULT_MATCH_WINDOW_MINUTES = 15 as const;
 const OBJECT_ID_HEX_LENGTH = 24 as const;
 const BOOKING_REFERENCE_LENGTH = 8 as const;
 
+const FATHOM_MATCHABLE_BOOKING_STATUSES = ['confirmed', 'completed'] as const;
+
 export type FathomBookingMatchResult =
   | { readonly status: 'linked'; readonly bookingId: string }
   | { readonly status: 'ambiguous'; readonly candidateBookingIds: readonly string[] }
@@ -81,8 +83,7 @@ async function matchFathomRecordingByBookingReference(
     const docs = await db
       .collection<BookingDocument>(COLLECTIONS.bookings)
       .find({
-        status: 'confirmed',
-        recordingOptIn: true,
+        status: { $in: [...FATHOM_MATCHABLE_BOOKING_STATUSES] },
         $expr: {
           $eq: [
             {
@@ -125,8 +126,7 @@ async function matchFathomRecordingByTimeWindow(input: {
   const docs = await db
     .collection<BookingDocument>(COLLECTIONS.bookings)
     .find({
-      status: 'confirmed',
-      recordingOptIn: true,
+      status: { $in: [...FATHOM_MATCHABLE_BOOKING_STATUSES] },
       startsAt: { $gte: rangeStart, $lte: rangeEnd },
     })
     .toArray();

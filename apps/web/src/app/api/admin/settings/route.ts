@@ -15,6 +15,7 @@ const patchSchema = z.object({
   diagnosticAiEnabled: z.boolean().optional(),
   diagnosticManageBookingEnabled: z.boolean().optional(),
   supportModuleEnabled: z.boolean().optional(),
+  bookingSessionRoomLinksEnabled: z.boolean().optional(),
   diagnosticMaxRounds: z.number().int().min(DIAGNOSTIC_MAX_ROUNDS_MIN).max(DIAGNOSTIC_MAX_ROUNDS_MAX).optional(),
   diagnosticQuestionsPerRound: z
     .number()
@@ -58,6 +59,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     body.diagnosticAiEnabled === undefined &&
     body.diagnosticManageBookingEnabled === undefined &&
     body.supportModuleEnabled === undefined &&
+    body.bookingSessionRoomLinksEnabled === undefined &&
     body.diagnosticMaxRounds === undefined &&
     body.diagnosticQuestionsPerRound === undefined &&
     body.diagnosticOptionsPerQuestion === undefined &&

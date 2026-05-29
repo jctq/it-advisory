@@ -3,11 +3,12 @@ import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentPolicy } from '@/domain/payment-types';
 import type { BookingDocument, LeadDocument } from '@/domain/types';
 import { findBookingById } from '@/lib/data/bookings';
+import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
 import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 import {
   formatBookingReferenceId,
-  matchesPhoneLastFour,
+  matchesGuestManageContact,
   normalizeBookingReferenceInput,
   normalizeGuestManageEmail,
 } from '@/lib/marketing/booking-reference';
@@ -60,6 +61,7 @@ export type GuestBookingManageView = {
   readonly recordingOptIn: boolean;
   readonly fathomNotesUrl: string | null;
   readonly fathomSummaryPreview: string | null;
+  readonly sessionEndedAtIso: string | null;
   readonly overduePendingActionsAvailable: boolean;
   readonly quizSessionMarketingRef: string | null;
 };
@@ -123,11 +125,20 @@ export async function resolveGuestBookingByCredentials(
     if (leadDoc === null) {
       continue;
     }
-    const leadEmail = typeof leadDoc.email === 'string' ? normalizeGuestManageEmail(leadDoc.email) : '';
-    if (leadEmail.length === 0 || leadEmail !== email) {
-      continue;
-    }
-    if (!matchesPhoneLastFour(leadDoc.phone, phoneLastFour)) {
+    const paymentTransactionIdRaw = bookingDoc.paymentTransactionId;
+    const transaction =
+      paymentTransactionIdRaw !== null && paymentTransactionIdRaw !== undefined
+        ? await findPaymentTransactionById(paymentTransactionIdRaw.toString())
+        : null;
+    const contactMatches = matchesGuestManageContact({
+      email,
+      phoneLastFour,
+      leadEmail: leadDoc.email,
+      leadPhone: leadDoc.phone,
+      transactionEmail: transaction?.customerEmail ?? null,
+      transactionPhone: transaction?.customerPhone ?? null,
+    });
+    if (!contactMatches) {
       continue;
     }
     return {
@@ -230,6 +241,13 @@ export async function buildGuestBookingManageView(
         ? `${fathomSummaryRaw.slice(0, 279)}…`
         : fathomSummaryRaw
       : null;
+  const fathomProcessedAt = activeVerified.booking.fathomProcessedAt;
+  const sessionEndedAtIso =
+    fathomProcessedAt instanceof Date && !Number.isNaN(fathomProcessedAt.getTime())
+      ? fathomProcessedAt.toISOString()
+      : activeVerified.booking.status === 'completed'
+        ? activeVerified.booking.updatedAt.toISOString()
+        : null;
   const manageKind = options?.manageKind ?? 'guest';
   const overduePendingActionsAvailable = isOverdueUnpaidPendingBooking({
     status: activeVerified.booking.status,
@@ -269,6 +287,7 @@ export async function buildGuestBookingManageView(
     recordingOptIn,
     fathomNotesUrl: recordingOptIn && fathomShareUrl.length > 0 ? fathomShareUrl : null,
     fathomSummaryPreview,
+    sessionEndedAtIso,
     overduePendingActionsAvailable,
     quizSessionMarketingRef,
   };
@@ -326,6 +345,65 @@ export async function findGuestBookingManageViewForAccountVisitor(
   visitorId: string,
 ): Promise<GuestBookingManageView | null> {
   const resolved = await resolveBookingOwnedByVisitor(bookingId, visitorId);
+  if (isGuestBookingNotFound(resolved)) {
+    return null;
+  }
+  return buildGuestBookingManageView(resolved, { expectedVisitorId: visitorId, manageKind: 'account' });
+}
+
+/**
+ * Resolves a confirmed booking owned by the visitor when the id suffix matches the reference input.
+ */
+export async function resolveBookingOwnedByVisitorViaReference(
+  bookingReference: string,
+  visitorId: string,
+): Promise<ResolveGuestBookingResult> {
+  if (!process.env.MONGODB_URI) {
+    return NOT_FOUND;
+  }
+  const normalizedReference = normalizeBookingReferenceInput(bookingReference);
+  if (normalizedReference.length < 4) {
+    return NOT_FOUND;
+  }
+  const escapedReference = normalizedReference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const db = await getDb();
+  const bookingDocs = await db
+    .collection<BookingDocument>(COLLECTIONS.bookings)
+    .find({
+      visitorId,
+      $expr: {
+        $regexMatch: {
+          input: { $toString: '$_id' },
+          regex: `${escapedReference}$`,
+          options: 'i',
+        },
+      },
+    })
+    .limit(5)
+    .toArray();
+  if (bookingDocs.length !== 1) {
+    return NOT_FOUND;
+  }
+  const bookingDoc = bookingDocs[0]!;
+  if (bookingDoc._id === undefined || bookingDoc.leadId === undefined) {
+    return NOT_FOUND;
+  }
+  const leadDoc = await db.collection<LeadDocument>(COLLECTIONS.leads).findOne({ _id: bookingDoc.leadId });
+  if (leadDoc === null || leadDoc._id === undefined) {
+    return NOT_FOUND;
+  }
+  return {
+    bookingId: bookingDoc._id.toString(),
+    booking: bookingDoc as BookingDocument & { _id: ObjectId },
+    lead: leadDoc as LeadDocument & { _id: ObjectId },
+  };
+}
+
+export async function findGuestBookingManageViewForAccountVisitorByReference(
+  bookingReference: string,
+  visitorId: string,
+): Promise<GuestBookingManageView | null> {
+  const resolved = await resolveBookingOwnedByVisitorViaReference(bookingReference, visitorId);
   if (isGuestBookingNotFound(resolved)) {
     return null;
   }
