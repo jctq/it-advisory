@@ -30,6 +30,7 @@ import {
   adminFormStickyFooterScrollPaddingClass,
 } from '@/components/admin/admin-form-sticky-footer';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
+import { AdminSettingsHint, AdminSettingsLabel } from '@/components/admin/admin-settings-hint';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -449,8 +450,10 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
           weekdayOverrides: settings.weekdayOverrides,
           dateWindowOverrides: settings.dateWindowOverrides,
           slotIntervalMinutes: settings.slotIntervalMinutes,
-          dailyBookingCapOverrides: settings.dailyBookingCapOverrides,
-          weeklyBookingCapOverrides: settings.weeklyBookingCapOverrides,
+          // Empty cap maps must be sent as `{}` — `undefined` is omitted by JSON.stringify and the API
+          // would otherwise keep previously saved caps.
+          dailyBookingCapOverrides: settings.dailyBookingCapOverrides ?? {},
+          weeklyBookingCapOverrides: settings.weeklyBookingCapOverrides ?? {},
           bookingHorizonDays: settings.bookingHorizonDays,
         }),
       });
@@ -563,7 +566,12 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                   </h3>
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="adv-timezone">IANA timezone</Label>
+                      <AdminSettingsLabel
+                        htmlFor="adv-timezone"
+                        hint="Read-only. All schedule keys and slot times use this IANA timezone for the workspace."
+                      >
+                        IANA timezone
+                      </AdminSettingsLabel>
                       <Input
                         id="adv-timezone"
                         value={PRIMARY_TIMEZONE}
@@ -571,10 +579,14 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                         aria-readonly="true"
                         className="min-h-11 cursor-not-allowed font-mono text-sm opacity-90"
                       />
-                      <p className="text-xs leading-relaxed text-muted-foreground">Read-only; aligned to your advisory region.</p>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="adv-horizon">Booking horizon (days)</Label>
+                      <AdminSettingsLabel
+                        htmlFor="adv-horizon"
+                        hint="Whole number from 1 to 366. Slots are not offered beyond today plus this many calendar days."
+                      >
+                        Booking horizon (days)
+                      </AdminSettingsLabel>
                       <Input
                         id="adv-horizon"
                         type="number"
@@ -587,7 +599,6 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                           setSettings({ ...settings, bookingHorizonDays: Number.parseInt(e.target.value, 10) || 1 })
                         }
                       />
-                      <p className="text-xs leading-relaxed text-muted-foreground">Maximum days into the future that slots are offered.</p>
                     </div>
                   </div>
                 </div>
@@ -598,12 +609,21 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                     Default weekday hours
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Used for every weekday that is not a weekend and does not have a custom weekday rule. Use 24-hour{' '}
-                    <span className="font-mono">HH:mm</span>.
+                    Used for every weekday that is not a weekend and does not have a custom weekday rule.
                   </p>
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="adv-def-start">Start</Label>
+                      <AdminSettingsLabel
+                        htmlFor="adv-def-start"
+                        hint={
+                          <>
+                            24-hour <span className="font-mono">HH:mm</span> (e.g. 08:00). Hour 0–23, minutes 0–59.
+                            Start must be before end or no slots are generated.
+                          </>
+                        }
+                      >
+                        Start
+                      </AdminSettingsLabel>
                       <Input
                         id="adv-def-start"
                         className="min-h-11 font-mono text-sm"
@@ -618,7 +638,17 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="adv-def-end">End</Label>
+                      <AdminSettingsLabel
+                        htmlFor="adv-def-end"
+                        hint={
+                          <>
+                            Same <span className="font-mono">HH:mm</span> format as start. The window is exclusive at
+                            end — the last slot must fit fully before this time.
+                          </>
+                        }
+                      >
+                        End
+                      </AdminSettingsLabel>
                       <Input
                         id="adv-def-end"
                         className="min-h-11 font-mono text-sm"
@@ -633,7 +663,12 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                       />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="adv-interval">Slot length</Label>
+                      <AdminSettingsLabel
+                        htmlFor="adv-interval"
+                        hint="Only 30, 45, 60, or 90 minutes. Each slot start is spaced by this interval inside an open window."
+                      >
+                        Slot length
+                      </AdminSettingsLabel>
                       <NativeSelect
                         id="adv-interval"
                         className="h-11 max-w-xs"
@@ -655,7 +690,12 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                 </div>
                 <Separator />
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground">Weekend days</h3>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-sm font-semibold text-foreground">Weekend days</h3>
+                    <AdminSettingsHint>
+                      Sun=0 through Sat=6. Checked days are closed unless a weekday rule or date override opens them.
+                    </AdminSettingsHint>
+                  </div>
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     Checked days are closed by default. You can still open a specific Saturday or Sunday from the Weekday
                     rules or Date overrides tabs.
@@ -719,9 +759,19 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                           </span>
                         </div>
                         <div className="min-w-0 flex-1 space-y-2">
-                          <Label className="text-xs text-muted-foreground sm:sr-only" htmlFor={`adv-ov-mode-${dow}`}>
+                          <AdminSettingsLabel
+                            className="text-xs text-muted-foreground sm:sr-only"
+                            htmlFor={`adv-ov-mode-${dow}`}
+                            hint={
+                              <>
+                                <strong>Default</strong> — follow baseline hours and weekend checkboxes.{' '}
+                                <strong>Closed</strong> — block the whole day. <strong>Custom hours</strong> — override
+                                with <span className="font-mono">HH:mm</span> window (start before end).
+                              </>
+                            }
+                          >
                             Schedule for {label}
-                          </Label>
+                          </AdminSettingsLabel>
                           <NativeSelect
                             id={`adv-ov-mode-${dow}`}
                             className="h-11 w-full min-w-0 sm:max-w-md"
@@ -736,20 +786,29 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                         </div>
                         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:max-w-xs">
                           {row.mode === 'window' ? (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Input
-                                className="h-11 w-24 font-mono text-sm sm:w-26"
-                                value={row.start}
-                                onChange={(e) => executeSetOverrideWindow(dow, e.target.value, row.end)}
-                                aria-label={`${label} window start`}
-                              />
-                              <span className="text-sm text-muted-foreground">–</span>
-                              <Input
-                                className="h-11 w-24 font-mono text-sm sm:w-26"
-                                value={row.end}
-                                onChange={(e) => executeSetOverrideWindow(dow, row.start, e.target.value)}
-                                aria-label={`${label} window end`}
-                              />
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground">Custom window</span>
+                                <AdminSettingsHint side="top">
+                                  24-hour <span className="font-mono">HH:mm</span>. Hour 0–23, minutes 0–59. Start
+                                  must be before end.
+                                </AdminSettingsHint>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Input
+                                  className="h-11 w-24 font-mono text-sm sm:w-26"
+                                  value={row.start}
+                                  onChange={(e) => executeSetOverrideWindow(dow, e.target.value, row.end)}
+                                  aria-label={`${label} window start`}
+                                />
+                                <span className="text-sm text-muted-foreground">–</span>
+                                <Input
+                                  className="h-11 w-24 font-mono text-sm sm:w-26"
+                                  value={row.end}
+                                  onChange={(e) => executeSetOverrideWindow(dow, row.start, e.target.value)}
+                                  aria-label={`${label} window end`}
+                                />
+                              </div>
                             </div>
                           ) : (
                             <p className="text-sm text-muted-foreground">No custom window</p>
@@ -1046,7 +1105,7 @@ function DateWindowOverrideEditor(props: DateWindowOverrideEditorProps): ReactEl
   const existingKeysForDialog: Readonly<Record<string, unknown>> = props.value as Readonly<Record<string, unknown>>;
   const rowCount: number = rows.length;
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {rowCount === 0 ? (
         <div className="flex flex-col items-center rounded-2xl border border-dashed border-border/90 bg-linear-to-b from-muted/40 to-muted/10 px-6 py-14 text-center sm:py-16">
           <div className="mb-5 flex size-14 items-center justify-center rounded-2xl bg-primary/12 text-primary shadow-sm ring-1 ring-primary/15">
@@ -1064,101 +1123,106 @@ function DateWindowOverrideEditor(props: DateWindowOverrideEditorProps): ReactEl
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-foreground">Active overrides</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Each card is one calendar date in {props.scheduleTimeZone}.
-              </p>
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-foreground">
+              Active overrides
+              <span className="font-normal text-muted-foreground"> · {props.scheduleTimeZone}</span>
+            </p>
             <Badge variant="secondary" className="tabular-nums">
               {rowCount} {rowCount === 1 ? 'date' : 'dates'}
             </Badge>
           </div>
-          <ul className="space-y-4" aria-label="Per-date schedule overrides">
+          <ul className="space-y-2" aria-label="Per-date schedule overrides">
             {rows.map((ymd) => {
               const row = resolveDateOverrideRow(ymd, props.value);
               return (
                 <li key={ymd}>
-                  <Card className="overflow-hidden border-border/80 shadow-sm ring-1 ring-border/40 p-0">
-                    <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 border-b border-border/70 bg-muted/25 px-4 py-4 sm:px-5">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <CardTitle className="font-mono text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                            {ymd}
-                          </CardTitle>
-                          <Badge variant="outline" className="font-mono text-[0.65rem] font-normal uppercase tracking-wide">
-                            {props.scheduleTimeZone}
-                          </Badge>
-                        </div>
-                        <CardDescription className="text-xs leading-relaxed sm:text-sm">
-                          Overrides all other rules for this single day.
-                        </CardDescription>
+                  <Card className="overflow-hidden border-border/80 p-0 shadow-sm ring-1 ring-border/40">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-muted/25 px-3 py-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <CardTitle className="font-mono text-sm font-semibold tracking-tight text-foreground">
+                          {ymd}
+                        </CardTitle>
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-[0.6rem] font-normal uppercase tracking-wide"
+                        >
+                          {props.scheduleTimeZone}
+                        </Badge>
+                        <AdminSettingsHint>
+                          Overrides weekday and weekend rules for this{' '}
+                          <span className="font-mono">yyyy-MM-dd</span> only.
+                        </AdminSettingsHint>
                       </div>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="min-h-10 shrink-0 gap-1.5 border-destructive/25 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        className="h-9 shrink-0 gap-1 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => executeRemoveRow(ymd)}
                         aria-label={`Remove override for ${ymd}`}
                       >
                         <Trash2 className="size-3.5" aria-hidden />
-                        Remove
+                        <span className="text-xs">Remove</span>
                       </Button>
-                    </CardHeader>
-                    <CardContent className="grid gap-6 p-4 sm:p-5 lg:grid-cols-2 lg:items-start lg:gap-8">
-                      <div className="space-y-3">
-                        <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          Availability type
-                        </Label>
-                        <div className="grid grid-cols-1 gap-2 sm:max-w-md sm:grid-cols-2">
+                    </div>
+                    <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-end sm:gap-4">
+                      <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-xs">
+                        <div className="flex items-center gap-1.5">
+                          <Label className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
+                            Type
+                          </Label>
+                          <AdminSettingsHint>
+                            <strong>Closed</strong> blocks every slot. <strong>Custom hours</strong> uses a{' '}
+                            <span className="font-mono">HH:mm</span> window.
+                          </AdminSettingsHint>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
                           <Button
                             type="button"
                             variant={row.mode === 'closed' ? 'default' : 'outline'}
-                            className="min-h-11 justify-center px-3 text-sm font-medium"
+                            size="sm"
+                            className="h-9 justify-center px-2 text-xs font-medium"
                             onClick={() => executeSetRowMode(ymd, 'closed')}
                             aria-pressed={row.mode === 'closed'}
                           >
-                            Closed all day
+                            Closed
                           </Button>
                           <Button
                             type="button"
                             variant={row.mode === 'window' ? 'default' : 'outline'}
-                            className="min-h-11 justify-center px-3 text-sm font-medium"
+                            size="sm"
+                            className="h-9 justify-center px-2 text-xs font-medium"
                             onClick={() => executeSetRowMode(ymd, 'window')}
                             aria-pressed={row.mode === 'window'}
                           >
-                            Custom hours
+                            Custom
                           </Button>
                         </div>
-                        <p className="text-xs leading-relaxed text-muted-foreground">
-                          Closed blocks every slot. Custom hours limits bookings to a window you define (24-hour{' '}
-                          <span className="font-mono">HH:mm</span>).
-                        </p>
                       </div>
-                      <div className="space-y-3">
-                        <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          {row.mode === 'closed' ? 'Hours' : 'Open window'}
-                        </Label>
+                      <div className="min-w-0 flex-1 sm:max-w-sm">
                         {row.mode === 'closed' ? (
-                          <div className="rounded-xl border border-dashed border-border/90 bg-muted/20 px-4 py-4">
-                            <p className="text-sm font-medium text-foreground">No booking slots</p>
-                            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                              This calendar day stays fully closed. Switch to &ldquo;Custom hours&rdquo; if clients
-                              should see specific start times.
-                            </p>
-                          </div>
+                          <p className="pb-0.5 text-xs text-muted-foreground sm:pb-2">No booking slots</p>
                         ) : (
-                          <div className="rounded-xl border border-border/80 bg-muted/25 p-4 shadow-inner">
-                            <div className="grid gap-4 sm:grid-cols-2 sm:gap-3">
-                              <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground" htmlFor={`date-ov-${ymd}-start`}>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
+                                Window
+                              </span>
+                              <AdminSettingsHint>
+                                24-hour <span className="font-mono">HH:mm</span>. Start before end; slots step by
+                                your slot length until the window end.
+                              </AdminSettingsHint>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <Label htmlFor={`date-ov-${ymd}-start`} className="sr-only">
                                   Opens
                                 </Label>
+                                <span className="text-xs text-muted-foreground">Opens</span>
                                 <Input
                                   id={`date-ov-${ymd}-start`}
-                                  className="h-11 font-mono text-sm"
+                                  className="h-9 w-24 font-mono text-sm"
                                   inputMode="numeric"
                                   autoComplete="off"
                                   placeholder="08:00"
@@ -1167,13 +1231,17 @@ function DateWindowOverrideEditor(props: DateWindowOverrideEditorProps): ReactEl
                                   aria-label={`${ymd} window start`}
                                 />
                               </div>
-                              <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground" htmlFor={`date-ov-${ymd}-end`}>
+                              <span className="text-xs text-muted-foreground" aria-hidden>
+                                –
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <Label htmlFor={`date-ov-${ymd}-end`} className="sr-only">
                                   Until
                                 </Label>
+                                <span className="text-xs text-muted-foreground">Until</span>
                                 <Input
                                   id={`date-ov-${ymd}-end`}
-                                  className="h-11 font-mono text-sm"
+                                  className="h-9 w-24 font-mono text-sm"
                                   inputMode="numeric"
                                   autoComplete="off"
                                   placeholder="17:00"
@@ -1183,9 +1251,6 @@ function DateWindowOverrideEditor(props: DateWindowOverrideEditorProps): ReactEl
                                 />
                               </div>
                             </div>
-                            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                              Slots are generated from Opens in steps of your slot length until the window end.
-                            </p>
                           </div>
                         )}
                       </div>
@@ -1196,9 +1261,9 @@ function DateWindowOverrideEditor(props: DateWindowOverrideEditorProps): ReactEl
             })}
           </ul>
           <Separator />
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">Need another exception?</p>
-            <Button type="button" variant="secondary" className="min-h-11 w-full gap-2 sm:w-auto" onClick={() => executeOpenPickDialog()}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">Need another exception?</p>
+            <Button type="button" variant="secondary" size="sm" className="h-9 w-full gap-2 sm:w-auto" onClick={() => executeOpenPickDialog()}>
               <Plus className="size-4" aria-hidden />
               Add date override
             </Button>
@@ -1248,7 +1313,13 @@ function DailyCapEditor(props: DailyCapEditorProps): ReactElement {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-foreground">Per-day caps</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium text-foreground">Per-day caps</p>
+            <AdminSettingsHint>
+              Date key format <span className="font-mono">yyyy-MM-dd</span> in your advisor timezone. Pick dates from
+              the calendar when adding.
+            </AdminSettingsHint>
+          </div>
           <p className="text-xs text-muted-foreground">Limit total bookings on specific dates.</p>
         </div>
       </div>
@@ -1276,9 +1347,13 @@ function DailyCapEditor(props: DailyCapEditorProps): ReactElement {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground" htmlFor={`day-cap-${date}`}>
+                <AdminSettingsLabel
+                  className="text-xs text-muted-foreground"
+                  htmlFor={`day-cap-${date}`}
+                  hint="Positive whole number (minimum 1). Pending and confirmed bookings count toward this daily limit."
+                >
                   Max bookings
-                </Label>
+                </AdminSettingsLabel>
                 <Input
                   id={`day-cap-${date}`}
                   type="number"
@@ -1356,7 +1431,13 @@ function WeeklyCapEditor(props: WeeklyCapEditorProps): ReactElement {
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-sm font-medium text-foreground">Per-week caps</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-medium text-foreground">Per-week caps</p>
+          <AdminSettingsHint>
+            Week key format <span className="font-mono">YYYY-Www</span> (ISO week, e.g. 2026-W24). Any day you pick
+            maps to that week&apos;s key.
+          </AdminSettingsHint>
+        </div>
         <p className="text-xs text-muted-foreground">Limit bookings across an ISO week (any day in the week maps to the same key).</p>
       </div>
       {rows.length === 0 ? (
@@ -1383,9 +1464,13 @@ function WeeklyCapEditor(props: WeeklyCapEditorProps): ReactElement {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground" htmlFor={`week-cap-${week}`}>
+                <AdminSettingsLabel
+                  className="text-xs text-muted-foreground"
+                  htmlFor={`week-cap-${week}`}
+                  hint="Positive whole number (minimum 1). Counts all active bookings whose start falls in this ISO week."
+                >
                   Max bookings
-                </Label>
+                </AdminSettingsLabel>
                 <Input
                   id={`week-cap-${week}`}
                   type="number"

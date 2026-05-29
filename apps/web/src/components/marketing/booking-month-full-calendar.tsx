@@ -1,6 +1,7 @@
 'use client';
 
 import type { DateClickArg } from '@fullcalendar/interaction';
+import type { DayCellMountArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
@@ -9,18 +10,18 @@ import { momentTimezonePlugin } from '@/lib/fullcalendar-moment-timezone-plugin'
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { useEffect, useRef, type ReactElement } from 'react';
 
+import { BookingMonthDayList } from '@/components/marketing/booking-month-day-list';
+import type { BookingMonthFullCalendarProps } from '@/components/marketing/booking-month-calendar-props';
+import { useMobileViewport } from '@/hooks/use-mobile-viewport';
+import {
+  formatSlotsLeftLabel,
+  resolveSlotCountForManilaYmd,
+} from '@/lib/marketing/booking-month-availability';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
-export type BookingMonthFullCalendarProps = {
-  readonly visibleManilaYearMonth: string;
-  readonly availabilityByDate: Readonly<Record<string, readonly string[]>>;
-  readonly availabilityReady: boolean;
-  /** Confirmed booking day (date + time chosen). */
-  readonly selectedManilaYmd: string | null;
-  /** Day whose time list is open in the dialog (subtle emphasis until confirmed). */
-  readonly pendingManilaYmd: string | null;
-  readonly onSelectDateWithSlots: (manilaYmd: string) => void;
-};
+export type { BookingMonthFullCalendarProps } from '@/components/marketing/booking-month-calendar-props';
+
+const AVAILABILITY_BADGE_CLASS = 'booking-month-day-availability';
 
 function manilaYmdForCalendarDate(date: Date): string {
   return formatInTimeZone(date, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
@@ -33,11 +34,54 @@ function manilaInitialDate(visibleManilaYearMonth: string): Date {
   );
 }
 
-/**
- * Month grid (FullCalendar) for marketing booking; uses {@link PRIMARY_TIMEZONE} for all cells and clicks.
- */
-export function BookingMonthFullCalendar(props: BookingMonthFullCalendarProps): ReactElement {
+function removeAvailabilityBadge(dayEl: HTMLElement): void {
+  dayEl.querySelector(`.${AVAILABILITY_BADGE_CLASS}`)?.remove();
+}
+
+function mountAvailabilityBadgeForYmd(
+  dayEl: HTMLElement,
+  manilaYmd: string,
+  props: BookingMonthFullCalendarProps,
+): void {
+  removeAvailabilityBadge(dayEl);
+  const slotCount = resolveSlotCountForManilaYmd(props.availabilityByDate, manilaYmd);
+  if (!props.availabilityReady || slotCount === 0) {
+    return;
+  }
+  const frame = dayEl.querySelector('.fc-daygrid-day-frame');
+  if (frame === null) {
+    return;
+  }
+  const slotsLeftLabel = formatSlotsLeftLabel(slotCount);
+  const badge = document.createElement('span');
+  badge.className = AVAILABILITY_BADGE_CLASS;
+  badge.setAttribute('role', 'status');
+  badge.setAttribute('aria-label', slotsLeftLabel);
+  badge.setAttribute('title', slotsLeftLabel);
+  badge.textContent = slotsLeftLabel;
+  frame.append(badge);
+}
+
+function syncAllAvailabilityBadges(
+  calendarRoot: HTMLElement,
+  props: BookingMonthFullCalendarProps,
+): void {
+  const dayElements = calendarRoot.querySelectorAll<HTMLElement>('.fc-daygrid-day');
+  dayElements.forEach((dayEl) => {
+    const manilaYmd = dayEl.getAttribute('data-date');
+    if (manilaYmd === null) {
+      removeAvailabilityBadge(dayEl);
+      return;
+    }
+    mountAvailabilityBadgeForYmd(dayEl, manilaYmd, props);
+  });
+}
+
+function BookingMonthFullCalendarGrid(props: BookingMonthFullCalendarProps): ReactElement {
+  const rootRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<FullCalendar>(null);
+  const propsRef = useRef(props);
+  propsRef.current = props;
   useEffect(() => {
     const api = calendarRef.current?.getApi();
     if (api === undefined) {
@@ -49,8 +93,25 @@ export function BookingMonthFullCalendar(props: BookingMonthFullCalendarProps): 
       api.gotoDate(target);
     }
   }, [props.visibleManilaYearMonth]);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (root === null) {
+      return;
+    }
+    syncAllAvailabilityBadges(root, props);
+  }, [props.availabilityByDate, props.availabilityReady, props.visibleManilaYearMonth]);
+  const handleDayCellDidMount = (arg: DayCellMountArg): void => {
+    mountAvailabilityBadgeForYmd(
+      arg.el,
+      manilaYmdForCalendarDate(arg.date),
+      propsRef.current,
+    );
+  };
+  const handleDayCellWillUnmount = (arg: DayCellMountArg): void => {
+    removeAvailabilityBadge(arg.el);
+  };
   return (
-    <div className="booking-month-fc">
+    <div ref={rootRef} className="booking-month-fc">
       <FullCalendar
         ref={calendarRef}
         plugins={[momentTimezonePlugin, dayGridPlugin, interactionPlugin]}
@@ -62,21 +123,27 @@ export function BookingMonthFullCalendar(props: BookingMonthFullCalendarProps): 
         fixedWeekCount={false}
         selectable={false}
         dayMaxEvents
+        dayHeaderFormat={{ weekday: 'short' }}
         dateClick={(info: DateClickArg) => {
           const ymd = manilaYmdForCalendarDate(info.date);
-          const count = props.availabilityByDate[ymd]?.length ?? 0;
+          const count = resolveSlotCountForManilaYmd(props.availabilityByDate, ymd);
           if (!props.availabilityReady || count === 0) {
             return;
           }
           props.onSelectDateWithSlots(ymd);
         }}
+        dayCellDidMount={handleDayCellDidMount}
+        dayCellWillUnmount={handleDayCellWillUnmount}
         dayCellClassNames={(arg) => {
           const ymd = manilaYmdForCalendarDate(arg.date);
-          const count = props.availabilityByDate[ymd]?.length ?? 0;
+          const count = resolveSlotCountForManilaYmd(props.availabilityByDate, ymd);
           const noSlots = props.availabilityReady && count === 0;
           const classes: string[] = [];
           if (noSlots) {
             classes.push('opacity-35', 'pointer-events-none', 'cursor-not-allowed');
+          }
+          if (props.availabilityReady && count > 0) {
+            classes.push('booking-month-day-has-slots');
           }
           const isConfirmed = props.selectedManilaYmd !== null && ymd === props.selectedManilaYmd;
           const isPending =
@@ -93,4 +160,15 @@ export function BookingMonthFullCalendar(props: BookingMonthFullCalendarProps): 
       />
     </div>
   );
+}
+
+/**
+ * Month picker for marketing booking — vertical day list on mobile, FullCalendar grid from `md` up.
+ */
+export function BookingMonthFullCalendar(props: BookingMonthFullCalendarProps): ReactElement {
+  const isMobileViewport = useMobileViewport();
+  if (isMobileViewport) {
+    return <BookingMonthDayList {...props} />;
+  }
+  return <BookingMonthFullCalendarGrid {...props} />;
 }

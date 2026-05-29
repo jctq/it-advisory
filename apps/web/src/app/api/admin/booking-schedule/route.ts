@@ -29,6 +29,15 @@ const patchSchema = z.object({
   bookingHorizonDays: z.number().int().min(1).max(366).optional(),
 });
 
+function emptyRecordToUndefined<T extends Record<string, unknown>>(
+  value: T | undefined,
+): T | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return Object.keys(value).length > 0 ? value : undefined;
+}
+
 function mergeAdvisorSettings(
   base: AdvisorBookingSettingsDocument,
   patch: z.infer<typeof patchSchema>,
@@ -40,9 +49,13 @@ function mergeAdvisorSettings(
     dateWindowOverrides:
       patch.dateWindowOverrides !== undefined ? patch.dateWindowOverrides : base.dateWindowOverrides,
     dailyBookingCapOverrides:
-      patch.dailyBookingCapOverrides !== undefined ? patch.dailyBookingCapOverrides : base.dailyBookingCapOverrides,
+      patch.dailyBookingCapOverrides !== undefined
+        ? emptyRecordToUndefined(patch.dailyBookingCapOverrides)
+        : base.dailyBookingCapOverrides,
     weeklyBookingCapOverrides:
-      patch.weeklyBookingCapOverrides !== undefined ? patch.weeklyBookingCapOverrides : base.weeklyBookingCapOverrides,
+      patch.weeklyBookingCapOverrides !== undefined
+        ? emptyRecordToUndefined(patch.weeklyBookingCapOverrides)
+        : base.weeklyBookingCapOverrides,
     updatedAt: new Date(),
   };
   return merged;

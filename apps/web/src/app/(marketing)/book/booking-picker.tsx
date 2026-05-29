@@ -10,7 +10,7 @@ import {
 import { useMarketingBookingFlow } from '@/hooks/marketing/use-marketing-booking-flow';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { addMonths, parse } from 'date-fns';
+import { parse } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import {
   AlertCircle,
@@ -48,6 +48,7 @@ import type { PaymentGatewayId } from '@/domain/payment-types';
 import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SESSION_DURATION } from '@techmd/diagnostic-core/project-rescue-service-context';
 import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sticky-action-bar';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
+import { BookingMonthYearNav } from '@/components/marketing/booking-month-year-nav';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { BookingConfirmedServiceCard } from '@/components/marketing/booking-confirmed-service-card';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
@@ -295,14 +296,6 @@ const BOOKING_STEPS: readonly {
   { id: 'details', barLabel: 'YOUR DETAILS', headline: 'Your details' },
   { id: 'payment', barLabel: 'PAYMENT', headline: 'Payment' },
 ];
-
-function addManilaYearMonth(manilaYearMonth: string, deltaMonths: number): string {
-  const pivot = fromZonedTime(
-    parse(`${manilaYearMonth}-15 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)),
-    PRIMARY_TIMEZONE,
-  );
-  return formatInTimeZone(addMonths(pivot, deltaMonths), PRIMARY_TIMEZONE, 'yyyy-MM');
-}
 
 function formatConfirmedSlotFromStartsAt(startsAtIso: string, timezone: string): ConfirmedSlotDisplay {
   const startsAt = new Date(startsAtIso);
@@ -1566,14 +1559,6 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     });
   }, [fieldErrors]);
 
-  const monthLabel = formatInTimeZone(
-    fromZonedTime(
-      parse(`${visibleManilaYearMonth}-01 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)),
-      PRIMARY_TIMEZONE,
-    ),
-    PRIMARY_TIMEZONE,
-    'MMMM yyyy',
-  );
   const manilaFetchBounds = useMemo(
     () => resolveManilaMonthGridYmdBounds(visibleManilaYearMonth),
     [visibleManilaYearMonth],
@@ -2205,7 +2190,12 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           {visibleCheckoutPhase === 'details' && 'Your Details'}
           {visibleCheckoutPhase === 'payment' && 'Payment'}
         </h1>
-        <p className="mt-2 text-pretty text-muted-foreground">
+        <p
+          className={cn(
+            'mt-2 text-pretty text-muted-foreground',
+            visibleCheckoutPhase === 'date' && 'hidden md:block',
+          )}
+        >
           {visibleCheckoutPhase === 'date' &&
             `Select a slot in Philippine Time (${PRIMARY_TIMEZONE}). You can add calendar sync later — this flow captures your preference now.`}
           {visibleCheckoutPhase === 'details' &&
@@ -2232,35 +2222,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           <div className="mt-10 grid grid-cols-1 gap-8 pb-[calc(11rem+env(safe-area-inset-bottom))] lg:grid-cols-[minmax(0,1fr)_min(100%,22rem)] lg:items-start lg:gap-x-8 lg:pb-0 xl:gap-x-10">
             <div className="min-w-0 space-y-8 lg:space-y-0">
               <section className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
-                <div className="flex items-center justify-between gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0"
-                    aria-label="Previous month"
-                    onClick={() => {
-                      hasUserNavigatedVisibleMonthRef.current = true;
-                      setVisibleManilaYearMonth((previous) => addManilaYearMonth(previous, -1));
-                    }}
-                  >
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <p className="text-sm font-semibold text-foreground">{monthLabel}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0"
-                    aria-label="Next month"
-                    onClick={() => {
-                      hasUserNavigatedVisibleMonthRef.current = true;
-                      setVisibleManilaYearMonth((previous) => addManilaYearMonth(previous, 1));
-                    }}
-                  >
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
+                <BookingMonthYearNav
+                  visibleManilaYearMonth={visibleManilaYearMonth}
+                  onVisibleManilaYearMonthChange={setVisibleManilaYearMonth}
+                  onNavigate={() => {
+                    hasUserNavigatedVisibleMonthRef.current = true;
+                  }}
+                />
                 <div className="mt-6">
                   <BookingMonthFullCalendar
                     visibleManilaYearMonth={visibleManilaYearMonth}

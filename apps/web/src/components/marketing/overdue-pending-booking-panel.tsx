@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { parse } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-import { ChevronLeft, ChevronRight, Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import {
   abandonAccountManagedBooking,
   abandonGuestManagedBooking,
@@ -14,6 +14,7 @@ import {
 } from '@techmd/api-client/marketing-booking-manage-api-client';
 import { getBookingAvailabilitySlots } from '@techmd/api-client/marketing-booking-api-client';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
+import { BookingMonthYearNav } from '@/components/marketing/booking-month-year-nav';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +34,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { buildAvailabilityByDateFromSlots } from '@/lib/marketing/booking-availability-by-date';
-import { addManilaYearMonth } from '@/lib/marketing/manila-year-month';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -75,11 +75,6 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
   const manilaFetchBounds = useMemo(
     () => resolveManilaMonthGridYmdBounds(visibleManilaYearMonth),
     [visibleManilaYearMonth],
-  );
-  const monthLabel = formatInTimeZone(
-    fromZonedTime(parse(`${visibleManilaYearMonth}-01 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)), PRIMARY_TIMEZONE),
-    PRIMARY_TIMEZONE,
-    'MMMM yyyy',
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -175,27 +170,10 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
         </p>
       </div>
       <div className="rounded-xl border border-border p-4">
-        <div className="flex items-center justify-between gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Previous month"
-            onClick={() => setVisibleManilaYearMonth((previous) => addManilaYearMonth(previous, -1))}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <p className="text-sm font-semibold text-foreground">{monthLabel}</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Next month"
-            onClick={() => setVisibleManilaYearMonth((previous) => addManilaYearMonth(previous, 1))}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
+        <BookingMonthYearNav
+          visibleManilaYearMonth={visibleManilaYearMonth}
+          onVisibleManilaYearMonthChange={setVisibleManilaYearMonth}
+        />
         <div className="mt-4">
           <BookingMonthFullCalendar
             visibleManilaYearMonth={visibleManilaYearMonth}

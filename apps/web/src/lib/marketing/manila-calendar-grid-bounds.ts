@@ -30,3 +30,18 @@ export function resolveManilaMonthGridYmdBounds(visibleManilaYearMonth: string):
   const gridTo = addManilaDays(sunForLast, 6);
   return { from: gridFrom, to: gridTo };
 }
+
+/**
+ * Returns every `yyyy-MM-dd` in `PRIMARY_TIMEZONE` for the given `yyyy-MM` calendar month.
+ */
+export function resolveManilaMonthDayYmds(visibleManilaYearMonth: string): readonly string[] {
+  const [yRaw, mRaw] = visibleManilaYearMonth.split('-');
+  const y = Number(yRaw);
+  const m = Number(mRaw);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const ymds: string[] = [];
+  for (let day = 1; day <= lastDay; day += 1) {
+    ymds.push(`${yRaw}-${mRaw}-${String(day).padStart(2, '0')}`);
+  }
+  return ymds;
+}

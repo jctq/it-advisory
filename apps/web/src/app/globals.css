@@ -1238,9 +1238,55 @@
   text-decoration: none;
 }
 .booking-month-fc .fc .fc-daygrid-day-frame {
-  min-height: 3.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-height: 4.75rem;
+  transition: background-color 150ms ease-out;
 }
+.booking-month-fc .fc .fc-daygrid-day-top {
+  display: flex !important;
+  flex: 1 1 auto;
+  flex-direction: row;
+  justify-content: flex-start !important;
+  width: 100%;
+  padding: 0.35rem 0.4rem 0;
+}
+.booking-month-fc .fc .fc-daygrid-day-events {
+  display: none;
+}
+.booking-month-fc .fc .fc-daygrid-day.booking-month-day-has-slots {
+  cursor: pointer;
+}
+.booking-month-fc .fc .fc-daygrid-day.booking-month-day-has-slots:hover .fc-daygrid-day-frame {
+  background-color: color-mix(in srgb, var(--primary) 10%, var(--card)) !important;
+}
+.booking-month-fc .fc .fc-daygrid-day.booking-month-day-has-slots:focus-within .fc-daygrid-day-frame {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.booking-month-fc .fc .booking-month-day-availability {
+  align-self: flex-end;
+  flex-shrink: 1;
+  max-width: calc(100% - 0.5rem);
+  margin: 0 0.25rem 0.3rem;
+  padding: 0.1rem 0.25rem;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  background-color: color-mix(in srgb, var(--primary) 10%, var(--card));
+  font-size: 0.6625rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--primary) 75%, var(--muted-foreground));
+  pointer-events: none;
+}
+.booking-month-fc .fc a.fc-daygrid-day-number,
 .booking-month-fc .fc .fc-daygrid-day-number {
+  float: none !important;
   padding: 0.35rem 0.5rem;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -1266,6 +1312,17 @@
 .booking-month-fc .fc .fc-daygrid-day.booking-month-day-selected .fc-daygrid-day-number {
   color: var(--primary) !important;
   font-weight: 700;
+}
+.booking-month-fc .fc .fc-daygrid-day.booking-month-day-selected .booking-month-day-availability {
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  background-color: color-mix(in srgb, var(--primary) 22%, var(--card));
+}
+.booking-month-fc .fc .fc-daygrid-day.booking-month-day-selected .booking-month-day-availability {
+  color: var(--primary) !important;
+}
+.booking-month-fc .fc .fc-daygrid-day.booking-month-day-pending .booking-month-day-availability {
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--muted));
 }
 .booking-month-fc .fc .fc-daygrid-day.booking-month-day-pending {
   background-color: color-mix(in srgb, var(--foreground) 6%, var(--muted)) !important;
