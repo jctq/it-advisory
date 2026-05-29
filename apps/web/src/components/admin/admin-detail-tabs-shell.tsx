@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -34,39 +33,59 @@ function addMountedTab<TTab extends string>(
   return next;
 }
 
+function buildTabUrl<TTab extends string>(
+  basePath: string,
+  shouldOmitTabFromUrl: (tab: TTab) => boolean,
+  tab: TTab,
+): string {
+  const nextParams = new URLSearchParams(window.location.search);
+  if (shouldOmitTabFromUrl(tab)) {
+    nextParams.delete('tab');
+  } else {
+    nextParams.set('tab', tab);
+  }
+  const query = nextParams.toString();
+  return query.length > 0 ? `${basePath}?${query}` : basePath;
+}
+
 export function AdminDetailTabsShell<TTab extends string>(
   props: AdminDetailTabsShellProps<TTab>,
 ): ReactElement {
-  const router = useRouter();
   const { tabs, initialTab, resolveTab, ariaLabel, basePath, shouldOmitTabFromUrl, renderPanel } = props;
   const [activeTab, setActiveTab] = useState<TTab>(initialTab);
   const [mountedTabs, setMountedTabs] = useState<ReadonlySet<TTab>>(() => new Set([initialTab]));
   const tabTriggerRefs = useRef<Partial<Record<TTab, HTMLButtonElement>>>({});
-  if (initialTab !== activeTab) {
+  useEffect(() => {
     setActiveTab(initialTab);
     setMountedTabs((previous) => addMountedTab(previous, initialTab));
-  }
+  }, [initialTab]);
   useEffect(() => {
     const activeTrigger = tabTriggerRefs.current[activeTab];
     if (!activeTrigger) {
       return;
     }
-    activeTrigger.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    activeTrigger.scrollIntoView({ block: 'nearest', inline: 'center' });
   }, [activeTab]);
+  useEffect(() => {
+    const handlePopState = (): void => {
+      const tabParam = new URLSearchParams(window.location.search).get('tab');
+      const nextTab = resolveTab(tabParam ?? '');
+      setActiveTab(nextTab);
+      setMountedTabs((previous) => addMountedTab(previous, nextTab));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [resolveTab]);
   const executeChangeTab = useCallback(
     (nextTab: TTab): void => {
       setActiveTab(nextTab);
       setMountedTabs((previous) => addMountedTab(previous, nextTab));
-      const nextParams = new URLSearchParams(window.location.search);
-      if (shouldOmitTabFromUrl(nextTab)) {
-        nextParams.delete('tab');
-      } else {
-        nextParams.set('tab', nextTab);
-      }
-      const query = nextParams.toString();
-      router.replace(query.length > 0 ? `${basePath}?${query}` : basePath, { scroll: false });
+      const nextUrl = buildTabUrl(basePath, shouldOmitTabFromUrl, nextTab);
+      window.history.replaceState(window.history.state, '', nextUrl);
     },
-    [basePath, shouldOmitTabFromUrl, router],
+    [basePath, shouldOmitTabFromUrl],
   );
   return (
     <Tabs
@@ -120,7 +139,7 @@ export function AdminDetailTabsShell<TTab extends string>(
         <TabsContent
           key={tab.value}
           value={tab.value}
-          className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+          className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
         >
           {mountedTabs.has(tab.value) ? renderPanel(tab.value) : null}
         </TabsContent>
