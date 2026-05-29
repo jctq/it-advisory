@@ -118,12 +118,19 @@ export function BookingSessionRoomFlow(props: {
 }): ReactElement {
   const bookingSessionRoomLinksEnabled = props.bookingSessionRoomLinksEnabled ?? true;
   const searchParams = useSearchParams();
+  const bookingReferenceFromQuery = searchParams.get('bookingReference')?.trim() ?? '';
+  const bookingIdFromQuery = searchParams.get('bookingId')?.trim() ?? '';
+  const shouldBootstrapByReference = bookingReferenceFromQuery.length >= 4;
+  const shouldBootstrapByBookingId = MONGO_OBJECT_ID_HEX.test(bookingIdFromQuery);
+  const shouldBootstrapFromQuery = shouldBootstrapByReference || shouldBootstrapByBookingId;
   const [roomPhase, setRoomPhase] = useState<SessionRoomPhase>('lookup');
-  const [bookingReference, setBookingReference] = useState('');
+  const [bookingReference, setBookingReference] = useState(
+    shouldBootstrapByReference ? bookingReferenceFromQuery : '',
+  );
   const [email, setEmail] = useState('');
   const [phoneLastFour, setPhoneLastFour] = useState('');
   const [booking, setBooking] = useState<GuestBookingManageView | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(shouldBootstrapFromQuery);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState<number | null>(null);
   const [popupBlocked, setPopupBlocked] = useState(false);
@@ -179,12 +186,8 @@ export function BookingSessionRoomFlow(props: {
     if (hasAttemptedBootstrapRef.current) {
       return;
     }
-    const bookingReferenceFromQuery = searchParams.get('bookingReference')?.trim() ?? '';
-    const bookingIdFromQuery = searchParams.get('bookingId')?.trim() ?? '';
-    if (bookingReferenceFromQuery.length >= 4) {
+    if (shouldBootstrapByReference) {
       hasAttemptedBootstrapRef.current = true;
-      setBookingReference(bookingReferenceFromQuery);
-      setIsSubmitting(true);
       void lookupAccountBookingSessionByReference({
         apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
         bookingReference: bookingReferenceFromQuery,
@@ -210,11 +213,10 @@ export function BookingSessionRoomFlow(props: {
         });
       return;
     }
-    if (!MONGO_OBJECT_ID_HEX.test(bookingIdFromQuery)) {
+    if (!shouldBootstrapByBookingId) {
       return;
     }
     hasAttemptedBootstrapRef.current = true;
-    setIsSubmitting(true);
     void lookupAccountBookingSession({
       apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
       bookingId: bookingIdFromQuery,
@@ -234,7 +236,13 @@ export function BookingSessionRoomFlow(props: {
       .finally(() => {
         setIsSubmitting(false);
       });
-  }, [enterSessionRoom, searchParams]);
+  }, [
+    bookingIdFromQuery,
+    bookingReferenceFromQuery,
+    enterSessionRoom,
+    shouldBootstrapByBookingId,
+    shouldBootstrapByReference,
+  ]);
   const handleLookupSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>): Promise<void> => {
       event.preventDefault();

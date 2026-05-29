@@ -8,7 +8,7 @@ import FullCalendar from '@fullcalendar/react';
 import { parse } from 'date-fns';
 import { momentTimezonePlugin } from '@/lib/fullcalendar-moment-timezone-plugin';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-import { useEffect, useRef, type ReactElement } from 'react';
+import { useCallback, useEffect, useRef, type ReactElement } from 'react';
 
 import { BookingMonthDayList } from '@/components/marketing/booking-month-day-list';
 import type { BookingMonthFullCalendarProps } from '@/components/marketing/booking-month-calendar-props';
@@ -80,33 +80,32 @@ function syncAllAvailabilityBadges(
 function BookingMonthFullCalendarGrid(props: BookingMonthFullCalendarProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<FullCalendar>(null);
-  const propsRef = useRef(props);
-  propsRef.current = props;
+  const { availabilityByDate, availabilityReady, visibleManilaYearMonth } = props;
   useEffect(() => {
     const api = calendarRef.current?.getApi();
     if (api === undefined) {
       return;
     }
-    const target = manilaInitialDate(props.visibleManilaYearMonth);
+    const target = manilaInitialDate(visibleManilaYearMonth);
     const currentYm = formatInTimeZone(api.getDate(), PRIMARY_TIMEZONE, 'yyyy-MM');
-    if (currentYm !== props.visibleManilaYearMonth) {
+    if (currentYm !== visibleManilaYearMonth) {
       api.gotoDate(target);
     }
-  }, [props.visibleManilaYearMonth]);
+  }, [visibleManilaYearMonth]);
   useEffect(() => {
     const root = rootRef.current;
     if (root === null) {
       return;
     }
     syncAllAvailabilityBadges(root, props);
-  }, [props.availabilityByDate, props.availabilityReady, props.visibleManilaYearMonth]);
-  const handleDayCellDidMount = (arg: DayCellMountArg): void => {
+  }, [availabilityByDate, availabilityReady, visibleManilaYearMonth, props]);
+  const handleDayCellDidMount = useCallback((arg: DayCellMountArg): void => {
     mountAvailabilityBadgeForYmd(
       arg.el,
       manilaYmdForCalendarDate(arg.date),
-      propsRef.current,
+      props,
     );
-  };
+  }, [props]);
   const handleDayCellWillUnmount = (arg: DayCellMountArg): void => {
     removeAvailabilityBadge(arg.el);
   };

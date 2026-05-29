@@ -54,11 +54,13 @@ export function AdminDetailTabsShell<TTab extends string>(
   const { tabs, initialTab, resolveTab, ariaLabel, basePath, shouldOmitTabFromUrl, renderPanel } = props;
   const [activeTab, setActiveTab] = useState<TTab>(initialTab);
   const [mountedTabs, setMountedTabs] = useState<ReadonlySet<TTab>>(() => new Set([initialTab]));
+  const [prevInitialTab, setPrevInitialTab] = useState<TTab>(initialTab);
   const tabTriggerRefs = useRef<Partial<Record<TTab, HTMLButtonElement>>>({});
-  useEffect(() => {
+  if (initialTab !== prevInitialTab) {
+    setPrevInitialTab(initialTab);
     setActiveTab(initialTab);
     setMountedTabs((previous) => addMountedTab(previous, initialTab));
-  }, [initialTab]);
+  }
   useEffect(() => {
     const activeTrigger = tabTriggerRefs.current[activeTab];
     if (!activeTrigger) {

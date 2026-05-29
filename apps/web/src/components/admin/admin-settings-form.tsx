@@ -131,6 +131,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       diagnosticAiEnabled,
       diagnosticManageBookingEnabled,
       supportModuleEnabled,
+      bookingSessionRoomLinksEnabled,
       diagnosticCacheDebugEnabled,
       diagnosticMaxRounds,
       diagnosticOptionsPerQuestion,

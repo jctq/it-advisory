@@ -299,9 +299,11 @@ type AdminAdvisorScheduleManagerProps = {
 
 export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerProps): ReactElement {
   const [activeTab, setActiveTab] = useState<ScheduleTab>(props.initialTab);
-  useEffect(() => {
+  const [prevInitialTab, setPrevInitialTab] = useState<ScheduleTab>(props.initialTab);
+  if (props.initialTab !== prevInitialTab) {
+    setPrevInitialTab(props.initialTab);
     setActiveTab(props.initialTab);
-  }, [props.initialTab]);
+  }
   useEffect(() => {
     const handlePopState = (): void => {
       const tabParam = new URLSearchParams(window.location.search).get('tab');

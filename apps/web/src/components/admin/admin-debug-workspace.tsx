@@ -61,11 +61,13 @@ function buildDebugTabUrl(tab: DebugTab): string {
 export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactElement {
   const [activeTab, setActiveTab] = useState<DebugTab>(props.initialTab);
   const [mountedTabs, setMountedTabs] = useState<ReadonlySet<DebugTab>>(() => new Set([props.initialTab]));
+  const [prevInitialTab, setPrevInitialTab] = useState<DebugTab>(props.initialTab);
   const tabTriggerRefs = useRef<Partial<Record<DebugTab, HTMLButtonElement>>>({});
-  useEffect(() => {
+  if (props.initialTab !== prevInitialTab) {
+    setPrevInitialTab(props.initialTab);
     setActiveTab(props.initialTab);
     setMountedTabs((previous) => addMountedDebugTab(previous, props.initialTab));
-  }, [props.initialTab]);
+  }
   useEffect(() => {
     const activeTrigger = tabTriggerRefs.current[activeTab];
     if (!activeTrigger) {
