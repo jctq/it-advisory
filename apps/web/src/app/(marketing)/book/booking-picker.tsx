@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import {
   fetchMarketingServerClockOffsetMs,
+  getBookingAvailabilitySlots,
   resolveServerClockOffsetMilliseconds,
 } from '@techmd/api-client/marketing-booking-api-client';
 import { PaymentHoldExpiryPanel } from '@/components/marketing/payment-hold-expiry-panel';
@@ -72,7 +73,7 @@ import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot
 import { resolveBookingJoinCalendarLocation, resolveBookingSessionRoomHref } from '@/lib/marketing/booking-session-room-path';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
-import { sortBookingSlotTimesForManilaDate } from '@/lib/marketing/sort-booking-slot-times-for-manila-date';
+import { buildAvailabilityByDateFromSlots } from '@/lib/marketing/booking-availability-by-date';
 import { hasCheckoutManageContact } from '@/lib/marketing/checkout-contact';
 import {
   isLinkedBookingCancelled,
@@ -530,6 +531,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const [dateActionsUnpinElement, setDateActionsUnpinElement] = useState<HTMLElement | null>(null);
   const [detailsActionsUnpinElement, setDetailsActionsUnpinElement] = useState<HTMLElement | null>(null);
   const [paymentActionsUnpinElement, setPaymentActionsUnpinElement] = useState<HTMLElement | null>(null);
+  const [availabilityRefreshToken, setAvailabilityRefreshToken] = useState<number>(0);
   const paymentHoldSyncInFlightRef = useRef<boolean>(false);
   const resumePaymentSelectionPendingRef = useRef<{
     readonly gatewayId: PaymentGatewayId;
@@ -1577,11 +1579,18 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     selectedDate !== null ? formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd') : null;
   const pendingManilaYmd = slotDialogOpen && slotDialogManilaYmd !== null ? slotDialogManilaYmd : null;
 
-  type AvailabilityApiSlot = {
-    readonly date: string;
-    readonly time: string;
-    readonly startsAtIso: string;
-  };
+  useEffect(() => {
+    if (phase !== 'date') {
+      return;
+    }
+    const executeBumpAvailabilityRefresh = (): void => {
+      setAvailabilityRefreshToken((previous) => previous + 1);
+    };
+    window.addEventListener('focus', executeBumpAvailabilityRefresh);
+    return () => {
+      window.removeEventListener('focus', executeBumpAvailabilityRefresh);
+    };
+  }, [phase]);
 
   useEffect(() => {
     if (phase !== 'date') {
@@ -1594,32 +1603,15 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       setAvailabilityStatus('loading');
       setAvailabilityError(null);
     });
-    const url = `${AVAILABILITY_API_URL}?serviceKey=${encodeURIComponent(checkoutServiceKeyForApi)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-    void fetch(url, { signal: controller.signal })
-      .then(async (response) => {
-        const payload = (await response.json()) as { slots?: AvailabilityApiSlot[]; error?: string };
-        if (!response.ok) {
-          throw new Error(typeof payload.error === 'string' ? payload.error : 'Failed to load times');
-        }
-        return payload.slots ?? [];
-      })
+    void getBookingAvailabilitySlots({
+      apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+      serviceKey: checkoutServiceKeyForApi,
+      fromYmd: from,
+      toYmd: to,
+      signal: controller.signal,
+    })
       .then((slots) => {
-        const map: Record<string, string[]> = {};
-        for (const row of slots) {
-          const existing = map[row.date];
-          if (existing === undefined) {
-            map[row.date] = [row.time];
-          } else {
-            existing.push(row.time);
-          }
-        }
-        for (const key of Object.keys(map)) {
-          const list = map[key];
-          if (list !== undefined) {
-            sortBookingSlotTimesForManilaDate(key, list);
-          }
-        }
-        setAvailabilityByDate(map);
+        setAvailabilityByDate(buildAvailabilityByDateFromSlots(slots));
         setAvailabilityStatus('ready');
       })
       .catch((error: unknown) => {
@@ -1634,6 +1626,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       controller.abort();
     };
   }, [
+    availabilityRefreshToken,
     checkoutServiceKeyForApi,
     manilaFetchBounds,
     phase,

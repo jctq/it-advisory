@@ -45,6 +45,181 @@ export type PublicAvailabilitySlot = {
 
 const SLOT_INTERVALS = new Set<number>([30, 45, 60, 90]);
 
+export type AdvisorSlotIntervalMinutes = 30 | 45 | 60 | 90;
+
+const MINUTES_PER_DAY = 24 * 60;
+
+function listGridMinutesForSlotInterval(slotIntervalMinutes: number): readonly number[] {
+  const labels: number[] = [];
+  for (let t = 0; t < MINUTES_PER_DAY; t += slotIntervalMinutes) {
+    labels.push(t);
+  }
+  return labels;
+}
+
+function pickClosestGridHm(
+  hm: string,
+  candidates: readonly string[],
+  fallback: string,
+): string {
+  if (candidates.length === 0) {
+    return fallback;
+  }
+  if (candidates.includes(hm)) {
+    return hm;
+  }
+  const target = parseHmToMinutes(hm);
+  if (target === null) {
+    return candidates[0] ?? fallback;
+  }
+  let best = candidates[0]!;
+  let bestDelta = Math.abs((parseHmToMinutes(best) ?? 0) - target);
+  for (const candidate of candidates) {
+    const candidateMin = parseHmToMinutes(candidate);
+    if (candidateMin === null) {
+      continue;
+    }
+    const delta = Math.abs(candidateMin - target);
+    if (delta < bestDelta) {
+      best = candidate;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
+/**
+ * True when at least one bookable slot fits inside the window at the given interval.
+ */
+export function isAdvisorScheduleWindowBookable(params: {
+  readonly start: string;
+  readonly end: string;
+  readonly slotIntervalMinutes: AdvisorSlotIntervalMinutes;
+}): boolean {
+  const startMin = parseHmToMinutes(params.start);
+  const endMin = parseHmToMinutes(params.end);
+  if (startMin === null || endMin === null) {
+    return false;
+  }
+  return startMin < endMin && startMin + params.slotIntervalMinutes <= endMin;
+}
+
+/**
+ * Valid window start times on the slot grid (optionally constrained by a chosen end).
+ */
+export function listAdvisorScheduleStartHmOptions(params: {
+  readonly slotIntervalMinutes: AdvisorSlotIntervalMinutes;
+  readonly endHm?: string;
+}): readonly string[] {
+  const endMin = params.endHm !== undefined ? parseHmToMinutes(params.endHm) : null;
+  return listGridMinutesForSlotInterval(params.slotIntervalMinutes)
+    .filter((startMin) => {
+      if (startMin + params.slotIntervalMinutes > MINUTES_PER_DAY) {
+        return false;
+      }
+      if (endMin === null) {
+        return true;
+      }
+      return startMin < endMin && startMin + params.slotIntervalMinutes <= endMin;
+    })
+    .map((minutes) => minutesToHm(minutes));
+}
+
+/**
+ * Valid window end times on the slot grid for a chosen start (end is exclusive; last slot must fit).
+ */
+export function listAdvisorScheduleEndHmOptions(params: {
+  readonly slotIntervalMinutes: AdvisorSlotIntervalMinutes;
+  readonly startHm: string;
+}): readonly string[] {
+  const startMin = parseHmToMinutes(params.startHm);
+  if (startMin === null) {
+    return [];
+  }
+  return listGridMinutesForSlotInterval(params.slotIntervalMinutes)
+    .filter((endMin) => startMin < endMin && startMin + params.slotIntervalMinutes <= endMin)
+    .map((minutes) => minutesToHm(minutes));
+}
+
+/**
+ * Snaps start/end to the nearest valid grid pair for the slot interval.
+ */
+export function resolveAdvisorScheduleWindowHm(params: {
+  readonly start: string;
+  readonly end: string;
+  readonly slotIntervalMinutes: AdvisorSlotIntervalMinutes;
+}): { readonly start: string; readonly end: string } {
+  const startOptions = listAdvisorScheduleStartHmOptions({
+    slotIntervalMinutes: params.slotIntervalMinutes,
+  });
+  const fallbackStart = startOptions[0] ?? '08:00';
+  const start = pickClosestGridHm(params.start, startOptions, fallbackStart);
+  const endOptions = listAdvisorScheduleEndHmOptions({
+    slotIntervalMinutes: params.slotIntervalMinutes,
+    startHm: start,
+  });
+  const fallbackEnd = endOptions[endOptions.length - 1] ?? minutesToHm(parseHmToMinutes(start)! + params.slotIntervalMinutes);
+  let end = pickClosestGridHm(params.end, endOptions, fallbackEnd);
+  const startMin = parseHmToMinutes(start);
+  const endMin = parseHmToMinutes(end);
+  if (
+    startMin !== null &&
+    endMin !== null &&
+    (endMin <= startMin || startMin + params.slotIntervalMinutes > endMin)
+  ) {
+    end = fallbackEnd;
+  }
+  return { start, end };
+}
+
+function reconcileWindowOverrideRecord(
+  overrides: Readonly<Partial<Record<string, AdvisorWeekdayOverride>>> | undefined,
+  slotIntervalMinutes: AdvisorSlotIntervalMinutes,
+): Readonly<Partial<Record<string, AdvisorWeekdayOverride>>> | undefined {
+  if (overrides === undefined) {
+    return undefined;
+  }
+  const next: Record<string, AdvisorWeekdayOverride> = {};
+  for (const key of Object.keys(overrides)) {
+    const value = overrides[key];
+    if (value === undefined) {
+      continue;
+    }
+    if (value.kind === 'closed') {
+      next[key] = value;
+      continue;
+    }
+    const resolved = resolveAdvisorScheduleWindowHm({
+      start: value.start,
+      end: value.end,
+      slotIntervalMinutes,
+    });
+    next[key] = { kind: 'window', start: resolved.start, end: resolved.end };
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+/**
+ * Re-aligns all custom hour windows when slot length changes in the admin UI.
+ */
+export function applyAdvisorSlotIntervalToBookingSettings(
+  doc: AdvisorBookingSettingsDocument,
+  slotIntervalMinutes: AdvisorSlotIntervalMinutes,
+): AdvisorBookingSettingsDocument {
+  const defaultWeekdayWindow = resolveAdvisorScheduleWindowHm({
+    start: doc.defaultWeekdayWindow.start,
+    end: doc.defaultWeekdayWindow.end,
+    slotIntervalMinutes,
+  });
+  return {
+    ...doc,
+    slotIntervalMinutes,
+    defaultWeekdayWindow,
+    weekdayOverrides: reconcileWindowOverrideRecord(doc.weekdayOverrides, slotIntervalMinutes),
+    dateWindowOverrides: reconcileWindowOverrideRecord(doc.dateWindowOverrides, slotIntervalMinutes),
+  };
+}
+
 function clampInt(value: number, min: number, max: number, fallback: number): number {
   if (!Number.isFinite(value)) {
     return fallback;
@@ -345,6 +520,65 @@ export function normalizeAdvisorBookingSettings(
     dailyBookingCapOverrides: daily,
     weeklyBookingCapOverrides: weekly,
     bookingHorizonDays: clampInt(doc.bookingHorizonDays, 1, 366, 60),
+  };
+}
+
+function mapWeekdayOverridesToRecord(
+  overrides: ReadonlyMap<number, AdvisorWeekdayOverride>,
+): Readonly<Partial<Record<string, AdvisorWeekdayOverride>>> | undefined {
+  if (overrides.size === 0) {
+    return undefined;
+  }
+  const next: Record<string, AdvisorWeekdayOverride> = {};
+  for (const [dow, value] of overrides) {
+    next[String(dow)] = value;
+  }
+  return next;
+}
+
+function mapDateOverridesToRecord(
+  overrides: ReadonlyMap<string, AdvisorWeekdayOverride>,
+): Readonly<Partial<Record<string, AdvisorWeekdayOverride>>> | undefined {
+  if (overrides.size === 0) {
+    return undefined;
+  }
+  const next: Record<string, AdvisorWeekdayOverride> = {};
+  for (const [key, value] of overrides) {
+    next[key] = value;
+  }
+  return next;
+}
+
+function mapCapOverridesToRecord(map: ReadonlyMap<string, number>): Readonly<Record<string, number>> | undefined {
+  if (map.size === 0) {
+    return undefined;
+  }
+  const next: Record<string, number> = {};
+  for (const [key, value] of map) {
+    next[key] = value;
+  }
+  return next;
+}
+
+/**
+ * Collapses a merged admin row to the same shape {@link normalizeAdvisorBookingSettings} uses for slot expansion
+ * (drops invalid windows and normalizes interval / horizon).
+ */
+export function materializeAdvisorBookingSettingsDocument(
+  merged: AdvisorBookingSettingsDocument,
+): AdvisorBookingSettingsDocument {
+  const normalized = normalizeAdvisorBookingSettings(merged);
+  return {
+    ...merged,
+    timezone: normalized.timezone,
+    weekendDayIndices: [...normalized.weekendDayIndices].sort((a, b) => a - b),
+    defaultWeekdayWindow: { ...normalized.defaultWeekdayWindow },
+    weekdayOverrides: mapWeekdayOverridesToRecord(normalized.weekdayOverrides),
+    dateWindowOverrides: mapDateOverridesToRecord(normalized.dateWindowOverrides),
+    slotIntervalMinutes: normalized.slotIntervalMinutes,
+    dailyBookingCapOverrides: mapCapOverridesToRecord(normalized.dailyBookingCapOverrides),
+    weeklyBookingCapOverrides: mapCapOverridesToRecord(normalized.weeklyBookingCapOverrides),
+    bookingHorizonDays: normalized.bookingHorizonDays,
   };
 }
 

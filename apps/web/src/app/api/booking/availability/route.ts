@@ -50,7 +50,14 @@ export async function GET(request: Request): Promise<NextResponse> {
       fromYmd: parsed.data.from,
       toYmd: parsed.data.to,
     });
-    return NextResponse.json({ slots });
+    return NextResponse.json(
+      { slots },
+      {
+        headers: {
+          'Cache-Control': 'no-store, max-age=0',
+        },
+      },
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: 'Failed to load availability.', details: message }, { status: 500 });

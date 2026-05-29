@@ -21,7 +21,7 @@ export async function getBookingAvailabilitySlots(
   const base = params.apiBaseUrl.replace(/\/$/, '');
   const serviceKey = params.serviceKey ?? 'project-rescue';
   const url = `${base}/api/booking/availability?serviceKey=${encodeURIComponent(serviceKey)}&from=${encodeURIComponent(params.fromYmd)}&to=${encodeURIComponent(params.toYmd)}`;
-  const response = await fetch(url, { signal: params.signal });
+  const response = await fetch(url, { signal: params.signal, cache: 'no-store' });
   const payload = (await response.json()) as { slots?: PublicBookingAvailabilitySlot[]; error?: string };
   if (!response.ok) {
     throw new Error(typeof payload.error === 'string' ? payload.error : 'Failed to load availability');

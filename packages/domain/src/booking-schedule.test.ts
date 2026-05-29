@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { AdvisorBookingSettingsDocument } from './types.js';
 import {
+  applyAdvisorSlotIntervalToBookingSettings,
   buildFullCalendarBusinessHourSegments,
   createDefaultAdvisorBookingSettingsDocument,
   expandAdvisorAvailabilityUtc,
   expandPublicAvailabilitySlots,
   isUtcInstantBookable,
+  isAdvisorScheduleWindowBookable,
   LEGACY_MARKETING_TIME_LABELS,
+  listAdvisorScheduleEndHmOptions,
+  listAdvisorScheduleStartHmOptions,
   listSunToSatYmdsForWeekContaining,
   normalizeAdvisorBookingSettings,
+  resolveAdvisorScheduleWindowHm,
 } from './booking-schedule.js';
 
 const fixedNow = new Date('2025-06-10T12:00:00.000Z');
@@ -230,6 +235,48 @@ describe('buildFullCalendarBusinessHourSegments', () => {
     const segments = buildFullCalendarBusinessHourSegments(settings, week);
     const tuesday = segments.find((s) => s.daysOfWeek[0] === 2);
     expect(tuesday).toEqual({ daysOfWeek: [2], startTime: '08:00', endTime: '22:00' });
+  });
+});
+
+describe('advisor schedule window pickers', () => {
+  it('lists start options that leave room before a fixed end', () => {
+    const starts = listAdvisorScheduleStartHmOptions({ slotIntervalMinutes: 60, endHm: '12:00' });
+    expect(starts).toContain('08:00');
+    expect(starts).toContain('11:00');
+    expect(starts).not.toContain('12:00');
+  });
+
+  it('lists end options after start on the slot grid', () => {
+    const ends = listAdvisorScheduleEndHmOptions({ slotIntervalMinutes: 30, startHm: '09:00' });
+    expect(ends[0]).toBe('09:30');
+    expect(ends).toContain('12:00');
+    expect(ends[ends.length - 1]).toBe('23:30');
+  });
+
+  it('resolves invalid manual values to the nearest grid pair', () => {
+    const resolved = resolveAdvisorScheduleWindowHm({
+      start: '08:15',
+      end: '17:45',
+      slotIntervalMinutes: 60,
+    });
+    expect(resolved).toEqual({ start: '08:00', end: '18:00' });
+  });
+
+  it('extends the end time when slot length no longer fits the previous window', () => {
+    const doc = baseDoc({
+      defaultWeekdayWindow: { start: '07:30', end: '08:30' },
+      slotIntervalMinutes: 60,
+    });
+    const next = applyAdvisorSlotIntervalToBookingSettings(doc, 90);
+    expect(next.slotIntervalMinutes).toBe(90);
+    expect(next.defaultWeekdayWindow).toEqual({ start: '07:30', end: '09:00' });
+    expect(
+      isAdvisorScheduleWindowBookable({
+        start: next.defaultWeekdayWindow.start,
+        end: next.defaultWeekdayWindow.end,
+        slotIntervalMinutes: 90,
+      }),
+    ).toBe(true);
   });
 });
 

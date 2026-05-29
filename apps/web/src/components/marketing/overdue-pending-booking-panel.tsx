@@ -72,10 +72,21 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
   const [slotDialogOpen, setSlotDialogOpen] = useState(false);
   const [slotDialogManilaYmd, setSlotDialogManilaYmd] = useState<string | null>(null);
   const [abandonDialogOpen, setAbandonDialogOpen] = useState(false);
+  const [availabilityRefreshToken, setAvailabilityRefreshToken] = useState<number>(0);
   const manilaFetchBounds = useMemo(
     () => resolveManilaMonthGridYmdBounds(visibleManilaYearMonth),
     [visibleManilaYearMonth],
   );
+  useEffect(() => {
+    const executeBumpAvailabilityRefresh = (): void => {
+      setAvailabilityRefreshToken((previous) => previous + 1);
+    };
+    window.addEventListener('focus', executeBumpAvailabilityRefresh);
+    return () => {
+      window.removeEventListener('focus', executeBumpAvailabilityRefresh);
+    };
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
@@ -104,7 +115,13 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
     return () => {
       controller.abort();
     };
-  }, [manilaFetchBounds.from, manilaFetchBounds.to, props.apiBaseUrl, props.booking.serviceKey]);
+  }, [
+    availabilityRefreshToken,
+    manilaFetchBounds.from,
+    manilaFetchBounds.to,
+    props.apiBaseUrl,
+    props.booking.serviceKey,
+  ]);
   const executeReschedule = useCallback(async (): Promise<void> => {
     if (selectedManilaYmd === null || selectedTime === null) {
       return;

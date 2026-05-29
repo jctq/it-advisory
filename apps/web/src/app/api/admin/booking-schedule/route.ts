@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createDefaultAdvisorBookingSettingsDocument } from '@techmd/domain/booking-schedule';
+import {
+  createDefaultAdvisorBookingSettingsDocument,
+  materializeAdvisorBookingSettingsDocument,
+} from '@techmd/domain/booking-schedule';
 import type { AdvisorBookingSettingsDocument, AdvisorWeekdayOverride } from '@/domain/types';
 import {
   findAdvisorBookingSettingsDocument,
@@ -12,15 +15,57 @@ export const dynamic = 'force-dynamic';
 
 const hm = z.string().regex(/^\d{1,2}:\d{2}$/);
 
-const weekdayOverrideSchema: z.ZodType<AdvisorWeekdayOverride> = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('closed') }),
-  z.object({ kind: z.literal('window'), start: hm, end: hm }),
-]);
+function parseHmToMinutesForValidation(hmValue: string): number | null {
+  const trimmed = hmValue.trim();
+  const match = /^(\d{1,2}):(\d{2})$/.exec(trimmed);
+  if (match === null) {
+    return null;
+  }
+  const hours = Number.parseInt(match[1]!, 10);
+  const minutes = Number.parseInt(match[2]!, 10);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  return hours * 60 + minutes;
+}
+
+function isAdvisorWindowStartBeforeEnd(window: { readonly start: string; readonly end: string }): boolean {
+  const startMin = parseHmToMinutesForValidation(window.start);
+  const endMin = parseHmToMinutesForValidation(window.end);
+  return startMin !== null && endMin !== null && startMin < endMin;
+}
+
+const advisorDayWindowSchema = z
+  .object({ start: hm, end: hm })
+  .refine(isAdvisorWindowStartBeforeEnd, { message: 'Start must be before end (HH:mm).' });
+
+const weekdayClosedOverrideSchema = z.object({ kind: z.literal('closed') });
+const weekdayWindowOverrideSchema = z.object({
+  kind: z.literal('window'),
+  start: hm,
+  end: hm,
+});
+
+const weekdayOverrideSchema: z.ZodType<AdvisorWeekdayOverride> = z
+  .union([weekdayClosedOverrideSchema, weekdayWindowOverrideSchema])
+  .superRefine((value, context) => {
+    if (value.kind !== 'window') {
+      return;
+    }
+    if (isAdvisorWindowStartBeforeEnd(value)) {
+      return;
+    }
+    context.addIssue({
+      code: 'custom',
+      message: 'Start must be before end (HH:mm).',
+      path: ['start'],
+    });
+  });
 
 const patchSchema = z.object({
   timezone: z.string().min(1).max(64).optional(),
   weekendDayIndices: z.array(z.number().int().min(0).max(6)).min(0).max(7).optional(),
-  defaultWeekdayWindow: z.object({ start: hm, end: hm }).optional(),
+  defaultWeekdayWindow: advisorDayWindowSchema.optional(),
   weekdayOverrides: z.record(z.string().regex(/^[0-6]$/), weekdayOverrideSchema).optional(),
   dateWindowOverrides: z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), weekdayOverrideSchema).optional(),
   slotIntervalMinutes: z.union([z.literal(30), z.literal(45), z.literal(60), z.literal(90)]).optional(),
@@ -45,9 +90,14 @@ function mergeAdvisorSettings(
   const merged: AdvisorBookingSettingsDocument = {
     ...base,
     ...patch,
-    weekdayOverrides: patch.weekdayOverrides !== undefined ? patch.weekdayOverrides : base.weekdayOverrides,
+    weekdayOverrides:
+      patch.weekdayOverrides !== undefined
+        ? emptyRecordToUndefined(patch.weekdayOverrides)
+        : base.weekdayOverrides,
     dateWindowOverrides:
-      patch.dateWindowOverrides !== undefined ? patch.dateWindowOverrides : base.dateWindowOverrides,
+      patch.dateWindowOverrides !== undefined
+        ? emptyRecordToUndefined(patch.dateWindowOverrides)
+        : base.dateWindowOverrides,
     dailyBookingCapOverrides:
       patch.dailyBookingCapOverrides !== undefined
         ? emptyRecordToUndefined(patch.dailyBookingCapOverrides)
@@ -102,8 +152,11 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const existing = await findAdvisorBookingSettingsDocument();
     const base = existing ?? createDefaultAdvisorBookingSettingsDocument(new Date());
     const merged = mergeAdvisorSettings(base, parsed.data);
-    const next = withLockedAdvisorTimezone(merged);
-    const saved = await replaceAdvisorBookingSettingsDocument(next);
+    const materialized = materializeAdvisorBookingSettingsDocument(withLockedAdvisorTimezone(merged));
+    const saved = await replaceAdvisorBookingSettingsDocument({
+      ...materialized,
+      updatedAt: merged.updatedAt,
+    });
     return NextResponse.json({ settings: saved });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

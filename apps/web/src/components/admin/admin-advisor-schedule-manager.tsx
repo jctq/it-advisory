@@ -17,12 +17,15 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import {
+  applyAdvisorSlotIntervalToBookingSettings,
   buildFullCalendarBusinessHourSegments,
   listSunToSatYmdsForWeekContaining,
+  materializeAdvisorBookingSettingsDocument,
   normalizeAdvisorBookingSettings,
   resolveAdvisorSchedulePreviewAnchorYmd,
+  type AdvisorSlotIntervalMinutes,
 } from '@techmd/domain/booking-schedule';
 import type { AdvisorBookingSettingsDocument, AdvisorWeekdayOverride } from '@/domain/types';
 import {
@@ -50,6 +53,10 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Separator } from '@/components/ui/separator';
 import { AdminSkeleton } from '@/components/admin/admin-skeleton';
+import {
+  AdvisorScheduleDefaultWindowPickers,
+  AdvisorScheduleWindowPickers,
+} from '@/components/admin/advisor-schedule-window-pickers';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -319,6 +326,8 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
     window.history.replaceState(window.history.state, '', buildScheduleTabUrl(nextTab));
   }, []);
   const [settings, setSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
+  const settingsRef = useRef<AdvisorBookingSettingsDocument | null>(null);
+  settingsRef.current = settings;
   const [lastSavedSettings, setLastSavedSettings] = useState<AdvisorBookingSettingsDocument | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -344,9 +353,10 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
       })
       .then((doc) => {
         if (!cancelled) {
-          const cloned = cloneSettings(doc);
+          const materialized = materializeAdvisorBookingSettingsDocument(doc);
+          const cloned = cloneSettings(materialized);
           setSettings(cloned);
-          setLastSavedSettings(cloneSettings(doc));
+          setLastSavedSettings(cloneSettings(materialized));
         }
       })
       .catch((error: unknown) => {
@@ -437,7 +447,8 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
     });
   }, []);
   const executeSave = useCallback(async (): Promise<void> => {
-    if (settings === null) {
+    const currentSettings = settingsRef.current;
+    if (currentSettings === null) {
       return;
     }
     setIsSaving(true);
@@ -447,16 +458,16 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           timezone: PRIMARY_TIMEZONE,
-          weekendDayIndices: settings.weekendDayIndices,
-          defaultWeekdayWindow: settings.defaultWeekdayWindow,
-          weekdayOverrides: settings.weekdayOverrides,
-          dateWindowOverrides: settings.dateWindowOverrides,
-          slotIntervalMinutes: settings.slotIntervalMinutes,
-          // Empty cap maps must be sent as `{}` — `undefined` is omitted by JSON.stringify and the API
-          // would otherwise keep previously saved caps.
-          dailyBookingCapOverrides: settings.dailyBookingCapOverrides ?? {},
-          weeklyBookingCapOverrides: settings.weeklyBookingCapOverrides ?? {},
-          bookingHorizonDays: settings.bookingHorizonDays,
+          weekendDayIndices: currentSettings.weekendDayIndices,
+          defaultWeekdayWindow: currentSettings.defaultWeekdayWindow,
+          // Empty maps must be sent as `{}` — `undefined` is omitted by JSON.stringify and the API
+          // would otherwise keep previously saved overrides.
+          weekdayOverrides: currentSettings.weekdayOverrides ?? {},
+          dateWindowOverrides: currentSettings.dateWindowOverrides ?? {},
+          slotIntervalMinutes: currentSettings.slotIntervalMinutes,
+          dailyBookingCapOverrides: currentSettings.dailyBookingCapOverrides ?? {},
+          weeklyBookingCapOverrides: currentSettings.weeklyBookingCapOverrides ?? {},
+          bookingHorizonDays: currentSettings.bookingHorizonDays,
         }),
       });
       const data = (await response.json()) as { settings?: AdvisorBookingSettingsDocument; error?: string };
@@ -475,7 +486,7 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
     } finally {
       setIsSaving(false);
     }
-  }, [settings]);
+  }, []);
   const executeResetToSaved = useCallback((): void => {
     if (lastSavedSettings === null) {
       return;
@@ -613,61 +624,22 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                   <p className="text-xs text-muted-foreground">
                     Used for every weekday that is not a weekend and does not have a custom weekday rule.
                   </p>
-                  <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-5">
+                    <AdvisorScheduleDefaultWindowPickers
+                      slotIntervalMinutes={settings.slotIntervalMinutes}
+                      start={settings.defaultWeekdayWindow.start}
+                      end={settings.defaultWeekdayWindow.end}
+                      onChange={(next) =>
+                        setSettings({
+                          ...settings,
+                          defaultWeekdayWindow: next,
+                        })
+                      }
+                    />
                     <div className="space-y-2">
-                      <AdminSettingsLabel
-                        htmlFor="adv-def-start"
-                        hint={
-                          <>
-                            24-hour <span className="font-mono">HH:mm</span> (e.g. 08:00). Hour 0–23, minutes 0–59.
-                            Start must be before end or no slots are generated.
-                          </>
-                        }
-                      >
-                        Start
-                      </AdminSettingsLabel>
-                      <Input
-                        id="adv-def-start"
-                        className="min-h-11 font-mono text-sm"
-                        placeholder="08:00"
-                        value={settings.defaultWeekdayWindow.start}
-                        onChange={(e) =>
-                          setSettings({
-                            ...settings,
-                            defaultWeekdayWindow: { ...settings.defaultWeekdayWindow, start: e.target.value },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <AdminSettingsLabel
-                        htmlFor="adv-def-end"
-                        hint={
-                          <>
-                            Same <span className="font-mono">HH:mm</span> format as start. The window is exclusive at
-                            end — the last slot must fit fully before this time.
-                          </>
-                        }
-                      >
-                        End
-                      </AdminSettingsLabel>
-                      <Input
-                        id="adv-def-end"
-                        className="min-h-11 font-mono text-sm"
-                        placeholder="22:00"
-                        value={settings.defaultWeekdayWindow.end}
-                        onChange={(e) =>
-                          setSettings({
-                            ...settings,
-                            defaultWeekdayWindow: { ...settings.defaultWeekdayWindow, end: e.target.value },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
                       <AdminSettingsLabel
                         htmlFor="adv-interval"
-                        hint="Only 30, 45, 60, or 90 minutes. Each slot start is spaced by this interval inside an open window."
+                        hint="Only 30, 45, 60, or 90 minutes. Each slot start is spaced by this interval inside an open window. Changing this updates all time pickers and re-aligns open windows."
                       >
                         Slot length
                       </AdminSettingsLabel>
@@ -675,12 +647,15 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                         id="adv-interval"
                         className="h-11 max-w-xs"
                         value={String(settings.slotIntervalMinutes)}
-                        onChange={(e) =>
-                          setSettings({
-                            ...settings,
-                            slotIntervalMinutes: Number.parseInt(e.target.value, 10) as AdvisorBookingSettingsDocument['slotIntervalMinutes'],
-                          })
-                        }
+                        onChange={(e) => {
+                          const nextInterval = Number.parseInt(e.target.value, 10) as AdvisorSlotIntervalMinutes;
+                          setSettings((previous) => {
+                            if (previous === null) {
+                              return previous;
+                            }
+                            return applyAdvisorSlotIntervalToBookingSettings(previous, nextInterval);
+                          });
+                        }}
                       >
                         <option value={30}>30 minutes between start times</option>
                         <option value={45}>45 minutes between start times</option>
@@ -792,25 +767,19 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
                               <div className="flex items-center gap-1.5">
                                 <span className="text-xs text-muted-foreground">Custom window</span>
                                 <AdminSettingsHint side="top">
-                                  24-hour <span className="font-mono">HH:mm</span>. Hour 0–23, minutes 0–59. Start
-                                  must be before end.
+                                  Pick start and end on the {settings.slotIntervalMinutes}-minute grid. Start must be
+                                  before end with room for at least one slot.
                                 </AdminSettingsHint>
                               </div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Input
-                                  className="h-11 w-24 font-mono text-sm sm:w-26"
-                                  value={row.start}
-                                  onChange={(e) => executeSetOverrideWindow(dow, e.target.value, row.end)}
-                                  aria-label={`${label} window start`}
-                                />
-                                <span className="text-sm text-muted-foreground">–</span>
-                                <Input
-                                  className="h-11 w-24 font-mono text-sm sm:w-26"
-                                  value={row.end}
-                                  onChange={(e) => executeSetOverrideWindow(dow, row.start, e.target.value)}
-                                  aria-label={`${label} window end`}
-                                />
-                              </div>
+                              <AdvisorScheduleWindowPickers
+                                slotIntervalMinutes={settings.slotIntervalMinutes}
+                                start={row.start}
+                                end={row.end}
+                                compact
+                                startId={`adv-ov-start-${dow}`}
+                                endId={`adv-ov-end-${dow}`}
+                                onChange={(next) => executeSetOverrideWindow(dow, next.start, next.end)}
+                              />
                             </div>
                           ) : (
                             <p className="text-sm text-muted-foreground">No custom window</p>
@@ -842,6 +811,7 @@ export function AdminAdvisorScheduleManager(props: AdminAdvisorScheduleManagerPr
               <CardContent className="px-4 pb-6 pt-6 sm:px-6">
                 <DateWindowOverrideEditor
                   scheduleTimeZone={PRIMARY_TIMEZONE}
+                  slotIntervalMinutes={settings.slotIntervalMinutes}
                   value={settings.dateWindowOverrides ?? {}}
                   onChange={(next) =>
                     setSettings({
@@ -1063,6 +1033,7 @@ function resolveDateOverrideRow(
 
 type DateWindowOverrideEditorProps = {
   readonly scheduleTimeZone: string;
+  readonly slotIntervalMinutes: AdvisorSlotIntervalMinutes;
   readonly value: Readonly<Partial<Record<string, AdvisorWeekdayOverride>>>;
   readonly onChange: (next: Record<string, AdvisorWeekdayOverride> | undefined) => void;
 };
@@ -1212,47 +1183,21 @@ function DateWindowOverrideEditor(props: DateWindowOverrideEditorProps): ReactEl
                                 Window
                               </span>
                               <AdminSettingsHint>
-                                24-hour <span className="font-mono">HH:mm</span>. Start before end; slots step by
-                                your slot length until the window end.
+                                Pick times on the {props.slotIntervalMinutes}-minute grid. End is exclusive; at least one
+                                full slot must fit before the end time.
                               </AdminSettingsHint>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="flex items-center gap-1.5">
-                                <Label htmlFor={`date-ov-${ymd}-start`} className="sr-only">
-                                  Opens
-                                </Label>
-                                <span className="text-xs text-muted-foreground">Opens</span>
-                                <Input
-                                  id={`date-ov-${ymd}-start`}
-                                  className="h-9 w-24 font-mono text-sm"
-                                  inputMode="numeric"
-                                  autoComplete="off"
-                                  placeholder="08:00"
-                                  value={row.start}
-                                  onChange={(e) => executeSetRowWindow(ymd, e.target.value, row.end)}
-                                  aria-label={`${ymd} window start`}
-                                />
-                              </div>
-                              <span className="text-xs text-muted-foreground" aria-hidden>
-                                –
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <Label htmlFor={`date-ov-${ymd}-end`} className="sr-only">
-                                  Until
-                                </Label>
-                                <span className="text-xs text-muted-foreground">Until</span>
-                                <Input
-                                  id={`date-ov-${ymd}-end`}
-                                  className="h-9 w-24 font-mono text-sm"
-                                  inputMode="numeric"
-                                  autoComplete="off"
-                                  placeholder="17:00"
-                                  value={row.end}
-                                  onChange={(e) => executeSetRowWindow(ymd, row.start, e.target.value)}
-                                  aria-label={`${ymd} window end`}
-                                />
-                              </div>
-                            </div>
+                            <AdvisorScheduleWindowPickers
+                              slotIntervalMinutes={props.slotIntervalMinutes}
+                              start={row.start}
+                              end={row.end}
+                              compact
+                              startId={`date-ov-${ymd}-start`}
+                              endId={`date-ov-${ymd}-end`}
+                              startLabel="Opens"
+                              endLabel="Until"
+                              onChange={(next) => executeSetRowWindow(ymd, next.start, next.end)}
+                            />
                           </div>
                         )}
                       </div>
