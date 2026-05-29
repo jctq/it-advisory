@@ -2,7 +2,6 @@
 
 import { Bug, CreditCard, Timer, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
-import { useRouter } from 'next/navigation';
 import { AdminClientDiagnosticWorkspace } from '@/components/admin/admin-client-diagnostic-workspace';
 import { AdminCronLogsTable } from '@/components/admin/admin-cron-logs-table';
 import { AdminPaymentLogsTable } from '@/components/admin/admin-payment-logs-table';
@@ -38,7 +37,7 @@ function addMountedDebugTab(previous: ReadonlySet<DebugTab>, tab: DebugTab): Rea
   return next;
 }
 
-function resolveDebugTab(value: string | undefined): DebugTab {
+function resolveDebugTab(value: string): DebugTab {
   if (value === 'cron-logs') {
     return 'cron-logs';
   }
@@ -48,37 +47,49 @@ function resolveDebugTab(value: string | undefined): DebugTab {
   return 'client-diagnostic';
 }
 
+function buildDebugTabUrl(tab: DebugTab): string {
+  const nextParams = new URLSearchParams(window.location.search);
+  if (tab === 'client-diagnostic') {
+    nextParams.delete('tab');
+  } else {
+    nextParams.set('tab', tab);
+  }
+  const query = nextParams.toString();
+  return query.length > 0 ? `/admin/debug?${query}` : '/admin/debug';
+}
+
 export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactElement {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<DebugTab>(props.initialTab);
   const [mountedTabs, setMountedTabs] = useState<ReadonlySet<DebugTab>>(() => new Set([props.initialTab]));
   const tabTriggerRefs = useRef<Partial<Record<DebugTab, HTMLButtonElement>>>({});
-  if (props.initialTab !== activeTab) {
+  useEffect(() => {
     setActiveTab(props.initialTab);
     setMountedTabs((previous) => addMountedDebugTab(previous, props.initialTab));
-  }
+  }, [props.initialTab]);
   useEffect(() => {
     const activeTrigger = tabTriggerRefs.current[activeTab];
     if (!activeTrigger) {
       return;
     }
-    activeTrigger.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    activeTrigger.scrollIntoView({ block: 'nearest', inline: 'center' });
   }, [activeTab]);
-  const executeChangeTab = useCallback(
-    (nextTab: DebugTab): void => {
+  useEffect(() => {
+    const handlePopState = (): void => {
+      const tabParam = new URLSearchParams(window.location.search).get('tab');
+      const nextTab = resolveDebugTab(tabParam ?? '');
       setActiveTab(nextTab);
       setMountedTabs((previous) => addMountedDebugTab(previous, nextTab));
-      const nextParams = new URLSearchParams(window.location.search);
-      if (nextTab === 'client-diagnostic') {
-        nextParams.delete('tab');
-      } else {
-        nextParams.set('tab', nextTab);
-      }
-      const query = nextParams.toString();
-      router.replace(query.length > 0 ? `/admin/debug?${query}` : '/admin/debug', { scroll: false });
-    },
-    [router],
-  );
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+  const executeChangeTab = useCallback((nextTab: DebugTab): void => {
+    setActiveTab(nextTab);
+    setMountedTabs((previous) => addMountedDebugTab(previous, nextTab));
+    window.history.replaceState(window.history.state, '', buildDebugTabUrl(nextTab));
+  }, []);
   return (
     <section className="mx-auto flex min-h-0 w-full flex-col">
       <div className="space-y-6">
@@ -136,7 +147,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
           </div>
           <TabsContent
             value="client-diagnostic"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('client-diagnostic') ? (
               <div data-admin-tour="page-debug-client-diagnostic">
@@ -150,7 +161,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
           </TabsContent>
           <TabsContent
             value="cron-logs"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('cron-logs') ? (
               <div data-admin-tour="page-debug-cron-logs" className="space-y-4">
@@ -164,7 +175,7 @@ export function AdminDebugWorkspace(props: AdminDebugWorkspaceProps): ReactEleme
           </TabsContent>
           <TabsContent
             value="payment-logs"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('payment-logs') ? (
               <div data-admin-tour="page-debug-payment-logs" className="space-y-4">
