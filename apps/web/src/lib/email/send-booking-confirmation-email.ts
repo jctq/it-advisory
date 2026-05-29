@@ -8,6 +8,7 @@ import { getDb } from '@/lib/mongodb';
 import { getCatalogServiceByKey } from '@/lib/data/public-catalog-services';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import { resolveBookingJoinPrimaryUrl } from '@/lib/marketing/booking-session-room-path';
+import { issueBookingSessionAccessToken } from '@/lib/marketing/booking-session-access-token';
 import { readBookingSessionRoomLinksEnabled } from '@/lib/marketing/booking-session-room-gate';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import type { CatalogServiceKind } from '@/domain/monetization-types';
@@ -179,13 +180,7 @@ function buildConfirmationPlainText(input: {
     }
     lines.push(input.primaryJoinUrl);
     lines.push('');
-  }
-  if (input.primaryJoinUsesSessionRoom && input.meetingUrl !== null && input.meetingUrl.trim().length > 0) {
-    lines.push('DIRECT VIDEO LINK');
-    lines.push('If the session room does not open your call, use this direct meeting link:');
-    lines.push(input.meetingUrl.trim());
-    lines.push('');
-  } else if (input.primaryJoinUrl.length === 0) {
+  } else {
     lines.push('Your meeting link will follow in a separate message if your advisor attaches one to this booking.');
     lines.push('');
   }
@@ -247,8 +242,6 @@ export function buildBookingConfirmationEmailHtml(input: {
   readonly paymentSectionHtml: string | null;
 }): string {
   const preheader = `Your ${input.brandName} consultation is confirmed. Reference ${input.bookingReference}.`;
-  const trimmedMeeting =
-    input.meetingUrl !== null && input.meetingUrl.trim().length > 0 ? input.meetingUrl.trim() : '';
   const brandNameRow = buildTransactionalEmailBrandNameRow({
     brandName: input.brandName,
     fontStack: EMAIL_FONT_STACK,
@@ -266,19 +259,12 @@ export function buildBookingConfirmationEmailHtml(input: {
     ? `<p style="margin:12px 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;">This consultation includes a visible AI notetaker (Fathom) to capture notes and summaries. By joining, you consent to recording and transcription for service delivery.</p>`
     : '';
   const trimmedPrimaryJoin = input.primaryJoinUrl.trim();
-  const primaryJoinSection =
+  const meetingSection =
     trimmedPrimaryJoin.length > 0
       ? input.primaryJoinUsesSessionRoom
         ? `${buildEmailSectionHeading('Session room')}${buildBulletproofButton('Open session room', trimmedPrimaryJoin)}<p style="margin:0 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;">From the session room you can verify your connection and join the video call when the window opens.</p>${recordingDisclosureBlock}<p style="margin:0 0 28px 0;"></p>`
         : `${buildEmailSectionHeading('Video meeting')}${buildBulletproofButton('Join video meeting', trimmedPrimaryJoin)}<p style="margin:0 0 0 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;word-break:break-word;">If the button above does not open your call, copy this link into your browser:<br /><a href="${escapeHtml(trimmedPrimaryJoin)}" style="color:#1d4ed8;text-decoration:underline;">${escapeHtml(trimmedPrimaryJoin)}</a></p>${recordingDisclosureBlock}<p style="margin:0 0 28px 0;"></p>`
-      : '';
-  const directMeetingBlock =
-    input.primaryJoinUsesSessionRoom && trimmedMeeting.length > 0
-      ? `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:13px;line-height:20px;color:#52525b;word-break:break-word;">Direct meeting link (backup):<br /><a href="${escapeHtml(trimmedMeeting)}" style="color:#1d4ed8;text-decoration:underline;">${escapeHtml(trimmedMeeting)}</a></p>`
-      : trimmedPrimaryJoin.length === 0
-        ? `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">Your meeting link will follow in a separate message if your advisor attaches one to this booking.</p>${recordingDisclosureBlock}`
-        : '';
-  const meetingSection = `${primaryJoinSection}${directMeetingBlock}`;
+      : `<p style="margin:0 0 28px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">Your meeting link will follow in a separate message if your advisor attaches one to this booking.</p>${recordingDisclosureBlock}`;
   const manageSection =
     input.manageUrl.length > 0
       ? `${buildEmailSectionHeading('Manage booking')}<p style="margin:0 0 12px 0;font-family:${EMAIL_FONT_STACK};font-size:14px;line-height:22px;color:#52525b;">You will need your booking reference, email, and the last four digits of your phone number.</p>${buildBulletproofButton('View or manage booking', input.manageUrl)}`
@@ -445,11 +431,16 @@ async function runSendBookingConfirmationEmail(input: {
   const paymentPlainLines = transaction !== null ? buildPaymentSectionPlainLines(transaction) : null;
   const brandName = await getResolvedSiteName();
   const useSessionRoomLinks = await readBookingSessionRoomLinksEnabled();
+  const accessToken =
+    useSessionRoomLinks
+      ? issueBookingSessionAccessToken({ bookingId: booking.id, startsAtIso: booking.startsAtIso })
+      : null;
   const primaryJoinUrl = resolveBookingJoinPrimaryUrl({
     useSessionRoomLinks,
     bookingReference,
     meetingUrl,
     siteOrigin,
+    accessToken,
   });
   const calendarLocation = primaryJoinUrl.length > 0 ? primaryJoinUrl : meetingUrl ?? '';
   const calendarDescriptionParts = [`Booking reference ${bookingReference}.`];
@@ -457,9 +448,6 @@ async function runSendBookingConfirmationEmail(input: {
     calendarDescriptionParts.push(
       useSessionRoomLinks ? `Session room: ${primaryJoinUrl}` : `Join: ${primaryJoinUrl}`,
     );
-  }
-  if (useSessionRoomLinks && meetingUrl !== null && meetingUrl.length > 0) {
-    calendarDescriptionParts.push(`Direct meeting link: ${meetingUrl}`);
   }
   if (manageUrl.length > 0) {
     calendarDescriptionParts.push(`Manage: ${manageUrl}`);

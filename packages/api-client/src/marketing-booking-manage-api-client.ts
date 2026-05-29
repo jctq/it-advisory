@@ -146,6 +146,22 @@ export async function lookupAccountBookingSessionByReference(params: {
   return parseSessionLookupResponse(response);
 }
 
+export async function lookupGuestBookingSessionByToken(params: {
+  readonly apiBaseUrl: string;
+  readonly token: string;
+  readonly signal?: AbortSignal;
+}): Promise<GuestBookingManageView> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/session/lookup-token');
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: params.token }),
+    signal: params.signal,
+  });
+  return parseSessionLookupResponse(response);
+}
+
 export async function syncAccountProfileToManagedBooking(params: {
   readonly apiBaseUrl: string;
   readonly bookingId: string;

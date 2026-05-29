@@ -304,6 +304,48 @@ export async function findGuestBookingManageView(
 }
 
 /**
+ * Resolves a booking by Mongo id for signed session-room access links.
+ */
+export async function resolveGuestBookingById(bookingId: string): Promise<ResolveGuestBookingResult> {
+  if (!process.env.MONGODB_URI) {
+    return NOT_FOUND;
+  }
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(bookingId);
+  } catch {
+    return NOT_FOUND;
+  }
+  const db = await getDb();
+  const bookingDoc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: objectId });
+  if (bookingDoc === null || bookingDoc._id === undefined || bookingDoc.leadId === undefined) {
+    return NOT_FOUND;
+  }
+  const leadDoc = await db.collection<LeadDocument>(COLLECTIONS.leads).findOne({ _id: bookingDoc.leadId });
+  if (leadDoc === null || leadDoc._id === undefined) {
+    return NOT_FOUND;
+  }
+  return {
+    bookingId: bookingDoc._id.toString(),
+    booking: bookingDoc as BookingDocument & { _id: ObjectId },
+    lead: leadDoc as LeadDocument & { _id: ObjectId },
+  };
+}
+
+export async function findGuestBookingManageViewForSessionToken(
+  bookingId: string,
+): Promise<GuestBookingManageView | null> {
+  const resolved = await resolveGuestBookingById(bookingId);
+  if (isGuestBookingNotFound(resolved)) {
+    return null;
+  }
+  if (resolved.booking.status !== 'confirmed' && resolved.booking.status !== 'completed') {
+    return null;
+  }
+  return buildGuestBookingManageView(resolved);
+}
+
+/**
  * Resolves a booking when its Mongo id matches and the row belongs to the given marketing visitor id.
  */
 export async function resolveBookingOwnedByVisitor(

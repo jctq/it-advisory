@@ -16,6 +16,7 @@ import { buildBookingFathomNotesEmailHtml } from '@/lib/email/send-booking-fatho
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { readBookingSessionRoomLinksEnabled } from '@/lib/marketing/booking-session-room-gate';
 import { resolveBookingJoinPrimaryUrl } from '@/lib/marketing/booking-session-room-path';
+import { issueBookingSessionAccessToken } from '@/lib/marketing/booking-session-access-token';
 import {
   BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
   buildBookingCalendarLinkBundle,
@@ -75,19 +76,24 @@ export async function buildTransactionalEmailTemplatePreviews(
   const manageUrl = manageBookingEnabled && siteOrigin.length > 0 ? `${siteOrigin}/book/manage` : '';
   const meetingUrl =
     siteOrigin.length > 0 ? `${siteOrigin}/meet/preview-strategy-session` : 'https://meet.google.com/abc-defg-hij';
+  const sampleStartsAt = new Date('2026-06-15T02:00:00.000Z');
+  const accessToken = issueBookingSessionAccessToken({
+    bookingId: '507f1f77bcf86cd799439011',
+    startsAtIso: sampleStartsAt.toISOString(),
+  });
   const primaryJoinUrl = resolveBookingJoinPrimaryUrl({
     useSessionRoomLinks,
     bookingReference: SAMPLE_BOOKING_REFERENCE,
     meetingUrl,
     siteOrigin,
+    accessToken,
   });
-  const sampleStartsAt = new Date('2026-06-15T02:00:00.000Z');
   const dateLong = 'Monday, June 15, 2026';
   const timeLabel = '10:00 AM';
   const serviceTitle = 'Strategy session';
   const calendarBundle = buildBookingCalendarLinkBundle({
     title: `${serviceTitle} — ${SAMPLE_BOOKING_REFERENCE}`,
-    description: `Booking reference ${SAMPLE_BOOKING_REFERENCE}. ${useSessionRoomLinks ? `Session room: ${primaryJoinUrl}` : `Join: ${primaryJoinUrl}`}. ${useSessionRoomLinks ? `Direct meeting link: ${meetingUrl}. ` : ''}${manageUrl.length > 0 ? `Manage: ${manageUrl}` : `Manage on ${brandName}.`}`,
+    description: `Booking reference ${SAMPLE_BOOKING_REFERENCE}. ${useSessionRoomLinks ? `Session room: ${primaryJoinUrl}` : `Join: ${primaryJoinUrl}`}. ${manageUrl.length > 0 ? `Manage: ${manageUrl}` : `Manage on ${brandName}.`}`,
     location: primaryJoinUrl.length > 0 ? primaryJoinUrl : meetingUrl,
     startsAtUtc: sampleStartsAt,
     durationMinutes: BOOKING_SESSION_CALENDAR_DURATION_MINUTES,

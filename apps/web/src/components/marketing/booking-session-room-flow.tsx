@@ -24,6 +24,7 @@ import {
   lookupAccountBookingSession,
   lookupAccountBookingSessionByReference,
   lookupGuestBookingSession,
+  lookupGuestBookingSessionByToken,
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
 } from '@techmd/api-client/marketing-booking-manage-api-client';
@@ -65,7 +66,8 @@ const SESSION_ROOM_POLL_INTERVAL_MS = 25_000;
 type SessionRefreshContext =
   | { readonly kind: 'guest'; readonly credentials: GuestBookingManageCredentials }
   | { readonly kind: 'account'; readonly bookingId: string }
-  | { readonly kind: 'account-by-reference'; readonly bookingReference: string };
+  | { readonly kind: 'account-by-reference'; readonly bookingReference: string }
+  | { readonly kind: 'token'; readonly token: string };
 
 const sessionCardClass = cn(
   'rounded-xl border border-border/60 bg-card/50 shadow-xs',
@@ -118,11 +120,13 @@ export function BookingSessionRoomFlow(props: {
 }): ReactElement {
   const bookingSessionRoomLinksEnabled = props.bookingSessionRoomLinksEnabled ?? true;
   const searchParams = useSearchParams();
+  const accessTokenFromQuery = searchParams.get('token')?.trim() ?? '';
   const bookingReferenceFromQuery = searchParams.get('bookingReference')?.trim() ?? '';
   const bookingIdFromQuery = searchParams.get('bookingId')?.trim() ?? '';
-  const shouldBootstrapByReference = bookingReferenceFromQuery.length >= 4;
-  const shouldBootstrapByBookingId = MONGO_OBJECT_ID_HEX.test(bookingIdFromQuery);
-  const shouldBootstrapFromQuery = shouldBootstrapByReference || shouldBootstrapByBookingId;
+  const shouldBootstrapByToken = accessTokenFromQuery.length >= 16;
+  const shouldBootstrapByReference = !shouldBootstrapByToken && bookingReferenceFromQuery.length >= 4;
+  const shouldBootstrapByBookingId = !shouldBootstrapByToken && MONGO_OBJECT_ID_HEX.test(bookingIdFromQuery);
+  const shouldBootstrapFromQuery = shouldBootstrapByToken || shouldBootstrapByReference || shouldBootstrapByBookingId;
   const [roomPhase, setRoomPhase] = useState<SessionRoomPhase>('lookup');
   const [bookingReference, setBookingReference] = useState(
     shouldBootstrapByReference ? bookingReferenceFromQuery : '',
@@ -186,6 +190,41 @@ export function BookingSessionRoomFlow(props: {
     if (hasAttemptedBootstrapRef.current) {
       return;
     }
+    if (shouldBootstrapByToken) {
+      hasAttemptedBootstrapRef.current = true;
+      void lookupGuestBookingSessionByToken({
+        apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+        token: accessTokenFromQuery,
+      })
+        .then((result) => {
+          setBookingReference(result.bookingReference);
+          enterSessionRoom(result, { kind: 'token', token: accessTokenFromQuery });
+        })
+        .catch((error: unknown) => {
+          if (error instanceof BookingSessionLookupError) {
+            if (error.statusCode === 401) {
+              setLookupError(
+                'This session link is invalid or has expired. Enter your booking details below to continue.',
+              );
+              if (bookingReferenceFromQuery.length >= 4) {
+                setBookingReference(bookingReferenceFromQuery);
+              }
+              return;
+            }
+            if (error.statusCode === 404) {
+              setLookupError('We could not find an active session for this link. Enter your booking details below.');
+              return;
+            }
+          }
+          const message = error instanceof Error ? error.message : 'Booking lookup failed.';
+          setLookupError(message);
+          notifyError(message);
+        })
+        .finally(() => {
+          setIsSubmitting(false);
+        });
+      return;
+    }
     if (shouldBootstrapByReference) {
       hasAttemptedBootstrapRef.current = true;
       void lookupAccountBookingSessionByReference({
@@ -237,11 +276,13 @@ export function BookingSessionRoomFlow(props: {
         setIsSubmitting(false);
       });
   }, [
+    accessTokenFromQuery,
     bookingIdFromQuery,
     bookingReferenceFromQuery,
     enterSessionRoom,
     shouldBootstrapByBookingId,
     shouldBootstrapByReference,
+    shouldBootstrapByToken,
   ]);
   const handleLookupSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -276,11 +317,17 @@ export function BookingSessionRoomFlow(props: {
                 bookingId: refreshContext.bookingId,
                 signal: controller.signal,
               })
-            : lookupAccountBookingSessionByReference({
-                apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
-                bookingReference: refreshContext.bookingReference,
-                signal: controller.signal,
-              });
+            : refreshContext.kind === 'account-by-reference'
+              ? lookupAccountBookingSessionByReference({
+                  apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+                  bookingReference: refreshContext.bookingReference,
+                  signal: controller.signal,
+                })
+              : lookupGuestBookingSessionByToken({
+                  apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+                  token: refreshContext.token,
+                  signal: controller.signal,
+                });
       void request
         .then((result) => {
           if (!controller.signal.aborted) {
