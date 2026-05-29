@@ -36,3 +36,18 @@ export async function getDb(): Promise<Db> {
   const dbName = process.env.MONGODB_DB_NAME ?? 'techmd';
   return client.db(dbName);
 }
+
+/** Closes the shared client so one-shot scripts (cron, CLI) can exit cleanly. */
+export async function closeMongoConnection(): Promise<void> {
+  const clientPromise = globalForMongo._mongoClientPromise;
+  if (clientPromise === undefined) {
+    return;
+  }
+  globalForMongo._mongoClientPromise = undefined;
+  try {
+    const client = await clientPromise;
+    await client.close();
+  } catch {
+    // Ignore close errors when connect never completed.
+  }
+}

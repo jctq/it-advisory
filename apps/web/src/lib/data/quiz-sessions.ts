@@ -17,7 +17,13 @@ import { getActiveDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
 import { getDb } from '@/lib/mongodb';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import {
+  normalizeBookingDocumentStatus,
+  pickPrimaryBookingForQuizSession,
+} from '@/lib/data/pick-primary-booking-for-quiz-session';
+import { buildAccountDiagnosticsBookingStatusMatch } from '@/lib/marketing/account-booking-status';
+import {
   normalizeVisitorQuizSessionListStatusFilter,
+  type BookingListStatusFilter,
   type DeleteQuizSessionForVisitorResult,
   type PaginatedVisitorQuizSessionsResult,
   type QuizAuditAdminRow,
@@ -30,8 +36,10 @@ import {
   type VisitorQuizSessionSummary,
 } from '@/lib/data/quiz-session-types';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import { releaseSlotReservationsForQuizSession } from '@/lib/payments/release-quiz-session-slot-reservations';
 
 export type {
+  BookingListStatusFilter,
   DeleteQuizSessionForVisitorResult,
   PaginatedVisitorQuizSessionsResult,
   QuizAuditAdminRow,
@@ -43,7 +51,11 @@ export type {
   VisitorQuizSessionListStatusFilter,
   VisitorQuizSessionSummary,
 } from '@/lib/data/quiz-session-types';
-export { normalizeVisitorQuizSessionListStatusFilter } from '@/lib/data/quiz-session-types';
+export {
+  normalizeBookingListStatusFilter,
+  normalizeVisitorQuizSessionListStatusFilter,
+} from '@/lib/data/quiz-session-types';
+export { buildAccountDiagnosticsBookingStatusMatch } from '@/lib/marketing/account-booking-status';
 
 const DEFAULT_QUIZ_SESSION_LIST_LIMIT = 500;
 const DEFAULT_QUIZ_AUDIT_LIST_LIMIT = 200;
@@ -127,28 +139,136 @@ async function fetchPrimaryBookingByQuizSessionIds(
     .collection<BookingDocument>(COLLECTIONS.bookings)
     .find(
       { quizSessionId: { $in: [...sessionIds] } },
-      { projection: { _id: 1, quizSessionId: 1, status: 1, startsAt: 1, timezone: 1, serviceKey: 1, meetingUrl: 1 } },
+      {
+        projection: {
+          _id: 1,
+          quizSessionId: 1,
+          status: 1,
+          startsAt: 1,
+          timezone: 1,
+          serviceKey: 1,
+          meetingUrl: 1,
+          updatedAt: 1,
+        },
+      },
     )
     .toArray();
+  const bookingsBySessionKey = new Map<string, BookingDocument[]>();
   for (const doc of docs) {
     if (doc._id === undefined || doc.quizSessionId === undefined || doc.quizSessionId === null) {
       continue;
     }
     const sessionKey = doc.quizSessionId.toString();
-    if (!result.has(sessionKey)) {
-      const meetingRaw = doc.meetingUrl;
-      const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
-      result.set(sessionKey, {
-        bookingId: doc._id.toString(),
-        bookingStatus: doc.status,
-        bookingStartsAtIso: doc.startsAt.toISOString(),
-        bookingTimezone: doc.timezone,
-        bookingServiceKey: doc.serviceKey,
-        bookingMeetingUrl: meetingUrl,
-      });
+    const existing = bookingsBySessionKey.get(sessionKey);
+    if (existing === undefined) {
+      bookingsBySessionKey.set(sessionKey, [doc]);
+      continue;
+    }
+    existing.push(doc);
+  }
+  for (const [sessionKey, sessionBookings] of bookingsBySessionKey) {
+    const primary = pickPrimaryBookingForQuizSession(sessionBookings);
+    if (primary === null || primary._id === undefined) {
+      continue;
+    }
+    const normalizedStatus = normalizeBookingDocumentStatus(primary.status);
+    if (normalizedStatus === null) {
+      continue;
+    }
+    const meetingRaw = primary.meetingUrl;
+    const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+    result.set(sessionKey, {
+      bookingId: primary._id.toString(),
+      bookingStatus: normalizedStatus,
+      bookingStartsAtIso: primary.startsAt.toISOString(),
+      bookingTimezone: primary.timezone,
+      bookingServiceKey: primary.serviceKey,
+      bookingMeetingUrl: meetingUrl,
+    });
+  }
+  return result;
+}
+
+function mapBookingDocumentToLinkedSummary(doc: BookingDocument & { _id: ObjectId }): LinkedBookingSummary | null {
+  const normalizedStatus = normalizeBookingDocumentStatus(doc.status);
+  if (normalizedStatus === null || doc.startsAt === undefined) {
+    return null;
+  }
+  const meetingRaw = doc.meetingUrl;
+  const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+  return {
+    bookingId: doc._id.toString(),
+    bookingStatus: normalizedStatus,
+    bookingStartsAtIso: doc.startsAt.toISOString(),
+    bookingTimezone: doc.timezone,
+    bookingServiceKey: doc.serviceKey,
+    bookingMeetingUrl: meetingUrl,
+  };
+}
+
+async function fetchLinkedBookingSummariesByBookingIds(
+  bookingIds: readonly string[],
+): Promise<Map<string, LinkedBookingSummary>> {
+  const result = new Map<string, LinkedBookingSummary>();
+  const uniqueIds = [...new Set(bookingIds.map((id) => id.trim()).filter((id) => id.length > 0))];
+  if (uniqueIds.length === 0 || !hasMongoUri()) {
+    return result;
+  }
+  const objectIds: ObjectId[] = [];
+  for (const id of uniqueIds) {
+    try {
+      objectIds.push(new ObjectId(id));
+    } catch {
+      /* Skip invalid booking ids. */
+    }
+  }
+  if (objectIds.length === 0) {
+    return result;
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<BookingDocument>(COLLECTIONS.bookings)
+    .find(
+      { _id: { $in: objectIds } },
+      {
+        projection: {
+          _id: 1,
+          status: 1,
+          startsAt: 1,
+          timezone: 1,
+          serviceKey: 1,
+          meetingUrl: 1,
+        },
+      },
+    )
+    .toArray();
+  for (const doc of docs) {
+    if (doc._id === undefined) {
+      continue;
+    }
+    const summary = mapBookingDocumentToLinkedSummary(doc as BookingDocument & { _id: ObjectId });
+    if (summary !== null) {
+      result.set(doc._id.toString(), summary);
     }
   }
   return result;
+}
+
+function resolveLinkedBookingForSession(
+  sessionHex: string,
+  bookingBySessionId: Map<string, LinkedBookingSummary>,
+  paymentBySessionId: Map<string, { readonly bookingId: string | null }>,
+  bookingById: Map<string, LinkedBookingSummary>,
+): LinkedBookingSummary | null {
+  const linkedBySession = bookingBySessionId.get(sessionHex);
+  if (linkedBySession !== undefined) {
+    return linkedBySession;
+  }
+  const paymentBookingId = paymentBySessionId.get(sessionHex)?.bookingId?.trim() ?? '';
+  if (paymentBookingId.length === 0) {
+    return null;
+  }
+  return bookingById.get(paymentBookingId) ?? null;
 }
 
 export { formatBookingReferenceId };
@@ -370,7 +490,7 @@ function mapVisitorQuizSessionSummary(
     isBooked: bookingId !== null,
     bookingId,
     bookingReferenceId: bookingId !== null ? formatBookingReferenceId(bookingId) : null,
-    bookingStatus: linkedBooking?.bookingStatus ?? null,
+    bookingStatus: normalizeBookingDocumentStatus(linkedBooking?.bookingStatus),
     bookingStartsAtIso: linkedBooking?.bookingStartsAtIso ?? linkedPayment?.checkoutStartsAtIso ?? null,
     bookingTimezone: linkedBooking?.bookingTimezone ?? linkedPayment?.checkoutTimezone ?? null,
     bookingServiceKey: linkedBooking?.bookingServiceKey ?? linkedPayment?.checkoutServiceKey ?? null,
@@ -405,6 +525,11 @@ export async function listQuizSessionsForVisitor(
   const sessionIdHexes = sessionIds.map((id) => id.toString());
   const bookingBySessionId = await fetchPrimaryBookingByQuizSessionIds(sessionIds);
   const paymentBySessionId = await fetchLatestPaymentTransactionsByQuizSessionIds(sessionIdHexes);
+  const fallbackBookingIds = sessionIdHexes
+    .filter((sessionHex) => !bookingBySessionId.has(sessionHex))
+    .map((sessionHex) => paymentBySessionId.get(sessionHex)?.bookingId ?? null)
+    .filter((bookingId): bookingId is string => bookingId !== null && bookingId.trim().length > 0);
+  const bookingById = await fetchLinkedBookingSummariesByBookingIds(fallbackBookingIds);
   return validDocs.map((doc) => {
     const sessionHex = doc._id.toString();
     const paymentRow = paymentBySessionId.get(sessionHex);
@@ -418,25 +543,14 @@ export async function listQuizSessionsForVisitor(
             checkoutServiceKey: paymentRow.serviceKey,
           }
         : null;
-    return mapVisitorQuizSessionSummary(doc, bookingBySessionId.get(sessionHex) ?? null, linkedPayment);
+    const linkedBooking = resolveLinkedBookingForSession(
+      sessionHex,
+      bookingBySessionId,
+      paymentBySessionId,
+      bookingById,
+    );
+    return mapVisitorQuizSessionSummary(doc, linkedBooking, linkedPayment);
   });
-}
-
-function buildVisitorSessionStatusMatch(status: VisitorQuizSessionListStatusFilter): Document {
-  switch (status) {
-    case 'all':
-      return {};
-    case 'pending':
-      return {
-        $or: [{ linkedBooking: null }, { 'linkedBooking.status': 'pending' }],
-      };
-    case 'confirmed':
-      return { 'linkedBooking.status': 'confirmed' };
-    case 'cancelled':
-      return { 'linkedBooking.status': 'cancelled' };
-    default:
-      return {};
-  }
 }
 
 type AggregatedVisitorQuizSessionRow = QuizSessionDocument & {
@@ -499,7 +613,7 @@ export async function listQuizSessionsForVisitorPaginated(input: {
   readonly visitorId: string;
   readonly page: number;
   readonly pageSize: number;
-  readonly status: VisitorQuizSessionListStatusFilter;
+  readonly status: BookingListStatusFilter;
   readonly bookingReference?: string;
 }): Promise<PaginatedVisitorQuizSessionsResult> {
   const page = Math.max(1, input.page);
@@ -536,16 +650,71 @@ export async function listQuizSessionsForVisitorPaginated(input: {
         let: { sessionId: '$_id' },
         pipeline: [
           { $match: { $expr: { $eq: ['$quizSessionId', '$$sessionId'] } } },
-          { $sort: { createdAt: 1 } },
-          { $limit: 1 },
-          { $project: { _id: 1, status: 1, startsAt: 1, timezone: 1, serviceKey: 1, meetingUrl: 1 } },
+          {
+            $project: {
+              _id: 1,
+              status: 1,
+              startsAt: 1,
+              timezone: 1,
+              serviceKey: 1,
+              meetingUrl: 1,
+              updatedAt: 1,
+              statusRank: {
+                $switch: {
+                  branches: [
+                    { case: { $eq: ['$status', 'completed'] }, then: 4 },
+                    { case: { $eq: ['$status', 'confirmed'] }, then: 3 },
+                    { case: { $eq: ['$status', 'pending'] }, then: 2 },
+                    { case: { $eq: ['$status', 'cancelled'] }, then: 1 },
+                  ],
+                  default: 0,
+                },
+              },
+            },
+          },
         ],
         as: 'linkedBookings',
       },
     },
-    { $addFields: { linkedBooking: { $arrayElemAt: ['$linkedBookings', 0] } } },
+    {
+      $addFields: {
+        linkedBooking: {
+          $let: {
+            vars: {
+              sortedBookings: {
+                $sortArray: {
+                  input: '$linkedBookings',
+                  sortBy: { statusRank: -1, updatedAt: -1 },
+                },
+              },
+            },
+            in: { $arrayElemAt: ['$$sortedBookings', 0] },
+          },
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: COLLECTIONS.paymentTransactions,
+        let: { sessionHex: { $toString: '$_id' } },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$quizSessionIdHex', '$$sessionHex'] } } },
+          { $sort: { updatedAt: -1 } },
+          { $limit: 1 },
+          { $project: { status: 1 } },
+        ],
+        as: 'latestPayments',
+      },
+    },
+    {
+      $addFields: {
+        latestPaymentStatus: {
+          $ifNull: [{ $arrayElemAt: ['$latestPayments.status', 0] }, null],
+        },
+      },
+    },
   ];
-  const statusMatch = buildVisitorSessionStatusMatch(input.status);
+  const statusMatch = buildAccountDiagnosticsBookingStatusMatch(input.status);
   if (Object.keys(statusMatch).length > 0) {
     pipeline.push({ $match: statusMatch });
   }
@@ -554,13 +723,25 @@ export async function listQuizSessionsForVisitorPaginated(input: {
     const escapedReference = bookingReference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     pipeline.push({
       $match: {
-        linkedBooking: { $ne: null },
         $expr: {
-          $regexMatch: {
-            input: { $toString: '$linkedBooking._id' },
-            regex: escapedReference,
-            options: 'i',
-          },
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: '$linkedBookings',
+                  as: 'booking',
+                  cond: {
+                    $regexMatch: {
+                      input: { $toString: '$$booking._id' },
+                      regex: escapedReference,
+                      options: 'i',
+                    },
+                  },
+                },
+              },
+            },
+            0,
+          ],
         },
       },
     });
@@ -579,8 +760,13 @@ export async function listQuizSessionsForVisitorPaginated(input: {
   const paymentBySessionId = await fetchLatestPaymentTransactionsByQuizSessionIds(
     rows.map((row) => row._id.toString()),
   );
+  const fallbackBookingIds = rows
+    .filter((row) => row.linkedBooking === null || row.linkedBooking === undefined)
+    .map((row) => paymentBySessionId.get(row._id.toString())?.bookingId ?? null)
+    .filter((bookingId): bookingId is string => bookingId !== null && bookingId.trim().length > 0);
+  const bookingById = await fetchLinkedBookingSummariesByBookingIds(fallbackBookingIds);
   const sessions = rows.map((row) => {
-    const linkedBooking =
+    const linkedBookingFromAggregation =
       row.linkedBooking !== null && row.linkedBooking !== undefined
         ? (() => {
             const meetingRaw = row.linkedBooking.meetingUrl;
@@ -588,7 +774,7 @@ export async function listQuizSessionsForVisitorPaginated(input: {
               typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
             return {
               bookingId: row.linkedBooking._id.toString(),
-              bookingStatus: row.linkedBooking.status,
+              bookingStatus: normalizeBookingDocumentStatus(row.linkedBooking.status) ?? row.linkedBooking.status,
               bookingStartsAtIso: row.linkedBooking.startsAt.toISOString(),
               bookingTimezone: row.linkedBooking.timezone,
               bookingServiceKey: row.linkedBooking.serviceKey,
@@ -608,6 +794,9 @@ export async function listQuizSessionsForVisitorPaginated(input: {
             checkoutServiceKey: paymentRow.serviceKey,
           }
         : null;
+    const linkedBooking =
+      linkedBookingFromAggregation ??
+      resolveLinkedBookingForSession(sessionHex, new Map(), paymentBySessionId, bookingById);
     return mapVisitorQuizSessionSummary(row, linkedBooking, linkedPayment);
   });
   return {
@@ -644,8 +833,8 @@ export async function findQuizSessionForVisitor(
 }
 
 /**
- * Removes a quiz session and its audit rows when it belongs to the visitor and is not linked from a booking
- * (in-progress or completed).
+ * Removes a quiz session and its audit rows when it belongs to the visitor. Active bookings and checkout holds
+ * for the session are cancelled first so the reserved slot is released for other visitors.
  */
 export async function deleteQuizSessionForVisitor(visitorId: string, sessionId: string): Promise<DeleteQuizSessionForVisitorResult> {
   if (!hasMongoUri()) {
@@ -663,12 +852,11 @@ export async function deleteQuizSessionForVisitor(visitorId: string, sessionId: 
   if (existing === null) {
     return { ok: false, code: 'not_found' };
   }
-  const bookingCount = await db
-    .collection(COLLECTIONS.bookings)
-    .countDocuments({ quizSessionId: objectId });
-  if (bookingCount > 0) {
-    return { ok: false, code: 'has_booking' };
-  }
+  await releaseSlotReservationsForQuizSession(objectId);
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateMany(
+    { quizSessionId: objectId },
+    { $unset: { quizSessionId: '' }, $set: { updatedAt: new Date() } },
+  );
   await db.collection<QuizAuditDocument>(COLLECTIONS.quizAudit).deleteMany({ sessionId: objectId });
   await sessions.deleteOne({ _id: objectId });
   const pointer = await db.collection<VisitorSessionDocument>(COLLECTIONS.visitorSessions).findOne({ visitorId });

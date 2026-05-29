@@ -714,8 +714,8 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this diagnostic?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the diagnostic snapshot and cannot be undone. Scheduled bookings stay on file
-              and are not deleted.
+              This permanently removes the diagnostic snapshot and cannot be undone. Any reserved consultation time
+              linked to this diagnostic is cancelled so the slot can be booked by someone else.
               {deleteSituationPreview !== null ? (
                 <span className="mt-2 block rounded-md border border-border bg-muted/40 px-3 py-2 text-foreground">
                   {deleteSituationPreview}

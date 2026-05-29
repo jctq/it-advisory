@@ -8,8 +8,8 @@ import {
   buildDefaultAccountDiagnosticsListRequest,
 } from '@/lib/marketing/account-diagnostics-list';
 import {
-  normalizeVisitorQuizSessionListStatusFilter,
-  type VisitorQuizSessionListStatusFilter,
+  normalizeBookingListStatusFilter,
+  type BookingListStatusFilter,
   type VisitorQuizSessionSummary,
 } from '@/lib/data/quiz-session-types';
 import {
@@ -38,7 +38,7 @@ export type MarketingAccountDiagnosticsView = AccountDiagnosticsState & {
   readonly setDeleteTarget: (value: AccountDiagnosticsDeleteTarget | null) => void;
   readonly setBookingReferenceInput: (value: string) => void;
   readonly setDebouncedBookingReference: (value: string) => void;
-  readonly setStatusFilter: (value: VisitorQuizSessionListStatusFilter) => void;
+  readonly setStatusFilter: (value: BookingListStatusFilter) => void;
   readonly setIsLoadingMore: (value: boolean) => void;
 };
 
@@ -81,7 +81,7 @@ function buildAccountDiagnosticsSetters(
     setBookingReferenceInput: (value) => patch({ bookingReferenceInput: value }),
     setDebouncedBookingReference: (value) => patch({ debouncedBookingReference: value }),
     setStatusFilter: (value) =>
-      patch({ statusFilter: normalizeVisitorQuizSessionListStatusFilter(value) }),
+      patch({ statusFilter: normalizeBookingListStatusFilter(value) }),
     setIsLoadingMore: (value) => patch({ isLoadingMore: value }),
   };
 }

@@ -8,6 +8,7 @@ import {
 import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
 import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { deleteQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { cancelActiveBookingAndPaymentHold } from '@/lib/payments/release-quiz-session-slot-reservations';
 import { isOverdueUnpaidPendingBooking } from '@/lib/marketing/overdue-pending-booking';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
@@ -126,15 +127,16 @@ export async function abandonOverduePendingBooking(
   }
   const db = await getDb();
   const quizSessionId = verified.booking.quizSessionId;
-  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
-    { _id: verified.booking._id },
-    {
-      $set: { status: 'cancelled', updatedAt: new Date() },
-      $unset: { quizSessionId: '' },
-    },
-  );
   if (quizSessionId !== undefined && quizSessionId !== null) {
-    await deleteQuizSessionForVisitor(verified.booking.visitorId, quizSessionId.toString());
+    const outcome = await deleteQuizSessionForVisitor(
+      verified.booking.visitorId,
+      quizSessionId.toString(),
+    );
+    if (outcome.ok === false) {
+      return { ok: false, code: 'session_not_found', message: 'Diagnostic could not be removed.' };
+    }
+  } else {
+    await cancelActiveBookingAndPaymentHold(verified.booking._id);
   }
   const refreshedBooking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: verified.booking._id });
   if (refreshedBooking === null || refreshedBooking._id === undefined) {

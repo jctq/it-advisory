@@ -1,16 +1,14 @@
-import type {
-  PaginatedVisitorQuizSessionsResult,
-  VisitorQuizSessionListStatusFilter,
-} from '@/lib/data/quiz-session-types';
+import type { PaginatedVisitorQuizSessionsResult } from '@/lib/data/quiz-session-types';
+import type { BookingListStatusFilter } from '@/lib/marketing/account-booking-status';
 
 export const ACCOUNT_DIAGNOSTICS_PAGE_SIZE = 8;
 export const ACCOUNT_DIAGNOSTICS_MOBILE_PAGE_SIZE = 15;
-export const ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS: VisitorQuizSessionListStatusFilter = 'pending';
+export const ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS: BookingListStatusFilter = 'pending';
 
 export type AccountDiagnosticsListRequest = {
   readonly page: number;
   readonly pageSize: number;
-  readonly status: VisitorQuizSessionListStatusFilter;
+  readonly status: BookingListStatusFilter;
   readonly bookingReference: string;
 };
 

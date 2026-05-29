@@ -1,6 +1,6 @@
 'use client';
 
-import { createColumnHelper, type PaginationState } from '@tanstack/react-table';
+import { createColumnHelper } from '@tanstack/react-table';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
@@ -20,9 +20,9 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { PAYMENT_GATEWAY_IDS, type PaymentGatewayId } from '@/domain/payment-types';
 import { PAYMENT_LOG_OUTCOMES, type PaymentLogOutcome } from '@/domain/payment-log-types';
 import { useAdminPaymentLogsQuery } from '@/hooks/admin/use-admin-payment-logs-query';
+import { useAdminDebugTablePagination } from '@/hooks/admin/use-admin-debug-table-pagination';
 import {
   ADMIN_DEBUG_SEARCH_DEBOUNCE_MS,
-  ADMIN_DEBUG_TABLE_PAGE_SIZE,
 } from '@/lib/admin/admin-paginated-list';
 import type {
   PaymentLogAdminRow,
@@ -240,19 +240,14 @@ export function AdminPaymentLogsTable(props: AdminPaymentLogsTableProps): ReactE
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [outcomeFilter, setOutcomeFilter] = useState<PaymentLogListOutcomeFilter>('all');
   const [gatewayFilter, setGatewayFilter] = useState<PaymentLogListGatewayFilter>('all');
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: ADMIN_DEBUG_TABLE_PAGE_SIZE,
-  });
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedSearch(searchInput.trim());
     }, ADMIN_DEBUG_SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timeoutId);
   }, [searchInput]);
-  useEffect(() => {
-    setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-  }, [debouncedSearch, gatewayFilter, outcomeFilter]);
+  const filterSignature = `${debouncedSearch}\0${gatewayFilter}\0${outcomeFilter}`;
+  const [pagination, setPagination] = useAdminDebugTablePagination(filterSignature);
   const queryFilters = useMemo(
     () => ({
       page: pagination.pageIndex + 1,
@@ -267,11 +262,9 @@ export function AdminPaymentLogsTable(props: AdminPaymentLogsTableProps): ReactE
   const rows = query.data?.rows ?? [];
   const totalCount = query.data?.totalCount ?? 0;
   const totalPages = query.data?.totalPages ?? 0;
-  useEffect(() => {
-    if (totalPages > 0 && pagination.pageIndex >= totalPages) {
-      setPagination((previous) => ({ ...previous, pageIndex: totalPages - 1 }));
-    }
-  }, [pagination.pageIndex, totalPages]);
+  if (totalPages > 0 && pagination.pageIndex >= totalPages) {
+    setPagination((previous) => ({ ...previous, pageIndex: totalPages - 1 }));
+  }
   const columns = useMemo(
     () => [
       columnHelper.accessor('receivedAtIso', {

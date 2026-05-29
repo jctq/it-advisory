@@ -33,10 +33,15 @@ import type {
   AdminBookingCalendarStatusCounts,
 } from '@/lib/data/bookings';
 import { formatBookingReferenceId, normalizeBookingReferenceInput } from '@/lib/marketing/booking-reference';
+import {
+  BOOKING_LIST_STATUS_FILTER_OPTIONS,
+  resolveAdminBookingLifecycleStatus,
+  type BookingListStatusFilter,
+} from '@/lib/marketing/account-booking-status';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 
-type BookingStatusFilter = 'all' | AdminBookingCalendarRow['status'];
+type BookingStatusFilter = BookingListStatusFilter;
 
 type BookingsViewMode = 'calendar' | 'table';
 
@@ -49,43 +54,29 @@ type StatusFilterOption = {
   readonly icon: typeof Inbox;
 };
 
-const STATUS_FILTER_OPTIONS: readonly StatusFilterOption[] = [
-  {
-    id: 'all',
-    label: 'All bookings',
-    shortLabel: 'All',
-    icon: Inbox,
-  },
-  {
-    id: 'confirmed',
-    label: 'Confirmed',
-    shortLabel: 'Confirmed',
-    icon: CalendarCheck2,
-  },
-  {
-    id: 'completed',
-    label: 'Completed',
-    shortLabel: 'Completed',
-    icon: CircleCheckBig,
-  },
-  {
-    id: 'pending',
-    label: 'Pending',
-    shortLabel: 'Pending',
-    icon: CalendarClock,
-  },
-  {
-    id: 'cancelled',
-    label: 'Cancelled',
-    shortLabel: 'Cancelled',
-    icon: CalendarX2,
-  },
-] as const;
+const STATUS_FILTER_ICONS: Record<BookingListStatusFilter, typeof Inbox> = {
+  all: Inbox,
+  pending: CalendarClock,
+  awaiting_payment: CalendarClock,
+  confirmed: CalendarCheck2,
+  completed: CircleCheckBig,
+  cancelled: CalendarX2,
+};
+
+const STATUS_FILTER_OPTIONS: readonly StatusFilterOption[] = BOOKING_LIST_STATUS_FILTER_OPTIONS.map(
+  (option) => ({
+    id: option.id,
+    label: option.id === 'all' ? 'All bookings' : option.label,
+    shortLabel: option.label,
+    icon: STATUS_FILTER_ICONS[option.id],
+  }),
+);
 
 const EMPTY_COUNTS: AdminBookingCalendarStatusCounts = {
   all: 0,
   confirmed: 0,
   pending: 0,
+  awaiting_payment: 0,
   cancelled: 0,
   completed: 0,
 };
@@ -281,7 +272,14 @@ export function AdminBookingsWorkspace(): ReactElement {
         }
         return [...previous, booking];
       });
-      if (statusFilter !== 'all' && booking.status !== statusFilter) {
+      if (
+        statusFilter !== 'all' &&
+        resolveAdminBookingLifecycleStatus({
+          status: booking.status,
+          paymentStatus: booking.paymentStatus,
+          paymentTransactionId: booking.paymentTransactionId,
+        }) !== statusFilter
+      ) {
         setStatusFilter('all');
       }
       setDraftFromYmd(bookingYmd);

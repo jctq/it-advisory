@@ -13,6 +13,10 @@ import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extra
 import { getDb } from '@/lib/mongodb';
 import { findQuizSessionForBookingSnapshot, findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { normalizeBookingReferenceInput } from '@/lib/marketing/booking-reference';
+import {
+  buildAdminBookingsRangeStatusQuery,
+  type BookingListStatusFilter,
+} from '@/lib/marketing/account-booking-status';
 import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 
 export type BookingRow = {
@@ -190,12 +194,13 @@ async function loadAccountVisitorContext(): Promise<{
   return { accountVisitorIds, accountEmailByVisitorId };
 }
 
-export type AdminBookingCalendarStatusFilter = 'all' | BookingDocument['status'];
+export type AdminBookingCalendarStatusFilter = BookingListStatusFilter;
 
 export type AdminBookingCalendarStatusCounts = {
   readonly all: number;
   readonly confirmed: number;
   readonly pending: number;
+  readonly awaiting_payment: number;
   readonly cancelled: number;
   readonly completed: number;
 };
@@ -330,27 +335,30 @@ async function mapBookingDocsToAdminCalendarRows(
   });
 }
 
-function buildAdminBookingStatusCounts(
-  statusCounts: ReadonlyArray<{ readonly _id: BookingDocument['status']; readonly count: number }>,
-): AdminBookingCalendarStatusCounts {
-  let all = 0;
-  let confirmed = 0;
-  let pending = 0;
-  let cancelled = 0;
-  let completed = 0;
-  for (const row of statusCounts) {
-    if (row._id === 'confirmed') {
-      confirmed = row.count;
-    } else if (row._id === 'pending') {
-      pending = row.count;
-    } else if (row._id === 'cancelled') {
-      cancelled = row.count;
-    } else if (row._id === 'completed') {
-      completed = row.count;
+async function buildAdminBookingLifecycleStatusCounts(
+  rangeFilter: { readonly startsAt: { readonly $gte: Date; readonly $lt: Date } },
+): Promise<AdminBookingCalendarStatusCounts> {
+  const db = await getDb();
+  const collection = db.collection<BookingDocument>(COLLECTIONS.bookings);
+  const all = await collection.countDocuments(rangeFilter);
+  const countForFilter = async (status: AdminBookingCalendarStatusFilter): Promise<number> => {
+    if (status === 'all') {
+      return all;
     }
-    all += row.count;
-  }
-  return { all, confirmed, pending, cancelled, completed };
+    const statusQuery = buildAdminBookingsRangeStatusQuery(status);
+    if (statusQuery === null) {
+      return all;
+    }
+    return collection.countDocuments({ ...rangeFilter, ...statusQuery });
+  };
+  const [pending, awaiting_payment, confirmed, completed, cancelled] = await Promise.all([
+    countForFilter('pending'),
+    countForFilter('awaiting_payment'),
+    countForFilter('confirmed'),
+    countForFilter('completed'),
+    countForFilter('cancelled'),
+  ]);
+  return { all, confirmed, pending, awaiting_payment, cancelled, completed };
 }
 
 /**
@@ -363,6 +371,7 @@ export async function listBookingsForAdminCalendarInRange(
     all: 0,
     confirmed: 0,
     pending: 0,
+    awaiting_payment: 0,
     cancelled: 0,
     completed: 0,
   };
@@ -373,16 +382,10 @@ export async function listBookingsForAdminCalendarInRange(
   const rangeFilter = {
     startsAt: { $gte: input.startsAtFrom, $lt: input.startsAtToExclusive },
   };
-  const statusCounts = await db
-    .collection<BookingDocument>(COLLECTIONS.bookings)
-    .aggregate<{ _id: BookingDocument['status']; count: number }>([
-      { $match: rangeFilter },
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ])
-    .toArray();
-  const countsByStatus = buildAdminBookingStatusCounts(statusCounts);
+  const countsByStatus = await buildAdminBookingLifecycleStatusCounts(rangeFilter);
+  const lifecycleStatusQuery = buildAdminBookingsRangeStatusQuery(input.status);
   const statusQuery =
-    input.status === 'all' ? rangeFilter : { ...rangeFilter, status: input.status };
+    lifecycleStatusQuery === null ? rangeFilter : { ...rangeFilter, ...lifecycleStatusQuery };
   const bookingDocs = await db
     .collection<BookingDocument>(COLLECTIONS.bookings)
     .find(statusQuery)
@@ -696,31 +699,16 @@ export type PrimaryBookingSlotRow = {
 };
 
 /**
- * Earliest booking row for a quiz session (matches the paginated account list lookup order).
+ * Canonical booking row for a quiz session (same priority as account diagnostics list).
  */
 export async function findPrimaryBookingSlotByQuizSessionId(quizSessionId: ObjectId): Promise<PrimaryBookingSlotRow | null> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
   const db = await getDb();
-  const doc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
-    { quizSessionId },
-    {
-      sort: { createdAt: 1 },
-      projection: {
-        status: 1,
-        startsAt: 1,
-        timezone: 1,
-        serviceKey: 1,
-        meetingUrl: 1,
-        paymentTransactionId: 1,
-        paymentMethodLabel: 1,
-        paymentStatus: 1,
-        paymentExpiresAt: 1,
-        leadId: 1,
-      },
-    },
-  );
+  const { pickPrimaryBookingForQuizSession } = await import('@/lib/data/pick-primary-booking-for-quiz-session');
+  const docs = await db.collection<BookingDocument>(COLLECTIONS.bookings).find({ quizSessionId }).toArray();
+  const doc = pickPrimaryBookingForQuizSession(docs);
   if (doc === null || doc._id === undefined || doc.startsAt === undefined) {
     return null;
   }

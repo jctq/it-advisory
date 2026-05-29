@@ -40,7 +40,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
   return NextResponse.json({
     nowIso: now.toISOString(),
-    cancelled: result.cancelled,
+    expired: result.expired,
+    cancelled: result.expired,
     bookingId: result.bookingId,
   });
 }

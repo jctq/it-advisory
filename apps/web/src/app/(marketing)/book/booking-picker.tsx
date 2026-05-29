@@ -246,6 +246,7 @@ type QuizSessionGateApiPayload = {
   readonly paymentHoldExpiresAtIso?: string | null;
   readonly canResumePaymentCheckout?: boolean;
   readonly latestPaymentTransactionStatus?: string | null;
+  readonly latestPaymentTransactionId?: string | null;
   readonly resumePaymentSelection?: unknown;
   readonly linkedBookingSlot?: unknown;
   readonly pendingCheckout?: unknown;
@@ -1127,6 +1128,20 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             sessionGateResolvedRef.current = ref;
             setSessionGateStatus('ready');
             return;
+          }
+          if (latestPaymentStatus === 'paid') {
+            const paidTransactionId =
+              (typeof data.latestPaymentTransactionId === 'string'
+                ? data.latestPaymentTransactionId.trim()
+                : '') ||
+              pendingCheckout?.transactionId?.trim() ||
+              '';
+            if (paidTransactionId.length > 0 && paymentReturnHandledRef.current !== paidTransactionId) {
+              finalizePaidCheckoutFromTransaction(paidTransactionId, new AbortController().signal);
+              sessionGateResolvedRef.current = ref;
+              setSessionGateStatus('ready');
+              return;
+            }
           }
           if (pendingCheckout !== null) {
             if (latestPaymentStatus === 'paid') {

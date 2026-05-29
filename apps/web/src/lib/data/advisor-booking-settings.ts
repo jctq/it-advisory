@@ -2,6 +2,11 @@ import { addDays, parse } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { COLLECTIONS } from '@/domain/collections';
 import type { AdvisorBookingSettingsDocument } from '@/domain/types';
+import {
+  hasGlobalOpenPaymentHoldAtSlot,
+  listOpenPaymentHoldStartsUtcInRange,
+  listPaidOccupiedStartsUtcInRange,
+} from '@/lib/data/payment-transactions';
 import { getDb } from '@/lib/mongodb';
 
 const ADVISOR_SETTINGS_ID = 'default' as const;
@@ -55,8 +60,29 @@ export async function replaceAdvisorBookingSettingsDocument(
   return next;
 }
 
+function mergeUniqueSortedStartsUtc(...groups: readonly (readonly Date[])[]): Date[] {
+  const seen = new Set<number>();
+  const merged: Date[] = [];
+  for (const group of groups) {
+    for (const instant of group) {
+      const key = instant.getTime();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      merged.push(instant);
+    }
+  }
+  merged.sort((a, b) => a.getTime() - b.getTime());
+  return merged;
+}
+
 /**
- * Lists `startsAt` for non-cancelled bookings in a calendar window (with buffer days) for caps and taken slots.
+ * Lists occupied slot instants for the shared advisor calendar (all services): pending/confirmed bookings,
+ * active checkout holds, and paid checkouts without a released booking.
+ *
+ * {@link input.serviceKey} is retained for API compatibility but does not scope occupancy — one advisor
+ * cannot double-book the same instant across catalog services.
  */
 export async function listActiveBookingStartsUtcInYmdWindow(input: {
   readonly serviceKey: string;
@@ -73,36 +99,76 @@ export async function listActiveBookingStartsUtcInYmdWindow(input: {
   const rangeStart = ymdStartUtc(loadFrom, input.timeZone);
   const rangeEndExclusive = ymdEndExclusiveUtc(addCalendarDaysToYmd(loadTo, 1, input.timeZone), input.timeZone);
   const db = await getDb();
-  const cursor = db
-    .collection<{ startsAt: Date }>(COLLECTIONS.bookings)
-    .find(
-      {
-        serviceKey: input.serviceKey,
-        status: { $in: ['pending', 'confirmed'] },
-        startsAt: { $gte: rangeStart, $lt: rangeEndExclusive },
-      },
-      { projection: { startsAt: 1 } },
-    )
-    .sort({ startsAt: 1 });
-  const rows = await cursor.toArray();
-  return rows.map((r) => r.startsAt);
+  const [bookingRows, holdStarts, paidStarts] = await Promise.all([
+    db
+      .collection<{ startsAt: Date }>(COLLECTIONS.bookings)
+      .find(
+        {
+          status: { $in: ['pending', 'confirmed'] },
+          startsAt: { $gte: rangeStart, $lt: rangeEndExclusive },
+        },
+        { projection: { startsAt: 1 } },
+      )
+      .sort({ startsAt: 1 })
+      .toArray(),
+    listOpenPaymentHoldStartsUtcInRange({
+      rangeStartUtc: rangeStart,
+      rangeEndExclusiveUtc: rangeEndExclusive,
+    }),
+    listPaidOccupiedStartsUtcInRange({
+      rangeStartUtc: rangeStart,
+      rangeEndExclusiveUtc: rangeEndExclusive,
+    }),
+  ]);
+  return mergeUniqueSortedStartsUtc(
+    bookingRows.map((row) => row.startsAt),
+    holdStarts,
+    paidStarts,
+  );
 }
 
 /**
- * Returns true when any non-cancelled booking already uses this instant for the service (solo advisor).
+ * Returns true when any non-cancelled booking, active checkout hold, or paid checkout occupies this instant.
  */
 export async function hasGlobalActiveBookingAtSlot(input: {
-  readonly serviceKey: string;
   readonly startsAtUtc: Date;
 }): Promise<boolean> {
   if (!process.env.MONGODB_URI) {
     return false;
   }
   const db = await getDb();
-  const count = await db.collection(COLLECTIONS.bookings).countDocuments({
-    serviceKey: input.serviceKey,
-    status: { $in: ['pending', 'confirmed'] },
-    startsAt: input.startsAtUtc,
-  });
-  return count > 0;
+  const [bookingCount, holdTaken, paidOccupied] = await Promise.all([
+    db.collection(COLLECTIONS.bookings).countDocuments({
+      status: { $in: ['pending', 'confirmed'] },
+      startsAt: input.startsAtUtc,
+    }),
+    hasGlobalOpenPaymentHoldAtSlot({
+      startsAtUtc: input.startsAtUtc,
+    }),
+    db.collection(COLLECTIONS.paymentTransactions).countDocuments({
+      status: 'paid',
+      startsAt: input.startsAtUtc,
+    }),
+  ]);
+  if (bookingCount > 0 || holdTaken) {
+    return true;
+  }
+  if (paidOccupied === 0) {
+    return false;
+  }
+  const paidRow = await db.collection(COLLECTIONS.paymentTransactions).findOne(
+    { status: 'paid', startsAt: input.startsAtUtc },
+    { projection: { bookingId: 1 } },
+  );
+  if (paidRow === null) {
+    return false;
+  }
+  if (paidRow.bookingId === undefined || paidRow.bookingId === null) {
+    return true;
+  }
+  const linkedBooking = await db.collection(COLLECTIONS.bookings).findOne(
+    { _id: paidRow.bookingId },
+    { projection: { status: 1 } },
+  );
+  return linkedBooking === null || linkedBooking.status !== 'cancelled';
 }

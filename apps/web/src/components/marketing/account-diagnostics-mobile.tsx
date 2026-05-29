@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
-import { ChevronRight, ClipboardList, Loader2, Search, Trash2 } from 'lucide-react';
+import { ChevronRight, ClipboardList, Loader2, Search } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -12,6 +12,7 @@ import {
   type ReactElement,
 } from 'react';
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { AccountDiagnosticsBookingStatusBadge } from '@/components/marketing/account-diagnostics-booking-status-badge';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -25,21 +26,23 @@ import {
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AccountDiagnosticsSessionActionsBar } from '@/components/marketing/account-diagnostics-session-actions-bar';
 import {
-  buildSessionAwaitingPaymentBookHref,
+  buildSessionManageHref,
   isSessionAwaitingPayment,
-  isSessionConfirmedForManage,
-  isSessionPaymentExpiredForManage,
+  resolveAccountDiagnosticsSessionActions,
 } from '@/lib/marketing/account-diagnostics-session-actions';
-import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import {
   resolveAccountDiagnosticListSummary,
   resolveAccountDiagnosticListTitle,
 } from '@/lib/marketing/quiz-session-list-display';
 import type {
-  VisitorQuizSessionListStatusFilter,
+  BookingListStatusFilter,
   VisitorQuizSessionSummary,
 } from '@/lib/data/quiz-session-types';
+import { BOOKING_LIST_STATUS_FILTER_OPTIONS } from '@/lib/marketing/account-booking-status';
+import { resolveAccountBookingStatusFromSummary } from '@/lib/marketing/account-booking-status';
+import { shouldShowAccountDiagnosticsScheduledSession } from '@/lib/marketing/account-diagnostics-booking-status';
 import { cn } from '@/lib/utils';
 
 const MOBILE_LIST_ITEM_ESTIMATE_PX = 108;
@@ -51,39 +54,25 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
   timeZone: 'Asia/Manila',
 });
 
-const STATUS_TAB_OPTIONS: readonly { readonly id: VisitorQuizSessionListStatusFilter; readonly label: string }[] = [
-  { id: 'pending', label: 'Pending' },
-  { id: 'confirmed', label: 'Confirmed' },
-  { id: 'cancelled', label: 'Cancelled' },
-  { id: 'all', label: 'All' },
-] as const;
+const STATUS_TAB_OPTIONS = BOOKING_LIST_STATUS_FILTER_OPTIONS;
 
-const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
-
-function buildBookManageHref(bookingId: string | null): string {
-  if (bookingId !== null && MONGO_OBJECT_ID_HEX.test(bookingId)) {
-    return `/book/manage?bookingId=${encodeURIComponent(bookingId)}`;
-  }
-  return '/book/manage';
-}
-
-function hasActiveCheckout(row: VisitorQuizSessionSummary): boolean {
-  return (
-    row.paymentTransactionStatus === 'paid' ||
-    row.paymentTransactionStatus === 'processing' ||
-    row.paymentTransactionStatus === 'pending'
-  );
-}
 
 function resolveMobileStatusLine(row: VisitorQuizSessionSummary): string | null {
-  if (row.bookingStatus === 'cancelled') {
+  const bookingStatus = resolveAccountBookingStatusFromSummary(row);
+  if (bookingStatus === 'completed') {
+    return 'Booking completed';
+  }
+  if (bookingStatus === 'cancelled') {
     return 'Booking cancelled';
   }
-  if (row.paymentTransactionStatus === 'failed' || row.paymentTransactionStatus === 'expired') {
-    return `Payment ${row.paymentTransactionStatus}`;
+  if (bookingStatus === 'awaiting_payment') {
+    return 'Awaiting payment';
   }
-  if (row.bookingStatus === 'pending') {
-    return 'Booking pending confirmation';
+  if (bookingStatus === 'confirmed') {
+    return 'Booking confirmed';
+  }
+  if (bookingStatus === 'pending') {
+    return 'Booking pending';
   }
   if (!row.isDiagnosticComplete && !row.isBooked && row.paymentTransactionStatus === null) {
     return 'Diagnostic in progress';
@@ -99,61 +88,9 @@ function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary 
   return <Badge className="bg-primary/15 text-primary hover:bg-primary/15">In progress</Badge>;
 }
 
-function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
-  const paymentStatus = props.row.paymentTransactionStatus;
-  if (props.row.bookingStatus === null) {
-    if (paymentStatus === 'paid') {
-      return <Badge className="bg-emerald-600/15 text-emerald-800 hover:bg-emerald-600/15 dark:text-emerald-200">Paid</Badge>;
-    }
-    if (paymentStatus === 'processing') {
-      return (
-        <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">
-          Confirming
-        </Badge>
-      );
-    }
-    if (paymentStatus === 'pending') {
-      return (
-        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
-          Awaiting payment
-        </Badge>
-      );
-    }
-    if (paymentStatus === 'failed' || paymentStatus === 'expired') {
-      return <Badge variant="outline">Payment {paymentStatus}</Badge>;
-    }
-    return (
-      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
-        Pending
-      </Badge>
-    );
-  }
-  if (props.row.bookingStatus === 'confirmed') {
-    return <Badge variant="secondary">Confirmed</Badge>;
-  }
-  if (props.row.bookingStatus === 'cancelled') {
-    return <Badge variant="outline">Cancelled</Badge>;
-  }
-  if (props.row.bookingStatus === 'pending') {
-    if (paymentStatus === 'expired' || paymentStatus === 'failed') {
-      return <Badge variant="outline">Payment {paymentStatus}</Badge>;
-    }
-    return (
-      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
-        Awaiting payment
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
-      Pending
-    </Badge>
-  );
-}
-
 export type AccountDiagnosticsMobileProps = {
   readonly sessions: readonly VisitorQuizSessionSummary[];
-  readonly statusFilter: VisitorQuizSessionListStatusFilter;
+  readonly statusFilter: BookingListStatusFilter;
   readonly bookingReferenceInput: string;
   readonly isLoading: boolean;
   readonly isLoadingMore: boolean;
@@ -163,7 +100,7 @@ export type AccountDiagnosticsMobileProps = {
   readonly deletingId: string | null;
   /** When false, infinite-scroll load-more is disabled (desktop table owns pagination). */
   readonly enableInfiniteScroll: boolean;
-  readonly onStatusFilterChange: (value: VisitorQuizSessionListStatusFilter) => void;
+  readonly onStatusFilterChange: (value: BookingListStatusFilter) => void;
   readonly onBookingReferenceInputChange: (value: string) => void;
   readonly onLoadMore: () => void;
   readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
@@ -461,10 +398,8 @@ type MobileDiagnosticsSessionDialogProps = {
 
 function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogProps): ReactElement {
   const session = props.session;
-  const awaitingPayment = session !== null && isSessionAwaitingPayment(session);
-  const paymentExpiredManage = session !== null && isSessionPaymentExpiredForManage(session);
-  const showConfirmedActions = session !== null && isSessionConfirmedForManage(session);
-  const canDelete = session !== null && !session.isBooked && !hasActiveCheckout(session);
+  const sessionActions = session !== null ? resolveAccountDiagnosticsSessionActions(session) : [];
+  const showManageOnBookingTab = sessionActions.includes('manage');
   const bookingTitle = useMemo(() => {
     if (session === null) {
       return 'Consultation';
@@ -554,54 +489,13 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                     </div>
                   ) : null}
                 </dl>
-                <div className="flex flex-wrap gap-2">
-                  {awaitingPayment ? (
-                    <>
-                      <Button type="button" variant="outline" size="sm" asChild>
-                        <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>View</Link>
-                      </Button>
-                      <Button type="button" variant="secondary" size="sm" asChild>
-                        <Link href={buildSessionAwaitingPaymentBookHref(session)}>Manage</Link>
-                      </Button>
-                    </>
-                  ) : paymentExpiredManage ? (
-                    <>
-                      <Button type="button" variant="outline" size="sm" asChild>
-                        <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>View</Link>
-                      </Button>
-                      {props.manageBookingEnabled && session.bookingId !== null ? (
-                        <Button type="button" variant="secondary" size="sm" asChild>
-                          <Link href={buildBookManageHref(session.bookingId)}>Manage</Link>
-                        </Button>
-                      ) : (
-                        <Button type="button" variant="secondary" size="sm" asChild>
-                          <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>Manage</Link>
-                        </Button>
-                      )}
-                    </>
-                  ) : showConfirmedActions ? (
-                    <Button type="button" variant="outline" size="sm" asChild>
-                      <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>View diagnostic</Link>
-                    </Button>
-                  ) : (
-                    <Button type="button" size="sm" asChild>
-                      <Link href={buildMarketingQuizSessionPath(session.marketingSessionRef)}>Continue</Link>
-                    </Button>
-                  )}
-                  {canDelete ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      disabled={props.deletingId === session.marketingSessionRef}
-                      onClick={() => props.onRequestDelete(session)}
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                      {props.deletingId === session.marketingSessionRef ? 'Deleting…' : 'Delete'}
-                    </Button>
-                  ) : null}
-                </div>
+                <AccountDiagnosticsSessionActionsBar
+                  row={session}
+                  deletingId={props.deletingId}
+                  manageBookingEnabled={props.manageBookingEnabled}
+                  onRequestDelete={props.onRequestDelete}
+                  viewLabel="View diagnostic"
+                />
               </TabsContent>
               <TabsContent value="booking" className="mt-0 space-y-4 pt-4">
                 <dl className="space-y-3 text-sm">
@@ -614,7 +508,7 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Booking status</dt>
                     <dd className="mt-1">
-                      <BookingStatusBadge row={session} />
+                      <AccountDiagnosticsBookingStatusBadge row={session} />
                     </dd>
                   </div>
                   <div>
@@ -624,7 +518,9 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Scheduled session</dt>
                     <dd className="mt-1 text-foreground">
-                      {startsAtIso !== null && slotFormatter !== null
+                      {shouldShowAccountDiagnosticsScheduledSession(session) &&
+                      startsAtIso !== null &&
+                      slotFormatter !== null
                         ? slotFormatter.format(new Date(startsAtIso))
                         : '—'}
                     </dd>
@@ -660,21 +556,15 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                 ) : session.paymentTransactionStatus === 'paid' && session.bookingStatus === null ? (
                   <p className="text-xs text-muted-foreground">Booking confirmation in progress</p>
                 ) : null}
-                <div className="flex flex-wrap gap-2">
-                  {awaitingPayment ? (
+                {showManageOnBookingTab ? (
+                  <div className="flex flex-wrap gap-2">
                     <Button type="button" variant="secondary" size="sm" asChild>
-                      <Link href={buildSessionAwaitingPaymentBookHref(session)}>Complete payment</Link>
+                      <Link href={buildSessionManageHref(session, props.manageBookingEnabled)}>
+                        {isSessionAwaitingPayment(session) ? 'Complete payment' : 'Manage booking'}
+                      </Link>
                     </Button>
-                  ) : paymentExpiredManage && props.manageBookingEnabled && session.bookingId !== null ? (
-                    <Button type="button" variant="secondary" size="sm" asChild>
-                      <Link href={buildBookManageHref(session.bookingId)}>Manage booking</Link>
-                    </Button>
-                  ) : showConfirmedActions && props.manageBookingEnabled && session.bookingId !== null ? (
-                    <Button type="button" variant="secondary" size="sm" asChild>
-                      <Link href={buildBookManageHref(session.bookingId)}>Manage booking</Link>
-                    </Button>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </TabsContent>
             </div>
           </Tabs>

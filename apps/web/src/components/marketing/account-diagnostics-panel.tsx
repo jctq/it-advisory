@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AccountDiagnosticsBookingStatusBadge } from '@/components/marketing/account-diagnostics-booking-status-badge';
 import { AccountDiagnosticsMobile } from '@/components/marketing/account-diagnostics-mobile';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
@@ -40,26 +41,20 @@ import {
   matchesAccountDiagnosticsListRequest,
   type AccountDiagnosticsInitialList,
 } from '@/lib/marketing/account-diagnostics-list';
-import {
-  buildSessionAwaitingPaymentBookHref,
-  isSessionAwaitingPayment,
-  isSessionConfirmedForManage,
-  isSessionPaymentExpiredForManage,
-} from '@/lib/marketing/account-diagnostics-session-actions';
-import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { AccountDiagnosticsSessionActionsBar } from '@/components/marketing/account-diagnostics-session-actions-bar';
 import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/quiz-session-list-display';
 import type {
   PaginatedVisitorQuizSessionsResult,
-  VisitorQuizSessionListStatusFilter,
+  BookingListStatusFilter,
   VisitorQuizSessionSummary,
 } from '@/lib/data/quiz-session-types';
+import { BOOKING_LIST_STATUS_FILTER_OPTIONS } from '@/lib/marketing/account-booking-status';
+import { shouldShowAccountDiagnosticsScheduledSession } from '@/lib/marketing/account-diagnostics-booking-status';
 import { cn } from '@/lib/utils';
 
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const MY_SESSIONS_API_URL = '/api/quiz/my-sessions';
 const BOOKING_REFERENCE_DEBOUNCE_MS = 350;
-
-const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
 
 const columnHelper = createColumnHelper<VisitorQuizSessionSummary>();
 
@@ -120,138 +115,19 @@ function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary 
   return <Badge className="bg-primary/15 text-primary hover:bg-primary/15">In progress</Badge>;
 }
 
-function BookingStatusBadge(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
-  const paymentStatus = props.row.paymentTransactionStatus;
-  if (props.row.bookingStatus === null) {
-    if (paymentStatus === 'paid') {
-      return <Badge className="bg-emerald-600/15 text-emerald-800 hover:bg-emerald-600/15 dark:text-emerald-200">Paid</Badge>;
-    }
-    if (paymentStatus === 'processing') {
-      return (
-        <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">
-          Confirming
-        </Badge>
-      );
-    }
-    if (paymentStatus === 'pending') {
-      return (
-        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
-          Awaiting payment
-        </Badge>
-      );
-    }
-    if (paymentStatus === 'failed' || paymentStatus === 'expired') {
-      return <Badge variant="outline">Payment {paymentStatus}</Badge>;
-    }
-    return (
-      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
-        Pending
-      </Badge>
-    );
-  }
-  if (props.row.bookingStatus === 'confirmed') {
-    return <Badge variant="secondary">Confirmed</Badge>;
-  }
-  if (props.row.bookingStatus === 'cancelled') {
-    return <Badge variant="outline">Cancelled</Badge>;
-  }
-  if (props.row.bookingStatus === 'pending') {
-    if (paymentStatus === 'expired' || paymentStatus === 'failed') {
-      return <Badge variant="outline">Payment {paymentStatus}</Badge>;
-    }
-    return (
-      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
-        Awaiting payment
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
-      Pending
-    </Badge>
-  );
-}
-
-function buildBookManageHref(bookingId: string | null): string {
-  if (bookingId !== null && MONGO_OBJECT_ID_HEX.test(bookingId)) {
-    return `/book/manage?bookingId=${encodeURIComponent(bookingId)}`;
-  }
-  return '/book/manage';
-}
-
-function hasActiveCheckout(row: VisitorQuizSessionSummary): boolean {
-  return (
-    row.paymentTransactionStatus === 'paid' ||
-    row.paymentTransactionStatus === 'processing' ||
-    row.paymentTransactionStatus === 'pending'
-  );
-}
-
 function SessionActions(props: {
   readonly row: VisitorQuizSessionSummary;
   readonly deletingId: string | null;
   readonly manageBookingEnabled: boolean;
   readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
 }): ReactElement {
-  const awaitingPayment = isSessionAwaitingPayment(props.row);
-  const paymentExpiredManage = isSessionPaymentExpiredForManage(props.row);
-  const showConfirmedActions = isSessionConfirmedForManage(props.row);
-  const canDelete = !props.row.isBooked && !hasActiveCheckout(props.row);
   return (
-    <div className="flex flex-wrap justify-end gap-2">
-      {awaitingPayment ? (
-        <>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
-          </Button>
-          <Button type="button" variant="secondary" size="sm" asChild>
-            <Link href={buildSessionAwaitingPaymentBookHref(props.row)}>Manage</Link>
-          </Button>
-        </>
-      ) : paymentExpiredManage ? (
-        <>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
-          </Button>
-          {props.manageBookingEnabled && props.row.bookingId !== null ? (
-            <Button type="button" variant="secondary" size="sm" asChild>
-              <Link href={buildBookManageHref(props.row.bookingId)}>Manage</Link>
-            </Button>
-          ) : (
-            <Button type="button" variant="secondary" size="sm" asChild>
-              <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>Manage</Link>
-            </Button>
-          )}
-        </>
-      ) : showConfirmedActions ? (
-        <>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>View</Link>
-          </Button>
-          {props.manageBookingEnabled ? (
-            <Button type="button" variant="secondary" size="sm" asChild>
-              <Link href={buildBookManageHref(props.row.bookingId)}>Manage</Link>
-            </Button>
-          ) : null}
-        </>
-      ) : (
-        <Button type="button" size="sm" asChild>
-          <Link href={buildMarketingQuizSessionPath(props.row.marketingSessionRef)}>Continue</Link>
-        </Button>
-      )}
-      {canDelete ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-          disabled={props.deletingId === props.row.marketingSessionRef}
-          onClick={() => props.onRequestDelete(props.row)}
-        >
-          {props.deletingId === props.row.marketingSessionRef ? 'Deleting…' : 'Delete'}
-        </Button>
-      ) : null}
-    </div>
+    <AccountDiagnosticsSessionActionsBar
+      row={props.row}
+      deletingId={props.deletingId}
+      manageBookingEnabled={props.manageBookingEnabled}
+      onRequestDelete={props.onRequestDelete}
+    />
   );
 }
 
@@ -399,6 +275,15 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     }
     void fetchSessions();
   }, [fetchSessions]);
+  useEffect(() => {
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') {
+        void fetchSessions();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [fetchSessions]);
   const executeDelete = useCallback(
     async (marketingSessionRef: string): Promise<void> => {
       setActionError(null);
@@ -454,13 +339,16 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
       columnHelper.display({
         id: 'bookingStatus',
         header: 'Booking',
-        cell: (info) => <BookingStatusBadge row={info.row.original} />,
+        cell: (info) => <AccountDiagnosticsBookingStatusBadge row={info.row.original} />,
       }),
       columnHelper.display({
         id: 'bookingSession',
         header: 'Scheduled session',
         cell: (info) => {
           const row = info.row.original;
+          if (!shouldShowAccountDiagnosticsScheduledSession(row)) {
+            return <span className="text-sm text-muted-foreground">—</span>;
+          }
           const startsAtIso = row.bookingStartsAtIso ?? row.checkoutStartsAtIso;
           const timezone = row.bookingTimezone ?? row.checkoutTimezone;
           const serviceKey = row.bookingServiceKey ?? row.checkoutServiceKey;
@@ -545,7 +433,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = totalCount === 0 ? 0 : Math.min(page * pageSize, totalCount);
   const hasMoreSessions = page < totalPages;
-  const handleStatusFilterChange = (value: VisitorQuizSessionListStatusFilter): void => {
+  const handleStatusFilterChange = (value: BookingListStatusFilter): void => {
     setStatusFilter(value);
   };
   const handleBookingReferenceInputChange = (value: string): void => {
@@ -571,8 +459,9 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this diagnostic?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the diagnostic snapshot and cannot be undone. Scheduled bookings stay on file
-              and are not deleted.
+              This permanently removes the diagnostic snapshot and cannot be undone. Any reserved consultation time
+              linked to this diagnostic is cancelled so the slot can be booked by someone else. Cancelled booking
+              records stay in our system for your history.
               {deleteTarget !== null &&
               ((deleteTarget.sessionTitlePreview !== null && deleteTarget.sessionTitlePreview.length > 0) ||
                 (deleteTarget.situationPreview !== null && deleteTarget.situationPreview.length > 0)) ? (
@@ -655,7 +544,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                 <BookingReferenceFilterField value={bookingReferenceInput} onChange={handleBookingReferenceInputChange} />
                 <StatusFilterField
                   value={statusFilter}
-                  onChange={(value) => handleStatusFilterChange(value as VisitorQuizSessionListStatusFilter)}
+                  onChange={(value) => handleStatusFilterChange(value as BookingListStatusFilter)}
                   disabled={isLoading}
                 />
               </div>
@@ -780,27 +669,28 @@ function BookingReferenceFilterField(props: {
 }
 
 function StatusFilterField(props: {
-  readonly value: VisitorQuizSessionListStatusFilter;
+  readonly value: BookingListStatusFilter;
   readonly onChange: (value: string) => void;
   readonly disabled: boolean;
 }): ReactElement {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor="diagnostic-status-filter" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <Label htmlFor="booking-status-filter" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Booking status
       </Label>
       <NativeSelect
-        id="diagnostic-status-filter"
+        id="booking-status-filter"
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}
         className="h-10"
         disabled={props.disabled}
         aria-label="Filter by booking status"
       >
-        <option value="pending">Pending</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="cancelled">Cancelled</option>
-        <option value="all">All</option>
+        {BOOKING_LIST_STATUS_FILTER_OPTIONS.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
       </NativeSelect>
     </div>
   );

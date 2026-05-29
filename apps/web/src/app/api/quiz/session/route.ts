@@ -5,6 +5,7 @@ import { findLatestPaymentTransactionByQuizSessionIdHex } from '@/lib/data/payme
 import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { resolvePaymentHoldExpiresAtIso } from '@/lib/marketing/payment-hold-expiry';
 import { resolvePaymentSelectionFromTransaction } from '@/lib/marketing/resolve-payment-selection-from-transaction';
+import { reconcileQuizSessionPaidBookingLink } from '@/lib/payments/reconcile-quiz-session-paid-booking-link';
 import { syncQuizSessionPaymentHold } from '@/lib/payments/sync-quiz-session-payment-hold';
 import {
   deleteQuizSessionForVisitor,
@@ -75,6 +76,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const sessionIdHex = session._id.toString();
   const serverNow = new Date();
   await syncQuizSessionPaymentHold({ quizSessionIdHex: sessionIdHex, visitorId, now: serverNow });
+  await reconcileQuizSessionPaidBookingLink({ quizSessionIdHex: sessionIdHex, visitorId });
   const bookedCount = await countBookingsByQuizSessionId(session._id);
   const linkedBookingSlot =
     bookedCount > 0 ? await findPrimaryBookingSlotByQuizSessionId(session._id) : null;
@@ -122,6 +124,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     ? resolvePaymentSelectionFromTransaction(latestPayment)
     : null;
   const latestPaymentTransactionStatus = latestPayment?.status ?? null;
+  const latestPaymentTransactionId = latestPayment?.id ?? null;
   return NextResponse.json({
     session: {
       answers: session.answers,
@@ -132,6 +135,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     paymentHoldExpiresAtIso,
     canResumePaymentCheckout: isAwaitingPaymentResume,
     latestPaymentTransactionStatus,
+    latestPaymentTransactionId,
     resumePaymentSelection,
     sessionId: encodeQuizSessionRefForMarketingUrl(sessionIdHex),
     pendingCheckout,
@@ -222,15 +226,6 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   if (parsedId.status === 'ok') {
     const outcome = await deleteQuizSessionForVisitor(visitorId, parsedId.objectIdHex);
     if (outcome.ok === false) {
-      if (outcome.code === 'has_booking') {
-        return NextResponse.json(
-          {
-            error: 'This diagnostic is linked to a booking and cannot be deleted.',
-            code: 'quiz_session_has_booking',
-          },
-          { status: 409 },
-        );
-      }
       return NextResponse.json({ error: 'Session not found', code: 'quiz_session_not_found' }, { status: 404 });
     }
     return NextResponse.json({

@@ -346,6 +346,117 @@ export async function fetchLatestPaymentTransactionsByQuizSessionIds(
 
 const OPEN_PAYMENT_TRANSACTION_STATUSES: readonly PaymentStatus[] = ['pending', 'processing'];
 
+function buildActiveOpenPaymentHoldFilter(now: Date): Record<string, unknown> {
+  return {
+    status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
+    $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: now } }],
+  };
+}
+
+/**
+ * Lists slot instants reserved by open checkout transactions (e.g. pay-before-booking holds without a booking row yet).
+ */
+export async function listOpenPaymentHoldStartsUtcInRange(input: {
+  readonly rangeStartUtc: Date;
+  readonly rangeEndExclusiveUtc: Date;
+  readonly nowUtc?: Date;
+}): Promise<Date[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const now = input.nowUtc ?? new Date();
+  const db = await getDb();
+  const cursor = db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find(
+      {
+        startsAt: { $gte: input.rangeStartUtc, $lt: input.rangeEndExclusiveUtc },
+        ...buildActiveOpenPaymentHoldFilter(now),
+      },
+      { projection: { startsAt: 1 } },
+    )
+    .sort({ startsAt: 1 });
+  const rows = await cursor.toArray();
+  return rows.map((row) => row.startsAt);
+}
+
+/**
+ * Paid checkout rows that still occupy a slot (orphan paid or linked to a non-cancelled booking).
+ */
+export async function listPaidOccupiedStartsUtcInRange(input: {
+  readonly rangeStartUtc: Date;
+  readonly rangeEndExclusiveUtc: Date;
+}): Promise<Date[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find(
+      {
+        status: 'paid',
+        startsAt: { $gte: input.rangeStartUtc, $lt: input.rangeEndExclusiveUtc },
+      },
+      { projection: { startsAt: 1, bookingId: 1 } },
+    )
+    .sort({ startsAt: 1 })
+    .toArray();
+  if (docs.length === 0) {
+    return [];
+  }
+  const bookingObjectIds: ObjectId[] = [];
+  for (const doc of docs) {
+    if (doc.bookingId !== undefined && doc.bookingId !== null) {
+      bookingObjectIds.push(doc.bookingId);
+    }
+  }
+  const cancelledBookingIds = new Set<string>();
+  if (bookingObjectIds.length > 0) {
+    const cancelledRows = await db
+      .collection(COLLECTIONS.bookings)
+      .find(
+        { _id: { $in: bookingObjectIds }, status: 'cancelled' },
+        { projection: { _id: 1 } },
+      )
+      .toArray();
+    for (const row of cancelledRows) {
+      if (row._id !== undefined) {
+        cancelledBookingIds.add(row._id.toString());
+      }
+    }
+  }
+  const occupied: Date[] = [];
+  for (const doc of docs) {
+    const bookingId =
+      doc.bookingId !== undefined && doc.bookingId !== null ? doc.bookingId.toString() : null;
+    if (bookingId !== null && cancelledBookingIds.has(bookingId)) {
+      continue;
+    }
+    occupied.push(doc.startsAt);
+  }
+  return occupied;
+}
+
+/**
+ * True when another visitor has an active checkout hold on this instant (no booking document required).
+ */
+export async function hasGlobalOpenPaymentHoldAtSlot(input: {
+  readonly startsAtUtc: Date;
+  readonly nowUtc?: Date;
+}): Promise<boolean> {
+  if (!process.env.MONGODB_URI) {
+    return false;
+  }
+  const now = input.nowUtc ?? new Date();
+  const db = await getDb();
+  const count = await db.collection(COLLECTIONS.paymentTransactions).countDocuments({
+    startsAt: input.startsAtUtc,
+    ...buildActiveOpenPaymentHoldFilter(now),
+  });
+  return count > 0;
+}
+
 export async function findOpenPaymentTransactionForBooking(
   bookingId: string,
 ): Promise<PaymentTransactionRow | null> {
@@ -407,6 +518,30 @@ export async function findOpenPaymentTransactionForCheckoutSlot(input: {
   return mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } });
 }
 
+export async function listOpenPaymentTransactionsByQuizSessionIdHex(
+  quizSessionIdHex: string,
+): Promise<readonly PaymentTransactionRow[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const sessionHex = quizSessionIdHex.trim();
+  if (sessionHex.length === 0) {
+    return [];
+  }
+  const db = await getDb();
+  const docs = await db
+    .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
+    .find({
+      quizSessionIdHex: sessionHex,
+      status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
+    })
+    .sort({ createdAt: -1 })
+    .toArray();
+  return docs.map((doc) =>
+    mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } }),
+  );
+}
+
 export async function findLatestPaymentTransactionByQuizSessionIdHex(
   quizSessionIdHex: string,
 ): Promise<PaymentTransactionRow | null> {
@@ -438,9 +573,9 @@ export async function listExpiredHoldTransactions(now: Date): Promise<readonly P
   const docs = await db
     .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
     .find({
-      paymentPolicy: 'pay_after_hold',
+      paymentPolicy: { $in: ['pay_after_hold', 'pay_before_booking'] },
       status: { $in: ['pending', 'processing'] },
-      expiresAt: { $lte: now },
+      expiresAt: { $lte: now, $ne: null },
     })
     .limit(200)
     .toArray();

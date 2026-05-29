@@ -2,10 +2,8 @@
 
 import { create } from 'zustand';
 import { ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS } from '@/lib/marketing/account-diagnostics-list';
-import type {
-  VisitorQuizSessionListStatusFilter,
-  VisitorQuizSessionSummary,
-} from '@/lib/data/quiz-session-types';
+import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
+import type { BookingListStatusFilter } from '@/lib/marketing/account-booking-status';
 import { buildStoreFieldPatch } from '@/store/marketing/set-store-field';
 
 export type AccountDiagnosticsDeleteTarget = {
@@ -27,7 +25,7 @@ export type MarketingAccountDiagnosticsState = {
   readonly deleteTarget: AccountDiagnosticsDeleteTarget | null;
   readonly bookingReferenceInput: string;
   readonly debouncedBookingReference: string;
-  readonly statusFilter: VisitorQuizSessionListStatusFilter;
+  readonly statusFilter: BookingListStatusFilter;
   readonly isLoadingMore: boolean;
 };
 

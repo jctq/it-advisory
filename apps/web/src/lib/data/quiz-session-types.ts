@@ -47,7 +47,10 @@ export type QuizAuditAdminRow = {
   readonly answersJson: string;
 };
 
-export type VisitorQuizSessionListStatusFilter = 'pending' | 'confirmed' | 'cancelled' | 'all';
+export type { AccountBookingStatus, BookingListStatusFilter } from '@/lib/marketing/account-booking-status';
+
+/** @deprecated Use {@link BookingListStatusFilter}. */
+export type { BookingListStatusFilter as VisitorQuizSessionListStatusFilter } from '@/lib/marketing/account-booking-status';
 
 export type PaginatedVisitorQuizSessionsResult = {
   readonly sessions: readonly VisitorQuizSessionSummary[];
@@ -88,7 +91,7 @@ export type VisitorQuizSessionSummary = {
 
 export type DeleteQuizSessionForVisitorResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly code: 'not_found' | 'has_booking' };
+  | { readonly ok: false; readonly code: 'not_found' };
 
 export type UpsertQuizProgressInput = {
   readonly visitorId: string;
@@ -104,15 +107,7 @@ export type UpsertQuizProgressResult = {
   readonly sessionId?: string;
 };
 
-/** Maps legacy `completed` query values to booking-status filters. */
-export function normalizeVisitorQuizSessionListStatusFilter(
-  raw: string,
-): VisitorQuizSessionListStatusFilter {
-  if (raw === 'completed') {
-    return 'pending';
-  }
-  if (raw === 'pending' || raw === 'confirmed' || raw === 'cancelled' || raw === 'all') {
-    return raw;
-  }
-  return 'pending';
-}
+export { normalizeBookingListStatusFilter } from '@/lib/marketing/account-booking-status';
+
+/** @deprecated Use {@link normalizeBookingListStatusFilter}. */
+export { normalizeBookingListStatusFilter as normalizeVisitorQuizSessionListStatusFilter } from '@/lib/marketing/account-booking-status';

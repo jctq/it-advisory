@@ -6,6 +6,7 @@ import {
   createBookingWithLatestQuizSnapshot,
   findBookingByVisitorSlot,
   insertMarketingBooking,
+  linkQuizSessionToVisitorBooking,
 } from '@/lib/data/bookings';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
@@ -17,6 +18,21 @@ import { incrementPromoRedemptionCount } from '@/lib/data/monetization-settings'
 import { syncBookingRecordingFieldsFromTransaction } from '@/lib/booking/apply-booking-recording-fields';
 import { ensureVideoMeetingStoredForBooking } from '@/lib/video-meetings/ensure-video-meeting-for-booking';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
+
+async function ensureTransactionBookingLinkedToQuizSession(
+  transaction: PaymentTransactionRow,
+  bookingId: ObjectId,
+): Promise<void> {
+  const quizSessionHex = transaction.quizSessionIdHex?.trim() ?? '';
+  if (quizSessionHex.length === 0) {
+    return;
+  }
+  await linkQuizSessionToVisitorBooking({
+    bookingId,
+    visitorId: transaction.visitorId,
+    quizSessionIdHex: quizSessionHex,
+  });
+}
 
 async function resolveQuizSnapshot(
   visitorId: string,
@@ -39,7 +55,7 @@ async function resolveQuizSnapshot(
 async function confirmBookingRow(bookingId: ObjectId): Promise<void> {
   const db = await getDb();
   await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
-    { _id: bookingId },
+    { _id: bookingId, status: { $nin: ['completed', 'cancelled'] } },
     { $set: { status: 'confirmed', updatedAt: new Date() } },
   );
 }
@@ -54,6 +70,26 @@ async function cancelBookingRow(bookingId: ObjectId): Promise<void> {
 
 export async function cancelBookingById(bookingId: ObjectId): Promise<void> {
   await cancelBookingRow(bookingId);
+}
+
+export type ExpiredPaymentBookingDisposition = 'cancel' | 'retain_pending';
+
+/** Clears an expired checkout hold while keeping the booking row pending for rebook / manage flows. */
+export async function resetBookingAfterExpiredPaymentHold(bookingId: ObjectId): Promise<void> {
+  const db = await getDb();
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: bookingId, status: { $nin: ['completed', 'cancelled'] } },
+    {
+      $set: {
+        status: 'pending',
+        paymentStatus: 'expired',
+        updatedAt: new Date(),
+      },
+      $unset: {
+        paymentExpiresAt: '',
+      },
+    },
+  );
 }
 
 export type UpdateBookingStatusByAdminResult =
@@ -92,7 +128,11 @@ export async function updateBookingStatusByAdmin(
         transaction !== null &&
         (transaction.status === 'pending' || transaction.status === 'processing')
       ) {
-        await applyPaymentStatusToBooking({ transaction, nextStatus: 'expired' });
+        await applyPaymentStatusToBooking({
+          transaction,
+          nextStatus: 'expired',
+          expiredBookingDisposition: 'retain_pending',
+        });
         return { ok: true };
       }
     }
@@ -145,8 +185,9 @@ export type CompletePaymentTransactionResult =
 export async function applyPaymentStatusToBooking(input: {
   readonly transaction: PaymentTransactionRow;
   readonly nextStatus: PaymentStatus;
+  readonly expiredBookingDisposition?: ExpiredPaymentBookingDisposition;
 }): Promise<CompletePaymentTransactionResult> {
-  const { transaction, nextStatus } = input;
+  const { transaction, nextStatus, expiredBookingDisposition = 'cancel' } = input;
   if (transaction.status === nextStatus && transaction.bookingId !== null) {
     return { kind: 'noop', transaction };
   }
@@ -154,7 +195,7 @@ export async function applyPaymentStatusToBooking(input: {
     return fulfillPaidTransaction(transaction);
   }
   if (nextStatus === 'failed' || nextStatus === 'expired') {
-    return failTransaction(transaction, nextStatus);
+    return failTransaction(transaction, nextStatus, expiredBookingDisposition);
   }
   const updated = await updatePaymentTransactionStatus({
     transactionId: transaction.id,
@@ -165,10 +206,12 @@ export async function applyPaymentStatusToBooking(input: {
 
 async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promise<CompletePaymentTransactionResult> {
   if (transaction.status === 'paid' && transaction.bookingId !== null) {
+    const bookingObjectId = new ObjectId(transaction.bookingId);
     await syncBookingRecordingFieldsFromTransaction({
-      bookingId: new ObjectId(transaction.bookingId),
+      bookingId: bookingObjectId,
       metadata: transaction.metadata,
     });
+    await ensureTransactionBookingLinkedToQuizSession(transaction, bookingObjectId);
     return { kind: 'noop', transaction };
   }
   let bookingId: ObjectId | null = transaction.bookingId !== null ? new ObjectId(transaction.bookingId) : null;
@@ -183,12 +226,16 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
     { _id: bookingId },
     { projection: { status: 1, paymentStatus: 1 } },
   );
-  if (existingBooking?.status === 'confirmed' && existingBooking.paymentStatus === 'paid') {
+  if (
+    (existingBooking?.status === 'confirmed' || existingBooking?.status === 'completed') &&
+    existingBooking.paymentStatus === 'paid'
+  ) {
     await syncBookingRecordingFieldsFromTransaction({
       bookingId,
       metadata: transaction.metadata,
     });
     await ensureVideoMeetingStoredForBooking(bookingId);
+    await ensureTransactionBookingLinkedToQuizSession(transaction, bookingId);
     const updated = await updatePaymentTransactionStatus({
       transactionId: transaction.id,
       status: 'paid',
@@ -218,6 +265,7 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
     },
   );
   await ensureVideoMeetingStoredForBooking(bookingId);
+  await ensureTransactionBookingLinkedToQuizSession(transaction, bookingId);
   const updated = await updatePaymentTransactionStatus({
     transactionId: transaction.id,
     status: 'paid',
@@ -260,9 +308,15 @@ async function loadTransactionPromoCode(transactionId: string): Promise<string |
 async function failTransaction(
   transaction: PaymentTransactionRow,
   nextStatus: PaymentStatus,
+  expiredBookingDisposition: ExpiredPaymentBookingDisposition,
 ): Promise<CompletePaymentTransactionResult> {
   if (transaction.bookingId !== null) {
-    await cancelBookingRow(new ObjectId(transaction.bookingId));
+    const bookingId = new ObjectId(transaction.bookingId);
+    if (nextStatus === 'expired' && expiredBookingDisposition === 'retain_pending') {
+      await resetBookingAfterExpiredPaymentHold(bookingId);
+    } else {
+      await cancelBookingRow(bookingId);
+    }
   }
   const updated = await updatePaymentTransactionStatus({
     transactionId: transaction.id,
@@ -283,6 +337,7 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
       bookingId: existing,
       metadata: transaction.metadata,
     });
+    await ensureTransactionBookingLinkedToQuizSession(transaction, existing);
     return existing;
   }
   const contact: MarketingBookingLeadContact | null =
@@ -324,6 +379,9 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
       serviceKey: transaction.serviceKey,
       startsAt: await loadTransactionStartsAt(transaction.id),
     });
+    if (retry !== null) {
+      await ensureTransactionBookingLinkedToQuizSession(transaction, retry);
+    }
     return retry;
   }
   const db = await getDb();
@@ -344,6 +402,7 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
     bookingId: created.bookingId,
     metadata: transaction.metadata,
   });
+  await ensureTransactionBookingLinkedToQuizSession(transaction, created.bookingId);
   return created.bookingId;
 }
 
@@ -429,6 +488,7 @@ export async function createPendingBookingForHoldPolicy(input: {
     bookingId,
     metadata: transaction.metadata,
   });
+  await ensureTransactionBookingLinkedToQuizSession(transaction, bookingId);
   return bookingId;
 }
 
@@ -494,6 +554,7 @@ export async function createManualConfirmBooking(input: {
     bookingId,
     metadata: input.transaction.metadata,
   });
+  await ensureTransactionBookingLinkedToQuizSession(input.transaction, bookingId);
   return bookingId;
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isSessionAwaitingPayment,
   isSessionPaymentExpiredForManage,
+  resolveAccountDiagnosticsSessionActions,
 } from './account-diagnostics-session-actions';
 import type { VisitorQuizSessionSummary } from '../data/quiz-session-types';
 
@@ -37,15 +38,40 @@ function buildRow(
 }
 
 describe('account diagnostics session actions', () => {
-  it('treats expired payment as view/manage only', () => {
+  it('treats expired payment as manage-only for pending complete diagnostics', () => {
     const row = buildRow({});
     expect(isSessionPaymentExpiredForManage(row)).toBe(true);
     expect(isSessionAwaitingPayment(row)).toBe(false);
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['manage', 'delete']);
   });
 
-  it('still treats open checkout as awaiting payment', () => {
+  it('shows manage only while checkout is open', () => {
     const row = buildRow({ paymentTransactionStatus: 'pending' });
     expect(isSessionAwaitingPayment(row)).toBe(true);
     expect(isSessionPaymentExpiredForManage(row)).toBe(false);
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['manage', 'delete']);
+  });
+
+  it('shows continue and delete for pending incomplete diagnostics', () => {
+    const row = buildRow({
+      isDiagnosticComplete: false,
+      isBooked: false,
+      bookingId: null,
+      bookingReferenceId: null,
+      bookingStatus: null,
+      paymentTransactionId: null,
+      paymentTransactionStatus: null,
+    });
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['continue', 'delete']);
+  });
+
+  it('shows view and delete for confirmed bookings', () => {
+    const row = buildRow({ bookingStatus: 'confirmed', paymentTransactionStatus: 'paid' });
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['view', 'delete']);
+  });
+
+  it('shows view and delete for cancelled bookings', () => {
+    const row = buildRow({ bookingStatus: 'cancelled', paymentTransactionStatus: null });
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['view', 'delete']);
   });
 });

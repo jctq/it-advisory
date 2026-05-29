@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   insertBlankQuizSessionForVisitor,
   listQuizSessionsForVisitorPaginated,
-  normalizeVisitorQuizSessionListStatusFilter,
+  normalizeBookingListStatusFilter,
 } from '@/lib/data/quiz-sessions';
 import { scheduleVisitorPaymentReconciliationIfNeeded } from '@/lib/payments/reconcile-visitor-payments';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -13,9 +13,9 @@ const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(8),
   status: z
-    .enum(['pending', 'confirmed', 'cancelled', 'completed', 'all'])
+    .enum(['pending', 'awaiting_payment', 'confirmed', 'cancelled', 'completed', 'all'])
     .default('pending')
-    .transform(normalizeVisitorQuizSessionListStatusFilter),
+    .transform(normalizeBookingListStatusFilter),
   bookingReference: z.string().trim().optional(),
 });
 

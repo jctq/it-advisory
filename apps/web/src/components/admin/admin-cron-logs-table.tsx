@@ -1,6 +1,6 @@
 'use client';
 
-import { createColumnHelper, type PaginationState } from '@tanstack/react-table';
+import { createColumnHelper } from '@tanstack/react-table';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { DataTable } from '@/components/admin/data-table';
@@ -10,9 +10,9 @@ import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { CRON_JOB_IDS, CRON_RUN_STATUSES, type CronJobId, type CronRunStatus } from '@/domain/cron-types';
 import { useAdminCronLogsQuery } from '@/hooks/admin/use-admin-cron-logs-query';
+import { useAdminDebugTablePagination } from '@/hooks/admin/use-admin-debug-table-pagination';
 import {
   ADMIN_DEBUG_SEARCH_DEBOUNCE_MS,
-  ADMIN_DEBUG_TABLE_PAGE_SIZE,
 } from '@/lib/admin/admin-paginated-list';
 import type { CronJobRunAdminRow, CronJobRunListJobFilter, CronJobRunListStatusFilter } from '@/lib/data/cron-job-runs';
 
@@ -87,19 +87,14 @@ export function AdminCronLogsTable(props: AdminCronLogsTableProps): ReactElement
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CronJobRunListStatusFilter>('all');
   const [jobFilter, setJobFilter] = useState<CronJobRunListJobFilter>('all');
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: ADMIN_DEBUG_TABLE_PAGE_SIZE,
-  });
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedSearch(searchInput.trim());
     }, ADMIN_DEBUG_SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timeoutId);
   }, [searchInput]);
-  useEffect(() => {
-    setPagination((previous) => ({ ...previous, pageIndex: 0 }));
-  }, [debouncedSearch, statusFilter, jobFilter]);
+  const filterSignature = `${debouncedSearch}\0${statusFilter}\0${jobFilter}`;
+  const [pagination, setPagination] = useAdminDebugTablePagination(filterSignature);
   const queryFilters = useMemo(
     () => ({
       page: pagination.pageIndex + 1,
@@ -114,11 +109,9 @@ export function AdminCronLogsTable(props: AdminCronLogsTableProps): ReactElement
   const rows = query.data?.rows ?? [];
   const totalCount = query.data?.totalCount ?? 0;
   const totalPages = query.data?.totalPages ?? 0;
-  useEffect(() => {
-    if (totalPages > 0 && pagination.pageIndex >= totalPages) {
-      setPagination((previous) => ({ ...previous, pageIndex: totalPages - 1 }));
-    }
-  }, [pagination.pageIndex, totalPages]);
+  if (totalPages > 0 && pagination.pageIndex >= totalPages) {
+    setPagination((previous) => ({ ...previous, pageIndex: totalPages - 1 }));
+  }
   const columns = useMemo(
     () => [
       columnHelper.accessor('startedAtIso', {

@@ -3,7 +3,10 @@ import type { Filter } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { BookingDocument } from '@/domain/types';
 import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
-import { applyPaymentStatusToBooking, cancelBookingById } from '@/lib/payments/payment-completion';
+import {
+  applyPaymentStatusToBooking,
+  resetBookingAfterExpiredPaymentHold,
+} from '@/lib/payments/payment-completion';
 import { getDb } from '@/lib/mongodb';
 
 const EXPIRED_PAYMENT_WINDOW_FILTER = (now: Date): Filter<BookingDocument> => ({
@@ -16,7 +19,7 @@ const EXPIRED_PAYMENT_WINDOW_FILTER = (now: Date): Filter<BookingDocument> => ({
   ],
 });
 
-async function cancelPendingBookingForExpiredPaymentWindow(
+async function syncPendingBookingForExpiredPaymentWindow(
   booking: BookingDocument & { readonly _id: ObjectId },
 ): Promise<boolean> {
   const paymentTransactionId = booking.paymentTransactionId;
@@ -26,11 +29,15 @@ async function cancelPendingBookingForExpiredPaymentWindow(
       transaction !== null &&
       (transaction.status === 'pending' || transaction.status === 'processing')
     ) {
-      await applyPaymentStatusToBooking({ transaction, nextStatus: 'expired' });
+      await applyPaymentStatusToBooking({
+        transaction,
+        nextStatus: 'expired',
+        expiredBookingDisposition: 'retain_pending',
+      });
       return true;
     }
   }
-  await cancelBookingById(booking._id);
+  await resetBookingAfterExpiredPaymentHold(booking._id);
   return true;
 }
 
@@ -41,7 +48,7 @@ export type CancelExpiredPaymentWindowBookingsInput = {
 };
 
 /**
- * Cancels unpaid pending bookings whose hold window has passed (and expires open checkout rows when linked).
+ * Expires unpaid checkout holds whose window has passed and keeps bookings in pending status for rebook flows.
  */
 export async function cancelExpiredPaymentWindowBookings(
   input: CancelExpiredPaymentWindowBookingsInput = {},
@@ -74,10 +81,10 @@ export async function cancelExpiredPaymentWindowBookings(
     if (doc._id === undefined) {
       continue;
     }
-    const cancelled = await cancelPendingBookingForExpiredPaymentWindow(
+    const synced = await syncPendingBookingForExpiredPaymentWindow(
       doc as BookingDocument & { _id: ObjectId },
     );
-    if (cancelled) {
+    if (synced) {
       count += 1;
     }
   }
