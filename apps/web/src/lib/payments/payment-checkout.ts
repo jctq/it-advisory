@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { findPaymentMethodOption, type PaymentGatewayId } from '@/domain/payment-types';
-import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
+import { isMarketingSlotInPublishedAvailabilityForCheckout } from '@/lib/data/booking-availability';
 import { findBookingById } from '@/lib/data/bookings';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
@@ -145,23 +145,12 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   } catch {
     return { ok: false, code: 'invalid_slot', error: 'Invalid date or time.' };
   }
-  const slotOk = await isMarketingSlotInPublishedAvailability({
-    serviceKey: params.serviceKey,
-    startsAtUtc: startsAt,
-  });
-  if (!slotOk) {
-    return { ok: false, code: 'booking_slot_unavailable', error: 'This time is no longer available.' };
-  }
   const contact: MarketingBookingLeadContact = {
     name: params.customerName.trim(),
     email: params.customerEmail.trim(),
     company: params.customerCompany?.trim() ?? '',
     phone: params.customerPhone.trim(),
   };
-  const leadId = await insertMarketingBookingLead(params.visitorId, contact);
-  if (leadId === null) {
-    return { ok: false, code: 'database_unavailable', error: 'Database unavailable.' };
-  }
   let resolvedPricing;
   try {
     resolvedPricing = await resolveCheckoutAmountCentavos({
@@ -176,7 +165,6 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       error: error instanceof Error ? error.message : 'Invalid promo code.',
     };
   }
-  const bookingDraftId = randomUUID();
   const existingOpenTransaction = await findOpenPaymentTransactionForCheckoutSlot({
     visitorId: params.visitorId,
     quizSessionIdHex: resolvedQuizSessionHex,
@@ -216,8 +204,21 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       bookingStatus: null,
     });
   }
+  const slotOk = await isMarketingSlotInPublishedAvailabilityForCheckout({
+    serviceKey: params.serviceKey,
+    startsAtUtc: startsAt,
+    quizSessionIdHex: resolvedQuizSessionHex,
+  });
+  if (!slotOk) {
+    return { ok: false, code: 'booking_slot_unavailable', error: 'This time is no longer available.' };
+  }
+  const leadId = await insertMarketingBookingLead(params.visitorId, contact);
+  if (leadId === null) {
+    return { ok: false, code: 'database_unavailable', error: 'Database unavailable.' };
+  }
+  const bookingDraftId = randomUUID();
   const expiresAt =
-    settings.paymentPolicy === 'pay_after_hold' || settings.paymentPolicy === 'pay_before_booking'
+    settings.paymentPolicy === 'pay_after_hold'
       ? new Date(Date.now() + settings.holdExpiresMinutes * 60_000)
       : null;
   const insertedId = await insertPaymentTransaction({

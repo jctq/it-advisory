@@ -167,7 +167,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
   }
   const holdExpiresAt = booking.paymentExpiresAt ?? null;
   const expiresAt =
-    settings.paymentPolicy === 'pay_after_hold' || settings.paymentPolicy === 'pay_before_booking'
+    settings.paymentPolicy === 'pay_after_hold'
       ? holdExpiresAt ?? new Date(Date.now() + settings.holdExpiresMinutes * 60_000)
       : null;
   const insertedId = await insertPaymentTransaction({

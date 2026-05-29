@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  ADMIN_PAYMENT_POLICIES,
   PAYMENT_GATEWAY_IDS,
-  PAYMENT_POLICIES,
   type PaymentGatewayId,
 } from '@/domain/payment-types';
 import { updatePaymentSettings, getPaymentSettingsAdminView } from '@/lib/data/payment-settings';
@@ -13,7 +13,7 @@ const gatewayCredentialsSchema = z.record(z.string(), z.string()).nullable().opt
 
 const patchSchema = z.object({
   paymentsEnabled: z.boolean().optional(),
-  paymentPolicy: z.enum(PAYMENT_POLICIES).optional(),
+  paymentPolicy: z.enum(ADMIN_PAYMENT_POLICIES).optional(),
   checkoutAmountCentavos: z.number().int().min(100).max(100_000_000).optional(),
   holdExpiresMinutes: z.number().int().min(5).max(1440).optional(),
   sandboxMode: z.boolean().optional(),

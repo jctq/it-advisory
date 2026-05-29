@@ -1,5 +1,6 @@
 import { addDays, parse } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { AdvisorBookingSettingsDocument } from '@/domain/types';
 import {
@@ -114,6 +115,70 @@ export async function listActiveBookingStartsUtcInYmdWindow(input: {
     listOpenPaymentHoldStartsUtcInRange({
       rangeStartUtc: rangeStart,
       rangeEndExclusiveUtc: rangeEndExclusive,
+    }),
+    listPaidOccupiedStartsUtcInRange({
+      rangeStartUtc: rangeStart,
+      rangeEndExclusiveUtc: rangeEndExclusive,
+    }),
+  ]);
+  return mergeUniqueSortedStartsUtc(
+    bookingRows.map((row) => row.startsAt),
+    holdStarts,
+    paidStarts,
+  );
+}
+
+/**
+ * Like {@link listActiveBookingStartsUtcInYmdWindow} but omits reservations owned by the given quiz session
+ * so the same diagnostic can retry checkout on its held slot without appearing globally taken.
+ */
+export async function listActiveBookingStartsUtcInYmdWindowForCheckout(input: {
+  readonly serviceKey: string;
+  readonly fromYmd: string;
+  readonly toYmd: string;
+  readonly bufferDays: number;
+  readonly timeZone: string;
+  readonly excludeQuizSessionIdHex: string;
+}): Promise<Date[]> {
+  if (!process.env.MONGODB_URI) {
+    return [];
+  }
+  const excludeSessionHex = input.excludeQuizSessionIdHex.trim();
+  if (excludeSessionHex.length === 0) {
+    return listActiveBookingStartsUtcInYmdWindow(input);
+  }
+  let excludeSessionObjectId: ObjectId;
+  try {
+    excludeSessionObjectId = new ObjectId(excludeSessionHex);
+  } catch {
+    return listActiveBookingStartsUtcInYmdWindow(input);
+  }
+  const loadFrom = addCalendarDaysToYmd(input.fromYmd, -input.bufferDays, input.timeZone);
+  const loadTo = addCalendarDaysToYmd(input.toYmd, input.bufferDays, input.timeZone);
+  const rangeStart = ymdStartUtc(loadFrom, input.timeZone);
+  const rangeEndExclusive = ymdEndExclusiveUtc(addCalendarDaysToYmd(loadTo, 1, input.timeZone), input.timeZone);
+  const db = await getDb();
+  const [bookingRows, holdStarts, paidStarts] = await Promise.all([
+    db
+      .collection<{ startsAt: Date }>(COLLECTIONS.bookings)
+      .find(
+        {
+          status: { $in: ['pending', 'confirmed'] },
+          startsAt: { $gte: rangeStart, $lt: rangeEndExclusive },
+          $or: [
+            { quizSessionId: { $exists: false } },
+            { quizSessionId: null },
+            { quizSessionId: { $ne: excludeSessionObjectId } },
+          ],
+        },
+        { projection: { startsAt: 1 } },
+      )
+      .sort({ startsAt: 1 })
+      .toArray(),
+    listOpenPaymentHoldStartsUtcInRange({
+      rangeStartUtc: rangeStart,
+      rangeEndExclusiveUtc: rangeEndExclusive,
+      excludeQuizSessionIdHex: excludeSessionHex,
     }),
     listPaidOccupiedStartsUtcInRange({
       rangeStartUtc: rangeStart,

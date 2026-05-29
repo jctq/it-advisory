@@ -8,6 +8,11 @@ export const PAYMENT_POLICIES = ['pay_before_booking', 'pay_after_hold', 'manual
 
 export type PaymentPolicy = (typeof PAYMENT_POLICIES)[number];
 
+/** Payment policies selectable in admin (legacy `pay_before_booking` is migrated to `pay_after_hold`). */
+export const ADMIN_PAYMENT_POLICIES = ['pay_after_hold', 'manual_confirm'] as const;
+
+export type AdminPaymentPolicy = (typeof ADMIN_PAYMENT_POLICIES)[number];
+
 export const PAYMENT_STATUSES = ['pending', 'processing', 'paid', 'failed', 'expired', 'refunded'] as const;
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];

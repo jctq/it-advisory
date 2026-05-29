@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { PAYMENT_POLICIES, type PaymentGatewayId, type PaymentPolicy } from '@/domain/payment-types';
+import { ADMIN_PAYMENT_POLICIES, PAYMENT_GATEWAY_IDS, type PaymentGatewayId, type PaymentPolicy } from '@/domain/payment-types';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { AdminSettingsHint, AdminSettingsLabel, AdminSettingsOptionTitle } from '@/components/admin/admin-settings-hint';
 import { Button } from '@/components/ui/button';
@@ -80,10 +80,6 @@ const GATEWAY_CREDENTIAL_FIELDS: Record<PaymentGatewayId, readonly { readonly ke
 };
 
 const POLICY_LABELS: Record<PaymentPolicy, { readonly title: string; readonly description: string }> = {
-  pay_before_booking: {
-    title: 'Pay before booking',
-    description: 'The slot is confirmed only after successful payment.',
-  },
   pay_after_hold: {
     title: 'Reserve then pay',
     description: 'Hold the slot while the customer completes payment within the hold window.',
@@ -91,6 +87,10 @@ const POLICY_LABELS: Record<PaymentPolicy, { readonly title: string; readonly de
   manual_confirm: {
     title: 'Manual confirmation',
     description: 'Create a pending booking; mark paid in admin after bank transfer or offline payment.',
+  },
+  pay_before_booking: {
+    title: 'Pay before booking',
+    description: 'Legacy policy — migrated to Reserve then pay.',
   },
 };
 
@@ -348,11 +348,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
           <div className="space-y-2">
             <AdminSettingsLabel
               htmlFor="holdExpiresMinutes"
-              hint={
-                settings.paymentPolicy === 'pay_after_hold'
-                  ? 'Customers must complete payment within this window after the slot is held.'
-                  : 'Used when extending payment deadlines on overdue bookings. For Reserve then pay, this is the hold window before the slot is released.'
-              }
+              hint="Customers must complete payment within this window after the slot is held."
             >
               Payment expiry (minutes)
             </AdminSettingsLabel>
@@ -374,7 +370,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium text-foreground">Payment timing</legend>
           <div className="grid gap-3 lg:grid-cols-3">
-            {PAYMENT_POLICIES.map((policy: PaymentPolicy) => {
+            {ADMIN_PAYMENT_POLICIES.map((policy) => {
               const meta = POLICY_LABELS[policy]!;
               return (
                 <label

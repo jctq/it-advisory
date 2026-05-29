@@ -80,10 +80,20 @@ function defaultEnabledGateways(): Record<PaymentGatewayId, boolean> {
   };
 }
 
+function normalizePaymentPolicy(policy: PaymentPolicy | undefined, fallback: PaymentPolicy): PaymentPolicy {
+  if (policy === 'pay_before_booking') {
+    return 'pay_after_hold';
+  }
+  if (policy !== undefined && PAYMENT_POLICIES.includes(policy)) {
+    return policy;
+  }
+  return fallback;
+}
+
 function defaultSettings(): PaymentSettingsValues {
   return {
     paymentsEnabled: false,
-    paymentPolicy: 'pay_before_booking',
+    paymentPolicy: 'pay_after_hold',
     currency: 'PHP',
     checkoutAmountCentavos: DEFAULT_CHECKOUT_AMOUNT_CENTAVOS,
     holdExpiresMinutes: 30,
@@ -141,7 +151,7 @@ function mergeDocument(doc: PaymentSettingsDocument | null): PaymentSettingsValu
   if (doc === null) {
     return base;
   }
-  const policy = PAYMENT_POLICIES.includes(doc.paymentPolicy) ? doc.paymentPolicy : base.paymentPolicy;
+  const policy = normalizePaymentPolicy(doc.paymentPolicy, base.paymentPolicy);
   return {
     paymentsEnabled: typeof doc.paymentsEnabled === 'boolean' ? doc.paymentsEnabled : base.paymentsEnabled,
     paymentPolicy: policy,
@@ -263,8 +273,8 @@ export async function updatePaymentSettings(patch: UpdatePaymentSettingsPatch): 
   const next: PaymentSettingsValues = {
     paymentsEnabled: patch.paymentsEnabled !== undefined ? patch.paymentsEnabled : current.paymentsEnabled,
     paymentPolicy:
-      patch.paymentPolicy !== undefined && PAYMENT_POLICIES.includes(patch.paymentPolicy)
-        ? patch.paymentPolicy
+      patch.paymentPolicy !== undefined
+        ? normalizePaymentPolicy(patch.paymentPolicy, current.paymentPolicy)
         : current.paymentPolicy,
     currency: 'PHP',
     checkoutAmountCentavos:

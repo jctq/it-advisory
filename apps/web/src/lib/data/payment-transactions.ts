@@ -360,21 +360,28 @@ export async function listOpenPaymentHoldStartsUtcInRange(input: {
   readonly rangeStartUtc: Date;
   readonly rangeEndExclusiveUtc: Date;
   readonly nowUtc?: Date;
+  readonly excludeQuizSessionIdHex?: string | null;
 }): Promise<Date[]> {
   if (!process.env.MONGODB_URI) {
     return [];
   }
   const now = input.nowUtc ?? new Date();
+  const excludeSessionHex = input.excludeQuizSessionIdHex?.trim() ?? '';
   const db = await getDb();
+  const filter: Record<string, unknown> = {
+    startsAt: { $gte: input.rangeStartUtc, $lt: input.rangeEndExclusiveUtc },
+    ...buildActiveOpenPaymentHoldFilter(now),
+  };
+  if (excludeSessionHex.length > 0) {
+    filter.$or = [
+      { quizSessionIdHex: { $exists: false } },
+      { quizSessionIdHex: null },
+      { quizSessionIdHex: { $ne: excludeSessionHex } },
+    ];
+  }
   const cursor = db
     .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
-    .find(
-      {
-        startsAt: { $gte: input.rangeStartUtc, $lt: input.rangeEndExclusiveUtc },
-        ...buildActiveOpenPaymentHoldFilter(now),
-      },
-      { projection: { startsAt: 1 } },
-    )
+    .find(filter, { projection: { startsAt: 1 } })
     .sort({ startsAt: 1 });
   const rows = await cursor.toArray();
   return rows.map((row) => row.startsAt);
@@ -507,7 +514,6 @@ export async function findOpenPaymentTransactionForCheckoutSlot(input: {
       serviceKey: input.serviceKey,
       startsAt: input.startsAtUtc,
       status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
-      $or: [{ bookingId: { $exists: false } }, { bookingId: null }],
     })
     .sort({ createdAt: -1 })
     .limit(1)
