@@ -14,6 +14,7 @@ export type ReservedBookingSlotLabels = {
   readonly timezoneLabel: string;
 };
 
+/** Prefer `resolveServerSyncedNowMsFromAnchor` for live countdowns — this uses wall-clock time. */
 export function resolveServerSyncedNowMs(serverClockOffsetMs: number | null): number | null {
   if (serverClockOffsetMs === null) {
     return null;
