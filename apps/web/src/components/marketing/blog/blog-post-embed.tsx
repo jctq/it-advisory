@@ -29,9 +29,9 @@ export async function BlogPostEmbed(props: BlogPostEmbedProps): Promise<ReactEle
       {descriptionText.length > 0 ? (
         <p className="text-sm leading-relaxed text-muted-foreground">{descriptionText}</p>
       ) : null}
-      {showPublishedDate && post.publishedAtIso !== null ? (
+      {showPublishedDate ? (
         <p className="text-xs text-muted-foreground/90">
-          Last updated: {format(new Date(post.publishedAtIso), 'MMMM d, yyyy')}
+          Last updated: {format(new Date(post.updatedAtIso), 'MMMM d, yyyy')}
         </p>
       ) : null}
       <MarketingBlogProse contentMarkdown={post.contentMarkdown} />
