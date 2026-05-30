@@ -97,13 +97,11 @@ export type AccountDiagnosticsMobileProps = {
   readonly hasMore: boolean;
   readonly totalCount: number;
   readonly manageBookingEnabled: boolean;
-  readonly deletingId: string | null;
   /** When false, infinite-scroll load-more is disabled (desktop table owns pagination). */
   readonly enableInfiniteScroll: boolean;
   readonly onStatusFilterChange: (value: BookingListStatusFilter) => void;
   readonly onBookingReferenceInputChange: (value: string) => void;
   readonly onLoadMore: () => void;
-  readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
 };
 
 export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): ReactElement {
@@ -116,12 +114,10 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
     hasMore,
     totalCount,
     manageBookingEnabled,
-    deletingId,
     onStatusFilterChange,
     onBookingReferenceInputChange,
     enableInfiniteScroll,
     onLoadMore,
-    onRequestDelete,
   } = props;
   const [selectedSession, setSelectedSession] = useState<VisitorQuizSessionSummary | null>(null);
   const listAnchorRef = useRef<HTMLDivElement>(null);
@@ -287,9 +283,7 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
       <MobileDiagnosticsSessionDialog
         session={selectedSession}
         manageBookingEnabled={manageBookingEnabled}
-        deletingId={deletingId}
         onOpenChange={handleCloseDialog}
-        onRequestDelete={onRequestDelete}
       />
     </div>
   );
@@ -391,9 +385,7 @@ function MobileDiagnosticsLoadMoreRow(props: { readonly isLoadingMore: boolean; 
 type MobileDiagnosticsSessionDialogProps = {
   readonly session: VisitorQuizSessionSummary | null;
   readonly manageBookingEnabled: boolean;
-  readonly deletingId: string | null;
   readonly onOpenChange: (open: boolean) => void;
-  readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
 };
 
 function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogProps): ReactElement {
@@ -491,9 +483,7 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                 </dl>
                 <AccountDiagnosticsSessionActionsBar
                   row={session}
-                  deletingId={props.deletingId}
                   manageBookingEnabled={props.manageBookingEnabled}
-                  onRequestDelete={props.onRequestDelete}
                   viewLabel="View diagnostic"
                 />
               </TabsContent>

@@ -12,9 +12,7 @@ import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-mark
 
 export type AccountDiagnosticsSessionActionsBarProps = {
   readonly row: VisitorQuizSessionSummary;
-  readonly deletingId: string | null;
   readonly manageBookingEnabled: boolean;
-  readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
   readonly viewLabel?: string;
 };
 
@@ -40,18 +38,6 @@ export function AccountDiagnosticsSessionActionsBar(
       {actions.includes('continue') ? (
         <Button type="button" size="sm" asChild>
           <Link href={viewHref}>Continue</Link>
-        </Button>
-      ) : null}
-      {actions.includes('delete') ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-          disabled={props.deletingId === props.row.marketingSessionRef}
-          onClick={() => props.onRequestDelete(props.row)}
-        >
-          {props.deletingId === props.row.marketingSessionRef ? 'Deleting…' : 'Delete'}
         </Button>
       ) : null}
     </div>

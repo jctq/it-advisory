@@ -33,7 +33,6 @@ export {
 } from '@/store/marketing/marketing-booking-flow-types';
 export {
   useMarketingAccountDiagnosticsStore,
-  type AccountDiagnosticsDeleteTarget,
   type MarketingAccountDiagnosticsStore,
 } from '@/store/marketing/marketing-account-diagnostics-store';
 export {

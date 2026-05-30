@@ -14,7 +14,6 @@ import {
 } from '@/lib/data/quiz-session-types';
 import {
   useMarketingAccountDiagnosticsStore,
-  type AccountDiagnosticsDeleteTarget,
   type MarketingAccountDiagnosticsStore,
 } from '@/store/marketing/marketing-account-diagnostics-store';
 
@@ -34,8 +33,6 @@ export type MarketingAccountDiagnosticsView = AccountDiagnosticsState & {
   readonly setTotalPages: (value: number) => void;
   readonly setPage: (value: number | ((previous: number) => number)) => void;
   readonly setHasAnySessions: (value: boolean) => void;
-  readonly setDeletingId: (value: string | null) => void;
-  readonly setDeleteTarget: (value: AccountDiagnosticsDeleteTarget | null) => void;
   readonly setBookingReferenceInput: (value: string) => void;
   readonly setDebouncedBookingReference: (value: string) => void;
   readonly setStatusFilter: (value: BookingListStatusFilter) => void;
@@ -52,8 +49,6 @@ function selectAccountDiagnosticsState(state: MarketingAccountDiagnosticsStore):
     totalPages: state.totalPages,
     page: state.page,
     hasAnySessions: state.hasAnySessions,
-    deletingId: state.deletingId,
-    deleteTarget: state.deleteTarget,
     bookingReferenceInput: state.bookingReferenceInput,
     debouncedBookingReference: state.debouncedBookingReference,
     statusFilter: state.statusFilter,
@@ -76,8 +71,6 @@ function buildAccountDiagnosticsSetters(
     setTotalPages: (value) => patch({ totalPages: value }),
     setPage: (value) => setField('page', value),
     setHasAnySessions: (value) => patch({ hasAnySessions: value }),
-    setDeletingId: (value) => patch({ deletingId: value }),
-    setDeleteTarget: (value) => patch({ deleteTarget: value }),
     setBookingReferenceInput: (value) => patch({ bookingReferenceInput: value }),
     setDebouncedBookingReference: (value) => patch({ debouncedBookingReference: value }),
     setStatusFilter: (value) =>

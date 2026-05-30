@@ -42,17 +42,17 @@ describe('account diagnostics session actions', () => {
     const row = buildRow({});
     expect(isSessionPaymentExpiredForManage(row)).toBe(true);
     expect(isSessionAwaitingPayment(row)).toBe(false);
-    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['manage', 'delete']);
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['manage']);
   });
 
   it('shows manage only while checkout is open', () => {
     const row = buildRow({ paymentTransactionStatus: 'pending' });
     expect(isSessionAwaitingPayment(row)).toBe(true);
     expect(isSessionPaymentExpiredForManage(row)).toBe(false);
-    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['manage', 'delete']);
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['manage']);
   });
 
-  it('shows continue and delete for pending incomplete diagnostics', () => {
+  it('shows continue for pending incomplete diagnostics', () => {
     const row = buildRow({
       isDiagnosticComplete: false,
       isBooked: false,
@@ -62,16 +62,16 @@ describe('account diagnostics session actions', () => {
       paymentTransactionId: null,
       paymentTransactionStatus: null,
     });
-    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['continue', 'delete']);
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['continue']);
   });
 
-  it('shows view and delete for confirmed bookings', () => {
+  it('shows view for confirmed bookings', () => {
     const row = buildRow({ bookingStatus: 'confirmed', paymentTransactionStatus: 'paid' });
-    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['view', 'delete']);
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['view']);
   });
 
-  it('shows view and delete for cancelled bookings', () => {
+  it('shows view for cancelled bookings', () => {
     const row = buildRow({ bookingStatus: 'cancelled', paymentTransactionStatus: null });
-    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['view', 'delete']);
+    expect(resolveAccountDiagnosticsSessionActions(row)).toEqual(['view']);
   });
 });

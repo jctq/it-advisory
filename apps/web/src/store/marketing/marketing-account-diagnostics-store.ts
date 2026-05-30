@@ -6,12 +6,6 @@ import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
 import type { BookingListStatusFilter } from '@/lib/marketing/account-booking-status';
 import { buildStoreFieldPatch } from '@/store/marketing/set-store-field';
 
-export type AccountDiagnosticsDeleteTarget = {
-  readonly marketingSessionRef: string;
-  readonly sessionTitlePreview: string | null;
-  readonly situationPreview: string | null;
-};
-
 export type MarketingAccountDiagnosticsState = {
   readonly actionError: string | null;
   readonly loadError: string | null;
@@ -21,8 +15,6 @@ export type MarketingAccountDiagnosticsState = {
   readonly totalPages: number;
   readonly page: number;
   readonly hasAnySessions: boolean;
-  readonly deletingId: string | null;
-  readonly deleteTarget: AccountDiagnosticsDeleteTarget | null;
   readonly bookingReferenceInput: string;
   readonly debouncedBookingReference: string;
   readonly statusFilter: BookingListStatusFilter;
@@ -57,8 +49,6 @@ function createInitialAccountDiagnosticsState(): MarketingAccountDiagnosticsStat
     totalPages: 0,
     page: 1,
     hasAnySessions: false,
-    deletingId: null,
-    deleteTarget: null,
     bookingReferenceInput: '',
     debouncedBookingReference: '',
     statusFilter: ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS,

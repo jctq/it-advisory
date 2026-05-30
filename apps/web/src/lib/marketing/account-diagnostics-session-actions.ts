@@ -7,7 +7,7 @@ import {
 
 const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
 
-export type AccountDiagnosticsSessionActionId = 'view' | 'manage' | 'continue' | 'delete';
+export type AccountDiagnosticsSessionActionId = 'view' | 'manage' | 'continue';
 
 function isTerminalPaymentStatus(
   status: VisitorQuizSessionSummary['paymentTransactionStatus'],
@@ -40,31 +40,29 @@ export function isSessionConfirmedForManage(row: VisitorQuizSessionSummary): boo
 /**
  * Primary actions for a diagnostics list row (My diagnostics).
  *
- * Delete is always offered; linked bookings are cancelled so the slot is released.
- *
- * - awaiting_payment → manage, delete
- * - pending + incomplete diagnostic → continue, delete
- * - pending + complete diagnostic → manage, delete
- * - confirmed / completed → view, delete
- * - cancelled → view, delete
+ * - awaiting_payment → manage
+ * - pending + incomplete diagnostic → continue
+ * - pending + complete diagnostic → manage
+ * - confirmed / completed → view
+ * - cancelled → view
  */
 export function resolveAccountDiagnosticsSessionActions(
   row: VisitorQuizSessionSummary,
 ): readonly AccountDiagnosticsSessionActionId[] {
   const lifecycleStatus = resolveAccountBookingStatusFromSummary(row);
   if (lifecycleStatus === 'cancelled') {
-    return ['view', 'delete'];
+    return ['view'];
   }
   if (lifecycleStatus === 'confirmed' || lifecycleStatus === 'completed') {
-    return ['view', 'delete'];
+    return ['view'];
   }
   if (lifecycleStatus === 'awaiting_payment') {
-    return ['manage', 'delete'];
+    return ['manage'];
   }
   if (!row.isDiagnosticComplete) {
-    return ['continue', 'delete'];
+    return ['continue'];
   }
-  return ['manage', 'delete'];
+  return ['manage'];
 }
 
 export function buildBookManageHref(bookingId: string | null): string {

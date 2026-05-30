@@ -7,22 +7,12 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table';
-import { ClipboardCopy, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { ClipboardCopy, Loader2, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useMarketingAccountDiagnostics } from '@/hooks/marketing/use-marketing-account-diagnostics';
 import { useMobileViewport } from '@/hooks/use-mobile-viewport';
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -52,7 +42,6 @@ import { BOOKING_LIST_STATUS_FILTER_OPTIONS } from '@/lib/marketing/account-book
 import { shouldShowAccountDiagnosticsScheduledSession } from '@/lib/marketing/account-diagnostics-booking-status';
 import { cn } from '@/lib/utils';
 
-const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const MY_SESSIONS_API_URL = '/api/quiz/my-sessions';
 const BOOKING_REFERENCE_DEBOUNCE_MS = 350;
 
@@ -117,16 +106,12 @@ function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary 
 
 function SessionActions(props: {
   readonly row: VisitorQuizSessionSummary;
-  readonly deletingId: string | null;
   readonly manageBookingEnabled: boolean;
-  readonly onRequestDelete: (row: VisitorQuizSessionSummary) => void;
 }): ReactElement {
   return (
     <AccountDiagnosticsSessionActionsBar
       row={props.row}
-      deletingId={props.deletingId}
       manageBookingEnabled={props.manageBookingEnabled}
-      onRequestDelete={props.onRequestDelete}
     />
   );
 }
@@ -153,8 +138,6 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     totalPages,
     page,
     hasAnySessions,
-    deletingId,
-    deleteTarget,
     bookingReferenceInput,
     debouncedBookingReference,
     statusFilter,
@@ -167,8 +150,6 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     setTotalPages,
     setPage,
     setHasAnySessions,
-    setDeletingId,
-    setDeleteTarget,
     setBookingReferenceInput,
     setDebouncedBookingReference,
     setStatusFilter,
@@ -284,45 +265,6 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [fetchSessions]);
-  const executeDelete = useCallback(
-    async (marketingSessionRef: string): Promise<void> => {
-      setActionError(null);
-      setDeletingId(marketingSessionRef);
-      try {
-        const response = await fetch(`${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(marketingSessionRef)}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        });
-        const payload: unknown = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const message =
-            typeof payload === 'object' && payload !== null && 'error' in payload && typeof (payload as { error?: unknown }).error === 'string'
-              ? (payload as { error: string }).error
-              : 'Delete failed.';
-          setActionError(message);
-          return;
-        }
-        setDeleteTarget(null);
-        await fetchSessions();
-      } finally {
-        setDeletingId(null);
-      }
-    },
-    [fetchSessions, setActionError, setDeleteTarget, setDeletingId],
-  );
-  const handleConfirmDelete = useCallback((): void => {
-    if (deleteTarget === null) {
-      return;
-    }
-    void executeDelete(deleteTarget.marketingSessionRef);
-  }, [deleteTarget, executeDelete]);
-  const handleRequestDelete = useCallback((row: VisitorQuizSessionSummary): void => {
-    setDeleteTarget({
-      marketingSessionRef: row.marketingSessionRef,
-      sessionTitlePreview: row.sessionTitlePreview,
-      situationPreview: row.situationPreview,
-    });
-  }, [setDeleteTarget]);
   const tableData = useMemo(() => [...sessions], [sessions]);
   const columns = useMemo(
     () => [
@@ -412,16 +354,11 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
         id: 'actions',
         header: () => <span className="sr-only">Actions</span>,
         cell: (info) => (
-          <SessionActions
-            row={info.row.original}
-            deletingId={deletingId}
-            manageBookingEnabled={manageBookingEnabled}
-            onRequestDelete={handleRequestDelete}
-          />
+          <SessionActions row={info.row.original} manageBookingEnabled={manageBookingEnabled} />
         ),
       }),
     ],
-    [deletingId, handleRequestDelete, manageBookingEnabled],
+    [manageBookingEnabled],
   );
   // TanStack Table returns unstable function references; React Compiler intentionally skips memoizing here.
   // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable is documented as incompatible with compiler memoization
@@ -447,59 +384,6 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
   }, [hasMoreSessions, isLoading, isLoadingMore, isMobileViewport, setPage]);
   return (
     <div className="space-y-6">
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open && deletingId === null) {
-            setDeleteTarget(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this diagnostic?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently removes the diagnostic snapshot and cannot be undone. Any reserved consultation time
-              linked to this diagnostic is cancelled so the slot can be booked by someone else. Cancelled booking
-              records stay in our system for your history.
-              {deleteTarget !== null &&
-              ((deleteTarget.sessionTitlePreview !== null && deleteTarget.sessionTitlePreview.length > 0) ||
-                (deleteTarget.situationPreview !== null && deleteTarget.situationPreview.length > 0)) ? (
-                <span className="mt-2 block rounded-md border border-border bg-muted/40 px-3 py-2 text-foreground">
-                  {deleteTarget.sessionTitlePreview !== null && deleteTarget.sessionTitlePreview.length > 0 ? (
-                    <span className="block font-medium">{deleteTarget.sessionTitlePreview}</span>
-                  ) : null}
-                  {deleteTarget.situationPreview !== null && deleteTarget.situationPreview.length > 0 ? (
-                    <span
-                      className={
-                        deleteTarget.sessionTitlePreview !== null && deleteTarget.sessionTitlePreview.length > 0
-                          ? 'mt-1 block text-sm text-muted-foreground'
-                          : 'block'
-                      }
-                    >
-                      {deleteTarget.situationPreview}
-                    </span>
-                  ) : null}
-                </span>
-              ) : null}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingId !== null}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className={cn(buttonVariants(), 'bg-destructive text-white hover:bg-destructive/90')}
-              disabled={deletingId !== null}
-              onClick={(event) => {
-                event.preventDefault();
-                handleConfirmDelete();
-              }}
-            >
-              <Trash2 className="size-4" aria-hidden />
-              {deletingId !== null ? 'Deleting…' : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <Card className="gap-0 border-0 bg-transparent py-0 shadow-none md:gap-6 md:border md:border-border/80 md:bg-card md:py-6 md:shadow-sm">
         <CardContent className="space-y-6 px-0 pt-0 md:px-6">
           {actionError !== null ? (
@@ -532,12 +416,10 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                 hasMore={hasMoreSessions}
                 totalCount={totalCount}
                 manageBookingEnabled={manageBookingEnabled}
-                deletingId={deletingId}
                 enableInfiniteScroll={isMobileViewport}
                 onStatusFilterChange={handleStatusFilterChange}
                 onBookingReferenceInputChange={handleBookingReferenceInputChange}
                 onLoadMore={handleLoadMoreSessions}
-                onRequestDelete={handleRequestDelete}
               />
               <div className="hidden space-y-4 md:block">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
