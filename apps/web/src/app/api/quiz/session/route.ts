@@ -5,6 +5,7 @@ import { findLatestPaymentTransactionByQuizSessionIdHex } from '@/lib/data/payme
 import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { resolvePaymentHoldExpiresAtIso } from '@/lib/marketing/payment-hold-expiry';
 import { resolvePaymentSelectionFromTransaction } from '@/lib/marketing/resolve-payment-selection-from-transaction';
+import { isQuizSessionEditingLocked } from '@/lib/marketing/quiz-session-edit-lock';
 import { reconcileQuizSessionPaidBookingLink } from '@/lib/payments/reconcile-quiz-session-paid-booking-link';
 import { syncQuizSessionPaymentHold } from '@/lib/payments/sync-quiz-session-payment-hold';
 import {
@@ -125,12 +126,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     : null;
   const latestPaymentTransactionStatus = latestPayment?.status ?? null;
   const latestPaymentTransactionId = latestPayment?.id ?? null;
+  const readOnly = isQuizSessionEditingLocked({
+    bookedCount,
+    latestPaymentStatus: latestPaymentTransactionStatus,
+  });
   return NextResponse.json({
     session: {
       answers: session.answers,
       currentStep: session.currentStep,
     },
-    readOnly: bookedCount > 0 || hasOpenPaymentTransaction,
+    readOnly,
     serverNowIso,
     paymentHoldExpiresAtIso,
     canResumePaymentCheckout: isAwaitingPaymentResume,
@@ -190,7 +195,15 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   }
   if (targetForBooking !== null && targetForBooking._id !== undefined) {
     const bookedCount = await countBookingsByQuizSessionId(targetForBooking._id);
-    if (bookedCount > 0) {
+    const latestPayment = await findLatestPaymentTransactionByQuizSessionIdHex(
+      targetForBooking._id.toString(),
+    );
+    if (
+      isQuizSessionEditingLocked({
+        bookedCount,
+        latestPaymentStatus: latestPayment?.status ?? null,
+      })
+    ) {
       return NextResponse.json(
         {
           error: 'This diagnostic is linked to a booking and cannot be edited.',

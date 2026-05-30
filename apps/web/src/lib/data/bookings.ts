@@ -589,6 +589,13 @@ export async function linkQuizSessionToVisitorBooking(input: {
     return false;
   }
   const snapshot = extractGuidedDiagnosticRawFromQuizAnswers(session.answers);
+  const setFields: Record<string, unknown> = {
+    quizSessionId: session._id,
+    updatedAt: new Date(),
+  };
+  if (snapshot !== null && snapshot.trim().length > 0) {
+    setFields.guidedDiagnosticSnapshot = snapshot;
+  }
   const db = await getDb();
   const result = await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
     {
@@ -596,11 +603,7 @@ export async function linkQuizSessionToVisitorBooking(input: {
       visitorId: input.visitorId,
     },
     {
-      $set: {
-        quizSessionId: session._id,
-        guidedDiagnosticSnapshot: snapshot,
-        updatedAt: new Date(),
-      },
+      $set: setFields,
     },
   );
   return result.matchedCount === 1;

@@ -11,6 +11,7 @@ import type { PaymentStatus } from '@/domain/payment-types';
 import { fetchLatestPaymentTransactionsByQuizSessionIds } from '@/lib/data/payment-transactions';
 import { resolveQuizSessionDiagnosticCompleted } from '@techmd/diagnostic-core/quiz-session-diagnostic-complete';
 import { resolveQuizSessionDisplayPreview } from '@techmd/diagnostic-core/quiz-session-display-preview';
+import { resolveQuizSessionSummaryDisplayPreview } from '@/lib/marketing/quiz-session-summary-display';
 import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';
 import { getActiveDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
@@ -116,6 +117,7 @@ type LinkedBookingSummary = {
   readonly bookingTimezone: string;
   readonly bookingServiceKey: string;
   readonly bookingMeetingUrl: string | null;
+  readonly guidedDiagnosticSnapshot: string | null;
 };
 
 async function fetchPrimaryBookingIdByQuizSessionIds(sessionIds: readonly ObjectId[]): Promise<Map<string, string>> {
@@ -148,6 +150,7 @@ async function fetchPrimaryBookingByQuizSessionIds(
           timezone: 1,
           serviceKey: 1,
           meetingUrl: 1,
+          guidedDiagnosticSnapshot: 1,
           updatedAt: 1,
         },
       },
@@ -177,6 +180,9 @@ async function fetchPrimaryBookingByQuizSessionIds(
     }
     const meetingRaw = primary.meetingUrl;
     const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+    const snapshotRaw = primary.guidedDiagnosticSnapshot;
+    const guidedDiagnosticSnapshot =
+      typeof snapshotRaw === 'string' && snapshotRaw.trim().length > 0 ? snapshotRaw.trim() : null;
     result.set(sessionKey, {
       bookingId: primary._id.toString(),
       bookingStatus: normalizedStatus,
@@ -184,6 +190,7 @@ async function fetchPrimaryBookingByQuizSessionIds(
       bookingTimezone: primary.timezone,
       bookingServiceKey: primary.serviceKey,
       bookingMeetingUrl: meetingUrl,
+      guidedDiagnosticSnapshot,
     });
   }
   return result;
@@ -196,6 +203,9 @@ function mapBookingDocumentToLinkedSummary(doc: BookingDocument & { _id: ObjectI
   }
   const meetingRaw = doc.meetingUrl;
   const meetingUrl = typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+  const snapshotRaw = doc.guidedDiagnosticSnapshot;
+  const guidedDiagnosticSnapshot =
+    typeof snapshotRaw === 'string' && snapshotRaw.trim().length > 0 ? snapshotRaw.trim() : null;
   return {
     bookingId: doc._id.toString(),
     bookingStatus: normalizedStatus,
@@ -203,6 +213,7 @@ function mapBookingDocumentToLinkedSummary(doc: BookingDocument & { _id: ObjectI
     bookingTimezone: doc.timezone,
     bookingServiceKey: doc.serviceKey,
     bookingMeetingUrl: meetingUrl,
+    guidedDiagnosticSnapshot,
   };
 }
 
@@ -238,6 +249,7 @@ async function fetchLinkedBookingSummariesByBookingIds(
           timezone: 1,
           serviceKey: 1,
           meetingUrl: 1,
+          guidedDiagnosticSnapshot: 1,
         },
       },
     )
@@ -465,17 +477,25 @@ function mapVisitorQuizSessionSummary(
   linkedPayment: LinkedPaymentSummary | null,
 ): VisitorQuizSessionSummary {
   const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(doc.answers);
-  const displayPreview = resolveQuizSessionDisplayPreview({
+  const situationAnswer = readSituationAnswer(doc.answers);
+  const bookingSnapshot = linkedBooking?.guidedDiagnosticSnapshot ?? null;
+  const displayPreview = resolveQuizSessionSummaryDisplayPreview({
     guidedDiagnosticRaw: guidedRaw,
-    situationAnswer: readSituationAnswer(doc.answers),
+    situationAnswer,
+    bookingGuidedDiagnosticSnapshot: bookingSnapshot,
   });
   const idHex = doc._id.toString();
   const bookingId = linkedBooking?.bookingId ?? null;
   const completedAtIso = doc.completedAt !== undefined ? doc.completedAt.toISOString() : null;
-  const isDiagnosticComplete = resolveQuizSessionDiagnosticCompleted({
-    completedAtIso,
-    guidedDiagnosticRaw: guidedRaw,
-  });
+  const isDiagnosticComplete =
+    resolveQuizSessionDiagnosticCompleted({
+      completedAtIso,
+      guidedDiagnosticRaw: guidedRaw,
+    }) ||
+    resolveQuizSessionDiagnosticCompleted({
+      completedAtIso,
+      guidedDiagnosticRaw: bookingSnapshot,
+    });
   return {
     id: idHex,
     marketingSessionRef: encodeQuizSessionRefForMarketingUrl(idHex),
@@ -562,6 +582,7 @@ type AggregatedVisitorQuizSessionRow = QuizSessionDocument & {
     timezone: string;
     serviceKey: string;
     meetingUrl?: string;
+    guidedDiagnosticSnapshot?: string | null;
   } | null;
 };
 
@@ -658,6 +679,7 @@ export async function listQuizSessionsForVisitorPaginated(input: {
               timezone: 1,
               serviceKey: 1,
               meetingUrl: 1,
+              guidedDiagnosticSnapshot: 1,
               updatedAt: 1,
               statusRank: {
                 $switch: {
@@ -772,6 +794,9 @@ export async function listQuizSessionsForVisitorPaginated(input: {
             const meetingRaw = row.linkedBooking.meetingUrl;
             const meetingUrl =
               typeof meetingRaw === 'string' && meetingRaw.trim().length > 0 ? meetingRaw.trim() : null;
+            const snapshotRaw = row.linkedBooking.guidedDiagnosticSnapshot;
+            const guidedDiagnosticSnapshot =
+              typeof snapshotRaw === 'string' && snapshotRaw.trim().length > 0 ? snapshotRaw.trim() : null;
             return {
               bookingId: row.linkedBooking._id.toString(),
               bookingStatus: normalizeBookingDocumentStatus(row.linkedBooking.status) ?? row.linkedBooking.status,
@@ -779,6 +804,7 @@ export async function listQuizSessionsForVisitorPaginated(input: {
               bookingTimezone: row.linkedBooking.timezone,
               bookingServiceKey: row.linkedBooking.serviceKey,
               bookingMeetingUrl: meetingUrl,
+              guidedDiagnosticSnapshot,
             };
           })()
         : null;

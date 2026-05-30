@@ -17,9 +17,6 @@ export function resolveAccountDiagnosticListTitle(row: SessionListRow): string {
   if (summary !== undefined && summary.length > 0) {
     return summary;
   }
-  if (row.bookingReferenceId !== null) {
-    return `Booking ${row.bookingReferenceId}`;
-  }
   if (row.hasGuidedDiagnostic) {
     return 'Guided diagnostic';
   }
