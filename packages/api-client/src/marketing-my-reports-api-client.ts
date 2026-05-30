@@ -211,7 +211,7 @@ export async function postMarketingMyReportReply(params: {
   if (!response.ok || payload.report === undefined || payload.replyPolicy === undefined) {
     const error = new Error(payload.error ?? 'Failed to send follow-up message.');
     if (payload.code === 'rate_limited' && payload.retryAfterSeconds !== undefined) {
-      (error as Error & { readonly retryAfterSeconds?: number }).retryAfterSeconds = payload.retryAfterSeconds;
+      (error as Error & { retryAfterSeconds?: number }).retryAfterSeconds = payload.retryAfterSeconds;
     }
     throw error;
   }

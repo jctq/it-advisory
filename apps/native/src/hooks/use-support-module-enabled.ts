@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { readNativeAppConfig } from './native-app-config';
+import { readNativeAppConfig } from '../lib/native-app-config';
 
 type DiagnosticConfigResponse = {
   readonly supportModuleEnabled?: boolean;
