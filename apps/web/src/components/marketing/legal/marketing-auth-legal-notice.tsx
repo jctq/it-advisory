@@ -39,22 +39,15 @@ export function MarketingAuthLegalNotice(props: MarketingAuthLegalNoticeProps): 
       setOpenDocumentId(null);
     }
   }, []);
-  const securityNote =
-    props.variant === 'register'
-      ? 'We store a salted password hash only — never the plaintext password.'
-      : 'Use a secure password you do not reuse elsewhere. ';
+  if (props.variant !== 'login') {
+    return <></>;
+  }
   return (
     <>
       <p className="mx-auto max-w-lg text-center text-xs text-muted-foreground">
-        {securityNote}
-        {props.variant === 'login' ? (
-          <>
-            {' '}
-            By continuing, you agree to our{' '}
-            <LegalDocumentButton documentId="terms-of-use" label="Terms of Use" onOpen={openLegalDocument} /> and{' '}
-            <LegalDocumentButton documentId="privacy-policy" label="Privacy Policy" onOpen={openLegalDocument} />.
-          </>
-        ) : null}
+        Use a secure password you do not reuse elsewhere. By continuing, you agree to our{' '}
+        <LegalDocumentButton documentId="terms-of-use" label="Terms of Use" onOpen={openLegalDocument} /> and{' '}
+        <LegalDocumentButton documentId="privacy-policy" label="Privacy Policy" onOpen={openLegalDocument} />.
       </p>
       <MarketingLegalDialog
         documentId={openDocumentId}

@@ -23,6 +23,7 @@ export function LoginForm(props: LoginFormProps): ReactElement {
   const [password, setPassword] = useState<string>('');
   const [mergeGuestProgress, setMergeGuestProgress] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const canSubmit = email.trim().length > 0 && password.length > 0;
   const executeSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>): Promise<void> => {
       event.preventDefault();
@@ -51,7 +52,7 @@ export function LoginForm(props: LoginFormProps): ReactElement {
     [email, mergeGuestProgress, password, props.nextPath, router],
   );
   return (
-    <form className="mx-auto flex w-full max-w-md flex-col gap-5" onSubmit={executeSubmit} noValidate>
+    <form className="mx-auto flex w-full max-w-md flex-col gap-5" onSubmit={executeSubmit}>
       <div className="space-y-2">
         <label htmlFor="login-email" className="text-sm font-medium text-foreground">
           Email
@@ -63,6 +64,7 @@ export function LoginForm(props: LoginFormProps): ReactElement {
           autoComplete="email"
           inputMode="email"
           required
+          aria-required={true}
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
@@ -77,6 +79,7 @@ export function LoginForm(props: LoginFormProps): ReactElement {
           type="password"
           autoComplete="current-password"
           required
+          aria-required={true}
           minLength={8}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
@@ -90,17 +93,13 @@ export function LoginForm(props: LoginFormProps): ReactElement {
         />
         <span className="min-w-0">Move diagnostic and booking activity from this browser onto my signed-in profile.</span>
       </label>
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
+      <Button type="submit" className="w-full" disabled={isSubmitting || !canSubmit}>
         {isSubmitting ? 'Signing in…' : 'Sign in'}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
         No account?{' '}
         <Link href="/register" className="font-medium text-primary underline-offset-4 hover:underline">
           Create one
-        </Link>
-        {' · '}
-        <Link href="/diagnostic" className="font-medium text-primary underline-offset-4 hover:underline">
-          Continue as guest
         </Link>
       </p>
     </form>

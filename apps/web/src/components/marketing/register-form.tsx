@@ -37,6 +37,11 @@ function LegalDocumentButton(props: {
 }
 
 const CHECKBOX_ROW_CLASS = 'flex cursor-pointer items-start gap-3 text-sm leading-5 text-muted-foreground';
+const REQUIRED_LABEL_SUFFIX = (
+  <span className="ml-0.5 text-destructive" aria-hidden>
+    *
+  </span>
+);
 
 /**
  * Client form for marketing-site registration.
@@ -49,6 +54,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
   const [hasAcceptedLegalTerms, setHasAcceptedLegalTerms] = useState<boolean>(false);
   const [openDocumentId, setOpenDocumentId] = useState<LegalDocumentId | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const canSubmit = email.trim().length > 0 && password.length > 0 && hasAcceptedLegalTerms;
   const openLegalDocument = useCallback((documentId: LegalDocumentId): void => {
     setOpenDocumentId(documentId);
   }, []);
@@ -89,10 +95,11 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
     [email, hasAcceptedLegalTerms, mergeGuestProgress, password, props.nextPath, router],
   );
   return (
-    <form className="mx-auto flex w-full max-w-md flex-col gap-5" onSubmit={executeSubmit} noValidate>
+    <form className="mx-auto flex w-full max-w-md flex-col gap-5" onSubmit={executeSubmit}>
       <div className="space-y-2">
         <label htmlFor="register-email" className="text-sm font-medium text-foreground">
           Email
+          {REQUIRED_LABEL_SUFFIX}
         </label>
         <Input
           id="register-email"
@@ -101,6 +108,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
           autoComplete="email"
           inputMode="email"
           required
+          aria-required={true}
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
@@ -108,6 +116,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
       <div className="space-y-2">
         <label htmlFor="register-password" className="text-sm font-medium text-foreground">
           Password
+          {REQUIRED_LABEL_SUFFIX}
         </label>
         <Input
           id="register-password"
@@ -115,6 +124,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
           type="password"
           autoComplete="new-password"
           required
+          aria-required={true}
           minLength={8}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
@@ -133,14 +143,16 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
         <Checkbox
           checked={hasAcceptedLegalTerms}
           className="mt-0.5"
+          aria-required={true}
           onCheckedChange={(checked) => setHasAcceptedLegalTerms(checked === true)}
         />
         <span className="min-w-0">
           I agree to the <LegalDocumentButton documentId="terms-of-use" label="Terms of Use" onOpen={openLegalDocument} />{' '}
           and <LegalDocumentButton documentId="privacy-policy" label="Privacy Policy" onOpen={openLegalDocument} />.
+          {REQUIRED_LABEL_SUFFIX}
         </span>
       </label>
-      <Button type="submit" className="w-full" disabled={isSubmitting || !hasAcceptedLegalTerms}>
+      <Button type="submit" className="w-full" disabled={isSubmitting || !canSubmit}>
         {isSubmitting ? 'Creating account…' : 'Create account'}
       </Button>
       <MarketingLegalDialog
@@ -153,10 +165,6 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
         Already have an account?{' '}
         <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
           Sign in
-        </Link>
-        {' · '}
-        <Link href="/diagnostic" className="font-medium text-primary underline-offset-4 hover:underline">
-          Continue as guest
         </Link>
       </p>
     </form>
