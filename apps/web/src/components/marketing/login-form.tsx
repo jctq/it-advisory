@@ -4,12 +4,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState, type FormEvent, type ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { notifyError } from '@/lib/notify';
 
 type LoginFormProps = {
   readonly nextPath: string;
 };
+
+const CHECKBOX_ROW_CLASS = 'flex cursor-pointer items-start gap-3 text-sm leading-5 text-muted-foreground';
 
 /**
  * Client form for marketing-site sign-in.
@@ -79,14 +82,13 @@ export function LoginForm(props: LoginFormProps): ReactElement {
           onChange={(event) => setPassword(event.target.value)}
         />
       </div>
-      <label className="flex cursor-pointer items-start gap-3 text-sm text-muted-foreground">
-        <input
-          type="checkbox"
-          className="mt-1 size-4 rounded border border-input"
+      <label className={CHECKBOX_ROW_CLASS}>
+        <Checkbox
           checked={mergeGuestProgress}
-          onChange={(event) => setMergeGuestProgress(event.target.checked)}
+          className="mt-0.5"
+          onCheckedChange={(checked) => setMergeGuestProgress(checked === true)}
         />
-        <span>Move diagnostic and booking activity from this browser onto my signed-in profile.</span>
+        <span className="min-w-0">Move diagnostic and booking activity from this browser onto my signed-in profile.</span>
       </label>
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? 'Signing in…' : 'Sign in'}

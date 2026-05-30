@@ -28,7 +28,11 @@ export default async function RegisterPage(props: RegisterPageProps): Promise<Re
         </p>
       </div>
       <div className="mx-auto mt-10 max-w-lg rounded-xl border border-border bg-card p-6 shadow-sm">
-        <RegisterForm nextPath={nextPath} />
+        <RegisterForm
+          nextPath={nextPath}
+          privacyPolicyContent={<PrivacyPolicyContent />}
+          termsOfUseContent={<TermsOfUseContent />}
+        />
       </div>
       <div className="mx-auto mt-8">
         <MarketingAuthLegalNotice

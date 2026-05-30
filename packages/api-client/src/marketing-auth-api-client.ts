@@ -6,6 +6,10 @@ type AuthEmailPasswordInput = {
   readonly mergeGuestProgress?: boolean;
 };
 
+type AuthRegisterInput = AuthEmailPasswordInput & {
+  readonly acceptedLegalTerms: true;
+};
+
 export type MarketingAuthUser = {
   readonly id: string;
   readonly email: string;
@@ -81,13 +85,14 @@ export class MarketingAuthApiClient {
     });
   }
 
-  public async register(input: AuthEmailPasswordInput): Promise<{ readonly user: MarketingAuthUser; readonly sessionToken: string }> {
+  public async register(input: AuthRegisterInput): Promise<{ readonly user: MarketingAuthUser; readonly sessionToken: string }> {
     return this.executeAuthSuccessRequest({
       pathname: '/api/auth/register',
       body: {
         email: input.email,
         password: input.password,
         mergeGuestProgress: input.mergeGuestProgress ?? true,
+        acceptedLegalTerms: input.acceptedLegalTerms,
         returnSessionToken: true,
       },
     });

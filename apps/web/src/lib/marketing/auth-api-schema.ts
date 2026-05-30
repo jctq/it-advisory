@@ -7,3 +7,9 @@ export const authEmailPasswordBodySchema = z.object({
   /** When true, response includes `sessionToken` for native clients; guest merge uses `x-device-id` instead of the visitor cookie. */
   returnSessionToken: z.boolean().optional().default(false),
 });
+
+export const authRegisterBodySchema = authEmailPasswordBodySchema.extend({
+  acceptedLegalTerms: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the Terms of Use and Privacy Policy.' }),
+  }),
+});

@@ -2,13 +2,13 @@ import type { ReactElement } from 'react';
 import { BlogPostEmbed } from '@/components/marketing/blog/blog-post-embed';
 import { DefaultTermsOfUseContent } from '@/components/marketing/legal/default-terms-of-use-content';
 import { MarketingLegalProse } from '@/components/marketing/legal/marketing-legal-prose';
-import { getTermsOfUseBlogPostIdFromEnv } from '@/lib/marketing/legal-blog-embed-config';
+import { resolveLegalDocumentBlogPostId } from '@/lib/marketing/resolve-legal-document-blog-post-id';
 
 /**
- * Terms of use body: CMS embed when `TERMS_OF_USE_BLOG_POST_ID` is set, otherwise built-in copy.
+ * Terms of use body: CMS embed when configured in env or by published slug, otherwise built-in copy.
  */
 export async function TermsOfUseContent(): Promise<ReactElement> {
-  const embedPostId = getTermsOfUseBlogPostIdFromEnv();
+  const embedPostId = await resolveLegalDocumentBlogPostId('terms-of-use');
   if (embedPostId === null) {
     return <DefaultTermsOfUseContent />;
   }

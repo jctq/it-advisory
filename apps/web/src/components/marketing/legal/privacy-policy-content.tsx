@@ -2,13 +2,13 @@ import type { ReactElement } from 'react';
 import { BlogPostEmbed } from '@/components/marketing/blog/blog-post-embed';
 import { DefaultPrivacyPolicyContent } from '@/components/marketing/legal/default-privacy-policy-content';
 import { MarketingLegalProse } from '@/components/marketing/legal/marketing-legal-prose';
-import { getPrivacyPolicyBlogPostIdFromEnv } from '@/lib/marketing/legal-blog-embed-config';
+import { resolveLegalDocumentBlogPostId } from '@/lib/marketing/resolve-legal-document-blog-post-id';
 
 /**
- * Privacy policy body: CMS embed when `PRIVACY_POLICY_BLOG_POST_ID` is set, otherwise built-in copy.
+ * Privacy policy body: CMS embed when configured in env or by published slug, otherwise built-in copy.
  */
 export async function PrivacyPolicyContent(): Promise<ReactElement> {
-  const embedPostId = getPrivacyPolicyBlogPostIdFromEnv();
+  const embedPostId = await resolveLegalDocumentBlogPostId('privacy-policy');
   if (embedPostId === null) {
     return <DefaultPrivacyPolicyContent />;
   }

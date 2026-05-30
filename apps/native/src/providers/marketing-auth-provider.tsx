@@ -114,7 +114,7 @@ export function MarketingAuthProvider(props: PropsWithChildren): ReactNode {
         apiOrigin: config.apiBaseUrl,
         deviceId,
       });
-      const result = await client.register({ email, password, mergeGuestProgress: true });
+      const result = await client.register({ email, password, mergeGuestProgress: true, acceptedLegalTerms: true });
       await SecureStore.setItemAsync(MARKETING_SESSION_KEY, result.sessionToken);
       setSessionToken(result.sessionToken);
       setUser(result.user);

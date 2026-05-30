@@ -7,7 +7,7 @@ import {
   LEGAL_DOCUMENT_TITLES,
   type LegalDocumentId,
 } from '@/lib/marketing/legal-document-id';
-import { getLegalDocumentBlogPostIdFromEnv } from '@/lib/marketing/legal-blog-embed-config';
+import { resolveLegalDocumentBlogPostId } from '@/lib/marketing/resolve-legal-document-blog-post-id';
 
 const DEFAULT_LEGAL_PAGE_SUBTITLE =
   'Independent technology guidance for growing teams in the Philippines.';
@@ -21,7 +21,7 @@ type MarketingLegalPageProps = {
  * Full-page layout for standalone privacy policy and terms routes.
  */
 async function resolveLegalPageSubtitle(documentId: LegalDocumentId): Promise<string> {
-  const embedPostId = getLegalDocumentBlogPostIdFromEnv(documentId);
+  const embedPostId = await resolveLegalDocumentBlogPostId(documentId);
   if (embedPostId === null) {
     return DEFAULT_LEGAL_PAGE_SUBTITLE;
   }

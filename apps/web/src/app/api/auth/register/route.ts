@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { authEmailPasswordBodySchema } from '@/lib/marketing/auth-api-schema';
+import { authRegisterBodySchema } from '@/lib/marketing/auth-api-schema';
 import { mergeVisitorIdentityIntoAccount } from '@/lib/data/merge-visitor-identity';
 import { createUserAuthSession } from '@/lib/data/user-auth-sessions';
 import { buildMarketingUserPublicFromNewAccount } from '@/lib/marketing/marketing-user-public';
@@ -18,7 +18,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const parsed = authEmailPasswordBodySchema.safeParse(json);
+  const parsed = authRegisterBodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
