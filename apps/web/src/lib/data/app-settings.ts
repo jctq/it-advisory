@@ -18,6 +18,7 @@ export type AppSettingsValues = {
   readonly diagnosticAiEnabled: boolean;
   readonly diagnosticManageBookingEnabled: boolean;
   readonly supportModuleEnabled: boolean;
+  readonly reviewsModuleEnabled: boolean;
   readonly bookingSessionRoomLinksEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
@@ -46,6 +47,7 @@ function defaultSettings(): AppSettingsValues {
     diagnosticAiEnabled: false,
     diagnosticManageBookingEnabled: false,
     supportModuleEnabled: false,
+    reviewsModuleEnabled: false,
     bookingSessionRoomLinksEnabled: true,
     diagnosticMaxRounds: 4,
     diagnosticQuestionsPerRound: 5,
@@ -69,6 +71,8 @@ function mergeDocument(doc: AppSettingsDocument | null): AppSettingsValues {
         : base.diagnosticManageBookingEnabled,
     supportModuleEnabled:
       typeof doc.supportModuleEnabled === 'boolean' ? doc.supportModuleEnabled : base.supportModuleEnabled,
+    reviewsModuleEnabled:
+      typeof doc.reviewsModuleEnabled === 'boolean' ? doc.reviewsModuleEnabled : base.reviewsModuleEnabled,
     bookingSessionRoomLinksEnabled:
       typeof doc.bookingSessionRoomLinksEnabled === 'boolean'
         ? doc.bookingSessionRoomLinksEnabled
@@ -140,6 +144,8 @@ export async function updateAppSettings(patch: Partial<AppSettingsValues>): Prom
         : current.diagnosticManageBookingEnabled,
     supportModuleEnabled:
       patch.supportModuleEnabled !== undefined ? patch.supportModuleEnabled : current.supportModuleEnabled,
+    reviewsModuleEnabled:
+      patch.reviewsModuleEnabled !== undefined ? patch.reviewsModuleEnabled : current.reviewsModuleEnabled,
     bookingSessionRoomLinksEnabled:
       patch.bookingSessionRoomLinksEnabled !== undefined
         ? patch.bookingSessionRoomLinksEnabled

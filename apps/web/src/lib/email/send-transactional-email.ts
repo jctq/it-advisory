@@ -194,8 +194,8 @@ export async function executeSendTransactionalProviderTestEmail(
     | { readonly providerId: 'sendgrid'; readonly apiKey: string; readonly from: string },
 ): Promise<{ readonly ok: true; readonly message: string } | { readonly ok: false; readonly message: string }> {
   const testTo = resolveDefaultTransactionalTestInbox();
-  const subject = `TechMD email test (${input.providerId})`;
-  const html = '<p>This is an admin test send from TechMD email settings.</p>';
+  const subject = `TeqMD email test (${input.providerId})`;
+  const html = '<p>This is an admin test send from TeqMD email settings.</p>';
   const bcc: readonly string[] = [];
   let send: TransactionalSendResult;
   if (input.providerId === 'resend') {

@@ -11,7 +11,7 @@ type LoginPageProps = {
 };
 
 export const metadata = buildNoIndexMetadata({
-  title: 'Sign in · TechMD',
+  title: 'Sign in · TeqMD',
   description: 'Sign in to save diagnostic progress across browsers.',
 });
 

@@ -25,7 +25,7 @@ export async function generateMetadata(props: BlogArticlePageProps) {
   const post = await findPublishedBlogPostBySlug(slug);
   if (post === null) {
     return buildMarketingMetadata({
-      title: 'Article not found — TechMD',
+      title: 'Article not found — TeqMD',
       description: 'This article could not be found.',
       pathname: `/blog/${slug}`,
     });
@@ -33,7 +33,7 @@ export async function generateMetadata(props: BlogArticlePageProps) {
   const seoTitle = getBlogPostSeoTitle(post);
   const seoKeywords = parseBlogPostSeoKeywords(post);
   return buildMarketingMetadata({
-    title: `${seoTitle} — TechMD Blog`,
+    title: `${seoTitle} — TeqMD Blog`,
     description: getBlogPostSeoDescription(post),
     pathname: `/blog/${slug}`,
     openGraphType: 'article',

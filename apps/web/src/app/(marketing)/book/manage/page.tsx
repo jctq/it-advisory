@@ -8,7 +8,7 @@ import { BookRouteLoadingFallback } from '../book-route-loading-fallback';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildNoIndexMetadata({
-  title: 'Manage your booking · TechMD',
+  title: 'Manage your booking · TeqMD',
   description: 'Look up your booking reference to check status or complete payment.',
 });
 

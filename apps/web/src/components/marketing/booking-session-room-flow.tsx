@@ -527,7 +527,7 @@ function BookingSessionRoomView(props: BookingSessionRoomViewProps): ReactElemen
             </div>
           ) : sessionEndedByFathom ? (
             <div className="mx-auto mt-6 max-w-md space-y-3">
-              <p className="text-sm text-muted-foreground">Your consultation has ended. Thank you for joining TechMD.</p>
+              <p className="text-sm text-muted-foreground">Your consultation has ended. Thank you for joining TeqMD.</p>
               {booking.fathomNotesUrl !== null ? (
                 <p className="text-sm">
                   <a
@@ -542,7 +542,7 @@ function BookingSessionRoomView(props: BookingSessionRoomViewProps): ReactElemen
               ) : null}
             </div>
           ) : displayPhase === 'ended' ? (
-            <p className="mt-6 text-sm text-muted-foreground">This session window has ended. Thank you for joining TechMD.</p>
+            <p className="mt-6 text-sm text-muted-foreground">This session window has ended. Thank you for joining TeqMD.</p>
           ) : displayPhase === 'live' ? (
             <div className="mt-6 space-y-2">
               <p className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">Your session is in progress</p>
@@ -612,7 +612,7 @@ function BookingSessionRoomView(props: BookingSessionRoomViewProps): ReactElemen
                 <AddToCalendarButtons
                   className="mt-3"
                   startsAtIso={booking.startsAtIso}
-                  title={`${sessionHeadline} · TechMD`}
+                  title={`${sessionHeadline} · TeqMD`}
                   description={calendarDescription}
                   location={resolveBookingJoinCalendarLocation({
                     useSessionRoomLinks: props.bookingSessionRoomLinksEnabled,

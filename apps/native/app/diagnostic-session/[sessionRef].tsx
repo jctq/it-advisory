@@ -223,7 +223,7 @@ export default function DiagnosticSessionDetailScreen() {
                 <AddToCalendarLinkRow
                   startsAtIso={linkedBookingSlot.startsAtIso}
                   title={calendarTitle}
-                  description="Booked consultation from your TechMD diagnostic."
+                  description="Booked consultation from your TeqMD diagnostic."
                   location={linkedBookingSlot.meetingUrl ?? undefined}
                   icsUidSeed={linkedBookingSlot.startsAtIso}
                   theme={calendarThemeSlice}

@@ -34,7 +34,7 @@ export function MarketingLegalDialog(props: MarketingLegalDialogProps): ReactEle
         <DialogHeader className="shrink-0 border-b border-border px-6 py-4 text-left">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">
-            {props.documentId !== null ? `${title} for TechMD` : ''}
+            {props.documentId !== null ? `${title} for TeqMD` : ''}
           </DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{bodyContent}</div>

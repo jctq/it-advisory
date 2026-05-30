@@ -8,7 +8,7 @@ type AdminMarketingUserDetailPageProps = {
 };
 
 export const metadata = {
-  title: 'User — TechMD Admin',
+  title: 'User — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

@@ -5,8 +5,8 @@ import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 export const dynamic = 'force-dynamic';
 
 export const metadata = buildNoIndexMetadata({
-  title: 'TechMD Admin',
-  description: 'Internal administration for TechMD.',
+  title: 'TeqMD Admin',
+  description: 'Internal administration for TeqMD.',
 });
 
 type AdminLayoutProps = {

@@ -35,7 +35,7 @@ export function MarketingCookieConsentBanner(): ReactElement {
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
               <div className="min-w-0 flex-1 space-y-2 pr-8 lg:pr-0">
                 <h2 id="cookie-banner-title" className="text-base font-semibold tracking-tight text-foreground">
-                  Cookies on TechMD
+                  Cookies on TeqMD
                 </h2>
                 <p id="cookie-banner-description" className="text-sm leading-relaxed text-muted-foreground">
                   Our site needs some cookies to work (sessions, diagnostic progress, and security). With your permission, we

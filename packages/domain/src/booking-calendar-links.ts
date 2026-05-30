@@ -70,7 +70,7 @@ function buildIcsCalendarContent(input: BuildBookingCalendarLinkBundleInput, end
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//TechMD//Booking//EN',
+    'PRODID:-//TeqMD//Booking//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',

@@ -13,8 +13,8 @@ export type AdminColorTheme = (typeof ADMIN_COLOR_THEMES)[number];
 export const DEFAULT_ADMIN_COLOR_MODE: AdminColorMode = 'system';
 export const DEFAULT_ADMIN_COLOR_THEME: AdminColorTheme = 'indigo';
 
-export const DEFAULT_MARKETING_COLOR_MODE: AdminColorMode = 'light';
-export const DEFAULT_MARKETING_COLOR_THEME: AdminColorTheme = 'indigo';
+export const DEFAULT_MARKETING_COLOR_MODE: AdminColorMode = 'dark';
+export const DEFAULT_MARKETING_COLOR_THEME: AdminColorTheme = 'amber';
 
 export type AdminColorModeOption = {
   readonly value: AdminColorMode;

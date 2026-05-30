@@ -7,7 +7,7 @@ import { BookRouteLoadingFallback } from './book-route-loading-fallback';
 import { buildMarketingMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildMarketingMetadata({
-  title: 'Book a session · TechMD',
+  title: 'Book a session · TeqMD',
   description: 'Choose a Philippine-time slot for your consultation.',
   pathname: '/book',
 });

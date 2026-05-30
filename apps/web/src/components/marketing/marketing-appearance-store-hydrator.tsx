@@ -39,11 +39,17 @@ export function MarketingAppearanceStoreHydrator(props: MarketingAppearanceStore
   );
   const syncExternalAppearance = useMarketingAppearanceStore((state) => state.syncExternalAppearance);
   const applyResolvedAppearance = useMarketingAppearanceStore((state) => state.applyResolvedAppearance);
+  const executeChangeColorMode = useMarketingAppearanceStore((state) => state.executeChangeColorMode);
+  const executeChangeColorTheme = useMarketingAppearanceStore((state) => state.executeChangeColorTheme);
   useLayoutEffect(() => {
     syncExternalAppearance({ storedColorMode, storedColorTheme, systemPrefersDark });
   }, [storedColorMode, storedColorTheme, systemPrefersDark, syncExternalAppearance]);
   useLayoutEffect(() => {
     applyResolvedAppearance();
   }, [storedColorMode, storedColorTheme, systemPrefersDark, applyResolvedAppearance]);
+  useLayoutEffect(() => {
+    executeChangeColorMode('dark');
+    executeChangeColorTheme('amber');
+  }, [executeChangeColorMode, executeChangeColorTheme]);
   return <>{props.children}</>;
 }

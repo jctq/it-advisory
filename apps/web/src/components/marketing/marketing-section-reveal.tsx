@@ -61,6 +61,7 @@ export function MarketingSectionReveal(props: MarketingSectionRevealProps): Reac
         <MarketingSectionRevealItem
           key={isValidElement(child) && child.key != null ? String(child.key) : `marketing-reveal-${index}`}
           as={Tag === 'ul' || Tag === 'ol' ? 'li' : 'div'}
+          className="h-full"
           direction={direction}
         >
           {child}

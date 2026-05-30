@@ -4,7 +4,7 @@ import { extractBookingReferenceCandidatesFromFathomText } from './extract-booki
 describe('extractBookingReferenceCandidatesFromFathomText', () => {
   it('extracts reference from Meet-style calendar title', () => {
     const actual = extractBookingReferenceCandidatesFromFathomText(
-      'TechMD · Project rescue — A1B2C3D4',
+      'TeqMD · Project rescue — A1B2C3D4',
     );
     expect(actual).toEqual(['A1B2C3D4']);
   });

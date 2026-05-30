@@ -14,7 +14,7 @@ type AdminDiagnosticTemplateDetailPageProps = {
 };
 
 export const metadata = {
-  title: 'Edit Diagnostic Template — TechMD Admin',
+  title: 'Edit Diagnostic Template — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

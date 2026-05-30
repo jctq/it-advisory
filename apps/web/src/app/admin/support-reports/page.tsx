@@ -3,7 +3,7 @@ import { SupportReportsTable } from '@/components/admin/support-reports-table';
 import { listSupportReportsForAdmin } from '@/lib/data/support-reports';
 
 export const metadata = {
-  title: 'Support reports — TechMD Admin',
+  title: 'Support reports — TeqMD Admin',
 };
 
 export default async function AdminSupportReportsPage() {

@@ -1,6 +1,6 @@
 'use client';
 
-import { Bug, Building2, CalendarDays, Headphones, LayoutTemplate, Video } from 'lucide-react';
+import { Bug, Building2, CalendarDays, Headphones, LayoutTemplate, MessageSquareQuote, Video } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -34,6 +34,7 @@ type SettingsPayload = {
   readonly diagnosticAiEnabled: boolean;
   readonly diagnosticManageBookingEnabled: boolean;
   readonly supportModuleEnabled: boolean;
+  readonly reviewsModuleEnabled: boolean;
   readonly bookingSessionRoomLinksEnabled: boolean;
   readonly diagnosticMaxRounds: number;
   readonly diagnosticQuestionsPerRound: number;
@@ -63,6 +64,7 @@ function areSettingsEqual(left: SettingsPayload, right: SettingsPayload): boolea
     left.diagnosticAiEnabled === right.diagnosticAiEnabled &&
     left.diagnosticManageBookingEnabled === right.diagnosticManageBookingEnabled &&
     left.supportModuleEnabled === right.supportModuleEnabled &&
+    left.reviewsModuleEnabled === right.reviewsModuleEnabled &&
     left.bookingSessionRoomLinksEnabled === right.bookingSessionRoomLinksEnabled &&
     left.diagnosticMaxRounds === right.diagnosticMaxRounds &&
     left.diagnosticQuestionsPerRound === right.diagnosticQuestionsPerRound &&
@@ -96,10 +98,11 @@ function SettingsCard(props: {
 
 export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
   const [siteName, setSiteName] = useState<string>('');
-  const [siteNameEnvDefault, setSiteNameEnvDefault] = useState<string>('TechMD');
+  const [siteNameEnvDefault, setSiteNameEnvDefault] = useState<string>('TeqMD');
   const [diagnosticAiEnabled, setDiagnosticAiEnabled] = useState<boolean>(false);
   const [diagnosticManageBookingEnabled, setDiagnosticManageBookingEnabled] = useState<boolean>(false);
   const [supportModuleEnabled, setSupportModuleEnabled] = useState<boolean>(false);
+  const [reviewsModuleEnabled, setReviewsModuleEnabled] = useState<boolean>(false);
   const [bookingSessionRoomLinksEnabled, setBookingSessionRoomLinksEnabled] = useState<boolean>(true);
   const [diagnosticMaxRounds, setDiagnosticMaxRounds] = useState<number>(4);
   const [diagnosticQuestionsPerRound, setDiagnosticQuestionsPerRound] = useState<number>(5);
@@ -119,6 +122,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       diagnosticAiEnabled,
       diagnosticManageBookingEnabled,
       supportModuleEnabled,
+      reviewsModuleEnabled,
       bookingSessionRoomLinksEnabled,
       diagnosticMaxRounds,
       diagnosticQuestionsPerRound,
@@ -131,6 +135,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       diagnosticAiEnabled,
       diagnosticManageBookingEnabled,
       supportModuleEnabled,
+      reviewsModuleEnabled,
       bookingSessionRoomLinksEnabled,
       diagnosticCacheDebugEnabled,
       diagnosticMaxRounds,
@@ -153,12 +158,14 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         if (!cancelled) {
           const snapshot: SettingsPayload = {
             siteName: typeof data.siteName === 'string' ? data.siteName : '',
-            siteNameEnvDefault: typeof data.siteNameEnvDefault === 'string' ? data.siteNameEnvDefault : 'TechMD',
+            siteNameEnvDefault: typeof data.siteNameEnvDefault === 'string' ? data.siteNameEnvDefault : 'TeqMD',
             diagnosticAiEnabled: typeof data.diagnosticAiEnabled === 'boolean' ? data.diagnosticAiEnabled : false,
             diagnosticManageBookingEnabled:
               typeof data.diagnosticManageBookingEnabled === 'boolean' ? data.diagnosticManageBookingEnabled : false,
             supportModuleEnabled:
               typeof data.supportModuleEnabled === 'boolean' ? data.supportModuleEnabled : false,
+            reviewsModuleEnabled:
+              typeof data.reviewsModuleEnabled === 'boolean' ? data.reviewsModuleEnabled : false,
             bookingSessionRoomLinksEnabled:
               typeof data.bookingSessionRoomLinksEnabled === 'boolean'
                 ? data.bookingSessionRoomLinksEnabled
@@ -174,6 +181,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
           setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
           setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
           setSupportModuleEnabled(snapshot.supportModuleEnabled);
+          setReviewsModuleEnabled(snapshot.reviewsModuleEnabled);
           setBookingSessionRoomLinksEnabled(snapshot.bookingSessionRoomLinksEnabled);
           setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
           setDiagnosticQuestionsPerRound(snapshot.diagnosticQuestionsPerRound);
@@ -207,6 +215,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
           diagnosticAiEnabled,
           diagnosticManageBookingEnabled,
           supportModuleEnabled,
+          reviewsModuleEnabled,
           bookingSessionRoomLinksEnabled,
           diagnosticMaxRounds,
           diagnosticQuestionsPerRound,
@@ -224,6 +233,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         diagnosticAiEnabled: data.diagnosticAiEnabled,
         diagnosticManageBookingEnabled: data.diagnosticManageBookingEnabled,
         supportModuleEnabled: data.supportModuleEnabled,
+        reviewsModuleEnabled: data.reviewsModuleEnabled,
         bookingSessionRoomLinksEnabled: data.bookingSessionRoomLinksEnabled,
         diagnosticMaxRounds: data.diagnosticMaxRounds,
         diagnosticQuestionsPerRound: data.diagnosticQuestionsPerRound,
@@ -235,6 +245,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       setDiagnosticAiEnabled(snapshot.diagnosticAiEnabled);
       setDiagnosticManageBookingEnabled(snapshot.diagnosticManageBookingEnabled);
       setSupportModuleEnabled(snapshot.supportModuleEnabled);
+      setReviewsModuleEnabled(snapshot.reviewsModuleEnabled);
       setBookingSessionRoomLinksEnabled(snapshot.bookingSessionRoomLinksEnabled);
       setDiagnosticMaxRounds(snapshot.diagnosticMaxRounds);
       setDiagnosticQuestionsPerRound(snapshot.diagnosticQuestionsPerRound);
@@ -252,6 +263,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     diagnosticCacheDebugEnabled,
     diagnosticManageBookingEnabled,
     supportModuleEnabled,
+    reviewsModuleEnabled,
     bookingSessionRoomLinksEnabled,
     diagnosticMaxRounds,
     diagnosticOptionsPerQuestion,
@@ -268,6 +280,7 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
     setDiagnosticAiEnabled(savedSnapshot.diagnosticAiEnabled);
     setDiagnosticManageBookingEnabled(savedSnapshot.diagnosticManageBookingEnabled);
     setSupportModuleEnabled(savedSnapshot.supportModuleEnabled);
+    setReviewsModuleEnabled(savedSnapshot.reviewsModuleEnabled);
     setBookingSessionRoomLinksEnabled(savedSnapshot.bookingSessionRoomLinksEnabled);
     setDiagnosticMaxRounds(savedSnapshot.diagnosticMaxRounds);
     setDiagnosticQuestionsPerRound(savedSnapshot.diagnosticQuestionsPerRound);
@@ -518,6 +531,37 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
               }
             >
               Enable support reports
+            </AdminSettingsLabel>
+          </div>
+        </div>
+      </SettingsCard>
+      <SettingsCard
+        icon={<MessageSquareQuote className="size-5" aria-hidden />}
+        title="Marketing testimonials"
+        description="Control whether the homepage can show a client testimonials section once published quotes exist."
+      >
+        <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
+          <input
+            id="reviewsModuleEnabled"
+            type="checkbox"
+            checked={reviewsModuleEnabled}
+            onChange={(event) => {
+              setReviewsModuleEnabled(event.target.checked);
+            }}
+            className="mt-1 size-4 rounded border-input"
+          />
+          <div>
+            <AdminSettingsLabel
+              htmlFor="reviewsModuleEnabled"
+              hint={
+                <>
+                  When disabled, the homepage testimonials band stays hidden even if quotes are stored. When enabled,
+                  the section appears only after at least one published testimonial exists in{' '}
+                  <span className="font-medium text-foreground">Admin → Testimonials</span>.
+                </>
+              }
+            >
+              Enable marketing testimonials
             </AdminSettingsLabel>
           </div>
         </div>

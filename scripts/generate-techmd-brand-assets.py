@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Regenerates TECHMD brand assets from masters in `public/brand/_source/`.
+Regenerates TEQMD brand assets from masters in `public/brand/_source/`.
 
 - **Light** (`techmd-logo-master.*`): full, compact, mark, SVG wrappers, native app icons.
 - **Dark** (`techmd-logo-master-dark.*`): same crops from the dark-mode master (keys navy backdrop
@@ -33,7 +33,7 @@ from PIL import Image, ImageFilter
 
 REPO = Path(__file__).resolve().parents[1]
 SOURCE_DIR = REPO / "apps/web/public/brand/_source"
-# Reference canvas used when the original TECHMD master was 1024×682 (crop math).
+# Reference canvas used when the original TEQMD master was 1024×682 (crop math).
 REFERENCE_MASTER_WIDTH_PX = 1024
 REFERENCE_MASTER_HEIGHT_PX = 682
 MARK_CROP_LEFT = 78
@@ -233,7 +233,7 @@ def save_png_optimized(im: Image.Image, path: Path) -> None:
     im.save(path, format="PNG", optimize=True, compress_level=6)
 
 
-def write_logo_svg(im: Image.Image, png_name: str, svg_path: Path, aria_label: str = "TECHMD") -> None:
+def write_logo_svg(im: Image.Image, png_name: str, svg_path: Path, aria_label: str = "TEQMD") -> None:
     w, h = im.size
     svg_path.write_text(
         (
@@ -495,7 +495,7 @@ def main() -> None:
         print("Light source not found in _source/ (techmd-logo-master.*)", file=sys.stderr)
         sys.exit(1)
     version = write_brand_asset_version(web_brand)
-    print(f"Wrote TECHMD assets to apps/web/public/brand and apps/native/assets (v={version})")
+    print(f"Wrote TEQMD assets to apps/web/public/brand and apps/native/assets (v={version})")
 
 
 if __name__ == "__main__":

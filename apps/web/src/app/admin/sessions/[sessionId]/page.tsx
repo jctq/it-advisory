@@ -25,7 +25,7 @@ type AdminQuizSessionDetailPageProps = {
 };
 
 export const metadata = {
-  title: 'Session — TechMD Admin',
+  title: 'Session — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

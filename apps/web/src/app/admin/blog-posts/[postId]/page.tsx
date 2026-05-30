@@ -3,7 +3,7 @@ import { BlogPostEditor } from '@/components/admin/blog-post-editor';
 import { findBlogPostById } from '@/lib/data/blog-posts';
 
 export const metadata = {
-  title: 'Edit blog post — TechMD Admin',
+  title: 'Edit blog post — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

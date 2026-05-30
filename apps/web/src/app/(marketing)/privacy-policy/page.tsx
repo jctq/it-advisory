@@ -3,8 +3,8 @@ import { MarketingLegalPage } from '@/components/marketing/legal/marketing-legal
 import { buildMarketingMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildMarketingMetadata({
-  title: 'Privacy Policy · TechMD',
-  description: 'How TechMD collects, uses, and protects your information.',
+  title: 'Privacy Policy · TeqMD',
+  description: 'How TeqMD collects, uses, and protects your information.',
   pathname: '/privacy-policy',
 });
 

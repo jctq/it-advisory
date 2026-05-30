@@ -9,7 +9,7 @@ type AdminSupportReportDetailPageProps = {
 export async function generateMetadata(props: AdminSupportReportDetailPageProps) {
   const { reportId } = await props.params;
   return {
-    title: `Support report ${reportId} — TechMD Admin`,
+    title: `Support report ${reportId} — TeqMD Admin`,
   };
 }
 

@@ -8,8 +8,8 @@ import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildNoIndexMetadata({
-  title: 'Profile — TechMD',
-  description: 'Manage your TechMD account profile.',
+  title: 'Profile — TeqMD',
+  description: 'Manage your TeqMD account profile.',
 });
 
 export const dynamic = 'force-dynamic';

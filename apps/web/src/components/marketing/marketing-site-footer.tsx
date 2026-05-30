@@ -2,41 +2,37 @@ import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { MarketingCookiePreferencesLink } from '@/components/marketing/cookie-consent/marketing-cookie-preferences-link';
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
+import { listPublishedMarketingTestimonials } from '@/lib/data/testimonials';
 import { LEGAL_DOCUMENT_PATHS } from '@/lib/marketing/legal-document-id';
-import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
+import {
+  buildMarketingExploreNavLinks,
+  resolveMarketingCaseStudiesNavEnabled,
+} from '@/lib/marketing/marketing-explore-nav-links';
+import { readReviewsModuleEnabled } from '@/lib/marketing/reviews-module-gate';
 
 type FooterLink = { readonly href: string; readonly label: string };
 
-const EXPLORE_FOOTER_LINKS: readonly FooterLink[] = [
-  { href: '/#how-it-works', label: 'How it works' },
-  { href: '/#services', label: 'Services' },
-  { href: '/#about', label: 'About' },
-  { href: '/#resources', label: 'Resources' },
-  { href: '/blog', label: 'Blog' },
+const START_HERE_FOOTER_LINKS: readonly FooterLink[] = [
+  { href: '/diagnostic', label: 'Take the Assessment' },
+  { href: '/book', label: 'Book a Consultation' },
+  { href: '/login', label: 'Sign In' },
 ] as const;
-
-const MANAGE_BOOKING_FOOTER_LINK: FooterLink = { href: '/book/manage', label: 'Manage booking' };
-
-function buildGetStartedFooterLinks(manageBookingEnabled: boolean): readonly FooterLink[] {
-  const links: FooterLink[] = [
-    { href: '/diagnostic', label: 'Guided diagnostic' },
-    { href: '/book', label: 'Book a session' },
-  ];
-  if (manageBookingEnabled) {
-    links.push(MANAGE_BOOKING_FOOTER_LINK);
-  }
-  links.push({ href: '/login', label: 'Sign in' });
-  return links;
-}
 
 /**
  * Multi-column marketing footer inspired by premium agency one-page layouts.
  */
 export async function MarketingSiteFooter(): Promise<ReactElement> {
-  const manageBookingEnabled = await readManageBookingEnabled();
+  const [reviewsModuleEnabled, testimonials] = await Promise.all([
+    readReviewsModuleEnabled(),
+    listPublishedMarketingTestimonials(),
+  ]);
+  const caseStudiesNavEnabled = resolveMarketingCaseStudiesNavEnabled({
+    reviewsModuleEnabled,
+    publishedTestimonialCount: testimonials.length,
+  });
   const footerLinkGroups: readonly { readonly title: string; readonly links: readonly FooterLink[] }[] = [
-    { title: 'Explore', links: EXPLORE_FOOTER_LINKS },
-    { title: 'Get started', links: buildGetStartedFooterLinks(manageBookingEnabled) },
+    { title: 'Explore', links: buildMarketingExploreNavLinks(caseStudiesNavEnabled) },
+    { title: 'Start Here', links: START_HERE_FOOTER_LINKS },
   ];
   return (
     <footer className="border-t border-border bg-muted/30">
@@ -50,8 +46,8 @@ export async function MarketingSiteFooter(): Promise<ReactElement> {
               <TechmdSiteLogo />
             </Link>
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Independent technology guidance for growing teams in the Philippines — from diagnostic to a
-              decision you can ship.
+              TeqMD helps organizations diagnose challenges, evaluate options, and make confident technology
+              decisions before investing time and money.
             </p>
           </div>
           {footerLinkGroups.map((group) => (
@@ -73,7 +69,10 @@ export async function MarketingSiteFooter(): Promise<ReactElement> {
           ))}
         </div>
         <div className="mt-12 flex flex-col gap-3 border-t border-border/80 pt-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} TechMD. Philippines · Asia/Manila.</p>
+          <div className="space-y-1">
+            <p>© {new Date().getFullYear()} TeqMD. All Rights Reserved.</p>
+            <p>Independent Technology Advisory • Philippines</p>
+          </div>
           <div className="flex flex-col gap-2 sm:items-end">
             <nav aria-label="Legal" className="flex flex-wrap gap-x-4 gap-y-1">
               <Link
@@ -91,7 +90,7 @@ export async function MarketingSiteFooter(): Promise<ReactElement> {
               <MarketingCookiePreferencesLink className="text-muted-foreground transition-colors hover:text-foreground" />
             </nav>
             <p className="text-muted-foreground/90">
-              Pain-first guidance · Guided steps · Vendor-neutral recommendations
+              Independent Advice · Practical Recommendations · Better Technology Decisions
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
-# TechMD — Turborepo
+# TeqMD — Turborepo
 
-Monorepo for **TechMD**, a Philippines-first technology advisory funnel: quiz → recommendation → booking, with admin CRM tables.
+Monorepo for **TeqMD**, a Philippines-first technology advisory funnel: quiz → recommendation → booking, with admin CRM tables.
 
 ## Stack
 

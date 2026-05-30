@@ -6,8 +6,8 @@ import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 import { BookRouteLoadingFallback } from '../book-route-loading-fallback';
 
 export const metadata = buildNoIndexMetadata({
-  title: 'Session room · TechMD',
-  description: 'Join your TechMD consultation from your branded session room.',
+  title: 'Session room · TeqMD',
+  description: 'Join your TeqMD consultation from your branded session room.',
 });
 
 export default async function BookSessionRoomPage(): Promise<ReactNode> {

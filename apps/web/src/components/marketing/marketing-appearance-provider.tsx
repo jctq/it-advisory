@@ -22,7 +22,7 @@ type MarketingAppearanceProviderProps = {
 };
 
 /**
- * Applies marketing-site appearance (separate localStorage from admin; default light mode).
+ * Applies marketing-site appearance (default dark mode, amber accent).
  */
 export function MarketingAppearanceProvider(props: MarketingAppearanceProviderProps): ReactElement {
   return (

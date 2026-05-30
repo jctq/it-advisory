@@ -36,6 +36,8 @@ export const COLLECTIONS = {
   fathomWebhookDeliveries: 'fathom_webhook_deliveries',
   /** Admin-managed blog posts (markdown CMS for marketing site). */
   blogPosts: 'blog_posts',
+  /** Admin-managed client quotes for the marketing homepage testimonials band. */
+  testimonials: 'testimonials',
   /** Append-only save history for blog post edits (field snapshots for diffs). */
   blogPostRevisions: 'blog_post_revisions',
   /** Uploaded images for blog post markdown (paste / insert in admin editor). */

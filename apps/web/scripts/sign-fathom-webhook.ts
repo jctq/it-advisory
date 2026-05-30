@@ -15,10 +15,10 @@ import { signFathomWebhook } from '../src/lib/fathom/verify-fathom-webhook';
 
 const DEFAULT_RAW_BODY = JSON.stringify({
   recording_id: '149718746',
-  title: 'TechMD · Automation Scoping Session — C492B59D',
+  title: 'TeqMD · Automation Scoping Session — C492B59D',
   share_url: 'https://fathom.video/share/JUoscpHas4ga8sD_s_BFBQYJdSpz28do',
   recording_start_time: '2026-05-27T00:00:59Z',
-  summary: 'TechMD · Automation Scoping Session — C492B59D',
+  summary: 'TeqMD · Automation Scoping Session — C492B59D',
 });
 
 function readRawBodyFromArgv(): string {

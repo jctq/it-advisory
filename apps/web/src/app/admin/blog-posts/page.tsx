@@ -2,7 +2,7 @@ import { BlogPostsList } from '@/components/admin/blog-posts-list';
 import { listBlogPosts } from '@/lib/data/blog-posts';
 
 export const metadata = {
-  title: 'Blog — TechMD Admin',
+  title: 'Blog — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

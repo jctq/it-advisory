@@ -1,5 +1,5 @@
 /** Fallback when {@link process.env.SITE_NAME} and admin override are unset. */
-export const DEFAULT_SITE_NAME = 'TechMD' as const;
+export const DEFAULT_SITE_NAME = 'TeqMD' as const;
 
 /**
  * Site name from environment (`SITE_NAME`). Used until overridden in Admin → Settings → General.

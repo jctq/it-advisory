@@ -4,7 +4,7 @@ import type { ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
-  title: 'Page not found — TechMD Admin',
+  title: 'Page not found — TeqMD Admin',
 };
 
 export default function AdminNotFoundPage(): ReactElement {

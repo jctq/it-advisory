@@ -71,8 +71,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       stopWhen: stepCountIs(15),
       temperature: 0.35,
       system:
-        'You support visitors to TechMD, a Philippines-focused independent technology advisory practice. Use web search when it improves factual grounding (products, vendors, trends). Stay neutral—no legal, medical, or HR guarantees. Short paragraphs only.',
-      prompt: `The visitor typed this situation or topic:\n"${trimmed}"\n\nWrite at most 130 words. Explain briefly what organizations often run into in similar situations (generally, not naming the visitor). Where web sources helped, answer in plain language. End with one sentence on what is useful to clarify in a TechMD session. If search adds little value, say so briefly and reason from general technology advisory context.`,
+        'You support visitors to TeqMD, a Philippines-focused independent technology advisory practice. Use web search when it improves factual grounding (products, vendors, trends). Stay neutral—no legal, medical, or HR guarantees. Short paragraphs only.',
+      prompt: `The visitor typed this situation or topic:\n"${trimmed}"\n\nWrite at most 130 words. Explain briefly what organizations often run into in similar situations (generally, not naming the visitor). Where web sources helped, answer in plain language. End with one sentence on what is useful to clarify in a TeqMD session. If search adds little value, say so briefly and reason from general technology advisory context.`,
     });
     const sources = collectSourceUrls(result.sources as readonly { readonly url?: string }[]);
     const text = result.text.trim();

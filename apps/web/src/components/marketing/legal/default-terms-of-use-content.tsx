@@ -12,14 +12,14 @@ export function DefaultTermsOfUseContent(): ReactElement {
       <section className="space-y-3">
         <h2>Agreement</h2>
         <p>
-          By accessing or using the TechMD website, guided diagnostic, optional account features, or booking services,
+          By accessing or using the TeqMD website, guided diagnostic, optional account features, or booking services,
           you agree to these Terms of Use. If you do not agree, do not use the services.
         </p>
       </section>
       <section className="space-y-3">
         <h2>Service description</h2>
         <p>
-          TechMD offers vendor-neutral technology guidance for teams in the Philippines, including an online diagnostic,
+          TeqMD offers vendor-neutral technology guidance for teams in the Philippines, including an online diagnostic,
           recommendations, and optional paid consultations. Features may change as we improve the product.
         </p>
       </section>
@@ -53,7 +53,7 @@ export function DefaultTermsOfUseContent(): ReactElement {
       <section className="space-y-3">
         <h2>Intellectual property</h2>
         <p>
-          The site, branding, templates, and original content are owned by TechMD or its licensors. You receive a limited,
+          The site, branding, templates, and original content are owned by TeqMD or its licensors. You receive a limited,
           non-exclusive license to use the services for your internal business purposes. You may not copy, resell, or
           redistribute our materials without written permission.
         </p>
@@ -77,7 +77,7 @@ export function DefaultTermsOfUseContent(): ReactElement {
       <section className="space-y-3">
         <h2>Limitation of liability</h2>
         <p>
-          To the maximum extent permitted by applicable law, TechMD and its affiliates will not be liable for indirect,
+          To the maximum extent permitted by applicable law, TeqMD and its affiliates will not be liable for indirect,
           incidental, special, consequential, or punitive damages, or for lost profits or data, arising from your use of the
           services. Our aggregate liability for direct damages is limited to the amount you paid us for the specific
           booking or service giving rise to the claim in the twelve months before the event, or one hundred US dollars if
@@ -87,7 +87,7 @@ export function DefaultTermsOfUseContent(): ReactElement {
       <section className="space-y-3">
         <h2>Indemnity</h2>
         <p>
-          You agree to indemnify and hold TechMD harmless from claims arising out of your misuse of the services or
+          You agree to indemnify and hold TeqMD harmless from claims arising out of your misuse of the services or
           violation of these terms.
         </p>
       </section>
@@ -107,7 +107,7 @@ export function DefaultTermsOfUseContent(): ReactElement {
       </section>
       <section className="space-y-3">
         <h2>Contact</h2>
-        <p>Questions about these Terms of Use may be submitted through the contact options published on the TechMD website.</p>
+        <p>Questions about these Terms of Use may be submitted through the contact options published on the TeqMD website.</p>
       </section>
     </MarketingLegalProse>
   );

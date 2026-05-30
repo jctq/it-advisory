@@ -32,59 +32,71 @@ import { MarketingSectionHeader } from '@/components/marketing/marketing-section
 import { MarketingServiceTabs } from '@/components/marketing/marketing-service-tabs';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { Button } from '@/components/ui/button';
+import {
+  MARKETING_CASE_STUDIES_SECTION_ID,
+  SHOW_HOME_RESOURCES_SECTION,
+} from '@/lib/marketing/marketing-explore-nav-links';
+import type { PublishedMarketingTestimonial } from '@/lib/testimonial-types';
 import { cn } from '@/lib/utils';
 
 const PROBLEM_ITEMS: readonly {
   readonly title: string;
   readonly description: string;
+  readonly examples?: string;
   readonly icon: LucideIcon;
 }[] = [
   {
-    title: 'Planning to buy software',
-    description: 'Shortlist vendors and avoid costly mismatches before you commit.',
-    icon: ShoppingCart,
-  },
-  {
-    title: 'Project is delayed or failing',
-    description: 'Get clarity on risks, gaps, and the fastest path to stabilization.',
-    icon: Timer,
-  },
-  {
-    title: 'Want to automate or use AI',
-    description: 'Separate hype from practical workflows that your team will adopt.',
+    title: 'Systems and Processes Are Inefficient',
+    description:
+      'Understand where bottlenecks, manual work, disconnected systems, and operational waste are slowing your organization down.',
+    examples: 'Duplicate Data Entry, Spreadsheet Dependency, Approval Delays',
     icon: Sparkles,
   },
   {
-    title: 'Processes are inefficient',
-    description: 'Map bottlenecks and prioritize fixes that move revenue or margin.',
+    title: 'Planning to Buy or Upgrade Software',
+    description: 'Evaluate solutions with confidence and avoid costly vendor, feature, or implementation mismatches.',
+    examples: 'ERP, CRM, HRIS, Accounting, Inventory, POS, Custom Software',
+    icon: ShoppingCart,
+  },
+  {
+    title: 'Software Project is Delayed or Struggling',
+    description: 'Identify project risks, implementation gaps, vendor issues, and recovery options before costs continue to escalate.',
+    examples: 'Delays, Scope Creep, Budget Overruns, Low User Adoption',
+    icon: Timer,
+  },
+  {
+    title: 'Looking to Automate or Leverage AI',
+    description: 'Discover practical automation and AI opportunities that improve efficiency and deliver measurable business value.',
+    examples: 'Workflow Automation, AI Assistants, Reporting, Process Digitization',
     icon: Layers,
   },
   {
-    title: 'Unsure what technology is needed',
-    description: 'Translate goals into a sane roadmap without locking in too early.',
+    title: 'Not Sure What Technology You Need',
+    description: 'Get independent guidance to translate business goals into a practical technology roadmap without committing too early.',
+    examples: 'Digital Transformation, Modernization, Growth Planning',
     icon: HelpCircle,
   },
 ] as const;
 
 const VALUE_PROPS: readonly { readonly title: string; readonly body: string; readonly icon: LucideIcon }[] = [
   {
-    title: 'Independent & vendor-neutral',
-    body: 'Recommendations tied to your outcomes — not a reseller quota.',
+    title: 'Independent Perspective',
+    body: "Make decisions based on what's right for your organization—not what's easiest to sell.",
     icon: Scale,
   },
   {
-    title: 'Enterprise experience',
-    body: 'Patterns from complex rollouts, distilled for growing teams.',
+    title: 'Proven Implementation Experience',
+    body: 'Leverage lessons learned from complex software implementations and technology initiatives.',
     icon: Briefcase,
   },
   {
-    title: 'Clear & actionable',
-    body: 'Concrete next steps you can execute this quarter.',
+    title: 'Actionable Recommendations',
+    body: 'Receive practical guidance with clear next steps and measurable outcomes.',
     icon: BadgeCheck,
   },
   {
-    title: 'On-demand',
-    body: 'Focused sessions when you need judgment — not a long retainer.',
+    title: 'Flexible Engagement Model',
+    body: 'Access expert advice when you need it, without ongoing consulting overhead.',
     icon: Clock,
   },
 ];
@@ -92,35 +104,51 @@ const VALUE_PROPS: readonly { readonly title: string; readonly body: string; rea
 const SERVICE_TAB_ITEMS = [
   {
     id: 'rescue',
-    label: 'Project rescue',
-    title: 'Project rescue consultation',
+    label: 'Improve Processes & Reduce Inefficiencies',
+    title: 'Improve Processes & Reduce Inefficiencies',
     description:
-      'Stabilize timelines, clarify ownership, and reduce delivery risk when a program is slipping or already off track.',
+      'Understand where time, effort, and money are being lost—and identify practical opportunities for improvement and automation.',
     icon: Timer,
   },
   {
     id: 'vendor',
-    label: 'Vendor review',
-    title: 'Vendor & architecture review',
+    label: 'Recover Delayed or At-Risk Projects',
+    title: 'Recover Delayed or At-Risk Projects',
     description:
-      'Validate proposals and contracts before signatures and sunk costs — architecture, scope, and commercial fit.',
+      'Address implementation challenges, delivery risks, vendor issues, and adoption concerns before they impact business outcomes.',
     icon: Scale,
   },
   {
     id: 'automation',
-    label: 'Automation & AI',
-    title: 'Automation & AI readiness',
+    label: 'Select the Right Software with Confidence',
+    title: 'Select the Right Software with Confidence',
     description:
-      'Pick practical automation paths without boiling the ocean — workflows your team will actually adopt.',
+      'Avoid costly mistakes by validating requirements, evaluating options, and choosing solutions that fit your organization.',
     icon: Sparkles,
   },
 ] as const;
 
 const STATS: readonly { readonly value: string; readonly label: string; readonly detail: string }[] = [
-  { value: '< 2', label: 'Minutes', detail: 'Guided diagnostic — minimal typing, pain-first routing.' },
-  { value: '3', label: 'Steps', detail: 'Diagnose, see your recommendation, book when ready.' },
-  { value: '100%', label: 'Neutral', detail: 'Independent guidance — not tied to vendor quotas.' },
-  { value: 'No', label: 'retainer', detail: 'On-demand sessions when you need judgment — extend only when the program requires it.' },
+  {
+    value: '100%',
+    label: 'Independent',
+    detail: 'No vendor commissions, quotas, or software sales incentives.',
+  },
+  {
+    value: '0',
+    label: 'Sales Pressure',
+    detail: 'Advice focused on solving problems—not selling products.',
+  },
+  {
+    value: '1',
+    label: 'Clear Recommendation',
+    detail: 'A tailored path forward based on your specific situation.',
+  },
+  {
+    value: 'Pay',
+    label: 'Only When Needed',
+    detail: 'No retainers or long-term consulting commitments.',
+  },
 ] as const;
 
 const HOW_IT_WORKS_STEPS: readonly {
@@ -128,74 +156,58 @@ const HOW_IT_WORKS_STEPS: readonly {
   readonly title: string;
   readonly body: string;
 }[] = [
-  { step: '01', title: 'Answer focused prompts', body: 'Tap options that match reality — minimal typing.' },
-  { step: '02', title: 'See your recommendation', body: 'Know which session fits before you invest time.' },
-  { step: '03', title: 'Book a slot', body: 'Pick a Philippine-time slot that works for your team.' },
+  { step: '01', title: 'Assess Your Situation', body: 'Help us understand your challenges, objectives, and technology landscape.' },
+  { step: '02', title: "Get a Recommended Path Forward", body: "Receive tailored recommendations designed around your needs—not a vendor's agenda." },
+  { step: '03', title: 'Engage an Expert When Needed', body: 'Book a focused consultation to validate decisions, reduce risks, and accelerate outcomes.' },
 ] as const;
 
 const SPOTLIGHT_ITEMS: readonly { readonly title: string; readonly subtitle: string }[] = [
   {
-    title: 'Pain-first routing',
-    subtitle: 'Start from what is broken — not from a vendor catalog.',
+    title: 'Understand the real problem first',
+    subtitle: "Avoid investing in solutions that don't address the underlying issue.",
   },
   {
-    title: 'A recommendation you can defend',
-    subtitle: 'Independent, documented rationale for stakeholders and finance.',
+    title: 'Get recommendations you can trust',
+    subtitle: 'Independent, vendor-neutral guidance focused on your business needs.',
   },
   {
-    title: 'Book when you are ready',
-    subtitle: 'Philippine-time slots; focused calls that end with decisions.',
+    title: 'Move forward with confidence',
+    subtitle: 'Make informed technology decisions backed by expert advice and practical experience.',
   },
 ] as const;
 
 const ENGAGEMENT_MODELS: readonly {
   readonly title: string;
   readonly eyebrow: string;
-  readonly body: string;
+  readonly body: readonly string[];
+  readonly bestFor?: readonly string[];
+  readonly ctaLabel: string;
 }[] = [
   {
-    title: 'Focused consultation',
-    eyebrow: 'Decisive session',
-    body: 'One structured engagement to stabilize, validate, or plan — tight scope, clear outputs.',
+    eyebrow: 'Decision support',
+    title: 'Focused Expert Consultation',
+    body: [
+      'A structured advisory session designed to help you validate decisions, evaluate options, and solve specific technology challenges.',
+      "Whether you're selecting software, reviewing vendors, planning implementations, or assessing project risks, get direct access to independent expertise.",
+    ],
+    bestFor: ['Software selection', 'Vendor evaluation', 'Project reviews', 'Technology planning'],
+    ctaLabel: 'Book a Consultation',
   },
   {
-    title: 'Light ongoing advisory',
-    eyebrow: 'When you need a steady hand',
-    body: 'Short retainer-style support for checkpoints across a program — strategy without bloat.',
+    eyebrow: 'Ongoing guidance',
+    title: 'Consultation Partnership',
+    body: [
+      'For organizations navigating larger technology initiatives, ongoing advisory support provides periodic reviews, implementation guidance, risk management, and executive-level decision support.',
+      'Stay aligned, reduce risk, and gain an independent perspective throughout your technology journey.',
+    ],
+    bestFor: [
+      'ERP implementations',
+      'Digital transformation programs',
+      'Multi-vendor initiatives',
+      'Technology modernization efforts',
+    ],
+    ctaLabel: 'Explore Advisory Support',
   },
-] as const;
-
-const TESTIMONIALS: readonly {
-  readonly quote: string;
-  readonly name: string;
-  readonly role: string;
-}[] = [
-  {
-    quote:
-      'We finally had a recommendation we could take to the board — vendor-neutral, specific, and tied to our timeline.',
-    name: 'Operations lead',
-    role: 'Growing services company',
-  },
-  {
-    quote:
-      'The diagnostic routed us to the right session in minutes. No sprawling intake form before we even knew the fit.',
-    name: 'Founder',
-    role: 'SME, Metro Manila',
-  },
-  {
-    quote:
-      'Clear next steps after one call — not another strategy deck. Exactly what we needed before signing an ERP contract.',
-    name: 'Finance & IT',
-    role: 'Multi-site operator',
-  },
-] as const;
-
-const CAPABILITY_CHIPS: readonly string[] = [
-  'Guided diagnostic',
-  'Architecture',
-  'Vendors & contracts',
-  'Automation & AI',
-  'Delivery risk',
 ] as const;
 
 type ResourceCategory = 'Guide' | 'Checklist' | 'Playbook';
@@ -274,10 +286,15 @@ const RESOURCE_ITEMS: readonly {
 
 type HomePageContentProps = {
   readonly isAuthenticated: boolean;
+  readonly siteName: string;
+  readonly reviewsModuleEnabled: boolean;
+  readonly testimonials: readonly PublishedMarketingTestimonial[];
 };
 
 export function HomePageContent(props: HomePageContentProps): ReactElement {
-  const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(props.isAuthenticated);
+  const { isAuthenticated, siteName, reviewsModuleEnabled, testimonials } = props;
+  const showTestimonialsSection = reviewsModuleEnabled && testimonials.length > 0;
+  const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(isAuthenticated);
   const { sectionRef: heroSectionRef, isBoosted, isInView, rootStyle } = useMarketingHeroInteraction();
   const problemCardClassName = cn(
     'group flex h-full w-full flex-col rounded-2xl border border-border/80 bg-card p-5 text-left',
@@ -296,26 +313,20 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         background={<MarketingHeroBackground interaction={{ isBoosted, isInView, rootStyle }} />}
       >
         <div className="mx-auto w-full max-w-6xl">
-          <p className="marketing-section-eyebrow">TechMD · IT advisory</p>
-          <h1 className="mt-6 max-w-4xl text-balance text-4xl font-semibold tracking-[-0.04em] text-foreground sm:text-5xl md:text-6xl md:leading-[1.04] lg:text-[3.75rem] lg:leading-[1.02]">
-            Grow your business with clearer technology decisions.
+          <h1 className="max-w-4xl text-balance text-4xl font-semibold tracking-[-0.04em] text-foreground sm:text-5xl md:text-6xl md:leading-[1.04] lg:text-[3.75rem] lg:leading-[1.02]">
+            Every technology problem has a root cause.
           </h1>
           <p className="mt-6 max-w-2xl text-pretty text-xl font-medium leading-snug text-foreground/90 md:text-2xl md:leading-snug">
-            Independent guidance for growing teams — from diagnostic to a decision you can ship.
+            Identify the challenges affecting your systems, processes, and software investments before they become
+            costly problems
           </p>
           <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
-            A short guided flow, a tailored recommendation, and booking when you are ready — no sprawling intake
-            forms.
+            A guided assessment, tailored recommendations, and expert consultation
           </p>
-          <ul className="mt-10 flex max-w-3xl flex-wrap gap-2" aria-label="Focus areas">
-            {CAPABILITY_CHIPS.map((chip) => (
-              <li key={chip}>
-                <span className="inline-flex items-center rounded-full border border-primary/15 bg-primary/6 px-3 py-1.5 text-xs font-medium text-foreground/90 shadow-xs backdrop-blur-sm dark:border-border/70 dark:bg-card/50">
-                  {chip}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+            — all designed to help you make
+            smarter technology decisions.
+          </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <Button
               size="lg"
@@ -323,23 +334,15 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               disabled={isNavigating}
               onClick={() => void navigateToNewQuiz()}
             >
-              {isNavigating ? 'Starting…' : 'Find my solution'}
+              {isNavigating ? 'Starting…' : 'Start My Assessment'}
               <ArrowRight
                 className="size-4 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5"
                 aria-hidden
               />
             </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="min-h-11 border-border/80 bg-background/60 shadow-xs backdrop-blur-sm dark:bg-card/40"
-            >
-              <Link href="#how-it-works">How it works</Link>
-            </Button>
           </div>
           <div className="mt-10 flex flex-col gap-8 sm:mt-12 md:mt-14 md:flex-row md:items-end md:justify-between md:gap-6">
-            <p className="text-sm text-muted-foreground md:pb-1">Takes less than 2 minutes.</p>
+            <p className="text-sm text-muted-foreground md:pb-1">Assessment takes less than 5 minutes.</p>
             <a
               href="#proof"
               className="marketing-scroll-cue ml-auto shrink-0 motion-safe:hover:text-foreground md:ml-0"
@@ -372,22 +375,24 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           <MarketingSectionHeader
             reveal
             eyebrow="At a glance"
-            title="Built for decisions, not decks."
-            description="Pragmatic metrics from how teams use TechMD — fast routing, neutral advice, and focused on-demand sessions."
+            title="Make technology decisions with confidence."
+            description="Independent assessments, tailored recommendations, and expert guidance to help you navigate software, systems, and implementation challenges."
             align="center"
           />
           <MarketingSectionReveal
-            className="relative mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
+            className="relative mt-12 grid gap-6 sm:grid-cols-2"
             stagger
           >
             {STATS.map((stat) => (
               <div
-                key={stat.label}
+                key={stat.label || stat.value}
                 className="marketing-stat-card rounded-2xl border border-border/60 p-6 transition-[transform,box-shadow,border-color] duration-200 motion-safe:hover:-translate-y-0.5 dark:border-border/50"
               >
                 <p className="marketing-stat-value">
                   {stat.value}
-                  <span className="ml-1 text-2xl font-medium text-primary md:text-3xl">{stat.label}</span>
+                  {stat.label ? (
+                    <span className="ml-1 text-2xl font-medium text-primary md:text-3xl">{stat.label}</span>
+                  ) : null}
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{stat.detail}</p>
               </div>
@@ -409,8 +414,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         <div className="relative mx-auto max-w-6xl">
           <MarketingSectionHeader
             reveal
-            eyebrow="Why teams start here"
+            eyebrow={`WHY START HERE @ ${siteName}`}
             title="Clarity before commitment."
+            description={`Technology decisions can impact your operations, costs, and growth for years. ${siteName} helps you identify the real problem, evaluate your options, and move forward with confidence before investing in software, vendors, or implementation projects.`}
             inverted
           />
           <MarketingSectionReveal as="ul" className="mt-12 divide-y divide-marketing-band-border" stagger>
@@ -428,7 +434,6 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                   </p>
                   <p className="max-w-xl text-sm leading-relaxed marketing-band-muted md:text-base">{item.subtitle}</p>
                 </div>
-                <ArrowRight className="size-7 shrink-0 text-marketing-band-muted sm:mb-1" aria-hidden />
               </div>
             ))}
           </MarketingSectionReveal>
@@ -438,9 +443,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         <div className="mx-auto max-w-6xl space-y-14">
           <MarketingSectionHeader
             reveal
-            eyebrow="Guided flow"
-            title="How we work"
-            description="Pain-first, guided, fast — three beats: diagnose your situation, see a tailored recommendation, book a focused consultation."
+            eyebrow="HOW IT WORKS"
+            title="Diagnose. Decide. Move forward."
+            description="Technology decisions shouldn't start with software demos or vendor sales pitches."
           />
           <div className="relative">
             <div
@@ -457,7 +462,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               {HOW_IT_WORKS_STEPS.map((item) => (
                 <div
                   key={item.step}
-                  className="marketing-card-elevated relative z-1 overflow-hidden rounded-2xl border border-border/80 p-6 md:p-8"
+                  className="marketing-card-elevated relative z-1 flex h-full flex-col overflow-hidden rounded-2xl border border-border/80 p-6 md:p-8"
                 >
                   <p
                     className="pointer-events-none absolute -right-2 -top-4 select-none text-[5.5rem] font-semibold leading-none tracking-tighter text-primary/10 md:text-[6.5rem]"
@@ -475,10 +480,10 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           <div className="space-y-8 rounded-3xl border border-border/70 bg-muted/30 p-8 md:p-10 dark:bg-muted/15">
             <MarketingSectionReveal stagger className="max-w-2xl space-y-2">
               <h3 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-                What business or IT problem are you facing?
+                What technology challenge are you trying to solve?
               </h3>
               <p className="text-muted-foreground">
-                Choose the closest match — you can refine details in the guided diagnostic.
+                Select the option that best describes your situation. We&apos;ll help identify the root cause and recommend the most effective path forward.
               </p>
             </MarketingSectionReveal>
             <MarketingSectionReveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" stagger>
@@ -497,8 +502,14 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                     </span>
                     <span className="mt-4 font-semibold text-foreground">{item.title}</span>
                     <span className="mt-2 text-sm text-muted-foreground">{item.description}</span>
-                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                      Start diagnostic
+                    {item.examples ? (
+                      <span className="mt-2 text-sm text-muted-foreground">
+                        <span className="font-semibold text-foreground">Examples: </span>
+                        {item.examples}
+                      </span>
+                    ) : null}
+                    <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-medium text-primary">
+                      Start Assessment
                       <ArrowRight className="size-4" aria-hidden />
                     </span>
                   </button>
@@ -517,9 +528,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         <div className="mx-auto max-w-6xl space-y-16">
           <MarketingSectionHeader
             reveal
-            eyebrow="Engagements"
-            title="We provide focused advisory solutions."
-            description="Advisory designed for decisions — not endless decks. Start with the diagnostic; we will route you to the right shape of help."
+            eyebrow="Engagement Options"
+            title="Navigate technology decisions with confidence."
+            description={`Whether you're evaluating software, recovering a struggling project, or planning your next technology investment, ${siteName} provides independent advice tailored to your needs.`}
           />
           <MarketingSectionReveal stagger>
             <MarketingServiceTabs
@@ -545,21 +556,44 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 </div>
                 <p className="relative text-xs font-semibold uppercase tracking-[0.2em] text-primary">{model.eyebrow}</p>
                 <h3 className="relative mt-3 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">{model.title}</h3>
-                <p className="relative mt-4 flex-1 text-sm leading-relaxed text-muted-foreground md:text-base">{model.body}</p>
+                <div className="relative mt-4 flex-1 space-y-3">
+                  {model.body.map((paragraph) => (
+                    <p key={paragraph} className="text-sm leading-relaxed text-muted-foreground md:text-base">
+                      {paragraph}
+                    </p>
+                  ))}
+                  {model.bestFor ? (
+                    <div className="pt-2">
+                      <p className="text-sm font-semibold text-foreground">Best for:</p>
+                      <ul className="mt-3 space-y-2">
+                        {model.bestFor.map((item) => (
+                          <li key={item} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                            <BadgeCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
                 <Button
                   type="button"
                   className="relative mt-8 w-fit min-h-11 gap-2"
                   disabled={isNavigating}
                   onClick={() => void navigateToNewQuiz()}
                 >
-                  {isNavigating ? 'Starting…' : 'Match me via diagnostic'}
+                  {isNavigating ? 'Starting…' : model.ctaLabel}
                   <ArrowRight className="size-4" aria-hidden />
                 </Button>
               </div>
             ))}
           </MarketingSectionReveal>
           <div>
-            <MarketingSectionHeader reveal eyebrow="Primary benefits" title="Why choose TechMD?" />
+            <MarketingSectionHeader
+              reveal
+              eyebrow={`WHY ${siteName.toUpperCase()}`}
+              title="Clarity. Confidence. Better technology decisions."
+            />
             <MarketingSectionReveal className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4" stagger>
               {VALUE_PROPS.map((item) => {
                 const Icon = item.icon;
@@ -578,47 +612,81 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           </div>
         </div>
       </MarketingParallaxSection>
-      <MarketingParallaxSection reveal={false} className="marketing-band-dark px-6 py-16 md:py-24" speed={0}>
-        <div className="mx-auto max-w-6xl space-y-10">
-          <MarketingSectionHeader
-            reveal
-            eyebrow="Trusted approach"
-            title="Teams come back for clarity they can act on."
-            inverted
-            align="center"
-          />
-          <MarketingSectionReveal as="ul" className="grid gap-6 md:grid-cols-3" stagger>
-            {TESTIMONIALS.map((item) => (
-              <div key={item.quote} className="marketing-band-card rounded-2xl p-6 backdrop-blur-sm md:p-8">
-                <Quote className="size-8 text-marketing-band-subtle" aria-hidden />
-                <blockquote className="mt-4 text-pretty text-base leading-relaxed text-marketing-band-fg/90">
-                  {item.quote}
-                </blockquote>
-                <footer className="mt-6 border-t border-marketing-band-border pt-4">
-                  <p className="font-semibold text-marketing-band-fg">{item.name}</p>
-                  <p className="mt-1 text-sm marketing-band-muted">{item.role}</p>
-                </footer>
-              </div>
-            ))}
-          </MarketingSectionReveal>
-        </div>
-      </MarketingParallaxSection>
+      {showTestimonialsSection ? (
+        <MarketingParallaxSection
+          id={SHOW_HOME_RESOURCES_SECTION ? undefined : MARKETING_CASE_STUDIES_SECTION_ID}
+          reveal={false}
+          className={cn(
+            'marketing-band-dark px-6 py-16 md:py-24',
+            !SHOW_HOME_RESOURCES_SECTION && 'scroll-mt-24',
+          )}
+          speed={0}
+        >
+          <div className="mx-auto max-w-6xl space-y-10">
+            <MarketingSectionHeader
+              reveal
+              eyebrow="Trusted approach"
+              title="Teams come back for clarity they can act on."
+              inverted
+              align="center"
+            />
+            <MarketingSectionReveal as="ul" className="grid gap-6 md:grid-cols-3" stagger>
+              {testimonials.map((item) => (
+                <li
+                  key={`${item.name}-${item.quote.slice(0, 32)}`}
+                  className="marketing-band-card list-none rounded-2xl p-6 backdrop-blur-sm md:p-8"
+                >
+                  <Quote className="size-8 text-marketing-band-subtle" aria-hidden />
+                  <blockquote className="mt-4 text-pretty text-base leading-relaxed text-marketing-band-fg/90">
+                    {item.quote}
+                  </blockquote>
+                  <footer className="mt-6 border-t border-marketing-band-border pt-4">
+                    <p className="font-semibold text-marketing-band-fg">{item.name}</p>
+                    {item.role.trim().length > 0 ? (
+                      <p className="mt-1 text-sm marketing-band-muted">{item.role}</p>
+                    ) : null}
+                  </footer>
+                </li>
+              ))}
+            </MarketingSectionReveal>
+          </div>
+        </MarketingParallaxSection>
+      ) : null}
       <MarketingParallaxSection id="about" reveal={false} className="scroll-mt-24 px-6 py-16 md:py-24" speed={0.12}>
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
             <div className="space-y-6">
               <MarketingSectionHeader
                 reveal
-                eyebrow="Our story"
-                title="Better way to make technology decisions."
-                description="TechMD for Growing Businesses helps founders and operators make pragmatic technology decisions — especially when vendors, timelines, or internal stakeholders disagree."
+                eyebrow={`WHY ${siteName.toUpperCase()} EXISTS`}
+                title="Better technology decisions start with the right diagnosis."
+                description="Most organizations don't struggle because they lack technology. They struggle because they're trying to solve the wrong problem."
               />
-              <p className="text-muted-foreground">
-                Sessions are structured, time-boxed, and documented so your team can align quickly after the call.
-                The goal is clarity you can act on this month, not a shelf-ready strategy deck.
-              </p>
-              <Button asChild variant="outline" className="min-h-11">
-                <Link href="/diagnostic">Learn more via diagnostic</Link>
+              <div className="space-y-4 text-muted-foreground">
+                <p>
+                  Before recommending software, vendors, automation, or implementation strategies, {siteName} helps
+                  uncover the root cause of the challenge—so you can invest with confidence and avoid costly mistakes.
+                </p>
+                <p>Technology decisions should be driven by business needs, not sales presentations.</p>
+                <p>
+                  Many software projects fail because organizations start with solutions before understanding the
+                  problem.
+                </p>
+                <p>
+                  That&apos;s why {siteName} begins with a guided assessment designed to identify your priorities,
+                  uncover risks, and recommend the most appropriate path forward.
+                </p>
+                <p>The goal isn&apos;t another strategy deck.</p>
+                <p>The goal is helping you make informed technology decisions that deliver measurable results.</p>
+              </div>
+              <Button
+                type="button"
+                className="min-h-11 gap-2"
+                disabled={isNavigating}
+                onClick={() => void navigateToNewQuiz()}
+              >
+                {isNavigating ? 'Starting…' : 'Start Your Assessment'}
+                <ArrowRight className="size-4" aria-hidden />
               </Button>
             </div>
             <MarketingSectionReveal
@@ -634,33 +702,52 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                   <Compass className="size-6" aria-hidden />
                 </span>
                 <div>
-                  <h3 className="text-xl font-semibold text-foreground">Why a guided diagnostic?</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">
-                    Starting from pain reduces bias and speeds routing. You get a recommendation that fits your
-                    situation — not a generic services catalog.
-                  </p>
+                  <h3 className="text-xl font-semibold text-foreground">Why start with a diagnostic assessment?</h3>
+                  <div className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground md:text-base">
+                    <p>
+                      Technology challenges often look similar on the surface but require very different solutions.
+                    </p>
+                    <p>A reporting issue might be a process problem.</p>
+                    <p>An automation initiative might require process redesign first.</p>
+                    <p>
+                      A software implementation delay might stem from unclear requirements or governance gaps.
+                    </p>
+                    <p>
+                      The assessment helps identify the real issue before time and money are invested in the wrong
+                      solution.
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="relative mt-8 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-border/70 bg-muted/40 p-4 dark:bg-muted/20">
                   <p className="text-xs font-semibold uppercase tracking-wider text-primary">Mission</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Help businesses establish a strong digital foundation with vendor-neutral judgment.
-                  </p>
+                  <div className="mt-2 space-y-2 text-sm text-muted-foreground">
+                    <p>Help organizations make smarter technology decisions.</p>
+                    <p>
+                      Provide independent, practical guidance that reduces risk, improves outcomes, and maximizes the
+                      value of technology investments.
+                    </p>
+                  </div>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-muted/40 p-4 dark:bg-muted/20">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Focus</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Responsive design for decisions — intuitive paths from problem to booked session.
-                  </p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Approach</p>
+                  <div className="mt-2 space-y-2 text-sm text-muted-foreground">
+                    <p className="font-semibold text-foreground">Diagnose first. Recommend second.</p>
+                    <p>
+                      Every recommendation starts with understanding the problem, evaluating the options, and identifying
+                      the path most likely to succeed.
+                    </p>
+                  </div>
                 </div>
               </div>
             </MarketingSectionReveal>
           </div>
         </div>
       </MarketingParallaxSection>
+      {SHOW_HOME_RESOURCES_SECTION ? (
       <MarketingParallaxSection
-        id="resources"
+        id="case-studies"
         reveal={false}
         className="scroll-mt-24 px-6 py-20 md:py-28"
         speed={-0.09}
@@ -698,7 +785,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 disabled={isNavigating}
                 onClick={() => void navigateToNewQuiz()}
               >
-                {isNavigating ? 'Starting…' : 'Find my solution'}
+                {isNavigating ? 'Starting…' : 'Start My Assessment'}
                 <ArrowRight className="size-4" aria-hidden />
               </Button>
             </div>
@@ -807,6 +894,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
           </div>
         </div>
       </MarketingParallaxSection>
+      ) : null}
     </main>
   );
 }

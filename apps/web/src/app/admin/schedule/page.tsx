@@ -3,7 +3,7 @@ import { AdminAdvisorSchedulePageContent } from '@/components/admin/admin-adviso
 import { resolveScheduleTab } from '@/lib/admin/admin-schedule-tabs';
 
 export const metadata = {
-  title: 'Schedule — TechMD Admin',
+  title: 'Schedule — TeqMD Admin',
 };
 
 type AdminSchedulePageProps = {

@@ -3,7 +3,7 @@ import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { resolveBookingsViewMode } from '@/lib/admin/admin-bookings-view';
 
 export const metadata = {
-  title: 'Bookings — TechMD Admin',
+  title: 'Bookings — TeqMD Admin',
 };
 
 type AdminBookingsPageProps = {

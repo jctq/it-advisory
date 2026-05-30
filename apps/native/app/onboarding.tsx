@@ -28,7 +28,7 @@ const ONBOARDING_SLIDES: readonly OnboardingSlide[] = [
   {
     id: 'purpose',
     title: 'Independent IT guidance',
-    body: 'TechMD Advisory helps you cut through vendor noise and delivery risk with structured, vendor-neutral advice for growing businesses in the Philippines.',
+    body: 'TeqMD Advisory helps you cut through vendor noise and delivery risk with structured, vendor-neutral advice for growing businesses in the Philippines.',
   },
   {
     id: 'how',

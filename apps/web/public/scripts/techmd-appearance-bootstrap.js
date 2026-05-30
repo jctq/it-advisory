@@ -4,8 +4,8 @@
   const validThemes = ["indigo","emerald","amber","rose"];
   const adminDefaultMode = "system";
   const adminDefaultTheme = "indigo";
-  const marketingDefaultMode = "light";
-  const marketingDefaultTheme = "indigo";
+  const marketingDefaultMode = "dark";
+  const marketingDefaultTheme = "amber";
   const adminModeKey = "techmd-admin-color-mode";
   const adminThemeKey = "techmd-admin-color-theme";
   const marketingModeKey = "techmd-marketing-color-mode";

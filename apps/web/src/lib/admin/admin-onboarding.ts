@@ -13,6 +13,7 @@ export type AdminOnboardingShellTarget =
   | 'nav-dashboard'
   | 'nav-templates'
   | 'nav-blog'
+  | 'nav-testimonials'
   | 'nav-sessions'
   | 'nav-leads'
   | 'nav-users'

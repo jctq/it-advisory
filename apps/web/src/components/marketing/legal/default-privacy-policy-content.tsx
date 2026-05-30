@@ -12,7 +12,7 @@ export function DefaultPrivacyPolicyContent(): ReactElement {
       <section className="space-y-3">
         <h2>Overview</h2>
         <p>
-          TechMD (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) provides independent technology guidance for growing teams in the
+          TeqMD (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) provides independent technology guidance for growing teams in the
           Philippines. This Privacy Policy explains how we collect, use, and protect information when you use our
           website, guided diagnostic, optional account features, and booking flows.
         </p>
@@ -66,7 +66,7 @@ export function DefaultPrivacyPolicyContent(): ReactElement {
       <section className="space-y-3">
         <h2>Cookies and similar technologies</h2>
         <p>
-          We use cookies and browser storage to operate TechMD. When you first visit, you can choose required cookies
+          We use cookies and browser storage to operate TeqMD. When you first visit, you can choose required cookies
           only or also allow analytics. You can change your choice anytime using <strong className="text-foreground">Cookie preferences</strong> in
           the site footer.
         </p>
@@ -80,7 +80,7 @@ export function DefaultPrivacyPolicyContent(): ReactElement {
           <li>
             <strong className="text-foreground">Analytics (optional)</strong> — If you opt in, Google Analytics (Google
             LLC) receives usage data such as pages viewed and general traffic patterns. We configure analytics with IP
-            anonymization and without ad personalization signals from TechMD. Analytics cookies are not set until you
+            anonymization and without ad personalization signals from TeqMD. Analytics cookies are not set until you
             accept them.
           </li>
           <li>
@@ -132,7 +132,7 @@ export function DefaultPrivacyPolicyContent(): ReactElement {
       <section className="space-y-3">
         <h2>Contact</h2>
         <p>
-          Questions about this Privacy Policy may be submitted through the contact options on the TechMD website. We
+          Questions about this Privacy Policy may be submitted through the contact options on the TeqMD website. We
           respond to privacy requests in line with applicable Philippine data privacy principles.
         </p>
       </section>

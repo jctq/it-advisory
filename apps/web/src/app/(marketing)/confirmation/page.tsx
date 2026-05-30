@@ -2,7 +2,7 @@ import { ConfirmationFlow } from './confirmation-flow';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildNoIndexMetadata({
-  title: 'Booking confirmed · TechMD',
+  title: 'Booking confirmed · TeqMD',
   description: 'Your consultation slot is reserved.',
 });
 

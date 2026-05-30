@@ -20,7 +20,7 @@ type AccountReportDetailPageProps = {
 export async function generateMetadata(props: AccountReportDetailPageProps) {
   const { reportId } = await props.params;
   return buildNoIndexMetadata({
-    title: `Report ${reportId} — TechMD`,
+    title: `Report ${reportId} — TeqMD`,
     description: 'View your support report and replies.',
   });
 }

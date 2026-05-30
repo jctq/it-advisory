@@ -21,7 +21,7 @@ export async function generateMetadata(props: BlogIndexPageProps) {
   const { page: pageParam } = await props.searchParams;
   const page = parseBlogListPageParam(pageParam);
   const pathname = page <= 1 ? '/blog' : buildBlogListPageHref(page);
-  const title = page <= 1 ? 'Blog — TechMD' : `Blog — Page ${page} — TechMD`;
+  const title = page <= 1 ? 'Blog — TeqMD' : `Blog — Page ${page} — TeqMD`;
   return buildMarketingMetadata({
     title,
     description: BLOG_INDEX_DESCRIPTION,

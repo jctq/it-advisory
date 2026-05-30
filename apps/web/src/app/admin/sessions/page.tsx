@@ -3,7 +3,7 @@ import { QuizSessionsTable } from '@/components/admin/quiz-sessions-table';
 import { listQuizSessionsForAdmin } from '@/lib/data/quiz-sessions';
 
 export const metadata = {
-  title: 'Sessions — TechMD Admin',
+  title: 'Sessions — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

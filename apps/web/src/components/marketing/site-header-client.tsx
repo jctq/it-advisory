@@ -21,8 +21,6 @@ import { useCallback } from 'react';
 import { useMarketingSupportReportsUnreadCount } from '@/hooks/marketing/use-marketing-support-reports-unread-count';
 import { useMarketingChromeStore } from '@/store/marketing/marketing-chrome-store';
 import { MarketingHeaderAccountMenu } from '@/components/marketing/marketing-header-account-menu';
-import { MarketingHeaderAppearanceMenu } from '@/components/marketing/marketing-header-appearance-menu';
-import { useMarketingAppearance } from '@/components/marketing/marketing-appearance-provider';
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { Button } from '@/components/ui/button';
@@ -35,15 +33,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { buildMarketingExploreNavLinks, MARKETING_CASE_STUDIES_NAV_HREF } from '@/lib/marketing/marketing-explore-nav-links';
 import type { AuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { cn } from '@/lib/utils';
-
-const BASE_NAV_LINKS: readonly { readonly href: string; readonly label: string }[] = [
-  { href: '/#how-it-works', label: 'How it works' },
-  { href: '/#services', label: 'Services' },
-  { href: '/#about', label: 'About' },
-  { href: '/#resources', label: 'Resources' },
-] as const;
 
 const MANAGE_BOOKING_NAV_LINK = { href: '/book/manage', label: 'Manage booking' } as const;
 
@@ -51,7 +43,7 @@ const MOBILE_NAV_LINK_ICONS: Record<string, LucideIcon> = {
   '/#how-it-works': CircleHelp,
   '/#services': Briefcase,
   '/#about': Info,
-  '/#resources': BookOpen,
+  [MARKETING_CASE_STUDIES_NAV_HREF]: BookOpen,
   '/book/manage': CalendarDays,
 };
 
@@ -62,6 +54,7 @@ export type SiteHeaderClientProps = {
   readonly marketingUser: AuthenticatedMarketingUser | null;
   readonly manageBookingEnabled: boolean;
   readonly supportModuleEnabled: boolean;
+  readonly caseStudiesNavEnabled: boolean;
   readonly className?: string;
 };
 
@@ -69,12 +62,12 @@ export type SiteHeaderClientProps = {
  * Interactive marketing header (navigation, optional account actions).
  */
 export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
+  const exploreNavLinks = buildMarketingExploreNavLinks(props.caseStudiesNavEnabled);
   const navLinks = props.manageBookingEnabled
-    ? [...BASE_NAV_LINKS, MANAGE_BOOKING_NAV_LINK]
-    : BASE_NAV_LINKS;
+    ? [...exploreNavLinks, MANAGE_BOOKING_NAV_LINK]
+    : exploreNavLinks;
   const router = useRouter();
   const pathname = usePathname();
-  const { colorMode, colorTheme, executeChangeColorMode, executeChangeColorTheme } = useMarketingAppearance();
   const executeSignOut = useCallback(async (): Promise<void> => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     router.replace('/');
@@ -127,19 +120,12 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
           ))}
         </nav>
         <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
-          <MarketingHeaderAppearanceMenu
-            className="shrink-0"
-            colorMode={colorMode}
-            colorTheme={colorTheme}
-            onModeChange={executeChangeColorMode}
-            onThemeChange={executeChangeColorTheme}
-          />
           {user === null ? (
             <div className="hidden items-center gap-2 xl:flex xl:gap-3">
               <Button variant="ghost" size="sm" className="h-10 px-3" asChild>
                 <Link href="/login">Sign in</Link>
               </Button>
-              <Button variant="outline" size="sm" className="h-10 px-3" asChild>
+              <Button variant="ghost" size="sm" className="h-10 px-3" asChild>
                 <Link href="/register">Register</Link>
               </Button>
             </div>
@@ -159,7 +145,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
             disabled={isNavigating}
             onClick={() => void navigateToNewQuiz()}
           >
-            {isNavigating ? 'Starting…' : 'Get Started'}
+            {isNavigating ? 'Starting…' : 'Start My Assessment'}
           </Button>
           <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -236,7 +222,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                     }}
                   >
                     <Rocket className="size-4 shrink-0" aria-hidden />
-                    {isNavigating ? 'Starting…' : 'Get Started'}
+                    {isNavigating ? 'Starting…' : 'Start My Assessment'}
                   </Button>
                 </div>
               </nav>

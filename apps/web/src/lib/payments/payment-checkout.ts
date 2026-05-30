@@ -304,7 +304,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     providerSession = await adapter.createCheckoutSession({
       amountCentavos: resolvedPricing.amountCentavos,
       currency: 'PHP',
-      description: 'TechMD Consultation Booking',
+      description: 'TeqMD Consultation Booking',
       successUrl,
       cancelUrl,
       referenceId: bookingDraftId,

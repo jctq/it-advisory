@@ -8,8 +8,8 @@ import { MarketingSiteFooter } from '@/components/marketing/marketing-site-foote
 import { SiteHeader } from '@/components/marketing/site-header';
 
 export const metadata: Metadata = {
-  title: 'Page not found — TechMD',
-  description: 'The page you requested could not be found. Return to TechMD home, blog, or start a guided diagnostic.',
+  title: 'Page not found — TeqMD',
+  description: 'The page you requested could not be found. Return to TeqMD home, blog, or start a guided diagnostic.',
 };
 
 /**

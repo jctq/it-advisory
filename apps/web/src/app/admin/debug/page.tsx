@@ -5,7 +5,7 @@ import {
 } from '@/components/admin/admin-debug-workspace';
 
 export const metadata = {
-  title: 'Debug — TechMD Admin',
+  title: 'Debug — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

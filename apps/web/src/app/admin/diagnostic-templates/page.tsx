@@ -2,7 +2,7 @@ import { DiagnosticTemplatesList } from '@/components/admin/diagnostic-templates
 import { listDiagnosticTemplates } from '@/lib/data/diagnostic-templates';
 
 export const metadata = {
-  title: 'Diagnostic Templates — TechMD Admin',
+  title: 'Diagnostic Templates — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

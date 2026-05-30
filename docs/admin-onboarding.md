@@ -1,6 +1,6 @@
 # Admin onboarding tour
 
-This document is the **source of truth** for the TechMD admin guided tour ([driver.js](https://driverjs.com/)). Attach this file when adding admin features so agents know what is already covered and how to extend the tour.
+This document is the **source of truth** for the TeqMD admin guided tour ([driver.js](https://driverjs.com/)). Attach this file when adding admin features so agents know what is already covered and how to extend the tour.
 
 ## Overview
 

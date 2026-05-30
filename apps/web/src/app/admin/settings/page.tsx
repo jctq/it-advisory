@@ -3,7 +3,7 @@ import { AdminSettingsWorkspace } from '@/components/admin/admin-settings-worksp
 import { resolveSettingsTab } from '@/lib/admin/admin-settings-tabs';
 
 export const metadata = {
-  title: 'Settings — TechMD Admin',
+  title: 'Settings — TeqMD Admin',
 };
 
 type AdminSettingsPageProps = {

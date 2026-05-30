@@ -18,7 +18,7 @@ const LOGO_IMAGE_CLASS =
   'absolute left-0 top-0 h-full w-auto max-w-none object-contain object-left';
 
 /**
- * Responsive TECHMD logo for the marketing header: full wordmark + tagline on large screens,
+ * Responsive TEQMD logo for the marketing header: full wordmark + tagline on large screens,
  * compact wordmark (no tagline) on smaller breakpoints. Light/dark pairs share one slot
  * (`dark:hidden` / `hidden dark:block`), same pattern as the admin sidebar.
  */
@@ -31,7 +31,7 @@ export function TechmdSiteLogo(): ReactElement {
       >
         <Image
           src={brandAssetUrl(BRAND_LOGO_FULL_LIGHT)}
-          alt="TECHMD — Technology consultation. Better decisions. Stronger business."
+          alt="TEQMD — Technology consultation. Better decisions. Stronger business."
           width={LOGO_LIGHT_WIDTH_PX}
           height={LOGO_LIGHT_HEIGHT_PX}
           priority
@@ -40,7 +40,7 @@ export function TechmdSiteLogo(): ReactElement {
         />
         <Image
           src={brandAssetUrl(BRAND_LOGO_FULL_DARK)}
-          alt="TECHMD — Technology consultation. Better decisions. Stronger business."
+          alt="TEQMD — Technology consultation. Better decisions. Stronger business."
           width={LOGO_DARK_WIDTH_PX}
           height={LOGO_DARK_HEIGHT_PX}
           priority
@@ -54,7 +54,7 @@ export function TechmdSiteLogo(): ReactElement {
       >
         <Image
           src={brandAssetUrl(BRAND_LOGO_COMPACT_LIGHT)}
-          alt="TECHMD"
+          alt="TEQMD"
           width={LOGO_LIGHT_WIDTH_PX}
           height={LOGO_LIGHT_HEIGHT_PX}
           priority
@@ -63,7 +63,7 @@ export function TechmdSiteLogo(): ReactElement {
         />
         <Image
           src={brandAssetUrl(BRAND_LOGO_COMPACT_DARK)}
-          alt="TECHMD"
+          alt="TEQMD"
           width={LOGO_DARK_WIDTH_PX}
           height={LOGO_DARK_HEIGHT_PX}
           priority

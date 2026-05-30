@@ -28,7 +28,7 @@ export function MarketingCookiePreferencesDialog(): ReactElement {
         <DialogHeader className="pr-8 text-left">
           <DialogTitle className="text-xl font-semibold tracking-tight">Your cookie preferences</DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
-            Choose which optional cookies TechMD may use. Required cookies stay on so the site can run sign-in, the
+            Choose which optional cookies TeqMD may use. Required cookies stay on so the site can run sign-in, the
             guided diagnostic, and bookings. We do not sell your personal information.
           </DialogDescription>
         </DialogHeader>
@@ -66,7 +66,7 @@ export function MarketingCookiePreferencesDialog(): ReactElement {
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold text-foreground">Analytics cookies</h3>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Help us understand how visitors use TechMD (pages viewed, general traffic) through Google Analytics.
+                  Help us understand how visitors use TeqMD (pages viewed, general traffic) through Google Analytics.
                   Data is aggregated and used to improve the experience.
                 </p>
               </div>
@@ -85,7 +85,7 @@ export function MarketingCookiePreferencesDialog(): ReactElement {
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 <li>Google Analytics measurement (only if you turn this category on)</li>
                 <li>Anonymous usage statistics such as page views and referral sources</li>
-                <li>No advertising or cross-site ad personalization from TechMD</li>
+                <li>No advertising or cross-site ad personalization from TeqMD</li>
               </ul>
             </details>
           </section>

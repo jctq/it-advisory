@@ -130,7 +130,7 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
     providerSession = await adapter.createCheckoutSession({
       amountCentavos: input.amountCentavos,
       currency: 'PHP',
-      description: 'TechMD Consultation Booking',
+      description: 'TeqMD Consultation Booking',
       successUrl,
       cancelUrl,
       referenceId: input.transaction.bookingDraftId,

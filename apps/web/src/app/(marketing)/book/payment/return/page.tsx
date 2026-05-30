@@ -3,8 +3,8 @@ import { PaymentReturnClient } from './payment-return-client';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildNoIndexMetadata({
-  title: 'Payment — TechMD',
-  description: 'Payment status for your TechMD consultation booking.',
+  title: 'Payment — TeqMD',
+  description: 'Payment status for your TeqMD consultation booking.',
 });
 
 export default function PaymentReturnPage(): ReactElement {

@@ -4,7 +4,7 @@ import { QuizRouteLoadingFallback } from '../quiz-route-loading-fallback';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildNoIndexMetadata({
-  title: 'Guided diagnostic · TechMD',
+  title: 'Guided diagnostic · TeqMD',
   description:
     'Describe your situation, answer short guided intake questions, then finish the diagnostic for a tailored recommendation.',
 });

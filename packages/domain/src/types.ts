@@ -347,6 +347,11 @@ export type AppSettingsDocument = {
   diagnosticManageBookingEnabled?: boolean;
   /** When false, hides support report UI and disables public support APIs. Defaults to false when omitted. */
   supportModuleEnabled?: boolean;
+  /**
+   * When false, hides the marketing testimonials section. When true, the section still appears only after
+   * published testimonials exist. Defaults to false when omitted.
+   */
+  reviewsModuleEnabled?: boolean;
   /** When true, booking join links use `/book/session` instead of direct video URLs. Defaults to true when omitted. */
   bookingSessionRoomLinksEnabled?: boolean;
   /**

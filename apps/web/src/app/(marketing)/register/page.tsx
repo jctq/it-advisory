@@ -11,7 +11,7 @@ type RegisterPageProps = {
 };
 
 export const metadata = buildNoIndexMetadata({
-  title: 'Create an account · TechMD',
+  title: 'Create an account · TeqMD',
   description: 'Register to tie your diagnostic history to your email.',
 });
 

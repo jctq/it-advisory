@@ -14,6 +14,7 @@ import {
   FileStack,
   FileText,
   Headphones,
+  MessageSquareQuote,
   LayoutDashboard,
   LifeBuoy,
   Settings,
@@ -62,6 +63,12 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     label: 'Blog',
     icon: FileText,
     tourTarget: 'nav-blog',
+  },
+  {
+    href: '/admin/testimonials',
+    label: 'Testimonials',
+    icon: MessageSquareQuote,
+    tourTarget: 'nav-testimonials',
   },
   {
     href: '/admin/sessions',
@@ -158,14 +165,14 @@ export function AdminSidebar(props: AdminSidebarProps) {
               <span className="flex size-10 items-center justify-center overflow-hidden rounded-2xl bg-sidebar-primary/10 shadow-sm">
                 <Image
                   src={brandAssetUrl(BRAND_MARK_LIGHT)}
-                  alt="TECHMD"
+                  alt="TEQMD"
                   width={382}
                   height={354}
                   className="size-9 object-contain dark:hidden"
                 />
                 <Image
                   src={brandAssetUrl(BRAND_MARK_DARK)}
-                  alt="TECHMD"
+                  alt="TEQMD"
                   width={381}
                   height={345}
                   className="hidden size-9 object-contain dark:block"
@@ -175,14 +182,14 @@ export function AdminSidebar(props: AdminSidebarProps) {
               <div className="min-w-0">
                 <Image
                   src={brandAssetUrl(BRAND_LOGO_COMPACT_LIGHT)}
-                  alt="TECHMD"
+                  alt="TEQMD"
                   width={1748}
                   height={368}
                   className="h-7 w-auto max-w-[min(100%,14rem)] object-contain object-left dark:hidden"
                 />
                 <Image
                   src={brandAssetUrl(BRAND_LOGO_COMPACT_DARK)}
-                  alt="TECHMD"
+                  alt="TEQMD"
                   width={1742}
                   height={348}
                   className="hidden h-7 w-auto max-w-[min(100%,14rem)] object-contain object-left dark:block"

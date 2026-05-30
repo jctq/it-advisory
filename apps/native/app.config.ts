@@ -1,6 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 
-const DEFAULT_APP_NAME = 'TechMD';
+const DEFAULT_APP_NAME = 'TeqMD';
 const DEFAULT_SLUG = 'techmd-native';
 const DEFAULT_SCHEME = 'techmd';
 const DEFAULT_IOS_BUNDLE_ID = 'com.techmd.native';

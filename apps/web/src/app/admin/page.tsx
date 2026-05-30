@@ -2,7 +2,7 @@ import { AdminDashboard } from '@/components/admin/admin-dashboard';
 import { getAdminDashboardData } from '@/lib/data/admin-dashboard';
 
 export const metadata = {
-  title: 'Dashboard — TechMD Admin',
+  title: 'Dashboard — TeqMD Admin',
 };
 
 export const dynamic = 'force-dynamic';

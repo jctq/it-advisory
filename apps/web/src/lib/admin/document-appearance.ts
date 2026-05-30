@@ -63,7 +63,7 @@ export function resolveAdminDocumentAppearanceFromBrowser(): DocumentAppearance 
 export function resolveMarketingDocumentAppearanceFromBrowser(): DocumentAppearance {
   if (typeof window === 'undefined') {
     return {
-      isDark: false,
+      isDark: DEFAULT_MARKETING_COLOR_MODE === 'dark',
       colorTheme: DEFAULT_MARKETING_COLOR_THEME,
     };
   }

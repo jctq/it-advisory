@@ -3,7 +3,7 @@ const MEETING_POPUP_HEIGHT = 800;
 const MEETING_POPUP_NAME = 'techmd-meeting';
 
 /**
- * Opens a video meeting in a centered popup so users stay anchored to TechMD while the call runs.
+ * Opens a video meeting in a centered popup so users stay anchored to TeqMD while the call runs.
  */
 export function openMeetingWindow(meetingUrl: string): Window | null {
   if (typeof window === 'undefined') {

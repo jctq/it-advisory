@@ -12,8 +12,8 @@ import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/serv
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildNoIndexMetadata({
-  title: 'My diagnostics — TechMD',
-  description: 'View your saved TechMD diagnostic sessions.',
+  title: 'My diagnostics — TeqMD',
+  description: 'View your saved TeqMD diagnostic sessions.',
 });
 
 export const dynamic = 'force-dynamic';
