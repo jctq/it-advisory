@@ -89,13 +89,6 @@ function MultipleChoiceQuestionCard(props: {
     props.question.selectionMode === 'single' ? getTerminalSelectedOptionId(props.selection) : null;
   return (
     <View style={styles.optionGroup}>
-      <ThemedText style={[styles.variantHint, { color: theme.textMuted }]}>
-        {props.question.selectionMode === 'multiple'
-          ? 'Select one or more options.'
-          : supportsSingleSelectCascade
-            ? 'Choose one path. More choices may appear after your first selection.'
-            : 'Select the option that fits best.'}
-      </ThemedText>
       {props.options.length > 0 ? (
         props.options.map((option) => {
           const isInSelectedPath = props.selection.selectedOptionIds.includes(option.id);

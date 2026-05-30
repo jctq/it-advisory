@@ -447,13 +447,6 @@ function MultipleChoiceRoundRenderer(props: {
       {props.question.description !== null ? (
         <p className={WIZARD_UI.questionDesc}>{props.question.description}</p>
       ) : null}
-      <p className={WIZARD_UI.hintText}>
-        {props.question.selectionMode === 'multiple'
-          ? 'Select one or more options.'
-          : supportsSingleSelectCascade
-            ? 'Choose one path. More choices may appear after your first selection.'
-            : 'Select the option that fits best.'}
-      </p>
       <div className={cn('grid xl:grid-cols-3 md:grid-cols-2', WIZARD_UI.gridGap)} role="group">
         {visibleOptions.map((option, optionIndex) => {
           const isInSelectedPath = props.selection.selectedOptionIds.includes(option.id);
