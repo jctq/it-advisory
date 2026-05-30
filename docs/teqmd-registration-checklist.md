@@ -192,6 +192,8 @@ Set `EXPO_PUBLIC_API_BASE_URL` in `apps/native/.env.local` to your deployed web 
 
 - Blog: Admin → Blog (MongoDB — no external CMS)
 - Optional legal embeds: `PRIVACY_POLICY_BLOG_POST_ID`, `TERMS_OF_USE_BLOG_POST_ID`
+- **Customer-facing privacy addendum:** [Processor & feature addendum](./privacy-policy-processor-addendum.md) (paste into CMS policy as Section 5.1.1)
+- **DPO / ops:** [Data subject erasure runbook](./data-subject-erasure-checklist.md)
 
 ---
 

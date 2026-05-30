@@ -12,12 +12,12 @@ function normalizeBlogPostIdFromEnv(envValue: string | undefined): string | null
   return trimmedValue;
 }
 
-/** MongoDB blog post id for CMS-driven privacy policy; unset uses built-in default copy. */
+/** MongoDB blog post id for CMS-driven privacy policy; unset shows empty state. */
 export function getPrivacyPolicyBlogPostIdFromEnv(): string | null {
   return normalizeBlogPostIdFromEnv(process.env.PRIVACY_POLICY_BLOG_POST_ID);
 }
 
-/** MongoDB blog post id for CMS-driven terms of use; unset uses built-in default copy. */
+/** MongoDB blog post id for CMS-driven terms of use; unset shows empty state. */
 export function getTermsOfUseBlogPostIdFromEnv(): string | null {
   return normalizeBlogPostIdFromEnv(process.env.TERMS_OF_USE_BLOG_POST_ID);
 }
