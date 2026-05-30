@@ -37,36 +37,41 @@ export async function MarketingSiteFooter(): Promise<ReactElement> {
   return (
     <footer className="border-t border-border bg-muted/30">
       <div className="mx-auto max-w-6xl px-6 py-14 md:py-16">
-        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-[1.2fr_repeat(2,minmax(0,1fr))] lg:gap-12">
-          <div className="space-y-4">
+        <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between lg:gap-16">
+          <div className="space-y-4 md:max-w-xs lg:max-w-sm">
             <Link
               href="/"
               className="inline-block text-foreground outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
             >
               <TechmdSiteLogo />
             </Link>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               TeqMD helps organizations diagnose challenges, evaluate options, and make confident technology
               decisions before investing time and money.
             </p>
           </div>
-          {footerLinkGroups.map((group) => (
-            <div key={group.title}>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">{group.title}</p>
-              <ul className="mt-4 space-y-2.5">
-                {group.links.map((link) => (
-                  <li key={link.href}>
-                    <a
-                      href={link.href}
-                      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <nav
+            aria-label="Footer"
+            className="grid grid-cols-2 gap-x-10 gap-y-8 sm:gap-x-14 md:shrink-0 md:gap-x-12 lg:gap-x-20"
+          >
+            {footerLinkGroups.map((group) => (
+              <div key={group.title}>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">{group.title}</p>
+                <ul className="mt-4 space-y-1">
+                  {group.links.map((link) => (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        className="inline-block rounded-sm py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
         </div>
         <div className="mt-12 flex flex-col gap-3 border-t border-border/80 pt-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
