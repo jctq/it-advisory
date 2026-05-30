@@ -1,6 +1,6 @@
 'use client';
 
-import { BrainCircuit, CircleDollarSign, Clapperboard, CreditCard, Headphones, Mail, Video, type LucideIcon } from 'lucide-react';
+import { BrainCircuit, CircleDollarSign, Clapperboard, CreditCard, Globe, Headphones, Mail, Video, type LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
@@ -39,6 +39,11 @@ import {
   type AdminSupportSettingsFormState,
 } from '@/components/admin/admin-support-settings-form';
 import {
+  AdminSeoSettingsForm,
+  type AdminSeoSettingsFormHandle,
+  type AdminSeoSettingsFormState,
+} from '@/components/admin/admin-seo-settings-form';
+import {
   AdminSettingsForm,
   type AdminSettingsFormHandle,
   type AdminSettingsFormState,
@@ -55,6 +60,7 @@ type SettingsTabConfig = {
 
 const SETTINGS_TABS: readonly SettingsTabConfig[] = [
   { value: 'general', label: 'General', icon: BrainCircuit },
+  { value: 'seo', label: 'SEO', icon: Globe },
   { value: 'pricing', label: 'Pricing', icon: CircleDollarSign },
   { value: 'payments', label: 'Payments', icon: CreditCard },
   { value: 'email', label: 'Email', icon: Mail },
@@ -64,6 +70,12 @@ const SETTINGS_TABS: readonly SettingsTabConfig[] = [
 ];
 
 const EMPTY_GENERAL_STATE: AdminSettingsFormState = {
+  isDirty: false,
+  isSaving: false,
+  isLoading: true,
+};
+
+const EMPTY_SEO_STATE: AdminSeoSettingsFormState = {
   isDirty: false,
   isSaving: false,
   isLoading: true,
@@ -145,6 +157,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
     [router],
   );
   const [generalState, setGeneralState] = useState<AdminSettingsFormState>(EMPTY_GENERAL_STATE);
+  const [seoState, setSeoState] = useState<AdminSeoSettingsFormState>(EMPTY_SEO_STATE);
   const [pricingState, setPricingState] = useState<AdminPricingSettingsFormState>(EMPTY_PRICING_STATE);
   const [paymentsState, setPaymentsState] = useState<AdminPaymentSettingsFormState>(EMPTY_PAYMENTS_STATE);
   const [emailState, setEmailState] = useState<AdminEmailSettingsFormState>(EMPTY_EMAIL_STATE);
@@ -152,6 +165,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
   const [recordingsState, setRecordingsState] = useState<AdminRecordingSettingsFormState>(EMPTY_RECORDINGS_STATE);
   const [supportState, setSupportState] = useState<AdminSupportSettingsFormState>(EMPTY_SUPPORT_STATE);
   const generalFormRef = useRef<AdminSettingsFormHandle>(null);
+  const seoFormRef = useRef<AdminSeoSettingsFormHandle>(null);
   const pricingFormRef = useRef<AdminPricingSettingsFormHandle>(null);
   const paymentsFormRef = useRef<AdminPaymentSettingsFormHandle>(null);
   const emailFormRef = useRef<AdminEmailSettingsFormHandle>(null);
@@ -169,20 +183,26 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
   const activeState =
     activeTab === 'general'
       ? generalState
-      : activeTab === 'pricing'
-        ? pricingState
-        : activeTab === 'payments'
-          ? paymentsState
-          : activeTab === 'email'
-            ? emailState
-            : activeTab === 'support'
-            ? supportState
-            : activeTab === 'meetings'
-              ? meetingsState
-              : recordingsState;
+      : activeTab === 'seo'
+        ? seoState
+        : activeTab === 'pricing'
+          ? pricingState
+          : activeTab === 'payments'
+            ? paymentsState
+            : activeTab === 'email'
+              ? emailState
+              : activeTab === 'support'
+                ? supportState
+                : activeTab === 'meetings'
+                  ? meetingsState
+                  : recordingsState;
   const executeSaveActive = useCallback((): void => {
     if (activeTab === 'general') {
       void generalFormRef.current?.save();
+      return;
+    }
+    if (activeTab === 'seo') {
+      void seoFormRef.current?.save();
       return;
     }
     if (activeTab === 'pricing') {
@@ -210,6 +230,10 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
   const executeResetActive = useCallback((): void => {
     if (activeTab === 'general') {
       generalFormRef.current?.reset();
+      return;
+    }
+    if (activeTab === 'seo') {
+      seoFormRef.current?.reset();
       return;
     }
     if (activeTab === 'pricing') {
@@ -296,6 +320,16 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
             {mountedTabs.has('general') ? (
               <div data-admin-tour="page-settings-general">
                 <AdminSettingsForm formRef={generalFormRef} onStateChange={setGeneralState} />
+              </div>
+            ) : null}
+          </TabsContent>
+          <TabsContent
+            value="seo"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+          >
+            {mountedTabs.has('seo') ? (
+              <div data-admin-tour="page-settings-seo">
+                <AdminSeoSettingsForm formRef={seoFormRef} onStateChange={setSeoState} />
               </div>
             ) : null}
           </TabsContent>

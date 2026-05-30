@@ -19,6 +19,7 @@
     "./payment-types": "./src/payment-types.ts",
     "./payment-log-types": "./src/payment-log-types.ts",
     "./recording-types": "./src/recording-types.ts",
+    "./seo-settings-types": "./src/seo-settings-types.ts",
     "./support-report-types": "./src/support-report-types.ts",
     "./support-report-guest-contact": "./src/support-report-guest-contact.ts",
     "./support-settings-types": "./src/support-settings-types.ts",

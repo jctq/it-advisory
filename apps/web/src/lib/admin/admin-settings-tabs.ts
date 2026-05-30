@@ -1,5 +1,6 @@
 export type SettingsTab =
   | 'general'
+  | 'seo'
   | 'pricing'
   | 'payments'
   | 'email'
@@ -9,6 +10,7 @@ export type SettingsTab =
 
 const SETTINGS_TAB_VALUES: readonly SettingsTab[] = [
   'general',
+  'seo',
   'pricing',
   'payments',
   'email',

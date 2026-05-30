@@ -7,7 +7,7 @@ import {
   buildBlogListPageHref,
   parseBlogListPageParam,
 } from '@/lib/marketing/blog-list-pagination';
-import { buildMarketingMetadata } from '@/lib/seo/site-seo';
+import { buildMarketingMetadataAsync, buildPageMetadata } from '@/lib/seo/site-seo';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,16 +15,16 @@ type BlogIndexPageProps = {
   readonly searchParams: Promise<{ readonly page?: string | string[] }>;
 };
 
-const BLOG_INDEX_DESCRIPTION = 'Technology guidance articles for growing teams in the Philippines.';
-
 export async function generateMetadata(props: BlogIndexPageProps) {
   const { page: pageParam } = await props.searchParams;
   const page = parseBlogListPageParam(pageParam);
   const pathname = page <= 1 ? '/blog' : buildBlogListPageHref(page);
-  const title = page <= 1 ? 'Blog — TeqMD' : `Blog — Page ${page} — TeqMD`;
-  return buildMarketingMetadata({
-    title,
-    description: BLOG_INDEX_DESCRIPTION,
+  if (page <= 1) {
+    return buildPageMetadata('blog', { pathname });
+  }
+  return buildMarketingMetadataAsync({
+    title: `Blog — Page ${page} — TeqMD`,
+    description: 'Technology guidance articles for growing teams in the Philippines.',
     pathname,
   });
 }

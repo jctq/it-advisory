@@ -6,7 +6,7 @@ import { QueryProvider } from '@/components/providers/query-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { brandAssetUrl } from '@/lib/brand/brand-assets';
 import { resolveRootLayoutDocumentAppearance } from '@/lib/brand/resolve-root-layout-document-appearance';
-import { buildRootLayoutMetadata, resolveMetadataBase } from '@/lib/seo/site-seo';
+import { buildRootLayoutMetadataAsync, resolveMetadataBase } from '@/lib/seo/site-seo';
 import './globals.css';
 
 const sans = Roboto({
@@ -22,32 +22,34 @@ const mono = Roboto_Mono({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  metadataBase: resolveMetadataBase(),
-  ...buildRootLayoutMetadata(),
-  icons: {
-    icon: [
-      {
-        url: brandAssetUrl('techmd-mark.png'),
-        type: 'image/png',
-        sizes: '326x344',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: brandAssetUrl('techmd-mark-dark.png'),
-        type: 'image/png',
-        sizes: '326x344',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: brandAssetUrl('techmd-mark-dark.png'),
-        type: 'image/png',
-        sizes: '326x344',
-      },
-    ],
-    apple: [{ url: brandAssetUrl('techmd-mark-dark.png'), sizes: '326x344', type: 'image/png' }],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    metadataBase: resolveMetadataBase(),
+    ...(await buildRootLayoutMetadataAsync()),
+    icons: {
+      icon: [
+        {
+          url: brandAssetUrl('techmd-mark.png'),
+          type: 'image/png',
+          sizes: '326x344',
+          media: '(prefers-color-scheme: light)',
+        },
+        {
+          url: brandAssetUrl('techmd-mark-dark.png'),
+          type: 'image/png',
+          sizes: '326x344',
+          media: '(prefers-color-scheme: dark)',
+        },
+        {
+          url: brandAssetUrl('techmd-mark-dark.png'),
+          type: 'image/png',
+          sizes: '326x344',
+        },
+      ],
+      apple: [{ url: brandAssetUrl('techmd-mark-dark.png'), sizes: '326x344', type: 'image/png' }],
+    },
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const appearance = await resolveRootLayoutDocumentAppearance();

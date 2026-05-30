@@ -193,7 +193,7 @@ export const ADMIN_ONBOARDING_PAGE_STEP_DEFINITIONS = [
     routeHref: '/admin/settings',
     title: 'Settings sections',
     description:
-      'Seven tabs—General, Pricing, Payments, Email, Support, Meetings, and Recordings. Save or reset the active tab with the sticky footer.',
+      'Eight tabs—General, SEO, Pricing, Payments, Email, Support, Meetings, and Recordings. Save or reset the active tab with the sticky footer.',
     side: 'bottom',
   },
   {
@@ -202,6 +202,15 @@ export const ADMIN_ONBOARDING_PAGE_STEP_DEFINITIONS = [
     routeHref: '/admin/settings',
     title: 'General',
     description: 'Diagnostic intake, branding, and core site configuration for web and native experiences.',
+    side: 'top',
+  },
+  {
+    target: 'page-settings-seo',
+    routePath: '/admin/settings',
+    routeHref: '/admin/settings?tab=seo',
+    title: 'SEO',
+    description:
+      'Site-wide meta defaults, search console verification, social cards, and per-page title/description overrides for marketing routes.',
     side: 'top',
   },
   {

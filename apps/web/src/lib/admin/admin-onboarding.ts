@@ -53,6 +53,7 @@ export type AdminOnboardingPageTarget =
   | 'page-advisor-chat'
   | 'page-settings-tabs'
   | 'page-settings-general'
+  | 'page-settings-seo'
   | 'page-settings-pricing'
   | 'page-settings-payments'
   | 'page-settings-email'
@@ -105,6 +106,7 @@ const ADMIN_ONBOARDING_MOBILE_SIDEBAR_CLOSED_TARGETS: ReadonlySet<AdminOnboardin
   'page-advisor-chat',
   'page-settings-tabs',
   'page-settings-general',
+  'page-settings-seo',
   'page-settings-pricing',
   'page-settings-payments',
   'page-settings-email',

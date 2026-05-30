@@ -13,6 +13,7 @@ describe('admin onboarding', () => {
     expect(targets).toContain('page-bookings-table');
     expect(targets).toContain('page-bookings-calendar');
     expect(targets).toContain('page-settings-general');
+    expect(targets).toContain('page-settings-seo');
     expect(targets).toContain('page-settings-recordings');
     expect(targets).toContain('page-support-reports-table');
     expect(targets).toContain('page-schedule-tabs');
@@ -29,7 +30,7 @@ describe('admin onboarding', () => {
     ).map((step) => step.target);
     expect(navTargets).toContain('nav-support-reports');
     expect(navTargets).toContain('nav-debug');
-    expect(ADMIN_ONBOARDING_STEP_DEFINITIONS.length).toBe(48);
+    expect(ADMIN_ONBOARDING_STEP_DEFINITIONS.length).toBe(49);
   });
 
   it('marks every drive step with disableActiveInteraction', () => {

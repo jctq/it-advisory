@@ -11,7 +11,7 @@ import {
   parseBlogPostSeoKeywords,
 } from '@/lib/blog-post-types';
 import { findPublishedBlogPostBySlug } from '@/lib/data/blog-posts';
-import { buildMarketingMetadata } from '@/lib/seo/site-seo';
+import { buildMarketingMetadataAsync } from '@/lib/seo/site-seo';
 import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ export async function generateMetadata(props: BlogArticlePageProps) {
   const { slug } = await props.params;
   const post = await findPublishedBlogPostBySlug(slug);
   if (post === null) {
-    return buildMarketingMetadata({
+    return buildMarketingMetadataAsync({
       title: 'Article not found — TeqMD',
       description: 'This article could not be found.',
       pathname: `/blog/${slug}`,
@@ -32,7 +32,7 @@ export async function generateMetadata(props: BlogArticlePageProps) {
   }
   const seoTitle = getBlogPostSeoTitle(post);
   const seoKeywords = parseBlogPostSeoKeywords(post);
-  return buildMarketingMetadata({
+  return buildMarketingMetadataAsync({
     title: `${seoTitle} — TeqMD Blog`,
     description: getBlogPostSeoDescription(post),
     pathname: `/blog/${slug}`,

@@ -118,7 +118,7 @@ export function MarketingServiceTabs(props: MarketingServiceTabsProps): ReactEle
             disabled={props.isNavigating}
             onClick={props.onStartDiagnostic}
           >
-            <MarketingNewQuizCtaLabel isNavigating={props.isNavigating} label="Match me via diagnostic" />
+            <MarketingNewQuizCtaLabel isNavigating={props.isNavigating} label="Start My Assessment" />
             <ArrowRight className="size-4 shrink-0" aria-hidden />
           </Button>
         </div>

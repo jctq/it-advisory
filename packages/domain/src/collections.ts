@@ -50,4 +50,6 @@ export const COLLECTIONS = {
   supportReports: 'support_reports',
   /** Singleton `{ _id: 'default' }` — support notification emails and reporter email policy. */
   supportSettings: 'support_settings',
+  /** Singleton `{ _id: 'default' }` — site-wide SEO defaults and marketing page meta overrides (admin). */
+  seoSettings: 'seo_settings',
 } as const;
