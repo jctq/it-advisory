@@ -7,6 +7,7 @@ import {
   MarketingSectionArt,
   type MarketingSectionArtVariant,
 } from '@/components/marketing/marketing-section-art';
+import { MarketingNewQuizCtaLabel } from '@/components/marketing/marketing-new-quiz-cta-label';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -103,22 +104,22 @@ export function MarketingServiceTabs(props: MarketingServiceTabsProps): ReactEle
             className="absolute -right-4 top-0 h-[min(100%,22rem)] w-[min(85%,20rem)] translate-y-2"
           />
         </div>
-        <div className="relative space-y-6">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="relative flex min-w-0 flex-col gap-6">
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <ActiveIcon className="size-7" aria-hidden />
           </span>
-          <div className="space-y-3">
+          <div className="relative z-10 min-w-0 space-y-3 pr-6 sm:pr-20 md:pr-28">
             <h3 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">{activeItem.title}</h3>
-            <p className="max-w-xl text-base leading-relaxed text-muted-foreground">{activeItem.description}</p>
+            <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">{activeItem.description}</p>
           </div>
           <Button
             type="button"
-            className="min-h-11 gap-2"
+            className="relative z-10 inline-flex h-11 w-fit shrink-0 items-center gap-2 active:translate-y-0"
             disabled={props.isNavigating}
             onClick={props.onStartDiagnostic}
           >
-            {props.isNavigating ? 'Starting…' : 'Match me via diagnostic'}
-            <ArrowRight className="size-4" aria-hidden />
+            <MarketingNewQuizCtaLabel isNavigating={props.isNavigating} label="Match me via diagnostic" />
+            <ArrowRight className="size-4 shrink-0" aria-hidden />
           </Button>
         </div>
       </div>

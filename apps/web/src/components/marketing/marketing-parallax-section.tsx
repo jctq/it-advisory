@@ -133,7 +133,7 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
         </div>
       ) : null}
       <div
-        className={cn('relative z-10', !isRevealEnabled && contentClassName)}
+        className={cn('relative z-10 min-w-0', !isRevealEnabled && contentClassName)}
         style={{
           transform: contentTransform,
           willChange: contentTransform === undefined ? undefined : 'transform',

@@ -22,6 +22,7 @@ import { useMarketingSupportReportsUnreadCount } from '@/hooks/marketing/use-mar
 import { useMarketingChromeStore } from '@/store/marketing/marketing-chrome-store';
 import { MarketingHeaderAccountMenu } from '@/components/marketing/marketing-header-account-menu';
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
+import { MarketingNewQuizCtaLabel } from '@/components/marketing/marketing-new-quiz-cta-label';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -141,11 +142,11 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
           )}
           <Button
             type="button"
-            className="hidden h-10 xl:inline-flex"
+            className="hidden h-10 active:translate-y-0 xl:inline-flex"
             disabled={isNavigating}
             onClick={() => void navigateToNewQuiz()}
           >
-            {isNavigating ? 'Starting…' : 'Start My Assessment'}
+            <MarketingNewQuizCtaLabel isNavigating={isNavigating} />
           </Button>
           <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -214,7 +215,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                 <div className="px-2">
                   <Button
                     type="button"
-                    className="h-10 w-full gap-2"
+                    className="h-10 w-full gap-2 active:translate-y-0"
                     disabled={isNavigating}
                     onClick={() => {
                       executeCloseMobileMenu();
@@ -222,7 +223,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                     }}
                   >
                     <Rocket className="size-4 shrink-0" aria-hidden />
-                    {isNavigating ? 'Starting…' : 'Start My Assessment'}
+                    <MarketingNewQuizCtaLabel isNavigating={isNavigating} />
                   </Button>
                 </div>
               </nav>

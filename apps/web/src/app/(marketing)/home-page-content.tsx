@@ -30,6 +30,7 @@ import { useMarketingHeroInteraction } from '@/components/marketing/use-marketin
 import { MarketingParallaxSection } from '@/components/marketing/marketing-parallax-section';
 import { MarketingSectionHeader } from '@/components/marketing/marketing-section-header';
 import { MarketingServiceTabs } from '@/components/marketing/marketing-service-tabs';
+import { MarketingNewQuizCtaLabel } from '@/components/marketing/marketing-new-quiz-cta-label';
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { Button } from '@/components/ui/button';
 import {
@@ -307,39 +308,39 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
       <MarketingParallaxSection
         ref={heroSectionRef}
         reveal={false}
-        className="relative flex min-h-[88dvh] flex-col justify-end overflow-hidden border-b border-border px-6 pb-14 pt-28 md:min-h-[92dvh] md:pb-20 md:pt-32"
+        className="relative flex min-h-[88dvh] flex-col justify-end border-b border-border px-6 pb-14 pt-28 md:min-h-[92dvh] md:pb-20 md:pt-32"
         speed={0.11}
         backgroundSpeed={0}
         background={<MarketingHeroBackground interaction={{ isBoosted, isInView, rootStyle }} />}
       >
-        <div className="mx-auto w-full max-w-6xl">
-          <h1 className="max-w-4xl text-balance text-4xl font-semibold tracking-[-0.04em] text-foreground sm:text-5xl md:text-6xl md:leading-[1.04] lg:text-[3.75rem] lg:leading-[1.02]">
-            Every technology problem has a root cause.
-          </h1>
-          <p className="mt-6 max-w-2xl text-pretty text-xl font-medium leading-snug text-foreground/90 md:text-2xl md:leading-snug">
-            Identify the challenges affecting your systems, processes, and software investments before they become
-            costly problems
-          </p>
-          <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
-            A guided assessment, tailored recommendations, and expert consultation
-          </p>
-          <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
-            — all designed to help you make
-            smarter technology decisions.
-          </p>
-          <div className="mt-10 flex flex-wrap gap-3">
-            <Button
-              size="lg"
-              className="marketing-hero-cta group min-h-11 gap-2 bg-transparent hover:bg-transparent dark:bg-primary dark:hover:bg-primary/90"
-              disabled={isNavigating}
-              onClick={() => void navigateToNewQuiz()}
-            >
-              {isNavigating ? 'Starting…' : 'Start My Assessment'}
-              <ArrowRight
-                className="size-4 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5"
-                aria-hidden
-              />
-            </Button>
+        <div className="mx-auto w-full min-w-0 max-w-6xl">
+          <div className="max-w-2xl min-w-0">
+            <h1 className="text-balance text-4xl font-semibold tracking-[-0.04em] text-foreground sm:text-5xl md:text-6xl md:leading-[1.04] lg:text-[3.75rem] lg:leading-[1.02]">
+              Every technology problem has a root cause.
+            </h1>
+            <p className="mt-6 text-pretty text-xl font-medium leading-snug text-foreground/90 md:text-2xl md:leading-snug">
+              Identify the challenges affecting your systems, processes, and software investments before they become
+              costly problems
+            </p>
+            <p className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground">
+              A guided assessment, tailored recommendations, and expert consultation — all designed to help you make
+              smarter technology decisions.
+            </p>
+            <div className="mt-10 flex flex-wrap gap-3">
+              <Button
+                type="button"
+                size="lg"
+                className="marketing-hero-cta group inline-flex h-11 items-center gap-2 bg-transparent active:translate-y-0 hover:bg-transparent dark:bg-primary dark:hover:bg-primary/90"
+                disabled={isNavigating}
+                onClick={() => void navigateToNewQuiz()}
+              >
+                <MarketingNewQuizCtaLabel isNavigating={isNavigating} />
+                <ArrowRight
+                  className="size-4 shrink-0 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </Button>
+            </div>
           </div>
           <div className="mt-10 flex flex-col gap-8 sm:mt-12 md:mt-14 md:flex-row md:items-end md:justify-between md:gap-6">
             <p className="text-sm text-muted-foreground md:pb-1">Assessment takes less than 5 minutes.</p>
@@ -539,7 +540,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               onStartDiagnostic={() => void navigateToNewQuiz()}
             />
           </MarketingSectionReveal>
-          <MarketingSectionReveal className="grid gap-6 lg:grid-cols-2" stagger>
+          <MarketingSectionReveal className="grid gap-6 lg:grid-cols-2 lg:items-stretch" stagger>
             {ENGAGEMENT_MODELS.map((model, index) => (
               <div
                 key={model.title}
@@ -556,7 +557,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 </div>
                 <p className="relative text-xs font-semibold uppercase tracking-[0.2em] text-primary">{model.eyebrow}</p>
                 <h3 className="relative mt-3 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">{model.title}</h3>
-                <div className="relative mt-4 flex-1 space-y-3">
+                <div className="relative z-10 mt-4 min-w-0 flex-1 space-y-3">
                   {model.body.map((paragraph) => (
                     <p key={paragraph} className="text-sm leading-relaxed text-muted-foreground md:text-base">
                       {paragraph}
@@ -576,15 +577,17 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                     </div>
                   ) : null}
                 </div>
-                <Button
-                  type="button"
-                  className="relative mt-8 w-fit min-h-11 gap-2"
-                  disabled={isNavigating}
-                  onClick={() => void navigateToNewQuiz()}
-                >
-                  {isNavigating ? 'Starting…' : model.ctaLabel}
-                  <ArrowRight className="size-4" aria-hidden />
-                </Button>
+                <div className="relative z-10 mt-auto pt-8">
+                  <Button
+                    type="button"
+                    className="inline-flex h-11 w-fit items-center gap-2 active:translate-y-0"
+                    disabled={isNavigating}
+                    onClick={() => void navigateToNewQuiz()}
+                  >
+                    <MarketingNewQuizCtaLabel isNavigating={isNavigating} label={model.ctaLabel} />
+                    <ArrowRight className="size-4 shrink-0" aria-hidden />
+                  </Button>
+                </div>
               </div>
             ))}
           </MarketingSectionReveal>
@@ -655,14 +658,14 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
       <MarketingParallaxSection id="about" reveal={false} className="scroll-mt-24 px-6 py-16 md:py-24" speed={0.12}>
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6 lg:max-w-2xl">
               <MarketingSectionHeader
                 reveal
                 eyebrow={`WHY ${siteName.toUpperCase()} EXISTS`}
                 title="Better technology decisions start with the right diagnosis."
                 description="Most organizations don't struggle because they lack technology. They struggle because they're trying to solve the wrong problem."
               />
-              <div className="space-y-4 text-muted-foreground">
+              <div className="min-w-0 space-y-4 text-pretty text-muted-foreground">
                 <p>
                   Before recommending software, vendors, automation, or implementation strategies, {siteName} helps
                   uncover the root cause of the challenge—so you can invest with confidence and avoid costly mistakes.
@@ -676,17 +679,19 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                   That&apos;s why {siteName} begins with a guided assessment designed to identify your priorities,
                   uncover risks, and recommend the most appropriate path forward.
                 </p>
-                <p>The goal isn&apos;t another strategy deck.</p>
-                <p>The goal is helping you make informed technology decisions that deliver measurable results.</p>
+                <p>
+                  The goal isn&apos;t another strategy deck — it&apos;s helping you make informed technology decisions
+                  that deliver measurable results.
+                </p>
               </div>
               <Button
                 type="button"
-                className="min-h-11 gap-2"
+                className="inline-flex h-11 items-center gap-2 active:translate-y-0"
                 disabled={isNavigating}
                 onClick={() => void navigateToNewQuiz()}
               >
-                {isNavigating ? 'Starting…' : 'Start Your Assessment'}
-                <ArrowRight className="size-4" aria-hidden />
+                <MarketingNewQuizCtaLabel isNavigating={isNavigating} label="Start Your Assessment" />
+                <ArrowRight className="size-4 shrink-0" aria-hidden />
               </Button>
             </div>
             <MarketingSectionReveal
@@ -781,12 +786,12 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
               <Button
                 type="button"
                 size="lg"
-                className="min-h-11 w-full shrink-0 shadow-md md:w-auto"
+                className="inline-flex h-11 w-full shrink-0 items-center gap-2 shadow-md active:translate-y-0 md:w-auto"
                 disabled={isNavigating}
                 onClick={() => void navigateToNewQuiz()}
               >
-                {isNavigating ? 'Starting…' : 'Start My Assessment'}
-                <ArrowRight className="size-4" aria-hidden />
+                <MarketingNewQuizCtaLabel isNavigating={isNavigating} />
+                <ArrowRight className="size-4 shrink-0" aria-hidden />
               </Button>
             </div>
           </div>
