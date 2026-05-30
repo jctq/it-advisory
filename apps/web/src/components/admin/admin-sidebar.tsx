@@ -162,37 +162,37 @@ export function AdminSidebar(props: AdminSidebarProps) {
             )}
           >
             {props.collapsed ? (
-              <span className="flex size-10 items-center justify-center overflow-hidden rounded-2xl bg-sidebar-primary/10 shadow-sm">
+              <span className="flex size-10 items-center justify-center">
                 <Image
                   src={brandAssetUrl(BRAND_MARK_LIGHT)}
                   alt="TEQMD"
-                  width={382}
-                  height={354}
+                  width={326}
+                  height={344}
                   className="size-9 object-contain dark:hidden"
                 />
                 <Image
                   src={brandAssetUrl(BRAND_MARK_DARK)}
                   alt="TEQMD"
-                  width={381}
-                  height={345}
+                  width={326}
+                  height={344}
                   className="hidden size-9 object-contain dark:block"
                 />
               </span>
             ) : (
-              <div className="min-w-0">
+              <div className="min-w-0 overflow-visible">
                 <Image
                   src={brandAssetUrl(BRAND_LOGO_COMPACT_LIGHT)}
                   alt="TEQMD"
-                  width={1748}
-                  height={368}
-                  className="h-7 w-auto max-w-[min(100%,14rem)] object-contain object-left dark:hidden"
+                  width={1590}
+                  height={374}
+                  className="h-8 w-auto max-w-[min(100%,15rem)] object-contain object-left dark:hidden"
                 />
                 <Image
                   src={brandAssetUrl(BRAND_LOGO_COMPACT_DARK)}
                   alt="TEQMD"
-                  width={1742}
-                  height={348}
-                  className="hidden h-7 w-auto max-w-[min(100%,14rem)] object-contain object-left dark:block"
+                  width={1588}
+                  height={374}
+                  className="hidden h-8 w-auto max-w-[min(100%,15rem)] object-contain object-left dark:block"
                 />
                 <p className="mt-1 text-xs text-sidebar-foreground/70">Admin console</p>
               </div>

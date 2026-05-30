@@ -8,14 +8,14 @@ import {
   BRAND_LOGO_FULL_LIGHT,
 } from '@/lib/brand/brand-assets';
 
-// Intrinsic pixels from `scripts/generate-techmd-brand-assets.py` (2× pipeline on 1024px masters).
-const LOGO_LIGHT_WIDTH_PX = 1748;
-const LOGO_LIGHT_HEIGHT_PX = 368;
-const LOGO_DARK_WIDTH_PX = 1742;
-const LOGO_DARK_HEIGHT_PX = 348;
+// Intrinsic pixels from `scripts/generate-techmd-brand-assets.py` — updated after regen.
+const LOGO_LIGHT_WIDTH_PX = 1590;
+const LOGO_LIGHT_HEIGHT_PX = 374;
+const LOGO_DARK_WIDTH_PX = 1588;
+const LOGO_DARK_HEIGHT_PX = 374;
 
 const LOGO_IMAGE_CLASS =
-  'absolute left-0 top-0 h-full w-auto max-w-none object-contain object-left';
+  'block h-9 w-auto max-w-none object-contain object-left sm:h-10 lg:h-11';
 
 /**
  * Responsive TEQMD logo for the marketing header: full wordmark + tagline on large screens,
@@ -24,11 +24,8 @@ const LOGO_IMAGE_CLASS =
  */
 export function TechmdSiteLogo(): ReactElement {
   return (
-    <span className="relative inline-flex max-h-10 items-center sm:max-h-11">
-      <span
-        className="relative hidden h-8 sm:h-9 lg:block lg:h-10"
-        style={{ aspectRatio: `${LOGO_LIGHT_WIDTH_PX} / ${LOGO_LIGHT_HEIGHT_PX}` }}
-      >
+    <span className="inline-flex shrink-0 items-center overflow-visible">
+      <span className="hidden lg:contents">
         <Image
           src={brandAssetUrl(BRAND_LOGO_FULL_LIGHT)}
           alt="TEQMD — Technology consultation. Better decisions. Stronger business."
@@ -36,7 +33,7 @@ export function TechmdSiteLogo(): ReactElement {
           height={LOGO_LIGHT_HEIGHT_PX}
           priority
           sizes="(min-width: 1024px) 384px, 1px"
-          className={`${LOGO_IMAGE_CLASS} block dark:hidden`}
+          className={`${LOGO_IMAGE_CLASS} dark:hidden`}
         />
         <Image
           src={brandAssetUrl(BRAND_LOGO_FULL_DARK)}
@@ -48,10 +45,7 @@ export function TechmdSiteLogo(): ReactElement {
           className={`${LOGO_IMAGE_CLASS} hidden dark:block`}
         />
       </span>
-      <span
-        className="relative h-8 sm:h-9 lg:hidden"
-        style={{ aspectRatio: `${LOGO_LIGHT_WIDTH_PX} / ${LOGO_LIGHT_HEIGHT_PX}` }}
-      >
+      <span className="lg:hidden">
         <Image
           src={brandAssetUrl(BRAND_LOGO_COMPACT_LIGHT)}
           alt="TEQMD"
@@ -59,7 +53,7 @@ export function TechmdSiteLogo(): ReactElement {
           height={LOGO_LIGHT_HEIGHT_PX}
           priority
           sizes="(max-width: 1023px) 288px, 1px"
-          className={`${LOGO_IMAGE_CLASS} block dark:hidden`}
+          className={`${LOGO_IMAGE_CLASS} dark:hidden`}
         />
         <Image
           src={brandAssetUrl(BRAND_LOGO_COMPACT_DARK)}

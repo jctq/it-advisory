@@ -97,11 +97,11 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
         props.className,
       )}
     >
-      <div className="mx-auto flex min-h-14 max-w-6xl items-center gap-3 px-4 py-2 sm:min-h-16 sm:gap-4 md:px-4 lg:px-0 lg:gap-6">
+      <div className="mx-auto flex min-h-14 max-w-6xl items-center gap-3 px-4 py-2 sm:min-h-16 sm:gap-4 md:px-4 lg:px-2 lg:gap-6">
         <Link
           href="/"
           onClick={executeHomeLogoClick}
-          className="shrink-0 text-foreground outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 overflow-visible text-foreground outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <TechmdSiteLogo />
         </Link>

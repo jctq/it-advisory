@@ -33,15 +33,15 @@ from PIL import Image, ImageFilter
 
 REPO = Path(__file__).resolve().parents[1]
 SOURCE_DIR = REPO / "apps/web/public/brand/_source"
-# Reference canvas used when the original TEQMD master was 1024×682 (crop math).
+# Reference canvas for horizontal masters (mark | wordmark + tagline).
 REFERENCE_MASTER_WIDTH_PX = 1024
-REFERENCE_MASTER_HEIGHT_PX = 682
-MARK_CROP_LEFT = 78
-MARK_CROP_TOP = 240
-MARK_CROP_RIGHT = 269
-MARK_CROP_BOTTOM = 417
-STRIP_TAGLINE_Y_REF = 399
-STRIP_TAGLINE_X_CUT_REF = 261
+REFERENCE_MASTER_HEIGHT_PX = 420
+MARK_CROP_LEFT = 121
+MARK_CROP_TOP = 84
+MARK_CROP_RIGHT = 284
+MARK_CROP_BOTTOM = 256
+STRIP_TAGLINE_Y_REF = 200
+STRIP_TAGLINE_X_CUT_REF = 326
 SUPERSAMPLE_IF_WIDTH_BELOW_PX = 1800
 SUPERSAMPLE_FACTOR = 2
 WEB_LOGO_MAX_WIDTH_PX = 3200
@@ -189,14 +189,71 @@ def mark_crop_box_px(im: Image.Image) -> tuple[int, int, int, int]:
     return (left, top, right, bottom)
 
 
-def strip_tagline_for_compact(im: Image.Image) -> Image.Image:
-    """Remove tagline region (coordinates scale with canvas vs 1024×682 reference)."""
+def detect_divider_x(im: Image.Image) -> int:
+    """Find the vertical separator between mark and wordmark."""
+    arr = np.array(im)
+    alpha = arr[:, :, 3]
+    h, w = alpha.shape
+    y0, y1 = int(h * 0.12), int(h * 0.88)
+    col_ink = (alpha[y0:y1, :] > 128).mean(axis=0)
+    search_start = int(w * 0.16)
+    search_end = max(search_start + 8, int(w * 0.42))
+    region = col_ink[search_start:search_end]
+    if region.size == 0:
+        return int(STRIP_TAGLINE_X_CUT_REF * w / REFERENCE_MASTER_WIDTH_PX)
+    return int(search_start + region.argmin())
+
+
+def detect_tagline_start_y(im: Image.Image, divider_x: int) -> int:
+    """Row where the tagline begins (first row after the wordmark/tagline gap)."""
     arr = np.array(im)
     h, w = arr.shape[0], arr.shape[1]
-    y0 = min(h - 1, max(0, int(STRIP_TAGLINE_Y_REF * h / REFERENCE_MASTER_HEIGHT_PX)))
-    x_cut = min(w - 1, max(0, int(STRIP_TAGLINE_X_CUT_REF * w / REFERENCE_MASTER_WIDTH_PX)))
-    for y in range(y0, h):
-        arr[y, x_cut + 1 :, 3] = 0
+    x0 = min(w - 1, divider_x + 12)
+    row_ink = (arr[:, x0:, 3] > 128).sum(axis=1)
+    if row_ink.max() == 0:
+        return h
+    threshold = max(8, row_ink.max() * 0.12)
+    active = np.where(row_ink > threshold)[0]
+    if len(active) < 2:
+        return h
+    best_gap = 0
+    split_y = h
+    for i in range(1, len(active)):
+        gap = int(active[i] - active[i - 1])
+        if gap >= 4 and gap > best_gap and active[i - 1] > h * 0.18:
+            best_gap = gap
+            split_y = int(active[i])
+    return split_y
+
+
+def mark_box_px(im: Image.Image, divider_x: int | None = None) -> tuple[int, int, int, int]:
+    """Bounding box for the mark to the left of the divider."""
+    if divider_x is None:
+        divider_x = detect_divider_x(im)
+    arr = np.array(im)
+    left = arr[:, : max(0, divider_x - 4), 3]
+    ys, xs = np.where(left > 128)
+    if len(xs) == 0:
+        return mark_crop_box_px(im)
+    pad = max(4, int(im.height * 0.025))
+    return (
+        max(0, int(xs.min()) - pad),
+        max(0, int(ys.min()) - pad),
+        min(im.width, int(xs.max()) + 1 + pad),
+        min(im.height, int(ys.max()) + 1 + pad),
+    )
+
+
+def strip_tagline_for_compact(im: Image.Image) -> Image.Image:
+    """Remove tagline on the right; keeps the full wordmark above the detected gap."""
+    arr = np.array(im)
+    h, w = arr.shape[0], arr.shape[1]
+    divider_x = detect_divider_x(im)
+    tagline_y = detect_tagline_start_y(im, divider_x)
+    if tagline_y >= h:
+        tagline_y = min(h - 1, max(0, int(STRIP_TAGLINE_Y_REF * h / REFERENCE_MASTER_HEIGHT_PX)))
+    for y in range(tagline_y, h):
+        arr[y, divider_x + 1 :, 3] = 0
     return Image.fromarray(arr, "RGBA")
 
 
@@ -277,9 +334,9 @@ def build_variants_from_master(
             f"{SOURCE_DIR}/ for sharp edges (matches dark master quality).",
             file=sys.stderr,
         )
-    full_src = trim_transparent(base, pad=2)
-    compact_src = trim_transparent(strip_tagline_for_compact(base), pad=2)
-    mark_src = trim_transparent(base.crop(mark_crop_box_px(base)), pad=2)
+    full_src = trim_transparent(base, pad=8)
+    compact_src = trim_transparent(strip_tagline_for_compact(base), pad=8)
+    mark_src = trim_transparent(base.crop(mark_box_px(base)), pad=8)
     return full_src, compact_src, mark_src
 
 

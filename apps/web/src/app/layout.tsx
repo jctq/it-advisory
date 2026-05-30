@@ -30,22 +30,22 @@ export const metadata: Metadata = {
       {
         url: brandAssetUrl('techmd-mark.png'),
         type: 'image/png',
-        sizes: '382x354',
+        sizes: '326x344',
         media: '(prefers-color-scheme: light)',
       },
       {
         url: brandAssetUrl('techmd-mark-dark.png'),
         type: 'image/png',
-        sizes: '382x354',
+        sizes: '326x344',
         media: '(prefers-color-scheme: dark)',
       },
       {
         url: brandAssetUrl('techmd-mark-dark.png'),
         type: 'image/png',
-        sizes: '382x354',
+        sizes: '326x344',
       },
     ],
-    apple: [{ url: brandAssetUrl('techmd-mark-dark.png'), sizes: '382x354', type: 'image/png' }],
+    apple: [{ url: brandAssetUrl('techmd-mark-dark.png'), sizes: '326x344', type: 'image/png' }],
   },
 };
 
