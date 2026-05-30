@@ -38,6 +38,21 @@ export function parseRecordingOptInFromTransactionMetadata(
   return raw === 'true' || raw === '1' || raw === 'yes';
 }
 
+/** Merges checkout opt-in, booking snapshot, and open-transaction metadata for pricing and PSP amount. */
+export function resolveCheckoutRecordingOptIn(input: {
+  readonly requested?: boolean;
+  readonly bookingRecordingOptIn?: boolean;
+  readonly transactionMetadata?: Record<string, string>;
+}): boolean {
+  if (input.requested === true) {
+    return true;
+  }
+  if (input.bookingRecordingOptIn === true) {
+    return true;
+  }
+  return parseRecordingOptInFromTransactionMetadata(input.transactionMetadata);
+}
+
 /** Applies recording opt-in from checkout transaction metadata to an existing booking row. */
 export async function syncBookingRecordingFieldsFromTransaction(input: {
   readonly bookingId: ObjectId;

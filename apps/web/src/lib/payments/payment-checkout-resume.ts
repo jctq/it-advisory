@@ -26,6 +26,10 @@ import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking
 import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
 import { resumeOpenPaymentTransactionCheckout } from '@/lib/payments/payment-checkout-resume-open';
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
+import {
+  applyBookingRecordingFieldsFromCheckout,
+  resolveCheckoutRecordingOptIn,
+} from '@/lib/booking/apply-booking-recording-fields';
 
 type ResumeCheckoutParams = {
   readonly credentials: GuestBookingManageCredentials;
@@ -35,6 +39,7 @@ type ResumeCheckoutParams = {
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string | null;
+  readonly recordingOptIn?: boolean;
 };
 
 type ResumeCheckoutCommonParams = {
@@ -44,6 +49,8 @@ type ResumeCheckoutCommonParams = {
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string | null;
+  /** Customer opted in at checkout (may differ from booking row until synced). */
+  readonly recordingOptIn?: boolean;
   /** When set, PSP cancel returns to `/book/[ref]?payment=cancelled` instead of manage booking. */
   readonly sessionMarketingRef?: string;
 };
@@ -109,13 +116,24 @@ export async function createPaymentCheckoutForVerifiedBooking(
   const slotParts = formatBookingSlotPartsFromStartsAt(booking.startsAt, booking.timezone);
   const bookingDraftId = verified.bookingId;
   const existingOpenTransaction = await findOpenPaymentTransactionForBooking(verified.bookingId);
+  const recordingOptIn = resolveCheckoutRecordingOptIn({
+    requested: params.recordingOptIn,
+    bookingRecordingOptIn: booking.recordingOptIn,
+    transactionMetadata: existingOpenTransaction?.metadata,
+  });
+  if (recordingOptIn && !booking.recordingOptIn) {
+    await applyBookingRecordingFieldsFromCheckout({
+      bookingId: booking._id,
+      recordingOptIn: true,
+    });
+  }
   let resolvedPricing;
   try {
     resolvedPricing = await resolveCheckoutAmountCentavos({
       serviceKey: booking.serviceKey,
       promoCode: params.promoCode,
       bookingId: verified.bookingId,
-      recordingOptIn: booking.recordingOptIn === true,
+      recordingOptIn,
     });
   } catch (error: unknown) {
     return {
@@ -311,6 +329,7 @@ export async function createPaymentCheckoutForExistingBooking(
     appBaseUrl: params.appBaseUrl,
     nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
     promoCode: params.promoCode,
+    recordingOptIn: params.recordingOptIn,
   });
 }
 
@@ -326,6 +345,7 @@ export async function createPaymentCheckoutForAccountBooking(params: {
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string | null;
+  readonly recordingOptIn?: boolean;
 }): Promise<CreateCheckoutSessionResult> {
   const verified = await findVerifiedAccountBookingForCheckout(params.bookingId, params.visitorId);
   if (verified === null) {
@@ -346,5 +366,6 @@ export async function createPaymentCheckoutForAccountBooking(params: {
     appBaseUrl: params.appBaseUrl,
     nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
     promoCode: params.promoCode,
+    recordingOptIn: params.recordingOptIn,
   });
 }

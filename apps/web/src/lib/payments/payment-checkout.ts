@@ -119,6 +119,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           appBaseUrl: params.appBaseUrl,
           nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
           promoCode: params.promoCode,
+          recordingOptIn: params.recordingOptIn,
           sessionMarketingRef,
         });
       }
