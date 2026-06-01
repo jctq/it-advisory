@@ -37,7 +37,6 @@ export type GuestBookingManageView = {
   readonly payabilityCode: string;
   readonly checkoutAmountLabel: string;
   readonly paymentsEnabled: boolean;
-  readonly recordingOptIn: boolean;
   readonly fathomNotesUrl: string | null;
   readonly fathomSummaryPreview: string | null;
   readonly sessionEndedAtIso: string | null;

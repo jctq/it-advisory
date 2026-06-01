@@ -26,6 +26,30 @@ export type BookingPayabilityCode =
   | 'booking_not_found'
   | 'session_slot_in_past';
 
+const BOOKING_PAYABILITY_CODES: readonly BookingPayabilityCode[] = [
+  'ok',
+  'status_confirmed',
+  'status_cancelled',
+  'status_refund_awaiting',
+  'status_refunded',
+  'status_not_pending',
+  'payments_disabled',
+  'manual_confirm_policy',
+  'payment_window_expired',
+  'lead_not_found',
+  'lead_email_missing',
+  'visitor_mismatch',
+  'credentials_mismatch',
+  'booking_not_found',
+  'session_slot_in_past',
+];
+
+export function parseBookingPayabilityCode(code: string): BookingPayabilityCode | undefined {
+  return BOOKING_PAYABILITY_CODES.includes(code as BookingPayabilityCode)
+    ? (code as BookingPayabilityCode)
+    : undefined;
+}
+
 export type BookingPayabilityResult = {
   readonly code: BookingPayabilityCode;
   readonly canPayOnline: boolean;

@@ -127,6 +127,8 @@ const PAYABILITY_ISSUE_META: Record<
   ok: { severity: 'info', title: 'Online payment allowed' },
   status_confirmed: { severity: 'info', title: 'Booking already confirmed' },
   status_cancelled: { severity: 'error', title: 'Booking cancelled' },
+  status_refund_awaiting: { severity: 'warn', title: 'Refund in progress' },
+  status_refunded: { severity: 'info', title: 'Booking refunded' },
   status_not_pending: { severity: 'error', title: 'Booking not pending' },
   payments_disabled: { severity: 'error', title: 'Payments disabled' },
   manual_confirm_policy: { severity: 'warn', title: 'Manual confirm policy' },

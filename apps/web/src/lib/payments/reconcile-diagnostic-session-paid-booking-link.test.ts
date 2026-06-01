@@ -32,6 +32,7 @@ describe('reconcileDiagnosticSessionPaidBookingLink', () => {
       customerCompany: null,
       customerPhone: null,
       paymentExpiresAtIso: null,
+      recordingOptIn: false,
     });
     const actual = await reconcileDiagnosticSessionPaidBookingLink({
       diagnosticSessionIdHex: '507f1f77bcf86cd799439011',

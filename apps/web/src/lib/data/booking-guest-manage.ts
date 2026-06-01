@@ -73,7 +73,6 @@ export type GuestBookingManageView = {
   readonly overduePendingActionsAvailable: boolean;
   readonly pendingPaymentExpiredForRebook: boolean;
   readonly hasCheckoutContact: boolean;
-  readonly recordingOptIn: boolean;
   readonly diagnosticSessionMarketingRef: string | null;
   readonly sessionTitle: string | null;
   readonly serviceTitle: string;
@@ -336,7 +335,6 @@ export async function buildGuestBookingManageView(
     overduePendingActionsAvailable,
     pendingPaymentExpiredForRebook,
     hasCheckoutContact,
-    recordingOptIn,
     diagnosticSessionMarketingRef,
     sessionTitle: displayTitles.sessionTitle,
     serviceTitle: displayTitles.serviceTitle,

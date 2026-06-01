@@ -65,7 +65,7 @@ async function renewStaleBookingForOpenTransaction(input: {
     return false;
   }
   const booking = await findBookingById(input.bookingId);
-  if (booking === null || booking._id === undefined) {
+  if (booking === null) {
     return false;
   }
   const needsRenewal =
@@ -84,7 +84,7 @@ async function renewStaleBookingForOpenTransaction(input: {
     transaction.createdAtIso,
   );
   await renewBookingCheckoutHoldFromOpenTransaction({
-    bookingId: booking._id,
+    bookingId: new ObjectId(booking.id),
     transaction,
     expiresAt,
   });

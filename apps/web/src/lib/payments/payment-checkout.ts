@@ -20,7 +20,7 @@ import { getDb } from '@/lib/mongodb';
 import { countBookingsByDiagnosticSessionId } from '@/lib/data/bookings';
 import { diagnoseDiagnosticSessionExistingBookingPayability } from '@/lib/data/booking-guest-manage';
 import { ensureDiagnosticSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-diagnostic-session-pending-booking-ready-for-checkout';
-import { buildPayabilityApiExtras } from '@/lib/payments/evaluate-booking-payability';
+import { buildPayabilityApiExtras, parseBookingPayabilityCode } from '@/lib/payments/evaluate-booking-payability';
 import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
 import { createPaymentCheckoutForVerifiedBooking } from '@/lib/payments/payment-checkout-resume';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
@@ -124,11 +124,12 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
         });
       }
       if (!pendingReady.ok && pendingReady.code !== 'booking_not_found') {
+        const payabilityCode = parseBookingPayabilityCode(pendingReady.code);
         return {
           ok: false,
           code: 'booking_not_payable',
           error: pendingReady.message,
-          payabilityCode: pendingReady.code,
+          ...(payabilityCode !== undefined ? { payabilityCode } : {}),
         };
       }
       const diagnosis = await diagnoseDiagnosticSessionExistingBookingPayability(params.visitorId, ownedDiagnosticSession._id);
