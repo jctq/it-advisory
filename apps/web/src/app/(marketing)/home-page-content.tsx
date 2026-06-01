@@ -296,7 +296,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
   const { isAuthenticated, siteName, reviewsModuleEnabled, testimonials } = props;
   const showTestimonialsSection = reviewsModuleEnabled && testimonials.length > 0;
   const { navigateToNewDiagnostic, isNavigating } = useMarketingNewDiagnosticNavigation(isAuthenticated);
-  const { sectionRef: heroSectionRef, isBoosted, isInView, rootStyle } = useMarketingHeroInteraction();
+  const { sectionRef: heroSectionRef, isBoosted, isInView, isDocumentVisible, rootStyle } = useMarketingHeroInteraction();
   const problemCardClassName = cn(
     'group flex h-full w-full flex-col rounded-2xl border border-border/80 bg-card p-5 text-left',
     'marketing-card-elevated transition-[border-color,transform] duration-200 motion-safe:hover:-translate-y-0.5',
@@ -311,7 +311,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
         className="relative flex min-h-[88dvh] flex-col justify-end border-b border-border px-6 pb-14 pt-28 md:min-h-[92dvh] md:pb-20 md:pt-32"
         speed={0.11}
         backgroundSpeed={0}
-        background={<MarketingHeroBackground interaction={{ isBoosted, isInView, rootStyle }} />}
+        background={<MarketingHeroBackground interaction={{ isBoosted, isInView, isDocumentVisible, rootStyle }} />}
       >
         <div className="mx-auto w-full min-w-0 max-w-6xl">
           <div className="max-w-2xl min-w-0">

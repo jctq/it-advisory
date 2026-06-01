@@ -306,6 +306,16 @@
    */
   .marketing-hero-interactive {
     --hero-parallax-strength: 5;
+    overflow: clip;
+    contain: paint;
+  }
+  .marketing-hero-bleed {
+    inset: -3px;
+  }
+  .marketing-hero-interactive[data-hero-paused] .marketing-hero-art-drift,
+  .marketing-hero-interactive[data-hero-paused] .marketing-hero-orb-primary,
+  .marketing-hero-interactive[data-hero-paused] .marketing-hero-orb-secondary {
+    animation-play-state: paused;
   }
   :root:not(.dark) .marketing-hero-base-wash {
     background-image:
@@ -351,6 +361,7 @@
       calc((var(--hero-fy, 0.5) - 0.5) * 6px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
+    backface-visibility: hidden;
   }
   :root:not(.dark) .marketing-hero-art-accent {
     background-image: radial-gradient(
@@ -372,6 +383,7 @@
       calc((var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
       0
     );
+    backface-visibility: hidden;
   }
   .marketing-hero-canvas {
     isolation: isolate;
@@ -531,6 +543,7 @@
         0
       )
       rotateY(calc((var(--hero-fx, 0.5) - 0.5) * 3deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)));
+    backface-visibility: hidden;
   }
   .marketing-hero-parallax-deep {
     transform: translate3d(
@@ -679,6 +692,7 @@
   @media (prefers-reduced-motion: no-preference) {
     .marketing-hero-art-drift {
       animation: marketing-hero-drift var(--hero-drift-duration, 28s) ease-in-out infinite alternate;
+      backface-visibility: hidden;
     }
     .marketing-hero-interactive .marketing-hero-art-drift {
       --hero-drift-duration: calc(28s - 12s * var(--hero-boost, 0));

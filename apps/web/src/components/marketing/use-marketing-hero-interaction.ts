@@ -4,11 +4,13 @@ import { useMotionValue, useSpring } from 'framer-motion';
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
 } from 'react';
 import { useCanUseHeroMouseParallax } from '@/hooks/use-can-use-hero-mouse-parallax';
+import { useDocumentVisible } from '@/hooks/use-document-visible';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const HERO_IDLE_DECAY_MS = 1200;
@@ -25,9 +27,16 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+type HeroParallaxSnapshot = {
+  readonly fx: number;
+  readonly fy: number;
+  readonly boost: number;
+};
+
 export type MarketingHeroInteractionState = {
   readonly isBoosted: boolean;
   readonly isInView: boolean;
+  readonly isDocumentVisible: boolean;
   readonly rootStyle: CSSProperties;
 };
 
@@ -44,11 +53,12 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   const prefersReducedMotion = usePrefersReducedMotion();
   const canUseMouseParallax = useCanUseHeroMouseParallax();
   const isParallaxEnabled = !prefersReducedMotion && canUseMouseParallax;
+  const isDocumentVisible = useDocumentVisible();
   const [sectionElement, setSectionElement] = useState<HTMLElement | null>(null);
   const [isInView, setIsInView] = useState(false);
   const [isBoosted, setIsBoosted] = useState(false);
+  const [parallaxSnapshot, setParallaxSnapshot] = useState<HeroParallaxSnapshot | null>(null);
   const boostUntilRef = useRef(0);
-  const isDocumentPausedRef = useRef(false);
   const pointerX = useMotionValue(HERO_PARALLAX_CENTER);
   const pointerY = useMotionValue(HERO_PARALLAX_CENTER);
   const boostTarget = useMotionValue(0);
@@ -56,13 +66,13 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   const springY = useSpring(pointerY, HERO_SPRING_CONFIG);
   const springBoost = useSpring(boostTarget, HERO_BOOST_SPRING_CONFIG);
   const executeExtendBoost = useCallback((): void => {
-    if (isDocumentPausedRef.current) {
+    if (!isDocumentVisible) {
       return;
     }
     boostUntilRef.current = Date.now() + HERO_IDLE_DECAY_MS;
     setIsBoosted(true);
     boostTarget.set(1);
-  }, [boostTarget]);
+  }, [boostTarget, isDocumentVisible]);
   const executeTapBoost = useCallback((): void => {
     boostUntilRef.current = Date.now() + HERO_TAP_BOOST_MS;
     setIsBoosted(true);
@@ -77,7 +87,7 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   }, []);
   const executeUpdatePointer = useCallback(
     (clientX: number, clientY: number): void => {
-      if (sectionElement === null || isDocumentPausedRef.current) {
+      if (sectionElement === null || !isDocumentVisible) {
         return;
       }
       const rect = sectionElement.getBoundingClientRect();
@@ -87,7 +97,7 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
       pointerX.set(clamp01((clientX - rect.left) / rect.width));
       pointerY.set(clamp01((clientY - rect.top) / rect.height));
     },
-    [pointerX, pointerY, sectionElement],
+    [pointerX, pointerY, sectionElement, isDocumentVisible],
   );
   const executeResetParallax = useCallback((): void => {
     pointerX.set(HERO_PARALLAX_CENTER);
@@ -124,21 +134,15 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
       return;
     }
     const executeOnPointerMove = (event: PointerEvent): void => {
-      if (isDocumentPausedRef.current) {
+      if (!isDocumentVisible) {
         return;
       }
       executeUpdatePointer(event.clientX, event.clientY);
       executeExtendBoost();
     };
-    const executeOnVisibilityChange = (): void => {
-      const isHidden = document.visibilityState === 'hidden';
-      isDocumentPausedRef.current = isHidden;
-    };
-    isDocumentPausedRef.current = document.visibilityState === 'hidden';
     document.addEventListener('pointermove', executeOnPointerMove, { passive: true });
-    document.addEventListener('visibilitychange', executeOnVisibilityChange);
     const idleTimer = window.setInterval(() => {
-      if (isDocumentPausedRef.current) {
+      if (!isDocumentVisible) {
         return;
       }
       if (Date.now() > boostUntilRef.current) {
@@ -147,17 +151,28 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
     }, HERO_IDLE_CHECK_MS);
     return () => {
       document.removeEventListener('pointermove', executeOnPointerMove);
-      document.removeEventListener('visibilitychange', executeOnVisibilityChange);
       window.clearInterval(idleTimer);
     };
   }, [
     isParallaxEnabled,
     isInView,
+    isDocumentVisible,
     executeExtendBoost,
     executeUpdatePointer,
     executeDecayBoost,
     executeResetParallax,
   ]);
+  useLayoutEffect(() => {
+    if (isDocumentVisible) {
+      setParallaxSnapshot(null);
+      return;
+    }
+    setParallaxSnapshot({
+      fx: springX.get(),
+      fy: springY.get(),
+      boost: springBoost.get(),
+    });
+  }, [isDocumentVisible, springBoost, springX, springY]);
   useEffect(() => {
     if (!isParallaxEnabled) {
       return;
@@ -184,11 +199,19 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
       sectionElement.removeEventListener('pointerdown', executeOnTap);
     };
   }, [isParallaxEnabled, executeTapBoost, executeUpdatePointer, sectionElement]);
-  const rootStyle = {
-    '--hero-fx': springX,
-    '--hero-fy': springY,
-    '--hero-boost': springBoost,
-    '--hero-parallax-strength': isParallaxEnabled ? HERO_PARALLAX_STRENGTH : 0,
-  } as CSSProperties;
-  return { isBoosted, isInView, rootStyle, sectionRef };
+  const rootStyle =
+    parallaxSnapshot === null
+      ? ({
+          '--hero-fx': springX,
+          '--hero-fy': springY,
+          '--hero-boost': springBoost,
+          '--hero-parallax-strength': isParallaxEnabled ? HERO_PARALLAX_STRENGTH : 0,
+        } as CSSProperties)
+      : ({
+          '--hero-fx': parallaxSnapshot.fx,
+          '--hero-fy': parallaxSnapshot.fy,
+          '--hero-boost': parallaxSnapshot.boost,
+          '--hero-parallax-strength': isParallaxEnabled ? HERO_PARALLAX_STRENGTH : 0,
+        } as CSSProperties);
+  return { isBoosted, isInView, isDocumentVisible, rootStyle, sectionRef };
 }

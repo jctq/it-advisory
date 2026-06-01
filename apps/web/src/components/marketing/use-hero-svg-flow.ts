@@ -16,6 +16,7 @@ type UseHeroSvgFlowParams = {
   readonly svgRef: RefObject<SVGSVGElement | null>;
   readonly isBoosted: boolean;
   readonly isActive: boolean;
+  readonly isDocumentVisible: boolean;
 };
 
 type FlowAnimationResult = JSAnimation | readonly JSAnimation[];
@@ -33,11 +34,17 @@ function executePauseAnimations(animations: readonly JSAnimation[]): void {
   });
 }
 
+function executePlayAnimations(animations: readonly JSAnimation[]): void {
+  animations.forEach((animation) => {
+    animation.play();
+  });
+}
+
 /**
  * Organic SVG motion: each line/path loops on its own random cadence; ambient node/arc pulses fill quiet gaps.
  */
 export function useHeroSvgFlow(params: UseHeroSvgFlowParams): void {
-  const { svgRef, isBoosted, isActive } = params;
+  const { svgRef, isBoosted, isActive, isDocumentVisible } = params;
   const flowAnimationsRef = useRef<readonly JSAnimation[]>([]);
   const ambientAnimationsRef = useRef<readonly JSAnimation[]>([]);
   const pulseTimelineRef = useRef<ReturnType<typeof createTimeline> | null>(null);
@@ -180,4 +187,15 @@ export function useHeroSvgFlow(params: UseHeroSvgFlowParams): void {
       });
     };
   }, [svgRef, isActive, isBoosted]);
+  useEffect(() => {
+    if (!isDocumentVisible) {
+      executePauseAnimations(flowAnimationsRef.current);
+      executePauseAnimations(ambientAnimationsRef.current);
+      pulseTimelineRef.current?.pause();
+      return;
+    }
+    executePlayAnimations(flowAnimationsRef.current);
+    executePlayAnimations(ambientAnimationsRef.current);
+    pulseTimelineRef.current?.play();
+  }, [isDocumentVisible]);
 }

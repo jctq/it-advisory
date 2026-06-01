@@ -122,7 +122,7 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
     >
       {hasBackground ? (
         <div
-          className="pointer-events-none absolute inset-0 z-0 min-h-full overflow-hidden"
+          className="pointer-events-none absolute inset-0 z-0 min-h-full overflow-clip"
           style={{
             transform: backgroundTransform,
             willChange: backgroundTransform === undefined ? undefined : 'transform',

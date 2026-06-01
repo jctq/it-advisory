@@ -28,17 +28,19 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
     svgRef,
     isBoosted: interaction.isBoosted,
     isActive: isMotionActive,
+    isDocumentVisible: interaction.isDocumentVisible,
   });
   return (
     <motion.div
-      className="pointer-events-none absolute inset-0 overflow-hidden marketing-hero-interactive"
+      className="pointer-events-none absolute inset-0 overflow-clip marketing-hero-interactive"
       style={interaction.rootStyle}
       data-hero-boosted={interaction.isBoosted ? '' : undefined}
+      data-hero-paused={interaction.isDocumentVisible ? undefined : ''}
       aria-hidden
     >
-      <div className="marketing-hero-base-wash absolute inset-0" />
-      <div className="marketing-hero-art-accent absolute inset-0" aria-hidden />
-      <div className="marketing-hero-canvas absolute inset-0">
+      <div className="marketing-hero-base-wash marketing-hero-bleed absolute" />
+      <div className="marketing-hero-art-accent marketing-hero-bleed absolute" aria-hidden />
+      <div className="marketing-hero-canvas marketing-hero-bleed absolute">
         <div
           className={cn('marketing-hero-art-glow marketing-hero-art-drift absolute inset-0')}
           aria-hidden
@@ -240,9 +242,9 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
           </div>
         </div>
       </div>
-      <div className="absolute inset-0 marketing-hero-text-fade" />
-      <div className="absolute inset-0 marketing-hero-highlight" />
-      <div className="absolute inset-0 marketing-grain opacity-20 dark:opacity-15" />
+      <div className="marketing-hero-text-fade marketing-hero-bleed absolute" />
+      <div className="marketing-hero-highlight marketing-hero-bleed absolute" />
+      <div className="marketing-hero-bleed absolute marketing-grain opacity-20 dark:opacity-15" />
     </motion.div>
   );
 }
