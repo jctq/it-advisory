@@ -2,16 +2,16 @@
  * Marketing booking persistence. Booking documents are append-only in this application:
  * there is no delete path (API or data layer) so CRM history and slot confirmations stay auditable.
  */
-import { resolveQuizSessionDisplayPreview } from '@techmd/diagnostic-core/quiz-session-display-preview';
+import { resolveDiagnosticSessionDisplayPreview } from '@techmd/diagnostic-core/diagnostic-session-display-preview';
 import { MongoServerError, ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { FathomMatchStatus } from '@/domain/recording-types';
 import type { PaymentGatewayId, PaymentStatus } from '@/domain/payment-types';
-import type { BookingDocument, LeadDocument, QuizAnswers, QuizSessionDocument, UserAccountDocument } from '@/domain/types';
+import type { BookingDocument, LeadDocument, DiagnosticAnswers, DiagnosticSessionDocument, UserAccountDocument } from '@/domain/types';
 import type { UpdateFilter } from 'mongodb';
-import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
+import { extractGuidedDiagnosticRawFromDiagnosticAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { getDb } from '@/lib/mongodb';
-import { findQuizSessionForBookingSnapshot, findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { findDiagnosticSessionForBookingSnapshot, findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
 import { normalizeBookingReferenceInput } from '@/lib/marketing/booking-reference';
 import {
   buildAdminBookingsRangeStatusQuery,
@@ -38,8 +38,8 @@ export type BookingRow = {
   paymentMethodLabel: string | null;
   paymentProviderRef: string | null;
   hasDiagnosticSnapshot: boolean;
-  /** Quiz session document id captured at booking time, when Mongo had a session row. */
-  quizSessionId: string | null;
+  /** diagnostic session document id captured at booking time, when Mongo had a session row. */
+  diagnosticSessionId: string | null;
   paymentExpiresAtIso: string | null;
   quotedAmountCentavos: number | null;
   quoteExpiresAtIso: string | null;
@@ -70,8 +70,8 @@ export type AdminBookingCalendarRow = BookingRow & {
 function mapBooking(
   doc: BookingDocument & { _id: { toString: () => string }; leadId: { toString: () => string } },
 ): BookingRow {
-  const quizSessionId =
-    doc.quizSessionId !== undefined && doc.quizSessionId !== null ? doc.quizSessionId.toString() : null;
+  const diagnosticSessionId =
+    doc.diagnosticSessionId !== undefined && doc.diagnosticSessionId !== null ? doc.diagnosticSessionId.toString() : null;
   return {
     id: doc._id.toString(),
     leadId: doc.leadId.toString(),
@@ -94,7 +94,7 @@ function mapBooking(
     paymentProviderRef: doc.paymentProviderRef ?? null,
     hasDiagnosticSnapshot:
       typeof doc.guidedDiagnosticSnapshot === 'string' && doc.guidedDiagnosticSnapshot.trim().length > 0,
-    quizSessionId,
+    diagnosticSessionId,
     paymentExpiresAtIso:
       doc.paymentExpiresAt instanceof Date ? doc.paymentExpiresAt.toISOString() : null,
     quotedAmountCentavos:
@@ -218,7 +218,7 @@ export type ListBookingsForAdminCalendarInRangeResult = {
   readonly countsByStatus: AdminBookingCalendarStatusCounts;
 };
 
-function readSituationAnswerFromQuizAnswers(answers: QuizAnswers): string | null {
+function readSituationAnswerFromDiagnosticAnswers(answers: DiagnosticAnswers): string | null {
   const raw = answers.situation;
   if (typeof raw !== 'string') {
     return null;
@@ -229,31 +229,31 @@ function readSituationAnswerFromQuizAnswers(answers: QuizAnswers): string | null
 
 function resolveBookingCalendarDisplayPreview(
   doc: BookingDocument,
-  quizSessionById: ReadonlyMap<string, QuizSessionDocument & { _id: ObjectId }>,
+  diagnosticSessionById: ReadonlyMap<string, DiagnosticSessionDocument & { _id: ObjectId }>,
 ): { readonly sessionTitlePreview: string | null; readonly situationPreview: string | null } {
   const snapshotRaw =
     typeof doc.guidedDiagnosticSnapshot === 'string' && doc.guidedDiagnosticSnapshot.trim().length > 0
       ? doc.guidedDiagnosticSnapshot.trim()
       : null;
   if (snapshotRaw !== null) {
-    return resolveQuizSessionDisplayPreview({
+    return resolveDiagnosticSessionDisplayPreview({
       guidedDiagnosticRaw: snapshotRaw,
       situationAnswer: null,
     });
   }
-  const quizSessionId =
-    doc.quizSessionId !== undefined && doc.quizSessionId !== null ? doc.quizSessionId.toHexString() : null;
-  if (quizSessionId === null) {
+  const diagnosticSessionId =
+    doc.diagnosticSessionId !== undefined && doc.diagnosticSessionId !== null ? doc.diagnosticSessionId.toHexString() : null;
+  if (diagnosticSessionId === null) {
     return { sessionTitlePreview: null, situationPreview: null };
   }
-  const sessionDoc = quizSessionById.get(quizSessionId);
+  const sessionDoc = diagnosticSessionById.get(diagnosticSessionId);
   if (sessionDoc === undefined) {
     return { sessionTitlePreview: null, situationPreview: null };
   }
-  const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(sessionDoc.answers);
-  return resolveQuizSessionDisplayPreview({
+  const guidedRaw = extractGuidedDiagnosticRawFromDiagnosticAnswers(sessionDoc.answers);
+  return resolveDiagnosticSessionDisplayPreview({
     guidedDiagnosticRaw: guidedRaw,
-    situationAnswer: readSituationAnswerFromQuizAnswers(sessionDoc.answers),
+    situationAnswer: readSituationAnswerFromDiagnosticAnswers(sessionDoc.answers),
   });
 }
 
@@ -265,26 +265,26 @@ async function mapBookingDocsToAdminCalendarRows(
   }
   const db = await getDb();
   const accountContext = await loadAccountVisitorContext();
-  const quizSessionIds = [
+  const diagnosticSessionIds = [
     ...new Set(
       bookingDocs
-        .map((doc) => doc.quizSessionId)
-        .filter((quizSessionId): quizSessionId is ObjectId => quizSessionId !== undefined && quizSessionId !== null),
+        .map((doc) => doc.diagnosticSessionId)
+        .filter((diagnosticSessionId): diagnosticSessionId is ObjectId => diagnosticSessionId !== undefined && diagnosticSessionId !== null),
     ),
   ];
-  const quizSessionDocs =
-    quizSessionIds.length === 0
+  const diagnosticSessionDocs =
+    diagnosticSessionIds.length === 0
       ? []
       : await db
-          .collection<QuizSessionDocument>(COLLECTIONS.quizSessions)
-          .find({ _id: { $in: quizSessionIds } })
+          .collection<DiagnosticSessionDocument>(COLLECTIONS.diagnosticSessions)
+          .find({ _id: { $in: diagnosticSessionIds } })
           .toArray();
-  const quizSessionById = new Map<string, QuizSessionDocument & { _id: ObjectId }>();
-  for (const sessionDoc of quizSessionDocs) {
+  const diagnosticSessionById = new Map<string, DiagnosticSessionDocument & { _id: ObjectId }>();
+  for (const sessionDoc of diagnosticSessionDocs) {
     if (sessionDoc._id === undefined) {
       continue;
     }
-    quizSessionById.set(sessionDoc._id.toHexString(), sessionDoc as QuizSessionDocument & { _id: ObjectId });
+    diagnosticSessionById.set(sessionDoc._id.toHexString(), sessionDoc as DiagnosticSessionDocument & { _id: ObjectId });
   }
   const leadIds = [
     ...new Set(
@@ -325,7 +325,7 @@ async function mapBookingDocsToAdminCalendarRows(
             contactPhone: null,
           };
     const accountEmail = accountContext.accountEmailByVisitorId.get(base.visitorId) ?? null;
-    const displayPreview = resolveBookingCalendarDisplayPreview(doc, quizSessionById);
+    const displayPreview = resolveBookingCalendarDisplayPreview(doc, diagnosticSessionById);
     return {
       ...base,
       ...contact,
@@ -481,7 +481,7 @@ export type CreateMarketingBookingInput = {
   readonly startsAt: Date;
   readonly timezone: string;
   readonly leadId: ObjectId;
-  readonly quizSessionId: ObjectId | null;
+  readonly diagnosticSessionId: ObjectId | null;
   readonly guidedDiagnosticSnapshot: string | null;
   readonly paymentMethodLabel?: string | null;
 };
@@ -506,7 +506,7 @@ export async function insertMarketingBooking(input: CreateMarketingBookingInput)
     status: 'pending',
     paymentMethodLabel: input.paymentMethodLabel ?? null,
     guidedDiagnosticSnapshot: input.guidedDiagnosticSnapshot,
-    quizSessionId: input.quizSessionId,
+    diagnosticSessionId: input.diagnosticSessionId,
     createdAt: now,
     updatedAt: now,
   };
@@ -522,42 +522,42 @@ export async function insertMarketingBooking(input: CreateMarketingBookingInput)
 }
 
 /**
- * Persists a booking with the quiz diagnostic snapshot for this visitor (full rounds / questions / options).
- * Prefers {@link input.preferredQuizSessionId} when provided and owned by the visitor; otherwise uses the visitor
- * session pointer / latest row (see {@link findQuizSessionForBookingSnapshot}).
+ * Persists a booking with the diagnostic snapshot for this visitor (full rounds / questions / options).
+ * Prefers {@link input.preferredDiagnosticSessionId} when provided and owned by the visitor; otherwise uses the visitor
+ * session pointer / latest row (see {@link findDiagnosticSessionForBookingSnapshot}).
  */
-export async function createBookingWithLatestQuizSnapshot(input: {
+export async function createBookingWithLatestDiagnosticSnapshot(input: {
   readonly visitorId: string;
   readonly serviceKey: string;
   readonly startsAt: Date;
   readonly timezone: string;
   readonly leadId: ObjectId;
-  readonly preferredQuizSessionId?: string | null;
+  readonly preferredDiagnosticSessionId?: string | null;
   readonly paymentMethodLabel?: string | null;
 }): Promise<
-  | { readonly bookingId: ObjectId; readonly quizSessionId: ObjectId | null }
+  | { readonly bookingId: ObjectId; readonly diagnosticSessionId: ObjectId | null }
   | 'duplicate_key'
-  | 'quiz_session_not_accessible'
+  | 'diagnostic_session_not_accessible'
   | null
 > {
   if (!process.env.MONGODB_URI) {
     return null;
   }
-  const preferredRaw = input.preferredQuizSessionId?.trim() ?? '';
+  const preferredRaw = input.preferredDiagnosticSessionId?.trim() ?? '';
   let session =
     preferredRaw.length > 0 && /^[a-f\d]{24}$/i.test(preferredRaw)
-      ? await findQuizSessionForVisitor(input.visitorId, preferredRaw)
+      ? await findDiagnosticSessionForVisitor(input.visitorId, preferredRaw)
       : null;
   if (preferredRaw.length > 0 && session === null) {
-    return 'quiz_session_not_accessible';
+    return 'diagnostic_session_not_accessible';
   }
   if (session === null) {
-    session = await findQuizSessionForBookingSnapshot(input.visitorId);
+    session = await findDiagnosticSessionForBookingSnapshot(input.visitorId);
   }
-  const quizSessionId = session?._id ?? null;
+  const diagnosticSessionId = session?._id ?? null;
   const snapshot =
     session !== null && session.answers !== undefined
-      ? extractGuidedDiagnosticRawFromQuizAnswers(session.answers)
+      ? extractGuidedDiagnosticRawFromDiagnosticAnswers(session.answers)
       : null;
   const inserted = await insertMarketingBooking({
     visitorId: input.visitorId,
@@ -565,7 +565,7 @@ export async function createBookingWithLatestQuizSnapshot(input: {
     startsAt: input.startsAt,
     timezone: input.timezone,
     leadId: input.leadId,
-    quizSessionId,
+    diagnosticSessionId,
     guidedDiagnosticSnapshot: snapshot,
     paymentMethodLabel: input.paymentMethodLabel ?? null,
   });
@@ -575,28 +575,28 @@ export async function createBookingWithLatestQuizSnapshot(input: {
   if (inserted.kind === 'duplicate_key') {
     return 'duplicate_key';
   }
-  return { bookingId: inserted.id, quizSessionId };
+  return { bookingId: inserted.id, diagnosticSessionId };
 }
 
 /**
- * Re-attachs a visitor-owned quiz session (and snapshot) to an existing booking row — used when the slot POST
+ * Re-attachs a visitor-owned diagnostic session (and snapshot) to an existing booking row — used when the slot POST
  * dedupes because the visitor already reserved that time but is linking a different diagnostic session.
  */
-export async function linkQuizSessionToVisitorBooking(input: {
+export async function linkDiagnosticSessionToVisitorBooking(input: {
   readonly bookingId: ObjectId;
   readonly visitorId: string;
-  readonly quizSessionIdHex: string;
+  readonly diagnosticSessionIdHex: string;
 }): Promise<boolean> {
   if (!process.env.MONGODB_URI) {
     return false;
   }
-  const session = await findQuizSessionForVisitor(input.visitorId, input.quizSessionIdHex.trim());
+  const session = await findDiagnosticSessionForVisitor(input.visitorId, input.diagnosticSessionIdHex.trim());
   if (session === null || session._id === undefined) {
     return false;
   }
-  const snapshot = extractGuidedDiagnosticRawFromQuizAnswers(session.answers);
+  const snapshot = extractGuidedDiagnosticRawFromDiagnosticAnswers(session.answers);
   const setFields: Record<string, unknown> = {
-    quizSessionId: session._id,
+    diagnosticSessionId: session._id,
     updatedAt: new Date(),
   };
   if (snapshot !== null && snapshot.trim().length > 0) {
@@ -616,10 +616,10 @@ export async function linkQuizSessionToVisitorBooking(input: {
 }
 
 /**
- * When the same slot is POSTed again (dedupe), updates `quizSessionId` + snapshot from the visitor's current
+ * When the same slot is POSTed again (dedupe), updates `diagnosticSessionId` + snapshot from the visitor's current
  * booking pointer session if it has saved guided content and differs from the row already on the booking.
  */
-export async function syncBookingQuizSessionIfPointerChanged(input: {
+export async function syncBookingDiagnosticSessionIfPointerChanged(input: {
   readonly bookingId: ObjectId;
   readonly visitorId: string;
 }): Promise<boolean> {
@@ -634,15 +634,15 @@ export async function syncBookingQuizSessionIfPointerChanged(input: {
   if (booking === null) {
     return false;
   }
-  const session = await findQuizSessionForBookingSnapshot(input.visitorId);
+  const session = await findDiagnosticSessionForBookingSnapshot(input.visitorId);
   if (session === null || session._id === undefined) {
     return false;
   }
-  const snapshot = extractGuidedDiagnosticRawFromQuizAnswers(session.answers);
+  const snapshot = extractGuidedDiagnosticRawFromDiagnosticAnswers(session.answers);
   if (snapshot === null || snapshot.trim().length === 0) {
     return false;
   }
-  const previousId = booking.quizSessionId ?? null;
+  const previousId = booking.diagnosticSessionId ?? null;
   if (previousId !== null && previousId.equals(session._id)) {
     return false;
   }
@@ -650,7 +650,7 @@ export async function syncBookingQuizSessionIfPointerChanged(input: {
     { _id: input.bookingId, visitorId: input.visitorId },
     {
       $set: {
-        quizSessionId: session._id,
+        diagnosticSessionId: session._id,
         guidedDiagnosticSnapshot: snapshot,
         updatedAt: new Date(),
       },
@@ -680,14 +680,14 @@ export async function findBookingByVisitorSlot(input: {
 }
 
 /**
- * Returns how many bookings reference this quiz session id.
+ * Returns how many bookings reference this diagnostic session id.
  */
-export async function countBookingsByQuizSessionId(sessionId: ObjectId): Promise<number> {
+export async function countBookingsByDiagnosticSessionId(sessionId: ObjectId): Promise<number> {
   if (!process.env.MONGODB_URI) {
     return 0;
   }
   const db = await getDb();
-  return db.collection<BookingDocument>(COLLECTIONS.bookings).countDocuments({ quizSessionId: sessionId });
+  return db.collection<BookingDocument>(COLLECTIONS.bookings).countDocuments({ diagnosticSessionId: sessionId });
 }
 
 export type PrimaryBookingSlotRow = {
@@ -709,16 +709,16 @@ export type PrimaryBookingSlotRow = {
 };
 
 /**
- * Canonical booking row for a quiz session (same priority as account diagnostics list).
+ * Canonical booking row for a diagnostic session (same priority as account diagnostics list).
  */
-export async function findPrimaryBookingSlotByQuizSessionId(quizSessionId: ObjectId): Promise<PrimaryBookingSlotRow | null> {
+export async function findPrimaryBookingSlotByDiagnosticSessionId(diagnosticSessionId: ObjectId): Promise<PrimaryBookingSlotRow | null> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
   const db = await getDb();
-  const { pickPrimaryBookingForQuizSession } = await import('@/lib/data/pick-primary-booking-for-quiz-session');
-  const docs = await db.collection<BookingDocument>(COLLECTIONS.bookings).find({ quizSessionId }).toArray();
-  const doc = pickPrimaryBookingForQuizSession(docs);
+  const { pickPrimaryBookingForDiagnosticSession } = await import('@/lib/data/pick-primary-booking-for-diagnostic-session');
+  const docs = await db.collection<BookingDocument>(COLLECTIONS.bookings).find({ diagnosticSessionId }).toArray();
+  const doc = pickPrimaryBookingForDiagnosticSession(docs);
   if (doc === null || doc._id === undefined || doc.startsAt === undefined) {
     return null;
   }

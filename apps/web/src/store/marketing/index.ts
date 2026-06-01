@@ -11,10 +11,10 @@ export {
 } from '@/store/marketing/marketing-cookie-consent-store';
 export { useMarketingChromeStore, type MarketingChromeStore } from '@/store/marketing/marketing-chrome-store';
 export {
-  useMarketingDiagnosticQuizStore,
-  marketingDiagnosticQuizSessionReadOnlyRef,
-  type MarketingDiagnosticQuizStore,
-} from '@/store/marketing/marketing-diagnostic-quiz-store';
+  useMarketingDiagnosticStore,
+  marketingDiagnosticSessionReadOnlyRef,
+  type MarketingDiagnosticStore,
+} from '@/store/marketing/marketing-diagnostic-store';
 export {
   useMarketingBookingFlowStore,
   selectMarketingBookingFlowState,

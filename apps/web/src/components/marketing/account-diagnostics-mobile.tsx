@@ -35,11 +35,11 @@ import {
 import {
   resolveAccountDiagnosticListSummary,
   resolveAccountDiagnosticListTitle,
-} from '@/lib/marketing/quiz-session-list-display';
+} from '@/lib/marketing/diagnostic-session-list-display';
 import type {
   BookingListStatusFilter,
-  VisitorQuizSessionSummary,
-} from '@/lib/data/quiz-session-types';
+  VisitorDiagnosticSessionSummary,
+} from '@/lib/data/diagnostic-session-types';
 import type { PaymentPolicy } from '@/domain/payment-types';
 import { BOOKING_LIST_STATUS_FILTER_OPTIONS } from '@/lib/marketing/account-booking-status';
 import { resolveAccountBookingStatusFromSummary } from '@/lib/marketing/account-booking-status';
@@ -58,7 +58,7 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
 const STATUS_TAB_OPTIONS = BOOKING_LIST_STATUS_FILTER_OPTIONS;
 
 
-function resolveMobileStatusLine(row: VisitorQuizSessionSummary): string | null {
+function resolveMobileStatusLine(row: VisitorDiagnosticSessionSummary): string | null {
   const bookingStatus = resolveAccountBookingStatusFromSummary(row);
   if (bookingStatus === 'completed') {
     return 'Booking completed';
@@ -87,7 +87,7 @@ function resolveMobileStatusLine(row: VisitorQuizSessionSummary): string | null 
   return null;
 }
 
-function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
+function DiagnosticStatusBadge(props: { readonly row: VisitorDiagnosticSessionSummary }): ReactElement {
   const isComplete = props.row.isDiagnosticComplete;
   if (isComplete) {
     return <Badge variant="secondary">Completed</Badge>;
@@ -96,7 +96,7 @@ function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary 
 }
 
 export type AccountDiagnosticsMobileProps = {
-  readonly sessions: readonly VisitorQuizSessionSummary[];
+  readonly sessions: readonly VisitorDiagnosticSessionSummary[];
   readonly statusFilter: BookingListStatusFilter;
   readonly bookingReferenceInput: string;
   readonly isLoading: boolean;
@@ -132,7 +132,7 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
     onLoadMore,
     onSessionCancelled,
   } = props;
-  const [selectedSession, setSelectedSession] = useState<VisitorQuizSessionSummary | null>(null);
+  const [selectedSession, setSelectedSession] = useState<VisitorDiagnosticSessionSummary | null>(null);
   const listAnchorRef = useRef<HTMLDivElement>(null);
   const loadMoreRequestedRef = useRef(false);
   const [scrollMargin, setScrollMargin] = useState(0);
@@ -176,7 +176,7 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
       onLoadMore();
     }
   }, [enableInfiniteScroll, hasMore, isLoading, isLoadingMore, onLoadMore, sessions.length, virtualItems]);
-  const handleOpenSession = useCallback((row: VisitorQuizSessionSummary): void => {
+  const handleOpenSession = useCallback((row: VisitorDiagnosticSessionSummary): void => {
     setSelectedSession(row);
   }, []);
   const handleCloseDialog = useCallback((open: boolean): void => {
@@ -306,8 +306,8 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
 }
 
 function MobileDiagnosticsListItem(props: {
-  readonly row: VisitorQuizSessionSummary;
-  readonly onOpen: (row: VisitorQuizSessionSummary) => void;
+  readonly row: VisitorDiagnosticSessionSummary;
+  readonly onOpen: (row: VisitorDiagnosticSessionSummary) => void;
 }): ReactElement {
   const statusLine = resolveMobileStatusLine(props.row);
   const title = resolveAccountDiagnosticListTitle(props.row);
@@ -399,7 +399,7 @@ function MobileDiagnosticsLoadMoreRow(props: { readonly isLoadingMore: boolean; 
 }
 
 type MobileDiagnosticsSessionDialogProps = {
-  readonly session: VisitorQuizSessionSummary | null;
+  readonly session: VisitorDiagnosticSessionSummary | null;
   readonly manageBookingEnabled: boolean;
   readonly paymentPolicy: PaymentPolicy;
   readonly refundsEnabled: boolean;

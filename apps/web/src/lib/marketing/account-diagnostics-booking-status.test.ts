@@ -3,11 +3,11 @@ import {
   resolveAccountDiagnosticsBookingStatusLabel,
   shouldShowAccountDiagnosticsScheduledSession,
 } from './account-diagnostics-booking-status';
-import type { VisitorQuizSessionSummary } from '../data/quiz-session-types';
+import type { VisitorDiagnosticSessionSummary } from '../data/diagnostic-session-types';
 
 function buildRow(
-  overrides: Partial<VisitorQuizSessionSummary>,
-): VisitorQuizSessionSummary {
+  overrides: Partial<VisitorDiagnosticSessionSummary>,
+): VisitorDiagnosticSessionSummary {
   return {
     id: '507f1f77bcf86cd799439011',
     marketingSessionRef: 'ref',

@@ -13,8 +13,8 @@ import {
 import { buildPaymentReminderDedupKey } from '@/lib/email/payment-reminder-dedup-key';
 import { executeDispatchTransactionalEmail } from '@/lib/email/send-transactional-email';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
-import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
-import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
+import { encodeDiagnosticSessionRefForMarketingUrl } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -442,13 +442,13 @@ async function runSendBookingPaymentReminderEmail(input: {
         ? `${siteOrigin}/book/manage?bookingReference=${encodeURIComponent(bookingReference)}`
         : `${siteOrigin}/book/manage`
       : '';
-  const quizSessionIdHex =
-    booking?.quizSessionId !== undefined && booking?.quizSessionId !== null
-      ? booking.quizSessionId
-      : transaction.quizSessionIdHex;
+  const diagnosticSessionIdHex =
+    booking?.diagnosticSessionId !== undefined && booking?.diagnosticSessionId !== null
+      ? booking.diagnosticSessionId
+      : transaction.diagnosticSessionIdHex;
   const sessionMarketingRef =
-    quizSessionIdHex !== null && quizSessionIdHex.trim().length > 0
-      ? encodeQuizSessionRefForMarketingUrl(quizSessionIdHex.trim())
+    diagnosticSessionIdHex !== null && diagnosticSessionIdHex.trim().length > 0
+      ? encodeDiagnosticSessionRefForMarketingUrl(diagnosticSessionIdHex.trim())
       : '';
   const serviceKey = booking?.serviceKey ?? transaction.serviceKey;
   const continueCheckoutUrl =

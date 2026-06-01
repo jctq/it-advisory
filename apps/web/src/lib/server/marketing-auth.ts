@@ -58,7 +58,7 @@ export async function getAuthenticatedMarketingUser(
 }
 
 /**
- * Builds the stable `quiz_sessions.visitorId` value for a signed-in account.
+ * Builds the stable `diagnostic_sessions.visitorId` value for a signed-in account.
  */
 export function buildAccountVisitorId(userIdHex: string): string {
   return `acct:${userIdHex}`;

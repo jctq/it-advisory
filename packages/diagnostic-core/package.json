@@ -8,12 +8,12 @@
     "./diagnostic-cache-debug": "./src/diagnostic-cache-debug.ts",
     "./diagnostic-thread": "./src/diagnostic-thread.ts",
     "./guided-diagnostic-types": "./src/guided-diagnostic-types.ts",
-    "./quiz-steps": "./src/quiz-steps.ts",
+    "./diagnostic-steps": "./src/diagnostic-steps.ts",
     "./situation-options": "./src/situation-options.ts",
     "./template-diagnostic-flow": "./src/template-diagnostic-flow.ts",
     "./project-rescue-service-context": "./src/project-rescue-service-context.ts",
-    "./quiz-session-display-preview": "./src/quiz-session-display-preview.ts",
-    "./quiz-session-diagnostic-complete": "./src/quiz-session-diagnostic-complete.ts"
+    "./diagnostic-session-display-preview": "./src/diagnostic-session-display-preview.ts",
+    "./diagnostic-session-complete": "./src/diagnostic-session-complete.ts"
   },
   "dependencies": {
     "@techmd/domain": "workspace:*"

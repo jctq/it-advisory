@@ -24,7 +24,7 @@ export function BookingsTable({ initialData }: BookingsTableProps) {
       }),
       columnHelper.accessor('status', { header: 'Status' }),
       columnHelper.accessor('visitorId', { header: 'Visitor' }),
-      columnHelper.accessor('quizSessionId', {
+      columnHelper.accessor('diagnosticSessionId', {
         header: 'Session',
         cell: (info) => {
           const id = info.getValue();

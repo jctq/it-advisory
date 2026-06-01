@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import {
   buildMarketingBookSessionPath,
-  isPlausibleMarketingQuizSessionRef,
-} from '@/lib/marketing/quiz-session-marketing-ref';
+  isPlausibleMarketingDiagnosticSessionRef,
+} from '@/lib/marketing/diagnostic-session-marketing-ref';
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLLS = 30;
@@ -30,7 +30,7 @@ export function PaymentReturnClient(): ReactElement {
   const transactionId = searchParams.get('transactionId')?.trim() ?? '';
   const sessionRef = searchParams.get('sessionRef')?.trim() ?? '';
   const isMock = searchParams.get('mock') === '1';
-  const hasValidSessionRef = isPlausibleMarketingQuizSessionRef(sessionRef);
+  const hasValidSessionRef = isPlausibleMarketingDiagnosticSessionRef(sessionRef);
   const [status, setStatus] = useState<ReturnStatus>('loading');
   const [paymentLabel, setPaymentLabel] = useState<string>('');
   const [pollGeneration, setPollGeneration] = useState(0);

@@ -7,7 +7,7 @@ import {
   MarketingSectionArt,
   type MarketingSectionArtVariant,
 } from '@/components/marketing/marketing-section-art';
-import { MarketingNewQuizCtaLabel } from '@/components/marketing/marketing-new-quiz-cta-label';
+import { MarketingNewDiagnosticCtaLabel } from '@/components/marketing/marketing-new-diagnostic-cta-label';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -118,7 +118,7 @@ export function MarketingServiceTabs(props: MarketingServiceTabsProps): ReactEle
             disabled={props.isNavigating}
             onClick={props.onStartDiagnostic}
           >
-            <MarketingNewQuizCtaLabel isNavigating={props.isNavigating} label="Start My Assessment" />
+            <MarketingNewDiagnosticCtaLabel isNavigating={props.isNavigating} label="Start My Assessment" />
             <ArrowRight className="size-4 shrink-0" aria-hidden />
           </Button>
         </div>

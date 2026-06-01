@@ -1,5 +1,5 @@
 import type { PaymentGatewayId, PaymentStatus } from '@/domain/payment-types';
-import type { QuizSessionLinkedBooking } from '@/lib/data/quiz-session-types';
+import type { DiagnosticSessionLinkedBooking } from '@/lib/data/diagnostic-session-types';
 
 export type BookingDetailTab = 'overview' | 'payment' | 'recording' | 'quote' | 'diagnostic';
 
@@ -35,7 +35,7 @@ export type SessionLinkedBookingCalendarBundle = {
   readonly icsDownloadName: string;
 };
 
-export type SessionLinkedBookingRow = QuizSessionLinkedBooking & {
+export type SessionLinkedBookingRow = DiagnosticSessionLinkedBooking & {
   readonly calendarBundle: SessionLinkedBookingCalendarBundle | null;
 };
 

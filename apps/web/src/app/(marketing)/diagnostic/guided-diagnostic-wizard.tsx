@@ -96,12 +96,12 @@ import {
 const MIN_PROMPT_LENGTH = 8;
 const MAX_ANSWER_NOTE_LENGTH = 2000;
 const SITUATION_SEED_CHIPS: readonly string[] = getSituationSeed();
-const DIAGNOSTIC_CONFIG_API_URL = '/api/quiz/diagnostic-config';
-const DIAGNOSTIC_ROUND_API_URL = '/api/quiz/diagnostic-round';
-const DIAGNOSTIC_TEMPLATE_API_URL = '/api/quiz/diagnostic-template';
-const DIAGNOSTIC_TEMPLATE_SUMMARY_API_URL = '/api/quiz/diagnostic-template-summary';
+const DIAGNOSTIC_CONFIG_API_URL = '/api/diagnostic/diagnostic-config';
+const DIAGNOSTIC_ROUND_API_URL = '/api/diagnostic/diagnostic-round';
+const DIAGNOSTIC_TEMPLATE_API_URL = '/api/diagnostic/diagnostic-template';
+const DIAGNOSTIC_TEMPLATE_SUMMARY_API_URL = '/api/diagnostic/diagnostic-template-summary';
 
-function scheduleScrollQuizWizardToTop(): void {
+function scheduleScrollDiagnosticWizardToTop(): void {
   requestAnimationFrame(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
@@ -211,7 +211,7 @@ function DiagnosticCacheDebugPanel(props: {
       </summary>
       <div className="mt-3 space-y-3">
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Each row is one response from <span className="font-medium text-foreground">/api/quiz/diagnostic-round</span>.
+          Each row is one response from <span className="font-medium text-foreground">/api/diagnostic/diagnostic-round</span>.
           <span className="font-medium text-emerald-700 dark:text-emerald-400"> Cache</span> means the response came from
           database (exact hash match or semantic vector neighbor);{' '}
           <span className="font-medium text-sky-700 dark:text-sky-400">AI</span> means OpenAI generated it (then stored
@@ -1176,10 +1176,10 @@ export type GuidedDiagnosticWizardProps = {
   readonly sessionReadOnly?: boolean;
   /** When false, hide outcome booking CTAs (paid or confirmed booking-linked session). */
   readonly showBookingActions?: boolean;
-  /** Quiz session ref for booking after service selection (`/book/[sessionRef]?serviceKey=…`). */
+  /** diagnostic session ref for booking after service selection (`/book/[sessionRef]?serviceKey=…`). */
   readonly marketingBookSessionRef?: string | null;
   /**
-   * When set, `/api/quiz/diagnostic-template` is scoped to this session so the pinned template is used on revisit
+   * When set, `/api/diagnostic/diagnostic-template` is scoped to this session so the pinned template is used on revisit
    * even if the admin activated a different template later.
    */
   readonly templateSessionMarketingRef?: string | null;
@@ -1403,7 +1403,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   } = props;
   const executeGoBackWithScroll = useCallback((): void => {
     onGoBack();
-    scheduleScrollQuizWizardToTop();
+    scheduleScrollDiagnosticWizardToTop();
   }, [onGoBack]);
   const [isAwaitingApi, setIsAwaitingApi] = useState<boolean>(false);
   const [diagnosticDebugLog, setDiagnosticDebugLog] = useState<DiagnosticDebugLogEntry[]>([]);
@@ -1940,7 +1940,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             },
           };
         });
-        scheduleScrollQuizWizardToTop();
+        scheduleScrollDiagnosticWizardToTop();
         return;
       }
       const peekedNextRound = tryPeekNextCompletedRound({
@@ -1951,14 +1951,14 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       });
       if (peekedNextRound !== null) {
         onGuidedChange(() => peekedNextRound);
-        scheduleScrollQuizWizardToTop();
+        scheduleScrollDiagnosticWizardToTop();
         return;
       }
       onGuidedChange((previous) => ({
         ...previous,
         activeRound: null,
       }));
-      scheduleScrollQuizWizardToTop();
+      scheduleScrollDiagnosticWizardToTop();
       return;
     }
     const activeRound = guided.activeRound;
@@ -1990,7 +1990,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             activeRound: nextRound,
             outcome: null,
           }));
-          scheduleScrollQuizWizardToTop();
+          scheduleScrollDiagnosticWizardToTop();
           return;
         }
         setIsAwaitingApi(true);
@@ -2001,7 +2001,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
             activeRound: null,
             outcome,
           }));
-          scheduleScrollQuizWizardToTop();
+          scheduleScrollDiagnosticWizardToTop();
         } catch (error: unknown) {
           notifyError(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
         } finally {
@@ -2013,7 +2013,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       try {
         const didAdvance = await executeFetchRound(guided.completedBundles);
         if (didAdvance) {
-          scheduleScrollQuizWizardToTop();
+          scheduleScrollDiagnosticWizardToTop();
         }
       } finally {
         setIsAwaitingApi(false);
@@ -2057,7 +2057,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           },
         });
       });
-      scheduleScrollQuizWizardToTop();
+      scheduleScrollDiagnosticWizardToTop();
       return;
     }
     const bundle = buildCompletedBundlePreservingAnswers({
@@ -2075,7 +2075,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     });
     if (peekedNextRound !== null) {
       onGuidedChange(() => peekedNextRound);
-      scheduleScrollQuizWizardToTop();
+      scheduleScrollDiagnosticWizardToTop();
       return;
     }
     const restoredOutcome = tryRestoreGuidedOutcome({
@@ -2084,7 +2084,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     });
     if (restoredOutcome !== null) {
       onGuidedChange(() => restoredOutcome);
-      scheduleScrollQuizWizardToTop();
+      scheduleScrollDiagnosticWizardToTop();
       return;
     }
     if (!diagnosticAiEnabled) {
@@ -2104,7 +2104,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           activeRound: nextRound,
           outcome: null,
         }));
-        scheduleScrollQuizWizardToTop();
+        scheduleScrollDiagnosticWizardToTop();
         return;
       }
       onGuidedChange((previous) => ({
@@ -2120,7 +2120,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           activeRound: null,
           outcome,
         }));
-        scheduleScrollQuizWizardToTop();
+        scheduleScrollDiagnosticWizardToTop();
       } catch (error: unknown) {
         notifyError(error instanceof Error ? error.message : 'Failed to generate advisor summary.');
       } finally {
@@ -2136,7 +2136,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     try {
       const didAdvance = await executeFetchRound(nextCompleted);
       if (didAdvance) {
-        scheduleScrollQuizWizardToTop();
+        scheduleScrollDiagnosticWizardToTop();
       }
     } finally {
       setIsAwaitingApi(false);
@@ -2148,7 +2148,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         preserveOutcome: sessionReadOnly,
       }),
     );
-    scheduleScrollQuizWizardToTop();
+    scheduleScrollDiagnosticWizardToTop();
   }, [onGuidedChange, sessionReadOnly]);
   if (guided.outcome !== null && guided.activeRound === null) {
     return (

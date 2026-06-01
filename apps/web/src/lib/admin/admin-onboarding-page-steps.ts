@@ -48,7 +48,7 @@ export const ADMIN_ONBOARDING_PAGE_STEP_DEFINITIONS = [
     target: 'page-users-table',
     routePath: '/admin/users',
     title: 'Marketing users',
-    description: 'Registered accounts with auth sessions. Open a user for quiz snapshots and sign-in history.',
+    description: 'Registered accounts with auth sessions. Open a user for diagnostic snapshots and sign-in history.',
     side: 'top',
   },
   {

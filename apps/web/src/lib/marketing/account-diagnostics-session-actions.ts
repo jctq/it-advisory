@@ -1,5 +1,5 @@
-import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
-import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
+import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
+import type { VisitorDiagnosticSessionSummary } from '@/lib/data/diagnostic-session-types';
 import type { PaymentPolicy } from '@/domain/payment-types';
 import {
   isBookingPaidForCustomerAction,
@@ -10,7 +10,7 @@ import {
   resolveAccountBookingStatusFromSummary,
   type AccountBookingStatus,
 } from '@/lib/marketing/account-booking-status';
-import { resolveCanDeleteDiagnosticSession } from '@/lib/marketing/quiz-session-linked-booking';
+import { resolveCanDeleteDiagnosticSession } from '@/lib/marketing/diagnostic-session-linked-booking';
 
 const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
 
@@ -22,7 +22,7 @@ export type AccountDiagnosticsSessionActionId =
   | 'refund'
   | 'delete';
 
-function rowHasDiagnosticContent(row: VisitorQuizSessionSummary): boolean {
+function rowHasDiagnosticContent(row: VisitorDiagnosticSessionSummary): boolean {
   if (row.hasGuidedDiagnostic) {
     return true;
   }
@@ -35,7 +35,7 @@ function rowHasDiagnosticContent(row: VisitorQuizSessionSummary): boolean {
   return row.currentStep > 0;
 }
 
-export function resolveAccountDiagnosticsCanDeleteSession(row: VisitorQuizSessionSummary): boolean {
+export function resolveAccountDiagnosticsCanDeleteSession(row: VisitorDiagnosticSessionSummary): boolean {
   return resolveCanDeleteDiagnosticSession({
     hasDiagnosticContent: rowHasDiagnosticContent(row),
     bookingStatus: row.bookingStatus,
@@ -47,7 +47,7 @@ export function resolveAccountDiagnosticsCanDeleteSession(row: VisitorQuizSessio
 
 function appendDeleteWhenEligible(
   actions: readonly AccountDiagnosticsSessionActionId[],
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
 ): readonly AccountDiagnosticsSessionActionId[] {
   if (!resolveAccountDiagnosticsCanDeleteSession(row)) {
     return actions;
@@ -56,13 +56,13 @@ function appendDeleteWhenEligible(
 }
 
 function isTerminalPaymentStatus(
-  status: VisitorQuizSessionSummary['paymentTransactionStatus'],
+  status: VisitorDiagnosticSessionSummary['paymentTransactionStatus'],
 ): boolean {
   return status === 'expired' || status === 'failed';
 }
 
 /** True when payment failed or expired — route manage to booking management when possible. */
-export function isSessionPaymentExpiredForManage(row: VisitorQuizSessionSummary): boolean {
+export function isSessionPaymentExpiredForManage(row: VisitorDiagnosticSessionSummary): boolean {
   if (isTerminalPaymentStatus(row.paymentTransactionStatus)) {
     return true;
   }
@@ -73,12 +73,12 @@ export function isSessionPaymentExpiredForManage(row: VisitorQuizSessionSummary)
 }
 
 /** True when checkout is in progress (user started payment). */
-export function isSessionAwaitingPayment(row: VisitorQuizSessionSummary): boolean {
+export function isSessionAwaitingPayment(row: VisitorDiagnosticSessionSummary): boolean {
   return resolveAccountBookingStatusFromSummary(row) === 'awaiting_payment';
 }
 
 /** True when the booking is confirmed or completed. */
-export function isSessionConfirmedForManage(row: VisitorQuizSessionSummary): boolean {
+export function isSessionConfirmedForManage(row: VisitorDiagnosticSessionSummary): boolean {
   const status = resolveAccountBookingStatusFromSummary(row);
   return status === 'confirmed' || status === 'completed';
 }
@@ -89,7 +89,7 @@ export type AccountDiagnosticsSessionActionsOptions = {
 };
 
 function resolveCustomerActionForRow(
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
   options: AccountDiagnosticsSessionActionsOptions,
 ): BookingCustomerActionMode | null {
   if (row.bookingStatus === null) {
@@ -130,7 +130,7 @@ function appendCustomerAction(
  * - cancelled → view
  */
 export function resolveAccountDiagnosticsSessionActions(
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
   options: AccountDiagnosticsSessionActionsOptions,
 ): readonly AccountDiagnosticsSessionActionId[] {
   const lifecycleStatus = resolveAccountBookingStatusFromSummary(row);
@@ -151,7 +151,7 @@ export function resolveAccountDiagnosticsSessionActions(
 }
 
 export function resolveAccountDiagnosticsSessionCustomerAction(
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
   options: AccountDiagnosticsSessionActionsOptions,
 ): BookingCustomerActionMode | null {
   return resolveCustomerActionForRow(row, options);
@@ -165,14 +165,14 @@ export function buildBookManageHref(bookingId: string | null): string {
 }
 
 /** Marketing checkout path to resume payment for this diagnostic session. */
-export function buildSessionAwaitingPaymentBookHref(row: VisitorQuizSessionSummary): string {
+export function buildSessionAwaitingPaymentBookHref(row: VisitorDiagnosticSessionSummary): string {
   const serviceKey = row.bookingServiceKey ?? row.checkoutServiceKey;
   return buildMarketingBookSessionPath(row.marketingSessionRef, serviceKey);
 }
 
 /** Manage href for pending rows with a completed diagnostic (checkout or booking management). */
 export function buildSessionManageHref(
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
   manageBookingEnabled: boolean,
 ): string {
   const lifecycleStatus = resolveAccountBookingStatusFromSummary(row);
@@ -190,7 +190,7 @@ export function buildSessionManageHref(
 }
 
 export function resolveAccountDiagnosticsSessionActionLifecycleStatus(
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
 ): AccountBookingStatus {
   return resolveAccountBookingStatusFromSummary(row);
 }

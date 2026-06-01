@@ -2,7 +2,7 @@
 
 import type { ReactElement } from 'react';
 import { Badge } from '@/components/ui/badge';
-import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
+import type { VisitorDiagnosticSessionSummary } from '@/lib/data/diagnostic-session-types';
 import { resolveAccountDiagnosticsBookingStatusLabel } from '@/lib/marketing/account-diagnostics-booking-status';
 
 const AWAITING_PAYMENT_BADGE_CLASS =
@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<
 };
 
 export function AccountDiagnosticsBookingStatusBadge(props: {
-  readonly row: VisitorQuizSessionSummary;
+  readonly row: VisitorDiagnosticSessionSummary;
 }): ReactElement {
   const status = resolveAccountDiagnosticsBookingStatusLabel(props.row);
   const label = STATUS_LABELS[status];

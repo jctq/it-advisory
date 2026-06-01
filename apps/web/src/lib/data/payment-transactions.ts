@@ -22,7 +22,7 @@ export type PaymentTransactionRow = {
   readonly customerEmail: string | null;
   readonly customerCompany: string | null;
   readonly customerPhone: string | null;
-  readonly quizSessionIdHex: string | null;
+  readonly diagnosticSessionIdHex: string | null;
   readonly redirectUrl: string | null;
   readonly paymentMethodLabel: string | null;
   readonly startsAtIso: string;
@@ -54,7 +54,7 @@ function mapTransaction(
     customerEmail: doc.customerEmail ?? null,
     customerCompany: doc.customerCompany ?? null,
     customerPhone: doc.customerPhone ?? null,
-    quizSessionIdHex: doc.quizSessionIdHex ?? null,
+    diagnosticSessionIdHex: doc.diagnosticSessionIdHex ?? null,
     redirectUrl: doc.redirectUrl ?? null,
     paymentMethodLabel: doc.paymentMethodLabel ?? null,
     startsAtIso: doc.startsAt.toISOString(),
@@ -81,7 +81,7 @@ export type CreatePaymentTransactionInput = {
   readonly customerEmail?: string | null;
   readonly customerCompany?: string | null;
   readonly customerPhone?: string | null;
-  readonly quizSessionIdHex?: string | null;
+  readonly diagnosticSessionIdHex?: string | null;
   readonly paymentMethodLabel?: string | null;
   readonly redirectUrl?: string | null;
   readonly metadata?: Record<string, string>;
@@ -113,7 +113,7 @@ export async function insertPaymentTransaction(input: CreatePaymentTransactionIn
     customerEmail: input.customerEmail ?? null,
     customerCompany: input.customerCompany ?? null,
     customerPhone: input.customerPhone ?? null,
-    quizSessionIdHex: input.quizSessionIdHex ?? null,
+    diagnosticSessionIdHex: input.diagnosticSessionIdHex ?? null,
     paymentMethodLabel: input.paymentMethodLabel ?? null,
     redirectUrl: input.redirectUrl ?? null,
     metadata: input.metadata,
@@ -309,22 +309,22 @@ export type PaymentTransactionSummaryRow = Pick<
   'id' | 'status' | 'gatewayId' | 'amountCentavos' | 'bookingId' | 'startsAtIso' | 'timezone' | 'serviceKey' | 'paidAtIso'
 >;
 
-export async function fetchLatestPaymentTransactionsByQuizSessionIds(
-  quizSessionIdHexes: readonly string[],
+export async function fetchLatestPaymentTransactionsByDiagnosticSessionIds(
+  diagnosticSessionIdHexes: readonly string[],
 ): Promise<Map<string, PaymentTransactionSummaryRow>> {
-  const uniqueIds = [...new Set(quizSessionIdHexes.map((id) => id.trim()).filter((id) => id.length > 0))];
+  const uniqueIds = [...new Set(diagnosticSessionIdHexes.map((id) => id.trim()).filter((id) => id.length > 0))];
   if (!process.env.MONGODB_URI || uniqueIds.length === 0) {
     return new Map();
   }
   const db = await getDb();
   const docs = await db
     .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
-    .find({ quizSessionIdHex: { $in: uniqueIds } })
+    .find({ diagnosticSessionIdHex: { $in: uniqueIds } })
     .sort({ createdAt: -1 })
     .toArray();
   const bySession = new Map<string, PaymentTransactionSummaryRow>();
   for (const doc of docs) {
-    const sessionHex = doc.quizSessionIdHex?.trim() ?? '';
+    const sessionHex = doc.diagnosticSessionIdHex?.trim() ?? '';
     if (sessionHex.length === 0 || bySession.has(sessionHex) || doc._id === undefined) {
       continue;
     }
@@ -360,13 +360,13 @@ export async function listOpenPaymentHoldStartsUtcInRange(input: {
   readonly rangeStartUtc: Date;
   readonly rangeEndExclusiveUtc: Date;
   readonly nowUtc?: Date;
-  readonly excludeQuizSessionIdHex?: string | null;
+  readonly excludeDiagnosticSessionIdHex?: string | null;
 }): Promise<Date[]> {
   if (!process.env.MONGODB_URI) {
     return [];
   }
   const now = input.nowUtc ?? new Date();
-  const excludeSessionHex = input.excludeQuizSessionIdHex?.trim() ?? '';
+  const excludeSessionHex = input.excludeDiagnosticSessionIdHex?.trim() ?? '';
   const db = await getDb();
   const filter: Record<string, unknown> = {
     startsAt: { $gte: input.rangeStartUtc, $lt: input.rangeEndExclusiveUtc },
@@ -374,9 +374,9 @@ export async function listOpenPaymentHoldStartsUtcInRange(input: {
   };
   if (excludeSessionHex.length > 0) {
     filter.$or = [
-      { quizSessionIdHex: { $exists: false } },
-      { quizSessionIdHex: null },
-      { quizSessionIdHex: { $ne: excludeSessionHex } },
+      { diagnosticSessionIdHex: { $exists: false } },
+      { diagnosticSessionIdHex: null },
+      { diagnosticSessionIdHex: { $ne: excludeSessionHex } },
     ];
   }
   const cursor = db
@@ -494,14 +494,14 @@ export async function findOpenPaymentTransactionForBooking(
 
 export async function findOpenPaymentTransactionForCheckoutSlot(input: {
   readonly visitorId: string;
-  readonly quizSessionIdHex: string;
+  readonly diagnosticSessionIdHex: string;
   readonly serviceKey: string;
   readonly startsAtUtc: Date;
 }): Promise<PaymentTransactionRow | null> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
-  const sessionHex = input.quizSessionIdHex.trim();
+  const sessionHex = input.diagnosticSessionIdHex.trim();
   if (sessionHex.length === 0) {
     return null;
   }
@@ -510,7 +510,7 @@ export async function findOpenPaymentTransactionForCheckoutSlot(input: {
     .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
     .find({
       visitorId: input.visitorId,
-      quizSessionIdHex: sessionHex,
+      diagnosticSessionIdHex: sessionHex,
       serviceKey: input.serviceKey,
       startsAt: input.startsAtUtc,
       status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
@@ -524,13 +524,13 @@ export async function findOpenPaymentTransactionForCheckoutSlot(input: {
   return mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } });
 }
 
-export async function listOpenPaymentTransactionsByQuizSessionIdHex(
-  quizSessionIdHex: string,
+export async function listOpenPaymentTransactionsByDiagnosticSessionIdHex(
+  diagnosticSessionIdHex: string,
 ): Promise<readonly PaymentTransactionRow[]> {
   if (!process.env.MONGODB_URI) {
     return [];
   }
-  const sessionHex = quizSessionIdHex.trim();
+  const sessionHex = diagnosticSessionIdHex.trim();
   if (sessionHex.length === 0) {
     return [];
   }
@@ -538,7 +538,7 @@ export async function listOpenPaymentTransactionsByQuizSessionIdHex(
   const docs = await db
     .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
     .find({
-      quizSessionIdHex: sessionHex,
+      diagnosticSessionIdHex: sessionHex,
       status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
     })
     .sort({ createdAt: -1 })
@@ -548,20 +548,20 @@ export async function listOpenPaymentTransactionsByQuizSessionIdHex(
   );
 }
 
-export async function findLatestPaymentTransactionByQuizSessionIdHex(
-  quizSessionIdHex: string,
+export async function findLatestPaymentTransactionByDiagnosticSessionIdHex(
+  diagnosticSessionIdHex: string,
 ): Promise<PaymentTransactionRow | null> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
-  const sessionHex = quizSessionIdHex.trim();
+  const sessionHex = diagnosticSessionIdHex.trim();
   if (sessionHex.length === 0) {
     return null;
   }
   const db = await getDb();
   const doc = await db
     .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
-    .find({ quizSessionIdHex: sessionHex })
+    .find({ diagnosticSessionIdHex: sessionHex })
     .sort({ createdAt: -1 })
     .limit(1)
     .next();

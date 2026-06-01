@@ -5,21 +5,21 @@ import type { BookingDocument, LeadDocument } from '@/domain/types';
 import { getAppSettings } from '@/lib/data/app-settings';
 import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import {
-  findLatestPaymentTransactionByQuizSessionIdHex,
+  findLatestPaymentTransactionByDiagnosticSessionIdHex,
   type PaymentTransactionRow,
 } from '@/lib/data/payment-transactions';
-import { findQuizSessionById } from '@/lib/data/quiz-sessions';
+import { findDiagnosticSessionById } from '@/lib/data/diagnostic-sessions';
 import { formatBookingReferenceId, normalizeBookingReferenceInput } from '@/lib/marketing/booking-reference';
-import { MARKETING_QUIZ_SESSION_REF_PREFIX } from '@/lib/marketing/quiz-session-marketing-ref';
+import { MARKETING_DIAGNOSTIC_SESSION_REF_PREFIX } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import {
   buildMarketingBookSessionPath,
-  buildMarketingQuizSessionPath,
-} from '@/lib/marketing/quiz-session-marketing-ref';
+  buildMarketingDiagnosticSessionPath,
+} from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { getDb } from '@/lib/mongodb';
 import {
-  encodeQuizSessionRefForMarketingUrl,
-  resolveQuizSessionObjectIdHexFromMarketingRef,
-} from '@/lib/server/quiz-session-marketing-ref-crypto';
+  encodeDiagnosticSessionRefForMarketingUrl,
+  resolveDiagnosticSessionObjectIdHexFromMarketingRef,
+} from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import {
   evaluateBookingPayability,
   type BookingPayabilityCode,
@@ -46,7 +46,7 @@ export type AdminClientDiagnosticBookingRow = {
   readonly timezone: string;
   readonly paymentExpiresAtIso: string | null;
   readonly paymentStatus: string | null;
-  readonly quizSessionId: string | null;
+  readonly diagnosticSessionId: string | null;
   readonly lead: {
     readonly id: string;
     readonly name: string;
@@ -98,7 +98,7 @@ export type AdminClientDiagnosticReport = {
     readonly configuredGatewayCount: number;
     readonly manageBookingEnabled: boolean;
     readonly diagnosticAiEnabled: boolean;
-    readonly quizUrlSecretConfigured: boolean;
+    readonly diagnosticUrlSecretConfigured: boolean;
   };
   readonly issues: readonly AdminDiagnosticIssue[];
   readonly sessions: readonly AdminClientDiagnosticSessionRow[];
@@ -248,13 +248,13 @@ async function buildBookingRow(
       ),
     );
   }
-  if (bookingDoc.quizSessionId === undefined || bookingDoc.quizSessionId === null) {
+  if (bookingDoc.diagnosticSessionId === undefined || bookingDoc.diagnosticSessionId === null) {
     issues.push(
       buildIssue(
         'warn',
-        'booking_missing_quiz_session',
+        'booking_missing_diagnostic_session',
         'No diagnostic session linked',
-        'This booking row has no quizSessionId — checkout and diagnostic flows may not line up.',
+        'This booking row has no diagnosticSessionId — checkout and diagnostic flows may not line up.',
       ),
     );
   }
@@ -269,9 +269,9 @@ async function buildBookingRow(
     paymentExpiresAtIso: paymentExpiresAt !== null ? paymentExpiresAt.toISOString() : null,
     paymentStatus:
       bookingDoc.paymentStatus !== undefined && bookingDoc.paymentStatus !== null ? bookingDoc.paymentStatus : null,
-    quizSessionId:
-      bookingDoc.quizSessionId !== undefined && bookingDoc.quizSessionId !== null
-        ? bookingDoc.quizSessionId.toString()
+    diagnosticSessionId:
+      bookingDoc.diagnosticSessionId !== undefined && bookingDoc.diagnosticSessionId !== null
+        ? bookingDoc.diagnosticSessionId.toString()
         : null,
     lead: {
       id: leadDoc?._id?.toString() ?? bookingDoc.leadId?.toString() ?? '',
@@ -304,9 +304,9 @@ function mapPaymentTransactionSummary(
 }
 
 function buildSessionIssues(input: {
-  readonly session: NonNullable<Awaited<ReturnType<typeof findQuizSessionById>>>;
+  readonly session: NonNullable<Awaited<ReturnType<typeof findDiagnosticSessionById>>>;
   readonly marketingRefInput: string;
-  readonly quizUrlSecretConfigured: boolean;
+  readonly diagnosticUrlSecretConfigured: boolean;
   readonly linkedBookingIds: readonly string[];
   readonly latestTransaction: PaymentTransactionRow | null;
   readonly manageBookingEnabled: boolean;
@@ -314,13 +314,13 @@ function buildSessionIssues(input: {
 }): AdminDiagnosticIssue[] {
   const issues: AdminDiagnosticIssue[] = [];
   const { session } = input;
-  if (input.marketingRefInput.trim().startsWith(MARKETING_QUIZ_SESSION_REF_PREFIX) && !input.quizUrlSecretConfigured) {
+  if (input.marketingRefInput.trim().startsWith(MARKETING_DIAGNOSTIC_SESSION_REF_PREFIX) && !input.diagnosticUrlSecretConfigured) {
     issues.push(
       buildIssue(
         'error',
-        'quiz_url_secret_missing',
+        'diagnostic_url_secret_missing',
         'Opaque session URL cannot be decoded',
-        'QUIZ_SESSION_URL_SECRET is not configured on the server, so qs1.* marketing links will fail for clients.',
+        'DIAGNOSTIC_SESSION_URL_SECRET is not configured on the server, so qs1.* marketing links will fail for clients.',
       ),
     );
   }
@@ -426,26 +426,26 @@ function buildSessionIssues(input: {
 async function buildSessionRow(
   sessionIdHex: string,
   marketingRefInput: string,
-  quizUrlSecretConfigured: boolean,
+  diagnosticUrlSecretConfigured: boolean,
   manageBookingEnabled: boolean,
 ): Promise<AdminClientDiagnosticSessionRow | null> {
-  const session = await findQuizSessionById(sessionIdHex);
+  const session = await findDiagnosticSessionById(sessionIdHex);
   if (session === null) {
     return null;
   }
   let marketingRef: string;
   try {
-    marketingRef = encodeQuizSessionRefForMarketingUrl(session.id);
+    marketingRef = encodeDiagnosticSessionRefForMarketingUrl(session.id);
   } catch {
     marketingRef = session.id;
   }
   const linkedBookingIds = session.linkedBookings.map((booking) => booking.id);
-  const latestTransaction = await findLatestPaymentTransactionByQuizSessionIdHex(session.id);
+  const latestTransaction = await findLatestPaymentTransactionByDiagnosticSessionIdHex(session.id);
   const hasGuidedDiagnostic = session.guidedDiagnosticRaw !== null;
   const issues = buildSessionIssues({
     session,
     marketingRefInput,
-    quizUrlSecretConfigured,
+    diagnosticUrlSecretConfigured,
     linkedBookingIds,
     latestTransaction,
     manageBookingEnabled,
@@ -463,7 +463,7 @@ async function buildSessionRow(
     linkedBookingIds,
     latestPaymentTransaction: mapPaymentTransactionSummary(latestTransaction),
     issues,
-    diagnosticUrl: buildMarketingQuizSessionPath(marketingRef),
+    diagnosticUrl: buildMarketingDiagnosticSessionPath(marketingRef),
     bookUrl: buildMarketingBookSessionPath(marketingRef),
     adminSessionUrl: `/admin/sessions/${encodeURIComponent(session.id)}`,
   };
@@ -484,8 +484,8 @@ export async function runAdminClientDiagnostic(
     return null;
   }
   const [publicSettings, appSettings] = await Promise.all([getPaymentSettingsPublicView(), getAppSettings()]);
-  const quizUrlSecretConfigured =
-    (process.env.QUIZ_SESSION_URL_SECRET?.trim() ?? '').length >= 16;
+  const diagnosticUrlSecretConfigured =
+    (process.env.DIAGNOSTIC_SESSION_URL_SECRET?.trim() ?? '').length >= 16;
   const platformIssues: AdminDiagnosticIssue[] = [];
   if (!publicSettings.paymentsEnabled) {
     platformIssues.push(
@@ -512,16 +512,16 @@ export async function runAdminClientDiagnostic(
   let resolvedSessionHex: string | null = null;
   let diagnosticResolveError: string | null = null;
   if (diagnosticInput.length > 0) {
-    const hex = resolveQuizSessionObjectIdHexFromMarketingRef(diagnosticInput);
+    const hex = resolveDiagnosticSessionObjectIdHexFromMarketingRef(diagnosticInput);
     if (hex === null) {
-      if (diagnosticInput.startsWith(MARKETING_QUIZ_SESSION_REF_PREFIX)) {
+      if (diagnosticInput.startsWith(MARKETING_DIAGNOSTIC_SESSION_REF_PREFIX)) {
         diagnosticResolveError = 'invalid_opaque_ref';
         platformIssues.push(
           buildIssue(
             'error',
             'diagnostic_invalid_opaque_ref',
             'Invalid or undecodable diagnostic ref',
-            'Could not decode the qs1.* marketing ref. Check QUIZ_SESSION_URL_SECRET matches the environment that created the link.',
+            'Could not decode the qs1.* marketing ref. Check DIAGNOSTIC_SESSION_URL_SECRET matches the environment that created the link.',
             { diagnosticInput },
           ),
         );
@@ -547,7 +547,7 @@ export async function runAdminClientDiagnostic(
           bookingDocById.set(hex, bookingDoc as BookingDocument & { _id: ObjectId });
         }
       }
-      const sessionExists = await findQuizSessionById(hex);
+      const sessionExists = await findDiagnosticSessionById(hex);
       if (sessionExists === null && diagnosticResolveError === null) {
         diagnosticResolveError = 'session_not_found';
         platformIssues.push(
@@ -555,7 +555,7 @@ export async function runAdminClientDiagnostic(
             'error',
             'diagnostic_session_not_found',
             'Diagnostic session not found',
-            'No quiz_sessions row exists for this id.',
+            'No diagnostic_sessions row exists for this id.',
             { sessionId: hex },
           ),
         );
@@ -588,8 +588,8 @@ export async function runAdminClientDiagnostic(
       for (const bookingDoc of bookingDocs) {
         const bookingId = bookingDoc._id.toString();
         bookingDocById.set(bookingId, bookingDoc);
-        if (bookingDoc.quizSessionId !== undefined && bookingDoc.quizSessionId !== null) {
-          sessionIdSet.add(bookingDoc.quizSessionId.toString());
+        if (bookingDoc.diagnosticSessionId !== undefined && bookingDoc.diagnosticSessionId !== null) {
+          sessionIdSet.add(bookingDoc.diagnosticSessionId.toString());
         }
       }
     }
@@ -599,7 +599,7 @@ export async function runAdminClientDiagnostic(
     const row = await buildSessionRow(
       sessionIdHex,
       diagnosticInput.length > 0 ? diagnosticInput : sessionIdHex,
-      quizUrlSecretConfigured,
+      diagnosticUrlSecretConfigured,
       appSettings.diagnosticManageBookingEnabled,
     );
     if (row !== null) {
@@ -624,7 +624,7 @@ export async function runAdminClientDiagnostic(
       configuredGatewayCount: publicSettings.gateways.length,
       manageBookingEnabled: appSettings.diagnosticManageBookingEnabled,
       diagnosticAiEnabled: appSettings.diagnosticAiEnabled,
-      quizUrlSecretConfigured,
+      diagnosticUrlSecretConfigured,
     },
     issues: platformIssues,
     sessions,

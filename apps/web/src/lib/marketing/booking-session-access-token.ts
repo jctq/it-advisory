@@ -16,9 +16,10 @@ function resolveSigningSecret(): string | null {
   if (dedicated.length >= MIN_SECRET_LENGTH) {
     return dedicated;
   }
-  const quizFallback = process.env.QUIZ_SESSION_URL_SECRET?.trim() ?? '';
-  if (quizFallback.length >= MIN_SECRET_LENGTH) {
-    return quizFallback;
+  const diagnosticFallback =
+    process.env.DIAGNOSTIC_SESSION_URL_SECRET?.trim() ?? process.env.DIAGNOSTIC_SESSION_URL_SECRET?.trim() ?? '';
+  if (diagnosticFallback.length >= MIN_SECRET_LENGTH) {
+    return diagnosticFallback;
   }
   return null;
 }

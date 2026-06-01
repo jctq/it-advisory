@@ -2,8 +2,8 @@ import { COLLECTIONS } from '@/domain/collections';
 import type {
   BookingDocument,
   LeadDocument,
-  QuizAuditDocument,
-  QuizSessionDocument,
+  DiagnosticAuditDocument,
+  DiagnosticSessionDocument,
   RecommendationDocument,
   VisitorSessionDocument,
 } from '@/domain/types';
@@ -32,8 +32,8 @@ export async function mergeVisitorIdentityIntoAccount(params: {
   const filter = { visitorId: fromVisitorId };
   const update = { $set: { visitorId: params.toAccountVisitorId } };
   await Promise.all([
-    db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).updateMany(filter, update),
-    db.collection<QuizAuditDocument>(COLLECTIONS.quizAudit).updateMany(filter, update),
+    db.collection<DiagnosticSessionDocument>(COLLECTIONS.diagnosticSessions).updateMany(filter, update),
+    db.collection<DiagnosticAuditDocument>(COLLECTIONS.diagnosticAudit).updateMany(filter, update),
     db.collection<VisitorSessionDocument>(COLLECTIONS.visitorSessions).updateMany(filter, update),
     db.collection<LeadDocument>(COLLECTIONS.leads).updateMany(filter, update),
     db.collection<BookingDocument>(COLLECTIONS.bookings).updateMany(filter, update),

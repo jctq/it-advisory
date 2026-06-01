@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { BookingDocument } from '@/domain/types';
 import {
-  countBookingsByQuizSessionId,
-  createBookingWithLatestQuizSnapshot,
+  countBookingsByDiagnosticSessionId,
+  createBookingWithLatestDiagnosticSnapshot,
   findBookingById,
   findBookingByVisitorSlot,
-  linkQuizSessionToVisitorBooking,
+  linkDiagnosticSessionToVisitorBooking,
 } from '@/lib/data/bookings';
 import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
@@ -14,8 +14,8 @@ import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
 import { getPaymentSettings } from '@/lib/data/payment-settings';
-import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
-import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
+import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 
 const PAYMENT_METHOD_IDS = ['card', 'gcash', 'maya', 'bank_transfer', 'paypal'] as const;
 
@@ -44,7 +44,7 @@ const postBodySchema = z
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     time: z.string().min(1).max(48),
     serviceKey: z.string().min(1).max(120).default('project-rescue'),
-    quizSessionId: z.string().min(1).max(512),
+    diagnosticSessionId: z.string().min(1).max(512),
     customerName: z.string().min(1).max(200).optional(),
     customerEmail: z.string().email().max(320).optional(),
     customerCompany: z.string().max(200).optional(),
@@ -75,7 +75,7 @@ const postBodySchema = z
   });
 
 /**
- * Persists a marketing booking and copies the latest quiz diagnostic (full rounds, questions, options) for admin CRM.
+ * Persists a marketing booking and copies the latest diagnostic (full rounds, questions, options) for admin CRM.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   let json: unknown;
@@ -88,29 +88,29 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
-  const resolvedQuizSession = resolveQuizSessionObjectIdHexFromMarketingRef(parsed.data.quizSessionId);
-  if (resolvedQuizSession === null) {
-    return NextResponse.json({ error: 'Invalid quiz session reference', code: 'quiz_session_invalid_id' }, { status: 400 });
+  const resolvedDiagnosticSession = resolveDiagnosticSessionObjectIdHexFromMarketingRef(parsed.data.diagnosticSessionId);
+  if (resolvedDiagnosticSession === null) {
+    return NextResponse.json({ error: 'Invalid diagnostic session reference', code: 'diagnostic_session_invalid_id' }, { status: 400 });
   }
-  const quizSessionIdHex = resolvedQuizSession;
+  const diagnosticSessionIdHex = resolvedDiagnosticSession;
   const visitorId = await resolveMarketingVisitorId(request);
-  const ownedQuizSession = await findQuizSessionForVisitor(visitorId, quizSessionIdHex);
-  if (ownedQuizSession === null) {
+  const ownedDiagnosticSession = await findDiagnosticSessionForVisitor(visitorId, diagnosticSessionIdHex);
+  if (ownedDiagnosticSession === null) {
     return NextResponse.json(
       {
         error: 'This diagnostic was not found or you no longer have access to it.',
-        code: 'quiz_session_not_found',
+        code: 'diagnostic_session_not_found',
       },
       { status: 404 },
     );
   }
-  if (ownedQuizSession._id !== undefined) {
-    const existingBookingCount = await countBookingsByQuizSessionId(ownedQuizSession._id);
+  if (ownedDiagnosticSession._id !== undefined) {
+    const existingBookingCount = await countBookingsByDiagnosticSessionId(ownedDiagnosticSession._id);
     if (existingBookingCount > 0) {
       return NextResponse.json(
         {
           error: 'This diagnostic is already linked to a booking.',
-          code: 'quiz_session_already_booked',
+          code: 'diagnostic_session_already_booked',
         },
         { status: 409 },
       );
@@ -153,14 +153,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     parsed.data.paymentMethod !== undefined ? resolvePaymentMethodLabel(parsed.data.paymentMethod) : null;
   const existingId = await findBookingByVisitorSlot({ visitorId, serviceKey, startsAt });
   if (existingId !== null) {
-    const linked = await linkQuizSessionToVisitorBooking({
+    const linked = await linkDiagnosticSessionToVisitorBooking({
       bookingId: existingId,
       visitorId,
-      quizSessionIdHex,
+      diagnosticSessionIdHex,
     });
     if (!linked) {
       return NextResponse.json(
-        { error: 'Could not link this diagnostic to the existing reservation.', code: 'quiz_link_failed' },
+        { error: 'Could not link this diagnostic to the existing reservation.', code: 'diagnostic_link_failed' },
         { status: 400 },
       );
     }
@@ -168,7 +168,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       ok: true as const,
       bookingId: existingId.toString(),
       deduped: true as const,
-      quizSessionLinked: true as const,
+      diagnosticSessionLinked: true as const,
       startsAtIso: startsAt.toISOString(),
       timezone: PRIMARY_TIMEZONE,
       bookingStatus: await resolveBookingStatusForId(existingId.toString()),
@@ -188,20 +188,20 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (leadId === null) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
   }
-  const created = await createBookingWithLatestQuizSnapshot({
+  const created = await createBookingWithLatestDiagnosticSnapshot({
     visitorId,
     serviceKey,
     startsAt,
     timezone: PRIMARY_TIMEZONE,
     leadId,
-    preferredQuizSessionId: quizSessionIdHex,
+    preferredDiagnosticSessionId: diagnosticSessionIdHex,
     paymentMethodLabel,
   });
-  if (created === 'quiz_session_not_accessible') {
+  if (created === 'diagnostic_session_not_accessible') {
     return NextResponse.json(
       {
         error: 'This diagnostic was not found or you no longer have access to it.',
-        code: 'quiz_session_not_found',
+        code: 'diagnostic_session_not_found',
       },
       { status: 404 },
     );

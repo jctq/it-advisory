@@ -14,11 +14,11 @@ async function ensureIndexes(): Promise<void> {
   const client = new MongoClient(uri);
   await client.connect();
   const db = client.db(dbName);
-  await db.collection(COLLECTIONS.quizSessions).createIndexes([
-    { key: { visitorId: 1, updatedAt: -1 }, name: 'quiz_sessions_visitor_updated' },
+  await db.collection(COLLECTIONS.diagnosticSessions).createIndexes([
+    { key: { visitorId: 1, updatedAt: -1 }, name: 'diagnostic_sessions_visitor_updated' },
   ]);
   await db.collection(COLLECTIONS.bookings).createIndexes([
-    { key: { quizSessionId: 1, createdAt: 1 }, name: 'bookings_quiz_session_created' },
+    { key: { diagnosticSessionId: 1, createdAt: 1 }, name: 'bookings_diagnostic_session_created' },
   ]);
   await db.collection(COLLECTIONS.bookingRefunds).createIndexes([
     { key: { status: 1, requestedAt: -1 }, name: 'booking_refunds_status_requested' },
@@ -26,7 +26,7 @@ async function ensureIndexes(): Promise<void> {
   ]);
   await db.collection(COLLECTIONS.paymentTransactions).createIndexes([
     { key: { visitorId: 1, status: 1, updatedAt: -1 }, name: 'payments_visitor_status_updated' },
-    { key: { quizSessionIdHex: 1, createdAt: -1 }, name: 'payments_quiz_session_created' },
+    { key: { diagnosticSessionIdHex: 1, createdAt: -1 }, name: 'payments_diagnostic_session_created' },
   ]);
   await client.close();
   console.log('MongoDB indexes ensured.');

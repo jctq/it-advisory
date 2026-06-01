@@ -1,17 +1,17 @@
 import { Suspense, type ReactElement } from 'react';
-import { QuizFlow } from './quiz-flow';
-import { QuizRouteLoadingFallback } from './quiz-route-loading-fallback';
+import { DiagnosticFlow } from './diagnostic-flow';
+import { DiagnosticRouteLoadingFallback } from './diagnostic-route-loading-fallback';
 import { buildPageMetadata } from '@/lib/seo/site-seo';
 
 export async function generateMetadata() {
   return buildPageMetadata('diagnostic', { pathname: '/diagnostic' });
 }
 
-export default function QuizPage(): ReactElement {
+export default function DiagnosticPage(): ReactElement {
   return (
     <main>
-      <Suspense fallback={<QuizRouteLoadingFallback />}>
-        <QuizFlow />
+      <Suspense fallback={<DiagnosticRouteLoadingFallback />}>
+        <DiagnosticFlow />
       </Suspense>
     </main>
   );

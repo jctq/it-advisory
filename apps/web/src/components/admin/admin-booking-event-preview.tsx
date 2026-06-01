@@ -111,11 +111,11 @@ export function AdminBookingEventPreview(props: AdminBookingEventPreviewProps): 
                 Guest manage lookup uses this email and the phone last four digits.
               </p>
             )}
-            {booking.quizSessionId !== null ? (
+            {booking.diagnosticSessionId !== null ? (
               <div className="text-xs">
                 <span className="text-muted-foreground">Session </span>
                 <Link
-                  href={`/admin/sessions/${booking.quizSessionId}`}
+                  href={`/admin/sessions/${booking.diagnosticSessionId}`}
                   className="font-medium text-primary underline-offset-4 hover:underline"
                 >
                   View diagnostic session
@@ -135,11 +135,11 @@ export function AdminBookingEventPreview(props: AdminBookingEventPreviewProps): 
           ) : (
             <p className="text-xs text-muted-foreground">Visitor id matches a marketing account.</p>
           )}
-          {booking.quizSessionId !== null ? (
+          {booking.diagnosticSessionId !== null ? (
             <div className="text-xs">
               <span className="text-muted-foreground">Session </span>
               <Link
-                href={`/admin/sessions/${booking.quizSessionId}`}
+                href={`/admin/sessions/${booking.diagnosticSessionId}`}
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
                 View diagnostic session

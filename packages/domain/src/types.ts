@@ -2,12 +2,12 @@ import type { ObjectId } from 'mongodb';
 import type { PaymentGatewayId, PaymentStatus } from './payment-types.js';
 import type { FathomMatchStatus } from './recording-types.js';
 
-export type QuizAnswers = Readonly<Record<string, string | string[] | number | boolean>>;
+export type DiagnosticAnswers = Readonly<Record<string, string | string[] | number | boolean>>;
 
-export type QuizSessionDocument = {
+export type DiagnosticSessionDocument = {
   _id?: ObjectId;
   visitorId: string;
-  answers: QuizAnswers;
+  answers: DiagnosticAnswers;
   currentStep: number;
   /**
    * Diagnostic template row pinned to this session (first save / blank insert).
@@ -19,17 +19,17 @@ export type QuizSessionDocument = {
   updatedAt: Date;
 };
 
-/** Immutable audit row for every quiz submission / step advance. */
-export type QuizAuditDocument = {
+/** Immutable audit row for every diagnostic submission / step advance. */
+export type DiagnosticAuditDocument = {
   _id?: ObjectId;
   visitorId: string;
   sessionId: ObjectId;
   step: number;
-  answersSnapshot: QuizAnswers;
+  answersSnapshot: DiagnosticAnswers;
   createdAt: Date;
 };
 
-/** Latest quiz pointer per anonymous or logged-in visitor. */
+/** Latest diagnostic pointer per anonymous or logged-in visitor. */
 export type VisitorSessionDocument = {
   _id?: ObjectId;
   visitorId: string;
@@ -99,9 +99,9 @@ export type BookingDocument = {
   fathomNotesEmailSentAt?: Date;
   /** Set when the unpaid-booking payment reminder email has been sent (once per pending booking). */
   paymentReminderEmailSentAt?: Date;
-  /** Raw guided diagnostic JSON (string or legacy object stringified) at booking time — full rounds, questions, options. */
+  /** Raw guided diagnostic JSON at booking time — full rounds, questions, options. */
   guidedDiagnosticSnapshot?: string | null;
-  quizSessionId?: ObjectId | null;
+  diagnosticSessionId?: ObjectId | null;
   /** Set when the customer requests a paid cancellation (refund pending admin). */
   refundRequestedAt?: Date;
   /** Set when admin marks the refund as completed. */

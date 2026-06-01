@@ -1,7 +1,7 @@
 /** Logical MongoDB collection names — align indexes and validators with these constants. */
 export const COLLECTIONS = {
-  quizSessions: 'quiz_sessions',
-  quizAudit: 'quiz_audit',
+  diagnosticSessions: 'diagnostic_sessions',
+  diagnosticAudit: 'diagnostic_audit',
   visitorSessions: 'visitor_sessions',
   recommendations: 'recommendations',
   leads: 'leads',
@@ -17,13 +17,13 @@ export const COLLECTIONS = {
   users: 'users',
   /** Opaque bearer sessions for marketing-site accounts (`it_auth_session` cookie). */
   userAuthSessions: 'user_auth_sessions',
-  /** Diagnostic cache for `/api/quiz/diagnostic-round`: unique `{ threadHash: 1 }`; Vector Search on `embedding` optional. */
+  /** Diagnostic cache for `/api/diagnostic/diagnostic-round`: unique `{ threadHash: 1 }`; Vector Search on `embedding` optional. */
   diagnosticRoundCache: 'diagnostic_round_cache',
-  /** Exact-match cache for `/api/quiz/diagnostic-template-summary`: unique `{ threadHash: 1 }`. */
+  /** Exact-match cache for `/api/diagnostic/diagnostic-template-summary`: unique `{ threadHash: 1 }`. */
   diagnosticTemplateSummaryCache: 'diagnostic_template_summary_cache',
   /** Admin-managed diagnostic templates with nested rounds/questions/options. */
   diagnosticTemplates: 'diagnostic_templates',
-  /** Singleton `{ _id: 'app' }` — diagnostic quiz tuning (admin). */
+  /** Singleton `{ _id: 'app' }` — diagnostic tuning (admin). */
   appSettings: 'app_settings',
   /** Singleton `{ _id: 'default' }` — service catalog, packages, and promo codes (admin). */
   monetizationSettings: 'monetization_settings',

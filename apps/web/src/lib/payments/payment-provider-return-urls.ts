@@ -8,7 +8,7 @@ export function buildPaymentProviderReturnUrls(params: {
   readonly nativeInAppPaymentReturn: boolean;
   /** Path + query, e.g. `/book/[sessionRef]?payment=cancelled` or `/book/manage?payment=cancelled`. */
   readonly cancelRelativeUrl: string;
-  /** Marketing quiz session ref; appended to the PSP success return URL when set. */
+  /** Marketing diagnostic session ref; appended to the PSP success return URL when set. */
   readonly sessionMarketingRef?: string;
 }): { readonly successUrl: string; readonly cancelUrl: string } {
   const base = params.appBaseUrl.replace(/\/$/, '');

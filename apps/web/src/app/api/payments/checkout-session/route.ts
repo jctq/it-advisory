@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { PAYMENT_GATEWAY_IDS } from '@/domain/payment-types';
 import { createPaymentCheckoutSession } from '@/lib/payments/payment-checkout';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
-import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
-import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
+import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import { resolveCheckoutAppBaseUrl } from '@/lib/server/resolve-checkout-app-base-url';
 
 const postBodySchema = z.object({
@@ -16,7 +16,7 @@ const postBodySchema = z.object({
   customerEmail: z.string().email().max(320),
   customerCompany: z.string().max(200).optional(),
   customerPhone: z.string().min(1).max(50),
-  quizSessionId: z.string().min(1).max(512),
+  diagnosticSessionId: z.string().min(1).max(512),
   paymentMethodId: z.string().min(1).max(64),
   paymentMethodLabel: z.string().min(1).max(120).optional(),
   /** When set (e.g. native), must match request origin, NEXT_PUBLIC_APP_URL, or CHECKOUT_ALLOWED_APP_BASE_URLS. */
@@ -38,17 +38,17 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
   }
-  const resolvedQuizSessionHex = resolveQuizSessionObjectIdHexFromMarketingRef(parsed.data.quizSessionId);
-  if (resolvedQuizSessionHex === null) {
-    return NextResponse.json({ error: 'Invalid quiz session reference', code: 'quiz_session_invalid_id' }, { status: 400 });
+  const resolvedDiagnosticSessionHex = resolveDiagnosticSessionObjectIdHexFromMarketingRef(parsed.data.diagnosticSessionId);
+  if (resolvedDiagnosticSessionHex === null) {
+    return NextResponse.json({ error: 'Invalid diagnostic session reference', code: 'diagnostic_session_invalid_id' }, { status: 400 });
   }
   const visitorId = await resolveMarketingVisitorId(request);
-  const ownedQuizSession = await findQuizSessionForVisitor(visitorId, resolvedQuizSessionHex);
-  if (ownedQuizSession === null) {
+  const ownedDiagnosticSession = await findDiagnosticSessionForVisitor(visitorId, resolvedDiagnosticSessionHex);
+  if (ownedDiagnosticSession === null) {
     return NextResponse.json(
       {
         error: 'This diagnostic was not found or you no longer have access to it.',
-        code: 'quiz_session_not_found',
+        code: 'diagnostic_session_not_found',
       },
       { status: 404 },
     );
@@ -63,7 +63,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     customerEmail: parsed.data.customerEmail,
     customerCompany: parsed.data.customerCompany,
     customerPhone: parsed.data.customerPhone,
-    quizSessionId: parsed.data.quizSessionId,
+    diagnosticSessionId: parsed.data.diagnosticSessionId,
     paymentMethodId: parsed.data.paymentMethodId,
     paymentMethodLabel: parsed.data.paymentMethodLabel,
     appBaseUrl: resolveCheckoutAppBaseUrl(request, parsed.data.appBaseUrl),
@@ -73,9 +73,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
   if (!result.ok) {
     const status =
-      result.code === 'booking_slot_unavailable' || result.code === 'quiz_session_already_booked'
+      result.code === 'booking_slot_unavailable' || result.code === 'diagnostic_session_already_booked'
         ? 409
-        : result.code === 'quiz_session_not_found'
+        : result.code === 'diagnostic_session_not_found'
           ? 404
           : result.code === 'database_unavailable'
             ? 503

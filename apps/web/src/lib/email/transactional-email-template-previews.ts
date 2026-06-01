@@ -56,7 +56,7 @@ function buildSamplePaymentTransaction(): PaymentTransactionRow {
     customerEmail: 'alex@example.com',
     customerCompany: 'Acme Corp',
     customerPhone: '+639171234567',
-    quizSessionIdHex: null,
+    diagnosticSessionIdHex: null,
     redirectUrl: null,
     paymentMethodLabel: 'GCash',
     startsAtIso: '2026-06-15T02:00:00.000Z',

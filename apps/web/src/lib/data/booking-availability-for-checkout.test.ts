@@ -11,7 +11,7 @@ describe('isMarketingSlotInPublishedAvailabilityForCheckout', () => {
     vi.clearAllMocks();
   });
 
-  it('passes quiz session id when loading occupancy for checkout retry', async () => {
+  it('passes diagnostic session id when loading occupancy for checkout retry', async () => {
     const { listActiveBookingStartsUtcInYmdWindowForCheckout } = await import(
       '@/lib/data/advisor-booking-settings'
     );
@@ -19,11 +19,11 @@ describe('isMarketingSlotInPublishedAvailabilityForCheckout', () => {
     const available = await isMarketingSlotInPublishedAvailabilityForCheckout({
       serviceKey: 'project-rescue',
       startsAtUtc,
-      quizSessionIdHex: '674a1b2c3d4e5f6789012345',
+      diagnosticSessionIdHex: '674a1b2c3d4e5f6789012345',
     });
     expect(listActiveBookingStartsUtcInYmdWindowForCheckout).toHaveBeenCalledWith(
       expect.objectContaining({
-        excludeQuizSessionIdHex: '674a1b2c3d4e5f6789012345',
+        excludeDiagnosticSessionIdHex: '674a1b2c3d4e5f6789012345',
       }),
     );
     expect(available).toBe(false);

@@ -22,7 +22,7 @@ function buildSampleTransaction(overrides: Partial<PaymentTransactionRow> = {}):
     customerEmail: 'alex@example.com',
     customerCompany: null,
     customerPhone: '+639171234567',
-    quizSessionIdHex: '507f1f77bcf86cd799439011',
+    diagnosticSessionIdHex: '507f1f77bcf86cd799439011',
     redirectUrl: null,
     paymentMethodLabel: 'GCash',
     startsAtIso: '2026-06-15T02:00:00.000Z',

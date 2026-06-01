@@ -1,6 +1,6 @@
 import { Suspense, type ReactElement } from 'react';
-import { QuizFlow } from '../quiz-flow';
-import { QuizRouteLoadingFallback } from '../quiz-route-loading-fallback';
+import { DiagnosticFlow } from '../diagnostic-flow';
+import { DiagnosticRouteLoadingFallback } from '../diagnostic-route-loading-fallback';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const metadata = buildNoIndexMetadata({
@@ -9,17 +9,17 @@ export const metadata = buildNoIndexMetadata({
     'Describe your situation, answer short guided intake questions, then finish the diagnostic for a tailored recommendation.',
 });
 
-type QuizSessionRefPageProps = {
+type DiagnosticSessionRefPageProps = {
   readonly params: Promise<{ readonly sessionRef: string }>;
 };
 
-export default async function QuizSessionRefPage(props: QuizSessionRefPageProps): Promise<ReactElement> {
+export default async function DiagnosticSessionRefPage(props: DiagnosticSessionRefPageProps): Promise<ReactElement> {
   const { sessionRef } = await props.params;
   const decoded = decodeURIComponent(sessionRef.trim());
   return (
     <main>
-      <Suspense fallback={<QuizRouteLoadingFallback />}>
-        <QuizFlow pathSessionRef={decoded} />
+      <Suspense fallback={<DiagnosticRouteLoadingFallback />}>
+        <DiagnosticFlow pathSessionRef={decoded} />
       </Suspense>
     </main>
   );

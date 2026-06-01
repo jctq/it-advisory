@@ -75,12 +75,12 @@ export async function isMarketingSlotInPublishedAvailability(input: {
 
 /**
  * Checkout availability: same as {@link isMarketingSlotInPublishedAvailability} but allows a slot
- * already reserved by the current quiz session (retry during an active hold window).
+ * already reserved by the current diagnostic session (retry during an active hold window).
  */
 export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
   readonly serviceKey: string;
   readonly startsAtUtc: Date;
-  readonly quizSessionIdHex: string;
+  readonly diagnosticSessionIdHex: string;
 }): Promise<boolean> {
   const doc = await findAdvisorBookingSettingsDocument();
   const normalized =
@@ -95,7 +95,7 @@ export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
     toYmd: dayKey,
     bufferDays: CAP_BUFFER_DAYS,
     timeZone: tz,
-    excludeQuizSessionIdHex: input.quizSessionIdHex,
+    excludeDiagnosticSessionIdHex: input.diagnosticSessionIdHex,
   });
   return isUtcInstantBookable({
     settings: normalized,

@@ -146,7 +146,7 @@ export async function listActiveBookingStartsUtcInYmdWindow(input: {
 }
 
 /**
- * Like {@link listActiveBookingStartsUtcInYmdWindow} but omits reservations owned by the given quiz session
+ * Like {@link listActiveBookingStartsUtcInYmdWindow} but omits reservations owned by the given diagnostic session
  * so the same diagnostic can retry checkout on its held slot without appearing globally taken.
  */
 export async function listActiveBookingStartsUtcInYmdWindowForCheckout(input: {
@@ -155,12 +155,12 @@ export async function listActiveBookingStartsUtcInYmdWindowForCheckout(input: {
   readonly toYmd: string;
   readonly bufferDays: number;
   readonly timeZone: string;
-  readonly excludeQuizSessionIdHex: string;
+  readonly excludeDiagnosticSessionIdHex: string;
 }): Promise<Date[]> {
   if (!process.env.MONGODB_URI) {
     return [];
   }
-  const excludeSessionHex = input.excludeQuizSessionIdHex.trim();
+  const excludeSessionHex = input.excludeDiagnosticSessionIdHex.trim();
   if (excludeSessionHex.length === 0) {
     return listActiveBookingStartsUtcInYmdWindow(input);
   }
@@ -183,9 +183,9 @@ export async function listActiveBookingStartsUtcInYmdWindowForCheckout(input: {
           ...buildActiveBookingSlotOccupancyFilter(),
           startsAt: { $gte: rangeStart, $lt: rangeEndExclusive },
           $or: [
-            { quizSessionId: { $exists: false } },
-            { quizSessionId: null },
-            { quizSessionId: { $ne: excludeSessionObjectId } },
+            { diagnosticSessionId: { $exists: false } },
+            { diagnosticSessionId: null },
+            { diagnosticSessionId: { $ne: excludeSessionObjectId } },
           ],
         },
         { projection: { startsAt: 1 } },
@@ -195,7 +195,7 @@ export async function listActiveBookingStartsUtcInYmdWindowForCheckout(input: {
     listOpenPaymentHoldStartsUtcInRange({
       rangeStartUtc: rangeStart,
       rangeEndExclusiveUtc: rangeEndExclusive,
-      excludeQuizSessionIdHex: excludeSessionHex,
+      excludeDiagnosticSessionIdHex: excludeSessionHex,
     }),
     listPaidOccupiedStartsUtcInRange({
       rangeStartUtc: rangeStart,

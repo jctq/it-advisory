@@ -10,8 +10,8 @@ import {
 import {
   normalizeBookingListStatusFilter,
   type BookingListStatusFilter,
-  type VisitorQuizSessionSummary,
-} from '@/lib/data/quiz-session-types';
+  type VisitorDiagnosticSessionSummary,
+} from '@/lib/data/diagnostic-session-types';
 import {
   useMarketingAccountDiagnosticsStore,
   type MarketingAccountDiagnosticsStore,

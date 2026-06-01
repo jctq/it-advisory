@@ -5,7 +5,7 @@ import {
 import { addDays, parse } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
 import { COLLECTIONS } from '@/domain/collections';
-import type { BookingDocument, LeadDocument, QuizSessionDocument } from '@/domain/types';
+import type { BookingDocument, LeadDocument, DiagnosticSessionDocument } from '@/domain/types';
 import { getDb } from '@/lib/mongodb';
 
 const ADMIN_TIMEZONE = 'Asia/Manila';
@@ -17,8 +17,8 @@ export type AdminDashboardStats = {
   readonly leadsTotal: number;
   readonly bookingsTotal: number;
   readonly bookingsUpcoming: number;
-  readonly quizSessionsTotal: number;
-  readonly quizSessionsCompleted: number;
+  readonly diagnosticSessionsTotal: number;
+  readonly diagnosticSessionsCompleted: number;
   readonly marketingUsersTotal: number;
   readonly templatesTotal: number;
   readonly templatesActive: number;
@@ -55,8 +55,8 @@ const EMPTY_STATS: AdminDashboardStats = {
   leadsTotal: 0,
   bookingsTotal: 0,
   bookingsUpcoming: 0,
-  quizSessionsTotal: 0,
-  quizSessionsCompleted: 0,
+  diagnosticSessionsTotal: 0,
+  diagnosticSessionsCompleted: 0,
   marketingUsersTotal: 0,
   templatesTotal: 0,
   templatesActive: 0,
@@ -124,8 +124,8 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     leadsTotal,
     bookingsTotal,
     bookingsUpcoming,
-    quizSessionsTotal,
-    quizSessionsCompleted,
+    diagnosticSessionsTotal,
+    diagnosticSessionsCompleted,
     marketingUsersTotal,
     templatesTotal,
     templatesActive,
@@ -139,8 +139,8 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       status: { $in: ['pending', 'confirmed'] },
       startsAt: { $gte: now },
     }),
-    db.collection(COLLECTIONS.quizSessions).countDocuments(),
-    db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).countDocuments({
+    db.collection(COLLECTIONS.diagnosticSessions).countDocuments(),
+    db.collection<DiagnosticSessionDocument>(COLLECTIONS.diagnosticSessions).countDocuments({
       completedAt: { $exists: true },
     }),
     db.collection(COLLECTIONS.users).countDocuments(),
@@ -172,8 +172,8 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       leadsTotal,
       bookingsTotal,
       bookingsUpcoming,
-      quizSessionsTotal,
-      quizSessionsCompleted,
+      diagnosticSessionsTotal,
+      diagnosticSessionsCompleted,
       marketingUsersTotal,
       templatesTotal,
       templatesActive,

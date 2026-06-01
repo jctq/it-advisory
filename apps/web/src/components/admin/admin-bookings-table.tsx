@@ -114,7 +114,7 @@ export function AdminBookingsTable(props: AdminBookingsTableProps): ReactElement
           </Badge>
         ),
       }),
-      columnHelper.accessor('quizSessionId', {
+      columnHelper.accessor('diagnosticSessionId', {
         header: 'Session',
         cell: (info) => {
           const sessionId = info.getValue();

@@ -123,12 +123,12 @@ function renderOverviewPanel(props: AdminBookingDetailWorkspaceProps): ReactElem
           <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diagnostic snapshot</dt>
           <dd className="mt-1 text-sm text-foreground">{booking.hasDiagnosticSnapshot ? 'Stored' : 'Not stored'}</dd>
         </div>
-        {booking.quizSessionId !== null ? (
+        {booking.diagnosticSessionId !== null ? (
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diagnostic session</dt>
             <dd className="mt-1 text-sm">
               <Link
-                href={`/admin/sessions/${booking.quizSessionId}`}
+                href={`/admin/sessions/${booking.diagnosticSessionId}`}
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
                 View session

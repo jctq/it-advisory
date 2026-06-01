@@ -103,7 +103,7 @@ async function readMarketingApiJsonPayload(
 }
 
 /**
- * Persists a new slot on the quiz session's pending booking after an expired payment hold.
+ * Persists a new slot on the diagnostic session's pending booking after an expired payment hold.
  */
 export async function rescheduleMarketingCheckoutSlot(
   params: RescheduleMarketingCheckoutSlotParams,

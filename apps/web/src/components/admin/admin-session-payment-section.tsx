@@ -33,7 +33,7 @@ export function AdminSessionPaymentSection(props: AdminSessionPaymentSectionProp
   const [isSyncing, setIsSyncing] = useState(false);
   const executeSyncPayment = (): void => {
     setIsSyncing(true);
-    void fetch(buildApiUrl(`/api/admin/quiz-sessions/${props.sessionId}/sync-payment`), { method: 'POST' })
+    void fetch(buildApiUrl(`/api/admin/diagnostic-sessions/${props.sessionId}/sync-payment`), { method: 'POST' })
       .then(async (response) => {
         const data = (await response.json()) as { error?: string; status?: PaymentStatus; bookingId?: string | null };
         if (!response.ok) {

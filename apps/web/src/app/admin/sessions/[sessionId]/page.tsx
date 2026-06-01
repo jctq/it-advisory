@@ -14,12 +14,12 @@ import {
   type SessionCheckoutTransaction,
   type SessionLinkedBookingRow,
 } from '@/lib/admin/admin-detail-tab-routing';
-import { findLatestPaymentTransactionByQuizSessionIdHex, findPaymentTransactionById } from '@/lib/data/payment-transactions';
+import { findLatestPaymentTransactionByDiagnosticSessionIdHex, findPaymentTransactionById } from '@/lib/data/payment-transactions';
 import { reconcilePaymentTransactionById } from '@/lib/payments/reconcile-visitor-payments';
-import { findQuizSessionById, listQuizAuditForSession } from '@/lib/data/quiz-sessions';
+import { findDiagnosticSessionById, listDiagnosticAuditForSession } from '@/lib/data/diagnostic-sessions';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 
-type AdminQuizSessionDetailPageProps = {
+type AdminDiagnosticSessionDetailPageProps = {
   readonly params: Promise<{ readonly sessionId: string }>;
   readonly searchParams: Promise<{ readonly tab?: string }>;
 };
@@ -40,15 +40,15 @@ function formatServiceKeyLabel(serviceKey: string): string {
     .join(' ');
 }
 
-export default async function AdminQuizSessionDetailPage(props: AdminQuizSessionDetailPageProps) {
+export default async function AdminDiagnosticSessionDetailPage(props: AdminDiagnosticSessionDetailPageProps) {
   const { sessionId } = await props.params;
   const searchParams = await props.searchParams;
-  const session = await findQuizSessionById(sessionId);
+  const session = await findDiagnosticSessionById(sessionId);
   if (session === null) {
     notFound();
   }
-  const auditRows = await listQuizAuditForSession(new ObjectId(session.id));
-  let checkoutTransaction = await findLatestPaymentTransactionByQuizSessionIdHex(session.id);
+  const auditRows = await listDiagnosticAuditForSession(new ObjectId(session.id));
+  let checkoutTransaction = await findLatestPaymentTransactionByDiagnosticSessionIdHex(session.id);
   if (checkoutTransaction !== null) {
     await reconcilePaymentTransactionById(checkoutTransaction.id);
     checkoutTransaction = (await findPaymentTransactionById(checkoutTransaction.id)) ?? checkoutTransaction;

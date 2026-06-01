@@ -173,8 +173,8 @@ function buildStatCards(
     },
     {
       label: 'Sessions',
-      value: stats.quizSessionsTotal,
-      detail: `${stats.quizSessionsCompleted} completed`,
+      value: stats.diagnosticSessionsTotal,
+      detail: `${stats.diagnosticSessionsCompleted} completed`,
       href: '/admin/sessions',
     },
     {

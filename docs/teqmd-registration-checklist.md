@@ -33,7 +33,7 @@ Generated: May 30, 2026
 
 - `CRON_SECRET` — protects `POST /api/cron/payment-holds`
 - `BOOKING_SESSION_ACCESS_SECRET` — signed links in confirmation emails
-- `QUIZ_SESSION_URL_SECRET` — opaque quiz session URLs in marketing
+- `DIAGNOSTIC_SESSION_URL_SECRET` — opaque quiz session URLs in marketing
 
 ### Scheduler
 
@@ -137,7 +137,7 @@ Uses `MEETINGS_CREDENTIALS_MASTER_KEY` for credential encryption.
 
 ---
 
-## 6. AI — OpenAI (optional but needed for full quiz/advisor)
+## 6. AI — OpenAI (optional but needed for full diagnostic/advisor)
 
 | Feature | Environment variables |
 |---------|----------------------|

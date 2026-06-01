@@ -27,7 +27,7 @@ const cachedResponseSchema = z.object({
 });
 
 /**
- * Stable key: template name + same transcript shape as `/api/quiz/diagnostic-round` uses for hashing.
+ * Stable key: template name + same transcript shape as `/api/diagnostic/diagnostic-round` uses for hashing.
  */
 export function buildTemplateSummaryCacheKey(params: {
   readonly templateName: string;

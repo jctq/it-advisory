@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { redirect } from 'next/navigation';
 import { AccountDiagnosticsPanel } from '@/components/marketing/account-diagnostics-panel';
-import { listQuizSessionsForVisitorPaginated } from '@/lib/data/quiz-sessions';
+import { listDiagnosticSessionsForVisitorPaginated } from '@/lib/data/diagnostic-sessions';
 import {
   buildDefaultAccountDiagnosticsListRequest,
   type AccountDiagnosticsInitialList,
@@ -29,7 +29,7 @@ export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
     redirect('/login?next=%2Faccount%2Fdiagnostics');
   }
   const defaultListRequest = buildDefaultAccountDiagnosticsListRequest();
-  const initialListResult = await listQuizSessionsForVisitorPaginated({
+  const initialListResult = await listDiagnosticSessionsForVisitorPaginated({
     visitorId: buildAccountVisitorId(user.id),
     ...defaultListRequest,
   });

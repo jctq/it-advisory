@@ -47,7 +47,7 @@ describe('booking-session-access-token', () => {
 
   it('returns null when secret is missing', () => {
     delete process.env.BOOKING_SESSION_ACCESS_SECRET;
-    delete process.env.QUIZ_SESSION_URL_SECRET;
+    delete process.env.DIAGNOSTIC_SESSION_URL_SECRET;
     expect(canIssueBookingSessionAccessToken()).toBe(false);
     expect(
       issueBookingSessionAccessToken({

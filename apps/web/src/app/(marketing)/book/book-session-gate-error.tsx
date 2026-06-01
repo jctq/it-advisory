@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { buildMarketingDiagnosticSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 
 export type BookSessionGateReason = 'missing' | 'invalid_format' | 'not_found' | 'already_booked';
 
@@ -42,7 +42,7 @@ export function BookSessionGateError(props: BookSessionGateErrorProps): ReactEle
         <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           {hasSessionRef ? (
             <Link
-              href={buildMarketingQuizSessionPath(trimmedRef)}
+              href={buildMarketingDiagnosticSessionPath(trimmedRef)}
               className="font-medium underline underline-offset-2"
             >
               Open diagnostic

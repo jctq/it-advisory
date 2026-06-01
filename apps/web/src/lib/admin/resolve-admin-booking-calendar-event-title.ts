@@ -1,6 +1,6 @@
 import type { AdminBookingCalendarRow } from '@/lib/data/bookings';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
-import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/quiz-session-list-display';
+import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/diagnostic-session-list-display';
 
 function formatServiceKeyLabel(serviceKey: string): string {
   const parts = serviceKey.split(/[-_]/).filter((part) => part.length > 0);

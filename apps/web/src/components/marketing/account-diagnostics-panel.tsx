@@ -21,7 +21,7 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountDiagnosticsBookingStatusBadge } from '@/components/marketing/account-diagnostics-booking-status-badge';
 import { AccountDiagnosticsMobile } from '@/components/marketing/account-diagnostics-mobile';
-import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
+import { useMarketingNewDiagnosticNavigation } from '@/components/marketing/marketing-new-diagnostic-session-client';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import {
   ACCOUNT_DIAGNOSTICS_MOBILE_PAGE_SIZE,
@@ -31,21 +31,21 @@ import {
   type AccountDiagnosticsInitialList,
 } from '@/lib/marketing/account-diagnostics-list';
 import { AccountDiagnosticsSessionActionsBar } from '@/components/marketing/account-diagnostics-session-actions-bar';
-import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/quiz-session-list-display';
+import { resolveAccountDiagnosticListTitle } from '@/lib/marketing/diagnostic-session-list-display';
 import type {
-  PaginatedVisitorQuizSessionsResult,
+  PaginatedVisitorDiagnosticSessionsResult,
   BookingListStatusFilter,
-  VisitorQuizSessionSummary,
-} from '@/lib/data/quiz-session-types';
+  VisitorDiagnosticSessionSummary,
+} from '@/lib/data/diagnostic-session-types';
 import type { PaymentPolicy } from '@/domain/payment-types';
 import { BOOKING_LIST_STATUS_FILTER_OPTIONS } from '@/lib/marketing/account-booking-status';
 import { shouldShowAccountDiagnosticsScheduledSession } from '@/lib/marketing/account-diagnostics-booking-status';
 import { cn } from '@/lib/utils';
 
-const MY_SESSIONS_API_URL = '/api/quiz/my-sessions';
+const MY_SESSIONS_API_URL = '/api/diagnostic/my-sessions';
 const BOOKING_REFERENCE_DEBOUNCE_MS = 350;
 
-const columnHelper = createColumnHelper<VisitorQuizSessionSummary>();
+const columnHelper = createColumnHelper<VisitorDiagnosticSessionSummary>();
 
 const TABLE_COLUMN_CLASS_NAMES: Record<string, string> = {
   bookingReference: 'w-[10.5rem]',
@@ -56,7 +56,7 @@ const TABLE_COLUMN_CLASS_NAMES: Record<string, string> = {
   actions: 'min-w-[14rem]',
 };
 
-function BookingReferenceCell(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
+function BookingReferenceCell(props: { readonly row: VisitorDiagnosticSessionSummary }): ReactElement {
   const [copied, setCopied] = useState(false);
   const reference = props.row.bookingReferenceId;
   const paymentStatus = props.row.paymentTransactionStatus;
@@ -96,7 +96,7 @@ function BookingReferenceCell(props: { readonly row: VisitorQuizSessionSummary }
   );
 }
 
-function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary }): ReactElement {
+function DiagnosticStatusBadge(props: { readonly row: VisitorDiagnosticSessionSummary }): ReactElement {
   const isComplete = props.row.isDiagnosticComplete;
   if (isComplete) {
     return <Badge variant="secondary">Completed</Badge>;
@@ -105,7 +105,7 @@ function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary 
 }
 
 function SessionActions(props: {
-  readonly row: VisitorQuizSessionSummary;
+  readonly row: VisitorDiagnosticSessionSummary;
   readonly manageBookingEnabled: boolean;
   readonly paymentPolicy: PaymentPolicy;
   readonly refundsEnabled: boolean;
@@ -175,7 +175,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
   const onNavigateError = useCallback((message: string): void => {
     setActionError(message);
   }, [setActionError]);
-  const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(true, onNavigateError);
+  const { navigateToNewDiagnostic, isNavigating } = useMarketingNewDiagnosticNavigation(true, onNavigateError);
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedBookingReference(bookingReferenceInput.trim());
@@ -222,7 +222,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
         setLoadError(message);
         return;
       }
-      const data = payload as PaginatedVisitorQuizSessionsResult;
+      const data = payload as PaginatedVisitorDiagnosticSessionsResult;
       if (shouldAppend) {
         setSessions((current) => {
           const existingRefs = new Set(current.map((session) => session.marketingSessionRef));
@@ -419,7 +419,7 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
               isNavigating={isNavigating}
               onStart={() => {
                 setActionError(null);
-                void navigateToNewQuiz();
+                void navigateToNewDiagnostic();
               }}
             />
           ) : (

@@ -1,11 +1,11 @@
 import 'server-only';
-import { resolveQuizSessionDisplayPreview } from '@techmd/diagnostic-core/quiz-session-display-preview';
+import { resolveDiagnosticSessionDisplayPreview } from '@techmd/diagnostic-core/diagnostic-session-display-preview';
 import type { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
-import type { BookingDocument, QuizAnswers, QuizSessionDocument } from '@/domain/types';
+import type { BookingDocument, DiagnosticAnswers, DiagnosticSessionDocument } from '@/domain/types';
 import { getCatalogServiceByKey } from '@/lib/data/public-catalog-services';
 import type { BookingSessionDisplayTitles } from '@/lib/marketing/booking-session-display-titles';
-import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
+import { extractGuidedDiagnosticRawFromDiagnosticAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { getDb } from '@/lib/mongodb';
 
 function formatServiceKeyLabel(serviceKey: string): string {
@@ -18,7 +18,7 @@ function formatServiceKeyLabel(serviceKey: string): string {
     .join(' ');
 }
 
-function readSituationAnswerFromQuizAnswers(answers: QuizAnswers): string | null {
+function readSituationAnswerFromDiagnosticAnswers(answers: DiagnosticAnswers): string | null {
   const raw = answers.situation;
   if (typeof raw !== 'string') {
     return null;
@@ -35,24 +35,24 @@ async function resolveSessionTitlePreviewFromBooking(
       ? booking.guidedDiagnosticSnapshot.trim()
       : null;
   if (snapshotRaw !== null) {
-    return resolveQuizSessionDisplayPreview({
+    return resolveDiagnosticSessionDisplayPreview({
       guidedDiagnosticRaw: snapshotRaw,
       situationAnswer: null,
     }).sessionTitlePreview;
   }
-  const quizSessionId: ObjectId | undefined | null = booking.quizSessionId;
-  if (quizSessionId === undefined || quizSessionId === null || !process.env.MONGODB_URI) {
+  const diagnosticSessionId: ObjectId | undefined | null = booking.diagnosticSessionId;
+  if (diagnosticSessionId === undefined || diagnosticSessionId === null || !process.env.MONGODB_URI) {
     return null;
   }
   const db = await getDb();
-  const sessionDoc = await db.collection<QuizSessionDocument>(COLLECTIONS.quizSessions).findOne({ _id: quizSessionId });
+  const sessionDoc = await db.collection<DiagnosticSessionDocument>(COLLECTIONS.diagnosticSessions).findOne({ _id: diagnosticSessionId });
   if (sessionDoc === null) {
     return null;
   }
-  const guidedRaw = extractGuidedDiagnosticRawFromQuizAnswers(sessionDoc.answers);
-  return resolveQuizSessionDisplayPreview({
+  const guidedRaw = extractGuidedDiagnosticRawFromDiagnosticAnswers(sessionDoc.answers);
+  return resolveDiagnosticSessionDisplayPreview({
     guidedDiagnosticRaw: guidedRaw,
-    situationAnswer: readSituationAnswerFromQuizAnswers(sessionDoc.answers),
+    situationAnswer: readSituationAnswerFromDiagnosticAnswers(sessionDoc.answers),
   }).sessionTitlePreview;
 }
 

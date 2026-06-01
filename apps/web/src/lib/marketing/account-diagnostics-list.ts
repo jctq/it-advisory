@@ -1,4 +1,4 @@
-import type { PaginatedVisitorQuizSessionsResult } from '@/lib/data/quiz-session-types';
+import type { PaginatedVisitorDiagnosticSessionsResult } from '@/lib/data/diagnostic-session-types';
 import type { BookingListStatusFilter } from '@/lib/marketing/account-booking-status';
 
 export const ACCOUNT_DIAGNOSTICS_PAGE_SIZE = 8;
@@ -13,7 +13,7 @@ export type AccountDiagnosticsListRequest = {
 };
 
 export type AccountDiagnosticsInitialList = AccountDiagnosticsListRequest & {
-  readonly result: PaginatedVisitorQuizSessionsResult;
+  readonly result: PaginatedVisitorDiagnosticSessionsResult;
 };
 
 export function matchesAccountDiagnosticsListRequest(

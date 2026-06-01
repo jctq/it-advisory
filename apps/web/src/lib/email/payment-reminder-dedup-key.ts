@@ -7,6 +7,6 @@ export function buildPaymentReminderDedupKey(input: {
   if (input.bookingId !== null) {
     return `booking:${input.bookingId}`;
   }
-  const quizSessionIdHex = input.transaction.quizSessionIdHex?.trim() ?? 'none';
-  return `checkout:${input.transaction.visitorId}:${quizSessionIdHex}:${input.transaction.serviceKey}:${input.transaction.startsAtIso}`;
+  const diagnosticSessionIdHex = input.transaction.diagnosticSessionIdHex?.trim() ?? 'none';
+  return `checkout:${input.transaction.visitorId}:${diagnosticSessionIdHex}:${input.transaction.serviceKey}:${input.transaction.startsAtIso}`;
 }

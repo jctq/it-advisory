@@ -17,16 +17,16 @@ import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentTransactionDocument } from '@/domain/payment-types';
 import type { BookingDocument } from '@/domain/types';
 import { getDb } from '@/lib/mongodb';
-import { countBookingsByQuizSessionId } from '@/lib/data/bookings';
-import { diagnoseQuizSessionExistingBookingPayability } from '@/lib/data/booking-guest-manage';
-import { ensureQuizSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-quiz-session-pending-booking-ready-for-checkout';
+import { countBookingsByDiagnosticSessionId } from '@/lib/data/bookings';
+import { diagnoseDiagnosticSessionExistingBookingPayability } from '@/lib/data/booking-guest-manage';
+import { ensureDiagnosticSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-diagnostic-session-pending-booking-ready-for-checkout';
 import { buildPayabilityApiExtras } from '@/lib/payments/evaluate-booking-payability';
-import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
 import { createPaymentCheckoutForVerifiedBooking } from '@/lib/payments/payment-checkout-resume';
-import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
-import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
 export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
@@ -90,25 +90,25 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   }
   const resolvedPaymentMethodLabel = params.paymentMethodLabel ?? methodOption.label;
   const settings = await getPaymentSettings();
-  const sessionMarketingRef = params.quizSessionId.trim();
-  const resolvedQuizSessionHex = resolveQuizSessionObjectIdHexFromMarketingRef(sessionMarketingRef);
-  if (resolvedQuizSessionHex === null) {
-    return { ok: false, code: 'quiz_session_invalid_id', error: 'Invalid quiz session reference.' };
+  const sessionMarketingRef = params.diagnosticSessionId.trim();
+  const resolvedDiagnosticSessionHex = resolveDiagnosticSessionObjectIdHexFromMarketingRef(sessionMarketingRef);
+  if (resolvedDiagnosticSessionHex === null) {
+    return { ok: false, code: 'diagnostic_session_invalid_id', error: 'Invalid diagnostic session reference.' };
   }
-  const ownedQuizSession = await findQuizSessionForVisitor(params.visitorId, resolvedQuizSessionHex);
-  if (ownedQuizSession === null) {
+  const ownedDiagnosticSession = await findDiagnosticSessionForVisitor(params.visitorId, resolvedDiagnosticSessionHex);
+  if (ownedDiagnosticSession === null) {
     return {
       ok: false,
-      code: 'quiz_session_not_found',
+      code: 'diagnostic_session_not_found',
       error: 'This diagnostic was not found or you no longer have access to it.',
     };
   }
-  if (ownedQuizSession._id !== undefined) {
-    const existingBookingCount = await countBookingsByQuizSessionId(ownedQuizSession._id);
+  if (ownedDiagnosticSession._id !== undefined) {
+    const existingBookingCount = await countBookingsByDiagnosticSessionId(ownedDiagnosticSession._id);
     if (existingBookingCount > 0) {
-      const pendingReady = await ensureQuizSessionPendingBookingReadyForCheckout(
+      const pendingReady = await ensureDiagnosticSessionPendingBookingReadyForCheckout(
         params.visitorId,
-        ownedQuizSession._id,
+        ownedDiagnosticSession._id,
         { dateYmd: params.date, timeLabel: params.time },
       );
       if (pendingReady.ok) {
@@ -131,7 +131,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           payabilityCode: pendingReady.code,
         };
       }
-      const diagnosis = await diagnoseQuizSessionExistingBookingPayability(params.visitorId, ownedQuizSession._id);
+      const diagnosis = await diagnoseDiagnosticSessionExistingBookingPayability(params.visitorId, ownedDiagnosticSession._id);
       if (diagnosis !== null && !diagnosis.canPayOnline) {
         return {
           ok: false,
@@ -142,7 +142,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       }
       return {
         ok: false,
-        code: 'quiz_session_already_booked',
+        code: 'diagnostic_session_already_booked',
         error: 'This diagnostic is already linked to a booking.',
         ...(diagnosis !== null ? buildPayabilityApiExtras(diagnosis) : {}),
       };
@@ -176,7 +176,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   }
   const existingOpenTransaction = await findOpenPaymentTransactionForCheckoutSlot({
     visitorId: params.visitorId,
-    quizSessionIdHex: resolvedQuizSessionHex,
+    diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
     serviceKey: params.serviceKey,
     startsAtUtc: startsAt,
   });
@@ -216,7 +216,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   const slotOk = await isMarketingSlotInPublishedAvailabilityForCheckout({
     serviceKey: params.serviceKey,
     startsAtUtc: startsAt,
-    quizSessionIdHex: resolvedQuizSessionHex,
+    diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
   });
   if (!slotOk) {
     return { ok: false, code: 'booking_slot_unavailable', error: 'This time is no longer available.' };
@@ -246,7 +246,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     customerEmail: contact.email,
     customerCompany: contact.company,
     customerPhone: contact.phone,
-    quizSessionIdHex: resolvedQuizSessionHex,
+    diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
     paymentMethodLabel: resolvedPaymentMethodLabel,
     redirectUrl: null,
     metadata: {

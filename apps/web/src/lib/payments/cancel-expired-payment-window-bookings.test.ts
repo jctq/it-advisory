@@ -3,12 +3,12 @@ import {
   GUIDED_DIAGNOSTIC_EMPTY,
   serializeGuidedDiagnostic,
 } from '@techmd/diagnostic-core/guided-diagnostic-types';
-import { resolveQuizSessionDiagnosticCompleted } from '@techmd/diagnostic-core/quiz-session-diagnostic-complete';
+import { resolveDiagnosticSessionCompleted } from '@techmd/diagnostic-core/diagnostic-session-complete';
 
-describe('resolveQuizSessionDiagnosticCompleted', () => {
+describe('resolveDiagnosticSessionCompleted', () => {
   it('returns true when completedAt is set', () => {
     expect(
-      resolveQuizSessionDiagnosticCompleted({
+      resolveDiagnosticSessionCompleted({
         completedAtIso: '2026-01-01T00:00:00.000Z',
         guidedDiagnosticRaw: null,
       }),
@@ -29,7 +29,7 @@ describe('resolveQuizSessionDiagnosticCompleted', () => {
       activeRound: null,
     };
     expect(
-      resolveQuizSessionDiagnosticCompleted({
+      resolveDiagnosticSessionCompleted({
         completedAtIso: null,
         guidedDiagnosticRaw: serializeGuidedDiagnostic(guided),
       }),
@@ -38,7 +38,7 @@ describe('resolveQuizSessionDiagnosticCompleted', () => {
 
   it('returns false for in-progress guided state', () => {
     expect(
-      resolveQuizSessionDiagnosticCompleted({
+      resolveDiagnosticSessionCompleted({
         completedAtIso: null,
         guidedDiagnosticRaw: serializeGuidedDiagnostic(GUIDED_DIAGNOSTIC_EMPTY),
       }),

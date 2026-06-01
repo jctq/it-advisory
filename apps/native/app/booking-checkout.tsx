@@ -151,9 +151,9 @@ export default function BookingCheckoutScreen() {
         deviceId,
         marketingSessionToken: sessionToken,
       });
-      const quizPayload = await diagnosticClient.fetchQuizSession();
-      const quizSessionId = quizPayload.sessionId?.trim() ?? '';
-      if (quizSessionId.length === 0) {
+      const diagnosticPayload = await diagnosticClient.fetchDiagnosticSession();
+      const diagnosticSessionId = diagnosticPayload.sessionId?.trim() ?? '';
+      if (diagnosticSessionId.length === 0) {
         throw new Error('Complete your diagnostic before booking.');
       }
       const session = await createPaymentCheckoutSession({
@@ -171,7 +171,7 @@ export default function BookingCheckoutScreen() {
         customerEmail,
         customerPhone,
         customerCompany: customerCompany.length > 0 ? customerCompany : undefined,
-        quizSessionId,
+        diagnosticSessionId,
         paymentMethodLabel: methodOption?.label,
         promoCode: promoCodeParam.length > 0 ? promoCodeParam : undefined,
       });

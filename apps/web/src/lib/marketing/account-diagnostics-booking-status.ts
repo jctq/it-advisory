@@ -1,4 +1,4 @@
-import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
+import type { VisitorDiagnosticSessionSummary } from '@/lib/data/diagnostic-session-types';
 import {
   resolveAccountBookingStatusFromSummary,
   type AccountBookingStatus,
@@ -7,14 +7,14 @@ import {
 export type { AccountBookingStatus as AccountDiagnosticsBookingStatusLabel };
 
 export function resolveAccountDiagnosticsBookingStatusLabel(
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
 ): AccountBookingStatus {
   return resolveAccountBookingStatusFromSummary(row);
 }
 
 /** Pending bookings may retain slot data server-side; hide it until payment confirms. */
 export function shouldShowAccountDiagnosticsScheduledSession(
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
 ): boolean {
   return resolveAccountBookingStatusFromSummary(row) !== 'pending';
 }

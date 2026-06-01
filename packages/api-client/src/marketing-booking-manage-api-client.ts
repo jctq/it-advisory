@@ -33,7 +33,7 @@ export type GuestBookingManageView = {
   readonly pendingPaymentExpiredForRebook: boolean;
   readonly hasCheckoutContact: boolean;
   readonly recordingOptIn: boolean;
-  readonly quizSessionMarketingRef: string | null;
+  readonly diagnosticSessionMarketingRef: string | null;
   readonly payabilityCode: string;
   readonly checkoutAmountLabel: string;
   readonly paymentsEnabled: boolean;

@@ -1,9 +1,9 @@
-import type { QuizAnswers } from '@/domain/types';
+import type { DiagnosticAnswers } from '@/domain/types';
 
 /**
  * Returns the persisted guided diagnostic payload as a JSON string for storage on bookings.
  */
-export function extractGuidedDiagnosticRawFromQuizAnswers(answers: QuizAnswers): string | null {
+export function extractGuidedDiagnosticRawFromDiagnosticAnswers(answers: DiagnosticAnswers): string | null {
   const raw = answers.guidedDiagnostic as unknown;
   if (typeof raw === 'string') {
     const trimmed = raw.trim();

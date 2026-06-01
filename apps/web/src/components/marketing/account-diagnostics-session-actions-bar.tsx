@@ -19,19 +19,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
+import type { VisitorDiagnosticSessionSummary } from '@/lib/data/diagnostic-session-types';
 import { BookingCancellationDialog } from '@/components/marketing/booking-cancellation-dialog';
 import {
   buildSessionManageHref,
   resolveAccountDiagnosticsSessionActions,
   resolveAccountDiagnosticsSessionCustomerAction,
 } from '@/lib/marketing/account-diagnostics-session-actions';
-import { buildMarketingQuizSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { buildMarketingDiagnosticSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { cn } from '@/lib/utils';
 import { notifyError, notifySuccess } from '@/lib/notify';
 
-const QUIZ_SESSION_API_URL = '/api/quiz/session';
+const DIAGNOSTIC_SESSION_API_URL = '/api/diagnostic/session';
 
 const MARKETING_CLIENT_API_BASE_URL = ((): string => {
   const configured = buildApiUrl('/api/checkout/payment-config');
@@ -42,7 +42,7 @@ const MARKETING_CLIENT_API_BASE_URL = ((): string => {
 })();
 
 export type AccountDiagnosticsSessionActionsBarProps = {
-  readonly row: VisitorQuizSessionSummary;
+  readonly row: VisitorDiagnosticSessionSummary;
   readonly manageBookingEnabled: boolean;
   readonly paymentPolicy: PaymentPolicy;
   readonly refundsEnabled?: boolean;
@@ -65,7 +65,7 @@ export function AccountDiagnosticsSessionActionsBar(
   const customerAction = resolveAccountDiagnosticsSessionCustomerAction(props.row, actionOptions);
   const viewLabel = props.viewLabel ?? 'View';
   const manageHref = buildSessionManageHref(props.row, props.manageBookingEnabled);
-  const viewHref = buildMarketingQuizSessionPath(props.row.marketingSessionRef);
+  const viewHref = buildMarketingDiagnosticSessionPath(props.row.marketingSessionRef);
   const deletePreview =
     props.row.situationPreview?.trim() ||
     props.row.sessionTitlePreview?.trim() ||
@@ -115,7 +115,7 @@ export function AccountDiagnosticsSessionActionsBar(
     setDeleteError(null);
     setIsDeleting(true);
     try {
-      const url = `${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(marketingSessionRef)}`;
+      const url = `${DIAGNOSTIC_SESSION_API_URL}?sessionId=${encodeURIComponent(marketingSessionRef)}`;
       const response = await fetch(url, { method: 'DELETE', credentials: 'include' });
       const payload: unknown = await response.json().catch(() => ({}));
       if (!response.ok) {

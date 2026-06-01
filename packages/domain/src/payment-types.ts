@@ -139,7 +139,7 @@ export type PaymentTransactionDocument = {
   customerEmail?: string | null;
   customerCompany?: string | null;
   customerPhone?: string | null;
-  quizSessionIdHex?: string | null;
+  diagnosticSessionIdHex?: string | null;
   paymentMethodLabel?: string | null;
   redirectUrl?: string | null;
   metadata?: Record<string, string>;

@@ -13,7 +13,7 @@ export function useSupportModuleEnabled(): boolean {
   useEffect(() => {
     let cancelled = false;
     const config = readNativeAppConfig();
-    void fetch(`${config.apiBaseUrl}/api/quiz/diagnostic-config`)
+    void fetch(`${config.apiBaseUrl}/api/diagnostic/diagnostic-config`)
       .then(async (response) => {
         const payload = (await response.json()) as DiagnosticConfigResponse;
         if (!response.ok) {

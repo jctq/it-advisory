@@ -1,11 +1,11 @@
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
-import type { QuizSessionDocument, UserAccountDocument, UserAuthSessionDocument } from '@/domain/types';
+import type { DiagnosticSessionDocument, UserAccountDocument, UserAuthSessionDocument } from '@/domain/types';
 import { getDb } from '@/lib/mongodb';
 import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 
 const DEFAULT_USER_LIST_LIMIT = 200;
-const QUIZ_SNAPSHOT_LIMIT = 25;
+const DIAGNOSTIC_SNAPSHOT_LIMIT = 25;
 const AUTH_SESSION_LIMIT = 50;
 
 function hasMongoUri(): boolean {
@@ -26,7 +26,7 @@ export type MarketingUserAuthSessionAdminRow = {
   readonly isExpired: boolean;
 };
 
-export type MarketingUserQuizSnapshotRow = {
+export type MarketingUserDiagnosticSnapshotRow = {
   readonly id: string;
   readonly currentStep: number;
   readonly updatedAtIso: string;
@@ -40,7 +40,7 @@ export type MarketingUserDetail = {
   readonly updatedAtIso: string;
   readonly accountVisitorId: string;
   readonly authSessions: readonly MarketingUserAuthSessionAdminRow[];
-  readonly quizSnapshots: readonly MarketingUserQuizSnapshotRow[];
+  readonly diagnosticSnapshots: readonly MarketingUserDiagnosticSnapshotRow[];
 };
 
 /**
@@ -79,7 +79,7 @@ function mapAuthSessionRow(doc: UserAuthSessionDocument & { _id: ObjectId }): Ma
   };
 }
 
-function mapQuizSnapshotRow(doc: QuizSessionDocument & { _id: ObjectId }): MarketingUserQuizSnapshotRow {
+function mapDiagnosticSnapshotRow(doc: DiagnosticSessionDocument & { _id: ObjectId }): MarketingUserDiagnosticSnapshotRow {
   return {
     id: doc._id.toHexString(),
     currentStep: doc.currentStep,
@@ -89,7 +89,7 @@ function mapQuizSnapshotRow(doc: QuizSessionDocument & { _id: ObjectId }): Marke
 }
 
 /**
- * Admin detail: one marketing user, recent sign-in sessions, and quiz rows keyed to `acct:<userId>`.
+ * Admin detail: one marketing user, recent sign-in sessions, and diagnostic session rows keyed to `acct:<userId>`.
  */
 export async function findMarketingUserDetailForAdmin(userId: string): Promise<MarketingUserDetail | null> {
   if (!hasMongoUri()) {
@@ -107,7 +107,7 @@ export async function findMarketingUserDetailForAdmin(userId: string): Promise<M
     return null;
   }
   const accountVisitorId = buildAccountVisitorId(userDoc._id.toHexString());
-  const [sessionDocs, quizDocs] = await Promise.all([
+  const [sessionDocs, diagnosticDocs] = await Promise.all([
     db
       .collection<UserAuthSessionDocument>(COLLECTIONS.userAuthSessions)
       .find({ userId: objectId })
@@ -115,18 +115,18 @@ export async function findMarketingUserDetailForAdmin(userId: string): Promise<M
       .limit(AUTH_SESSION_LIMIT)
       .toArray(),
     db
-      .collection<QuizSessionDocument>(COLLECTIONS.quizSessions)
+      .collection<DiagnosticSessionDocument>(COLLECTIONS.diagnosticSessions)
       .find({ visitorId: accountVisitorId })
       .sort({ updatedAt: -1 })
-      .limit(QUIZ_SNAPSHOT_LIMIT)
+      .limit(DIAGNOSTIC_SNAPSHOT_LIMIT)
       .toArray(),
   ]);
   const authSessions = sessionDocs
     .filter((doc): doc is UserAuthSessionDocument & { _id: ObjectId } => doc._id !== undefined)
     .map(mapAuthSessionRow);
-  const quizSnapshots = quizDocs
-    .filter((doc): doc is QuizSessionDocument & { _id: ObjectId } => doc._id !== undefined)
-    .map(mapQuizSnapshotRow);
+  const diagnosticSnapshots = diagnosticDocs
+    .filter((doc): doc is DiagnosticSessionDocument & { _id: ObjectId } => doc._id !== undefined)
+    .map(mapDiagnosticSnapshotRow);
   return {
     id: userDoc._id.toHexString(),
     email: userDoc.emailNormalized,
@@ -134,6 +134,6 @@ export async function findMarketingUserDetailForAdmin(userId: string): Promise<M
     updatedAtIso: userDoc.updatedAt.toISOString(),
     accountVisitorId,
     authSessions,
-    quizSnapshots,
+    diagnosticSnapshots,
   };
 }

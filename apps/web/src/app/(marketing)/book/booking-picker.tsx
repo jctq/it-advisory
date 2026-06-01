@@ -92,21 +92,21 @@ import {
   pendingCheckoutToCheckoutDraft,
   type LinkedBookingSlotSnapshot,
   type PendingCheckoutSnapshot,
-} from '@/lib/marketing/quiz-session-linked-booking';
+} from '@/lib/marketing/diagnostic-session-linked-booking';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { notifyError } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import {
   buildMarketingBookSessionPath,
-  buildMarketingQuizSessionPath,
-  isPlausibleMarketingQuizSessionRef,
-} from '@/lib/marketing/quiz-session-marketing-ref';
+  buildMarketingDiagnosticSessionPath,
+  isPlausibleMarketingDiagnosticSessionRef,
+} from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { BookSessionGateError } from './book-session-gate-error';
 import { BookRouteLoadingFallback } from './book-route-loading-fallback';
 
 const BOOKINGS_API_URL = '/api/bookings';
-const QUIZ_SESSION_API_URL = '/api/quiz/session';
+const DIAGNOSTIC_SESSION_API_URL = '/api/diagnostic/session';
 const PAYMENT_CONFIG_API_URL = buildApiUrl('/api/checkout/payment-config');
 const AVAILABILITY_API_URL = buildApiUrl('/api/booking/availability');
 const CHECKOUT_RESCHEDULE_SLOT_API_URL = buildApiUrl('/api/bookings/checkout/reschedule-slot');
@@ -247,7 +247,7 @@ type AwaitingPaymentReservedSlotState = {
   readonly timezone: string;
 };
 
-type QuizSessionGateApiPayload = {
+type DiagnosticSessionGateApiPayload = {
   readonly session?: unknown;
   readonly readOnly?: boolean;
   readonly serverNowIso?: string;
@@ -294,7 +294,7 @@ function resolvePaymentSelectionAfterConfigLoad(
 
 const BOOKING_STEPS: readonly {
   readonly id: BookingSlotPhase;
-  /** Uppercase label in the desktop stepper (matches quiz template progress). */
+  /** Uppercase label in the desktop stepper (matches diagnostic template progress). */
   readonly barLabel: string;
   /** Title case headline on the mobile summary row. */
   readonly headline: string;
@@ -399,19 +399,19 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       return;
     }
     const fromQuery = searchParams.get('sessionId')?.trim() ?? '';
-    if (!isPlausibleMarketingQuizSessionRef(fromQuery)) {
+    if (!isPlausibleMarketingDiagnosticSessionRef(fromQuery)) {
       return;
     }
     router.replace(buildMarketingBookSessionPath(fromQuery));
   }, [pathSessionRef, pathname, router, searchParams]);
-  const quizSessionRef = useMemo((): string => {
+  const diagnosticSessionRef = useMemo((): string => {
     if (pathSessionRef !== undefined && pathSessionRef !== null) {
       const trimmed = pathSessionRef.trim();
-      return isPlausibleMarketingQuizSessionRef(trimmed) ? trimmed : '';
+      return isPlausibleMarketingDiagnosticSessionRef(trimmed) ? trimmed : '';
     }
     return searchParams.get('sessionId')?.trim() ?? '';
   }, [pathSessionRef, searchParams]);
-  const hasValidQuizSessionParam = isPlausibleMarketingQuizSessionRef(quizSessionRef);
+  const hasValidDiagnosticSessionParam = isPlausibleMarketingDiagnosticSessionRef(diagnosticSessionRef);
   const pathRefTrimmed =
     pathSessionRef !== undefined && pathSessionRef !== null ? pathSessionRef.trim() : '';
   const querySessionId = searchParams.get('sessionId')?.trim() ?? '';
@@ -589,14 +589,14 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     [executeActivatePaymentHold],
   );
   const executeSyncPaymentHoldExpiry = useCallback(async (): Promise<boolean> => {
-    if (!hasValidQuizSessionParam) {
+    if (!hasValidDiagnosticSessionParam) {
       return false;
     }
     const response = await fetch(PAYMENT_HOLD_SYNC_API_URL, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionRef: quizSessionRef }),
+      body: JSON.stringify({ sessionRef: diagnosticSessionRef }),
     });
     const payload: unknown = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -624,7 +624,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       }
     }
     return cancelled;
-  }, [hasValidQuizSessionParam, quizSessionRef, setServerClockOffsetMs]);
+  }, [hasValidDiagnosticSessionParam, diagnosticSessionRef, setServerClockOffsetMs]);
   const bookingServiceKey = resolveBookingServiceKey(searchParams, hasEnabledCatalog);
   const checkoutServiceKeyForApi =
     bookingServiceKey.trim().length > 0 ? bookingServiceKey.trim() : DEFAULT_SERVICE_KEY;
@@ -661,10 +661,10 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const clearCheckoutSlotSelection = useCallback((): void => {
     setSelectedDate(null);
     setSelectedTime(null);
-    if (hasValidQuizSessionParam) {
-      clearCheckoutDraftFromSessionStorage(quizSessionRef);
+    if (hasValidDiagnosticSessionParam) {
+      clearCheckoutDraftFromSessionStorage(diagnosticSessionRef);
     }
-  }, [hasValidQuizSessionParam, quizSessionRef, setSelectedDate, setSelectedTime]);
+  }, [hasValidDiagnosticSessionParam, diagnosticSessionRef, setSelectedDate, setSelectedTime]);
   const executeReturnToFreshCheckoutDateStep = useCallback((): void => {
     manualSlotRebookRef.current = true;
     setMustPersistSlotBeforeCheckout(true);
@@ -678,16 +678,16 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     setPaymentCancelledNotice(false);
     clearCheckoutSlotSelection();
     resumePaymentSelectionPendingRef.current = null;
-    if (hasValidQuizSessionParam) {
-      checkoutResumeHandledRef.current = quizSessionRef;
+    if (hasValidDiagnosticSessionParam) {
+      checkoutResumeHandledRef.current = diagnosticSessionRef;
     }
     setPhase('date');
     setAvailabilityRefreshToken((previous) => previous + 1);
-    if (hasValidQuizSessionParam && hasPathSegment) {
-      router.replace(buildMarketingBookSessionPath(quizSessionRef, checkoutServiceKeyForApi));
+    if (hasValidDiagnosticSessionParam && hasPathSegment) {
+      router.replace(buildMarketingBookSessionPath(diagnosticSessionRef, checkoutServiceKeyForApi));
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (hasValidQuizSessionParam) {
+    if (hasValidDiagnosticSessionParam) {
       void executeSyncPaymentHoldExpiry().catch(() => undefined);
     }
   }, [
@@ -695,8 +695,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     clearCheckoutSlotSelection,
     executeSyncPaymentHoldExpiry,
     hasPathSegment,
-    hasValidQuizSessionParam,
-    quizSessionRef,
+    hasValidDiagnosticSessionParam,
+    diagnosticSessionRef,
     router,
     setErrorMessage,
     setPaymentCancelledNotice,
@@ -806,7 +806,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             setPhase('error');
             return;
           }
-          linkedConfirmationHandledRef.current = quizSessionRef;
+          linkedConfirmationHandledRef.current = diagnosticSessionRef;
           const meetingTrimmed = result.meetingUrl?.trim() ?? '';
           setConfirmedMeetingUrl(meetingTrimmed.length > 0 ? meetingTrimmed : null);
           setSuccessBookingStatus(result.bookingStatus);
@@ -826,7 +826,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           if (result.bookingId !== null) {
             setConfirmedBookingReference(formatBookingReferenceId(result.bookingId));
           }
-          clearCheckoutDraftFromSessionStorage(quizSessionRef);
+          clearCheckoutDraftFromSessionStorage(diagnosticSessionRef);
           setPhase('success');
           const paidServiceKey = result.serviceKey ?? bookingServiceKey;
           const shouldNormalizeUrl =
@@ -834,7 +834,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             checkoutReturnParamsRef.current.transactionId.length > 0 ||
             (searchParams.get('serviceKey')?.trim() ?? '') !== paidServiceKey;
           if (shouldNormalizeUrl) {
-            router.replace(buildMarketingBookSessionPath(quizSessionRef, paidServiceKey));
+            router.replace(buildMarketingBookSessionPath(diagnosticSessionRef, paidServiceKey));
           }
         })
         .catch((error: unknown) => {
@@ -852,7 +852,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     },
     [
       bookingServiceKey,
-      quizSessionRef,
+      diagnosticSessionRef,
       router,
       searchParams,
       setConfirmedBookingReference,
@@ -915,7 +915,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     });
   }, [pathRefTrimmed, querySessionId, setCatalogFallbackCheckout, setCheckoutCatalogService, setHasEnabledCatalog]);
   useEffect(() => {
-    if (!hasValidQuizSessionParam) {
+    if (!hasValidDiagnosticSessionParam) {
       return;
     }
     const controller = new AbortController();
@@ -933,7 +933,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           !catalogUrlNormalizedRef.current
         ) {
           catalogUrlNormalizedRef.current = true;
-          router.replace(buildMarketingBookSessionPath(quizSessionRef));
+          router.replace(buildMarketingBookSessionPath(diagnosticSessionRef));
         }
       })
       .catch(() => {
@@ -944,7 +944,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [hasValidQuizSessionParam, quizSessionRef, router, searchParams, setCatalogFallbackCheckout, setHasEnabledCatalog]);
+  }, [hasValidDiagnosticSessionParam, diagnosticSessionRef, router, searchParams, setCatalogFallbackCheckout, setHasEnabledCatalog]);
   useEffect(() => {
     if (phase === 'success' || phase === 'processing') {
       return;
@@ -990,7 +990,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       return;
     }
     if (pathname === '/book' && !hasPathSegment) {
-      if (isPlausibleMarketingQuizSessionRef(querySessionId)) {
+      if (isPlausibleMarketingDiagnosticSessionRef(querySessionId)) {
         queueMicrotask(() => {
           setSessionGateStatus('loading');
         });
@@ -1002,7 +1002,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       return;
     }
     const ref = hasPathSegment ? pathRefTrimmed : querySessionId;
-    if (!isPlausibleMarketingQuizSessionRef(ref)) {
+    if (!isPlausibleMarketingDiagnosticSessionRef(ref)) {
       queueMicrotask(() => {
         setSessionGateStatus('invalid_format');
       });
@@ -1023,7 +1023,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     queueMicrotask(() => {
       setSessionGateStatus('loading');
     });
-    const sessionUrl = `${QUIZ_SESSION_API_URL}?sessionId=${encodeURIComponent(ref)}`;
+    const sessionUrl = `${DIAGNOSTIC_SESSION_API_URL}?sessionId=${encodeURIComponent(ref)}`;
     const gateRequestStartedAtMs = Date.now();
     void fetch(sessionUrl, { credentials: 'include', signal: controller.signal })
       .then(async (response) => {
@@ -1038,7 +1038,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           setSessionGateStatus('not_found');
           return;
         }
-        const data = (await response.json()) as QuizSessionGateApiPayload;
+        const data = (await response.json()) as DiagnosticSessionGateApiPayload;
         const gateResponseReceivedAtMs = Date.now();
         if (cancelled) {
           return;
@@ -1381,21 +1381,21 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     setSessionGateStatus,
   ]);
   useEffect(() => {
-    if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam || !hasPathSegment) {
+    if (sessionGateStatus !== 'ready' || !hasValidDiagnosticSessionParam || !hasPathSegment) {
       return;
     }
-    if (checkoutResumeHandledRef.current === quizSessionRef) {
+    if (checkoutResumeHandledRef.current === diagnosticSessionRef) {
       return;
     }
     const paymentResult = searchParams.get('payment')?.trim() ?? '';
     if (paymentResult === 'cancelled' || paymentResult === 'success') {
       return;
     }
-    const storedDraft = readCheckoutDraftFromSessionStorage(quizSessionRef);
+    const storedDraft = readCheckoutDraftFromSessionStorage(diagnosticSessionRef);
     if (storedDraft === null) {
       return;
     }
-    checkoutResumeHandledRef.current = quizSessionRef;
+    checkoutResumeHandledRef.current = diagnosticSessionRef;
     restoreCheckoutDraftFromSnapshot(storedDraft);
     if (
       hasCheckoutManageContact({
@@ -1408,22 +1408,22 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     }
   }, [
     hasPathSegment,
-    hasValidQuizSessionParam,
-    quizSessionRef,
+    hasValidDiagnosticSessionParam,
+    diagnosticSessionRef,
     restoreCheckoutDraftFromSnapshot,
     searchParams,
     sessionGateStatus,
     setPhase,
   ]);
   useEffect(() => {
-    if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
+    if (sessionGateStatus !== 'ready' || !hasValidDiagnosticSessionParam) {
       return;
     }
     const paymentResult = searchParams.get('payment')?.trim() ?? '';
     if (paymentResult !== 'cancelled') {
       return;
     }
-    const storedDraft = readCheckoutDraftFromSessionStorage(quizSessionRef);
+    const storedDraft = readCheckoutDraftFromSessionStorage(diagnosticSessionRef);
     queueMicrotask(() => {
       setPaymentCancelledNotice(true);
       setPhase('payment');
@@ -1431,11 +1431,11 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         restoreCheckoutDraftFromSnapshot(storedDraft);
       }
     });
-    router.replace(buildMarketingBookSessionPath(quizSessionRef, bookingServiceKey.trim().length > 0 ? bookingServiceKey : null));
+    router.replace(buildMarketingBookSessionPath(diagnosticSessionRef, bookingServiceKey.trim().length > 0 ? bookingServiceKey : null));
   }, [
     bookingServiceKey,
-    hasValidQuizSessionParam,
-    quizSessionRef,
+    hasValidDiagnosticSessionParam,
+    diagnosticSessionRef,
     restoreCheckoutDraftFromSnapshot,
     router,
     searchParams,
@@ -1557,7 +1557,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (!isCheckoutPaymentSuccessReturn()) {
       return;
     }
-    if (!hasValidQuizSessionParam) {
+    if (!hasValidDiagnosticSessionParam) {
       return;
     }
     const returnTransactionId = checkoutReturnParamsRef.current.transactionId;
@@ -1572,7 +1572,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     return () => {
       controller.abort();
     };
-  }, [finalizePaidCheckoutFromTransaction, hasValidQuizSessionParam, searchParams, sessionGateStatus]);
+  }, [finalizePaidCheckoutFromTransaction, hasValidDiagnosticSessionParam, searchParams, sessionGateStatus]);
   const selectedGateway = useMemo(() => {
     if (paymentConfig === null || selectedGatewayId === null) {
       return null;
@@ -1635,7 +1635,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     };
   }, [activePaymentHold, setServerClockOffsetMs]);
   useEffect(() => {
-    if (!isPaymentHoldBlocked || !hasValidQuizSessionParam || pendingPaymentHoldDialogOpen) {
+    if (!isPaymentHoldBlocked || !hasValidDiagnosticSessionParam || pendingPaymentHoldDialogOpen) {
       return;
     }
     if (paymentHoldSyncInFlightRef.current) {
@@ -1668,7 +1668,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   }, [
     executeReturnToFreshCheckoutDateStep,
     executeSyncPaymentHoldExpiry,
-    hasValidQuizSessionParam,
+    hasValidDiagnosticSessionParam,
     isPaymentHoldBlocked,
     pendingPaymentHoldDialogOpen,
     phase,
@@ -1838,8 +1838,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const displayTimeLabel = selectedTime ?? '';
   const confirmedDateLong = confirmedSlotDisplay?.dateLong ?? displayDateLong;
   const confirmedTimeLabel = confirmedSlotDisplay?.timeLabel ?? displayTimeLabel;
-  const activeDiagnosticHref = hasValidQuizSessionParam
-    ? buildMarketingQuizSessionPath(quizSessionRef)
+  const activeDiagnosticHref = hasValidDiagnosticSessionParam
+    ? buildMarketingDiagnosticSessionPath(diagnosticSessionRef)
     : '/diagnostic';
 
   const resetCheckoutSessionGate = useCallback((): void => {
@@ -1852,13 +1852,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       return;
     }
     void (async (): Promise<void> => {
-      if (mustPersistSlotBeforeCheckout && hasValidQuizSessionParam) {
+      if (mustPersistSlotBeforeCheckout && hasValidDiagnosticSessionParam) {
         setIsPersistingCheckoutSlot(true);
         try {
           const dateYmd = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
           await rescheduleMarketingCheckoutSlot({
             apiUrl: CHECKOUT_RESCHEDULE_SLOT_API_URL,
-            sessionRef: quizSessionRef,
+            sessionRef: diagnosticSessionRef,
             dateYmd,
             timeLabel: selectedTime,
           });
@@ -1874,7 +1874,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             timezone: PRIMARY_TIMEZONE,
           });
           setPendingPaymentHoldDialogOpen(false);
-          checkoutResumeHandledRef.current = quizSessionRef;
+          checkoutResumeHandledRef.current = diagnosticSessionRef;
         } catch (error: unknown) {
           notifyError(error instanceof Error ? error.message : 'Could not save your new session time.');
           return;
@@ -1905,8 +1905,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (Object.keys(nextErrors).length > 0) {
       return;
     }
-    if (hasValidQuizSessionParam && selectedDate !== null && selectedTime !== null) {
-      writeCheckoutDraftToSessionStorage(quizSessionRef, {
+    if (hasValidDiagnosticSessionParam && selectedDate !== null && selectedTime !== null) {
+      writeCheckoutDraftToSessionStorage(diagnosticSessionRef, {
         date: formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd'),
         time: selectedTime,
         fullName: trimmedName,
@@ -1922,7 +1922,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
 
   const hasCheckoutSlotSelected = selectedDate !== null && selectedTime !== null;
   const executePay = async (): Promise<void> => {
-    if (sessionGateStatus !== 'ready' || !hasValidQuizSessionParam) {
+    if (sessionGateStatus !== 'ready' || !hasValidDiagnosticSessionParam) {
       return;
     }
     if (isPaymentHoldBlocked) {
@@ -1959,13 +1959,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           customerEmail: email.trim(),
           customerPhone: phone.trim(),
           customerCompany: company.trim().length > 0 ? company.trim() : undefined,
-          quizSessionId: quizSessionRef,
+          diagnosticSessionId: diagnosticSessionRef,
           paymentMethodLabel: resolvedPaymentLabel,
           promoCode: promoCode.trim().length > 0 ? promoCode.trim() : undefined,
           recordingOptIn,
         });
         if (session.manualConfirm || session.redirectUrl === null) {
-          clearCheckoutDraftFromSessionStorage(quizSessionRef);
+          clearCheckoutDraftFromSessionStorage(diagnosticSessionRef);
           void router.refresh();
           setSuccessPaymentLabel(resolvedPaymentLabel);
           setSuccessBookingStatus(session.bookingStatus ?? null);
@@ -1987,7 +1987,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           setPhase('success');
           return;
         }
-        writeCheckoutDraftToSessionStorage(quizSessionRef, {
+        writeCheckoutDraftToSessionStorage(diagnosticSessionRef, {
           date: dateParam,
           time: selectedTime,
           fullName: fullName.trim(),
@@ -2045,7 +2045,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (trimmedCompany.length > 0) {
       body.customerCompany = trimmedCompany;
     }
-    body.quizSessionId = quizSessionRef;
+    body.diagnosticSessionId = diagnosticSessionRef;
     try {
       const response = await fetch(BOOKINGS_API_URL, {
         method: 'POST',
@@ -2179,12 +2179,12 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       return (
         <BookSessionGateError
           reason="already_booked"
-          sessionRef={quizSessionRef}
+          sessionRef={diagnosticSessionRef}
           manageBookingEnabled={manageBookingEnabled}
         />
       );
     }
-    return <BookSessionGateError reason="not_found" sessionRef={quizSessionRef} />;
+    return <BookSessionGateError reason="not_found" sessionRef={diagnosticSessionRef} />;
   }
 
   if (phase === 'error') {

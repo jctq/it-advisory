@@ -1,5 +1,5 @@
 /**
- * Canonical situation labels for the quiz (single source of truth for step 1 + search).
+ * Canonical situation labels for the diagnostic (single source of truth for step 1 + search).
  */
 export const SITUATION_OPTIONS = [
   'Vendor keeps missing timelines',

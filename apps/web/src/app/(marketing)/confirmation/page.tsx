@@ -37,7 +37,7 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
         timeRaw={timeRaw}
         displayDate={displayDate}
         displayTime={displayTime}
-        quizSessionIdRaw={sessionIdRaw.length > 0 ? sessionIdRaw : undefined}
+        diagnosticSessionIdRaw={sessionIdRaw.length > 0 ? sessionIdRaw : undefined}
       />
     </main>
   );

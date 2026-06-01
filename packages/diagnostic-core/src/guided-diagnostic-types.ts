@@ -52,7 +52,7 @@ export type DiagnosticQuestionOption = {
 };
 
 /**
- * Persisted guided quiz (replaces static QUIZ_STEPS). Stored as answers.guidedDiagnostic JSON.
+ * Persisted guided diagnostic (replaces static DIAGNOSTIC_STEPS). Stored as answers.guidedDiagnostic JSON.
  */
 export type DiagnosticQuestionBlock = {
   readonly id: string;

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS } from '@/lib/marketing/account-diagnostics-list';
-import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
+import type { VisitorDiagnosticSessionSummary } from '@/lib/data/diagnostic-session-types';
 import type { BookingListStatusFilter } from '@/lib/marketing/account-booking-status';
 import { buildStoreFieldPatch } from '@/store/marketing/set-store-field';
 
@@ -10,7 +10,7 @@ export type MarketingAccountDiagnosticsState = {
   readonly actionError: string | null;
   readonly loadError: string | null;
   readonly isLoading: boolean;
-  readonly sessions: readonly VisitorQuizSessionSummary[];
+  readonly sessions: readonly VisitorDiagnosticSessionSummary[];
   readonly totalCount: number;
   readonly totalPages: number;
   readonly page: number;
@@ -31,8 +31,8 @@ export type MarketingAccountDiagnosticsActions = {
   ) => void;
   readonly setSessions: (
     updater:
-      | readonly VisitorQuizSessionSummary[]
-      | ((previous: readonly VisitorQuizSessionSummary[]) => readonly VisitorQuizSessionSummary[]),
+      | readonly VisitorDiagnosticSessionSummary[]
+      | ((previous: readonly VisitorDiagnosticSessionSummary[]) => readonly VisitorDiagnosticSessionSummary[]),
   ) => void;
   readonly resetAccountDiagnostics: () => void;
 };

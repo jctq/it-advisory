@@ -1,10 +1,10 @@
 import { ObjectId } from 'mongodb';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ensureQuizSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-quiz-session-pending-booking-ready-for-checkout';
-import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { ensureDiagnosticSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-diagnostic-session-pending-booking-ready-for-checkout';
+import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
-import { resolveQuizSessionObjectIdHexFromMarketingRef } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 
 const postBodySchema = z.object({
   sessionRef: z.string().min(1).max(512),
@@ -24,19 +24,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
     }
-    const sessionHex = resolveQuizSessionObjectIdHexFromMarketingRef(parsed.data.sessionRef);
+    const sessionHex = resolveDiagnosticSessionObjectIdHexFromMarketingRef(parsed.data.sessionRef);
     if (sessionHex === null) {
-      return NextResponse.json({ error: 'Invalid session reference', code: 'quiz_session_invalid_id' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid session reference', code: 'diagnostic_session_invalid_id' }, { status: 400 });
     }
     const visitorId = await resolveMarketingVisitorId(request);
-    const ownedSession = await findQuizSessionForVisitor(visitorId, sessionHex);
+    const ownedSession = await findDiagnosticSessionForVisitor(visitorId, sessionHex);
     if (ownedSession === null) {
       return NextResponse.json(
-        { error: 'This diagnostic was not found or you no longer have access to it.', code: 'quiz_session_not_found' },
+        { error: 'This diagnostic was not found or you no longer have access to it.', code: 'diagnostic_session_not_found' },
         { status: 404 },
       );
     }
-    const result = await ensureQuizSessionPendingBookingReadyForCheckout(
+    const result = await ensureDiagnosticSessionPendingBookingReadyForCheckout(
       visitorId,
       new ObjectId(sessionHex),
       {

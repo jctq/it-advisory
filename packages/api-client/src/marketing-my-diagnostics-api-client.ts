@@ -43,7 +43,7 @@ type FetchMyDiagnosticsParams = {
 };
 
 /**
- * Lists diagnostic quiz sessions for the signed-in marketing account.
+ * Lists diagnostic diagnostic sessions for the signed-in marketing account.
  */
 export async function fetchMarketingMyDiagnosticSessions(params: FetchMyDiagnosticsParams): Promise<MarketingMyDiagnosticsPage> {
   const origin = params.apiBaseUrl.replace(/\/$/, '');
@@ -55,7 +55,7 @@ export async function fetchMarketingMyDiagnosticSessions(params: FetchMyDiagnost
     pageSize: String(pageSize),
     status,
   });
-  const response = await fetch(`${origin}/api/quiz/my-sessions?${query.toString()}`, {
+  const response = await fetch(`${origin}/api/diagnostic/my-sessions?${query.toString()}`, {
     method: 'GET',
     headers: {
       [VISITOR_SESSION_CONFIG.mobileDeviceIdHeaderName]: params.deviceId,

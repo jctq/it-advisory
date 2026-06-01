@@ -3,16 +3,16 @@ import { COLLECTIONS } from '@/domain/collections';
 import type { BookingDocument } from '@/domain/types';
 import type { PaymentGatewayId, PaymentPolicy, PaymentStatus } from '@/domain/payment-types';
 import {
-  createBookingWithLatestQuizSnapshot,
+  createBookingWithLatestDiagnosticSnapshot,
   findBookingByVisitorSlot,
-  findPrimaryBookingSlotByQuizSessionId,
+  findPrimaryBookingSlotByDiagnosticSessionId,
   insertMarketingBooking,
-  linkQuizSessionToVisitorBooking,
+  linkDiagnosticSessionToVisitorBooking,
 } from '@/lib/data/bookings';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
-import { extractGuidedDiagnosticRawFromQuizAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
+import { extractGuidedDiagnosticRawFromDiagnosticAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { findPaymentTransactionById, updatePaymentTransactionStatus, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
-import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
+import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
 import { getDb } from '@/lib/mongodb';
 import { executeSendBookingConfirmationEmail } from '@/lib/email/send-booking-confirmation-email';
 import { incrementPromoRedemptionCount } from '@/lib/data/monetization-settings';
@@ -21,37 +21,37 @@ import { ensureVideoMeetingStoredForBooking } from '@/lib/video-meetings/ensure-
 import { RELEASED_BOOKING_SLOT_STARTS_AT } from '@/lib/booking/released-booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
-async function ensureTransactionBookingLinkedToQuizSession(
+async function ensureTransactionBookingLinkedToDiagnosticSession(
   transaction: PaymentTransactionRow,
   bookingId: ObjectId,
 ): Promise<void> {
-  const quizSessionHex = transaction.quizSessionIdHex?.trim() ?? '';
-  if (quizSessionHex.length === 0) {
+  const diagnosticSessionHex = transaction.diagnosticSessionIdHex?.trim() ?? '';
+  if (diagnosticSessionHex.length === 0) {
     return;
   }
-  await linkQuizSessionToVisitorBooking({
+  await linkDiagnosticSessionToVisitorBooking({
     bookingId,
     visitorId: transaction.visitorId,
-    quizSessionIdHex: quizSessionHex,
+    diagnosticSessionIdHex: diagnosticSessionHex,
   });
 }
 
-async function resolveQuizSnapshot(
+async function resolveDiagnosticSnapshot(
   visitorId: string,
-  quizSessionIdHex: string | null,
-): Promise<{ readonly quizSessionId: ObjectId | null; readonly snapshot: string | null }> {
-  const preferredRaw = quizSessionIdHex?.trim() ?? '';
+  diagnosticSessionIdHex: string | null,
+): Promise<{ readonly diagnosticSessionId: ObjectId | null; readonly snapshot: string | null }> {
+  const preferredRaw = diagnosticSessionIdHex?.trim() ?? '';
   let session =
     preferredRaw.length > 0 && /^[a-f\d]{24}$/i.test(preferredRaw)
-      ? await findQuizSessionForVisitor(visitorId, preferredRaw)
+      ? await findDiagnosticSessionForVisitor(visitorId, preferredRaw)
       : null;
   if (session === null) {
-    return { quizSessionId: null, snapshot: null };
+    return { diagnosticSessionId: null, snapshot: null };
   }
-  const quizSessionId = session._id ?? null;
+  const diagnosticSessionId = session._id ?? null;
   const snapshot =
-    session.answers !== undefined ? extractGuidedDiagnosticRawFromQuizAnswers(session.answers) : null;
-  return { quizSessionId, snapshot };
+    session.answers !== undefined ? extractGuidedDiagnosticRawFromDiagnosticAnswers(session.answers) : null;
+  return { diagnosticSessionId, snapshot };
 }
 
 async function confirmBookingRow(bookingId: ObjectId): Promise<void> {
@@ -218,7 +218,7 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
       bookingId: bookingObjectId,
       metadata: transaction.metadata,
     });
-    await ensureTransactionBookingLinkedToQuizSession(transaction, bookingObjectId);
+    await ensureTransactionBookingLinkedToDiagnosticSession(transaction, bookingObjectId);
     return { kind: 'noop', transaction };
   }
   let bookingId: ObjectId | null = transaction.bookingId !== null ? new ObjectId(transaction.bookingId) : null;
@@ -242,7 +242,7 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
       metadata: transaction.metadata,
     });
     await ensureVideoMeetingStoredForBooking(bookingId);
-    await ensureTransactionBookingLinkedToQuizSession(transaction, bookingId);
+    await ensureTransactionBookingLinkedToDiagnosticSession(transaction, bookingId);
     const updated = await updatePaymentTransactionStatus({
       transactionId: transaction.id,
       status: 'paid',
@@ -272,7 +272,7 @@ async function fulfillPaidTransaction(transaction: PaymentTransactionRow): Promi
     },
   );
   await ensureVideoMeetingStoredForBooking(bookingId);
-  await ensureTransactionBookingLinkedToQuizSession(transaction, bookingId);
+  await ensureTransactionBookingLinkedToDiagnosticSession(transaction, bookingId);
   const updated = await updatePaymentTransactionStatus({
     transactionId: transaction.id,
     status: 'paid',
@@ -344,7 +344,7 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
       bookingId: existing,
       metadata: transaction.metadata,
     });
-    await ensureTransactionBookingLinkedToQuizSession(transaction, existing);
+    await ensureTransactionBookingLinkedToDiagnosticSession(transaction, existing);
     return existing;
   }
   const contact: MarketingBookingLeadContact | null =
@@ -368,16 +368,16 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
   if (leadId === null) {
     return null;
   }
-  const created = await createBookingWithLatestQuizSnapshot({
+  const created = await createBookingWithLatestDiagnosticSnapshot({
     visitorId: transaction.visitorId,
     serviceKey: transaction.serviceKey,
     startsAt,
     timezone: transaction.timezone || PRIMARY_TIMEZONE,
     leadId,
-    preferredQuizSessionId: transaction.quizSessionIdHex,
+    preferredDiagnosticSessionId: transaction.diagnosticSessionIdHex,
     paymentMethodLabel: transaction.paymentMethodLabel,
   });
-  if (created === 'quiz_session_not_accessible') {
+  if (created === 'diagnostic_session_not_accessible') {
     return null;
   }
   if (created === null || created === 'duplicate_key') {
@@ -387,7 +387,7 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
       startsAt: await loadTransactionStartsAt(transaction.id),
     });
     if (retry !== null) {
-      await ensureTransactionBookingLinkedToQuizSession(transaction, retry);
+      await ensureTransactionBookingLinkedToDiagnosticSession(transaction, retry);
     }
     return retry;
   }
@@ -409,7 +409,7 @@ async function createBookingForTransaction(transaction: PaymentTransactionRow): 
     bookingId: created.bookingId,
     metadata: transaction.metadata,
   });
-  await ensureTransactionBookingLinkedToQuizSession(transaction, created.bookingId);
+  await ensureTransactionBookingLinkedToDiagnosticSession(transaction, created.bookingId);
   return created.bookingId;
 }
 
@@ -471,11 +471,11 @@ export async function createPendingBookingForHoldPolicy(input: {
   if (leadId === null) {
     return null;
   }
-  const { quizSessionId, snapshot } = await resolveQuizSnapshot(transaction.visitorId, transaction.quizSessionIdHex);
+  const { diagnosticSessionId, snapshot } = await resolveDiagnosticSnapshot(transaction.visitorId, transaction.diagnosticSessionIdHex);
   const startsAt = await loadTransactionStartsAt(transaction.id);
   let bookingId: ObjectId | null = null;
-  if (quizSessionId !== null) {
-    const primarySlot = await findPrimaryBookingSlotByQuizSessionId(quizSessionId);
+  if (diagnosticSessionId !== null) {
+    const primarySlot = await findPrimaryBookingSlotByDiagnosticSessionId(diagnosticSessionId);
     if (primarySlot !== null) {
       bookingId = new ObjectId(primarySlot.bookingId);
     }
@@ -487,7 +487,7 @@ export async function createPendingBookingForHoldPolicy(input: {
       startsAt,
       timezone: transaction.timezone || PRIMARY_TIMEZONE,
       leadId,
-      quizSessionId,
+      diagnosticSessionId,
       guidedDiagnosticSnapshot: snapshot,
       paymentMethodLabel: transaction.paymentMethodLabel,
     });
@@ -536,7 +536,7 @@ export async function createPendingBookingForHoldPolicy(input: {
     bookingId,
     metadata: transaction.metadata,
   });
-  await ensureTransactionBookingLinkedToQuizSession(transaction, bookingId);
+  await ensureTransactionBookingLinkedToDiagnosticSession(transaction, bookingId);
   return bookingId;
 }
 
@@ -554,9 +554,9 @@ export async function createManualConfirmBooking(input: {
   if (leadId === null) {
     return null;
   }
-  const { quizSessionId, snapshot } = await resolveQuizSnapshot(
+  const { diagnosticSessionId, snapshot } = await resolveDiagnosticSnapshot(
     input.transaction.visitorId,
-    input.transaction.quizSessionIdHex,
+    input.transaction.diagnosticSessionIdHex,
   );
   const inserted = await insertMarketingBooking({
     visitorId: input.transaction.visitorId,
@@ -564,7 +564,7 @@ export async function createManualConfirmBooking(input: {
     startsAt,
     timezone: input.transaction.timezone || PRIMARY_TIMEZONE,
     leadId,
-    quizSessionId,
+    diagnosticSessionId,
     guidedDiagnosticSnapshot: snapshot,
     paymentMethodLabel: input.transaction.paymentMethodLabel,
   });
@@ -602,7 +602,7 @@ export async function createManualConfirmBooking(input: {
     bookingId,
     metadata: input.transaction.metadata,
   });
-  await ensureTransactionBookingLinkedToQuizSession(input.transaction, bookingId);
+  await ensureTransactionBookingLinkedToDiagnosticSession(input.transaction, bookingId);
   return bookingId;
 }
 

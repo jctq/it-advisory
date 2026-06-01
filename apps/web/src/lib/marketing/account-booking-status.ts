@@ -1,7 +1,7 @@
 import type { Document } from 'mongodb';
 import type { PaymentStatus } from '@/domain/payment-types';
 import type { BookingDocument } from '@/domain/types';
-import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
+import type { VisitorDiagnosticSessionSummary } from '@/lib/data/diagnostic-session-types';
 
 /**
  * Canonical booking lifecycle status for account diagnostics and admin calendar filters.
@@ -90,7 +90,7 @@ export function resolveAccountBookingStatus(input: ResolveAccountBookingStatusIn
 }
 
 export function resolveAccountBookingStatusFromSummary(
-  row: VisitorQuizSessionSummary,
+  row: VisitorDiagnosticSessionSummary,
 ): AccountBookingStatus {
   return resolveAccountBookingStatus({
     bookingStatus: row.bookingStatus,

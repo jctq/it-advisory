@@ -11,8 +11,8 @@ import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import {
   buildMarketingBookSessionPath,
-  isPlausibleMarketingQuizSessionRef,
-} from '@/lib/marketing/quiz-session-marketing-ref';
+  isPlausibleMarketingDiagnosticSessionRef,
+} from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { notifyError } from '@/lib/notify';
 
 const BOOKINGS_API_URL = '/api/bookings';
@@ -37,8 +37,8 @@ type ConfirmationFlowProps = {
   readonly displayTime: string;
   readonly dateRaw: string;
   readonly timeRaw: string;
-  /** When set, booking API links this quiz row (must belong to the visitor). */
-  readonly quizSessionIdRaw?: string;
+  /** When set, booking API links this diagnostic session row (must belong to the visitor). */
+  readonly diagnosticSessionIdRaw?: string;
 };
 
 /**
@@ -57,11 +57,11 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
     }
     const trimmedDate = props.dateRaw.trim();
     const trimmedTime = props.timeRaw.trim();
-    const trimmedQuizSessionId = props.quizSessionIdRaw?.trim() ?? '';
+    const trimmedDiagnosticSessionId = props.diagnosticSessionIdRaw?.trim() ?? '';
     if (
       trimmedDate.length === 0 ||
       trimmedTime.length === 0 ||
-      !isPlausibleMarketingQuizSessionRef(trimmedQuizSessionId)
+      !isPlausibleMarketingDiagnosticSessionRef(trimmedDiagnosticSessionId)
     ) {
       queueMicrotask(() => {
         setStatus('invalid');
@@ -75,7 +75,7 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
           date: trimmedDate,
           time: trimmedTime,
           serviceKey: 'project-rescue',
-          quizSessionId: trimmedQuizSessionId,
+          diagnosticSessionId: trimmedDiagnosticSessionId,
         };
         const response = await fetch(BOOKINGS_API_URL, {
           method: 'POST',
@@ -106,10 +106,10 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
         setStatus('error');
       }
     })();
-  }, [props.dateRaw, props.timeRaw, props.quizSessionIdRaw, router]);
+  }, [props.dateRaw, props.timeRaw, props.diagnosticSessionIdRaw, router]);
   const bookHref =
-    props.quizSessionIdRaw !== undefined && isPlausibleMarketingQuizSessionRef(props.quizSessionIdRaw.trim())
-      ? buildMarketingBookSessionPath(props.quizSessionIdRaw.trim())
+    props.diagnosticSessionIdRaw !== undefined && isPlausibleMarketingDiagnosticSessionRef(props.diagnosticSessionIdRaw.trim())
+      ? buildMarketingBookSessionPath(props.diagnosticSessionIdRaw.trim())
       : '/diagnostic';
   if (status === 'invalid') {
     return (
@@ -196,7 +196,7 @@ export function ConfirmationFlow(props: ConfirmationFlowProps): ReactElement {
               <dt className="text-xs font-medium text-muted-foreground">Format</dt>
               <dd className="text-sm font-semibold text-foreground">Video meeting</dd>
               <dd className="text-xs text-muted-foreground">
-                {props.quizSessionIdRaw !== undefined && props.quizSessionIdRaw.trim().length > 0
+                {props.diagnosticSessionIdRaw !== undefined && props.diagnosticSessionIdRaw.trim().length > 0
                   ? 'A join link is added after online payment completes (check email and your account diagnostics).'
                   : 'Complete checkout to confirm; the join link is emailed after payment and appears in your account.'}
               </dd>

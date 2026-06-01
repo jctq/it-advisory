@@ -25,7 +25,7 @@ export async function resolveGuestVisitorIdForAuthMerge(params: {
 }
 
 /**
- * Visitor key used for quiz, bookings, and leads: signed-in account (cookie or Bearer) wins,
+ * Visitor key used for diagnostics, bookings, and leads: signed-in account (cookie or Bearer) wins,
  * then native device id, then anonymous browser cookie visitor.
  */
 export async function resolveMarketingVisitorId(request?: Request): Promise<string> {

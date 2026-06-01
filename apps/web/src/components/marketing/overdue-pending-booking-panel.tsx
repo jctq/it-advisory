@@ -35,7 +35,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { buildAvailabilityByDateFromSlots } from '@/lib/marketing/booking-availability-by-date';
-import { buildMarketingBookSessionCheckoutResumePath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { buildMarketingBookSessionCheckoutResumePath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -146,7 +146,7 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
               timeLabel: selectedTime,
             });
       props.onBookingUpdated(refreshed);
-      const sessionRef = refreshed.quizSessionMarketingRef?.trim() ?? '';
+      const sessionRef = refreshed.diagnosticSessionMarketingRef?.trim() ?? '';
       if (sessionRef.length > 0) {
         router.push(
           buildMarketingBookSessionCheckoutResumePath(sessionRef, {

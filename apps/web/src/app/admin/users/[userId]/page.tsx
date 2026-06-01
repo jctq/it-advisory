@@ -109,10 +109,10 @@ export default async function AdminMarketingUserDetailPage(props: AdminMarketing
       <div className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">Diagnostic snapshots (this account)</h2>
         <p className="text-sm text-muted-foreground">
-          Latest rows in <span className="font-mono text-xs">quiz_sessions</span> for visitor id{' '}
+          Latest rows in <span className="font-mono text-xs">diagnostic_sessions</span> for visitor id{' '}
           <span className="font-mono text-xs">{detail.accountVisitorId}</span>.
         </p>
-        {detail.quizSnapshots.length === 0 ? (
+        {detail.diagnosticSnapshots.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
             No diagnostic rows for this account yet.
           </p>
@@ -129,7 +129,7 @@ export default async function AdminMarketingUserDetailPage(props: AdminMarketing
                 </tr>
               </thead>
               <tbody>
-                {detail.quizSnapshots.map((row) => (
+                {detail.diagnosticSnapshots.map((row) => (
                   <tr key={row.id} className="border-b border-border/80 last:border-0">
                     <td className="px-4 py-3 font-mono text-xs text-foreground">{row.id}</td>
                     <td className="px-4 py-3 text-muted-foreground">{row.currentStep}</td>

@@ -30,8 +30,8 @@ import { useMarketingHeroInteraction } from '@/components/marketing/use-marketin
 import { MarketingParallaxSection } from '@/components/marketing/marketing-parallax-section';
 import { MarketingSectionHeader } from '@/components/marketing/marketing-section-header';
 import { MarketingServiceTabs } from '@/components/marketing/marketing-service-tabs';
-import { MarketingNewQuizCtaLabel } from '@/components/marketing/marketing-new-quiz-cta-label';
-import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
+import { MarketingNewDiagnosticCtaLabel } from '@/components/marketing/marketing-new-diagnostic-cta-label';
+import { useMarketingNewDiagnosticNavigation } from '@/components/marketing/marketing-new-diagnostic-session-client';
 import { Button } from '@/components/ui/button';
 import {
   MARKETING_CASE_STUDIES_SECTION_ID,
@@ -295,7 +295,7 @@ type HomePageContentProps = {
 export function HomePageContent(props: HomePageContentProps): ReactElement {
   const { isAuthenticated, siteName, reviewsModuleEnabled, testimonials } = props;
   const showTestimonialsSection = reviewsModuleEnabled && testimonials.length > 0;
-  const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(isAuthenticated);
+  const { navigateToNewDiagnostic, isNavigating } = useMarketingNewDiagnosticNavigation(isAuthenticated);
   const { sectionRef: heroSectionRef, isBoosted, isInView, rootStyle } = useMarketingHeroInteraction();
   const problemCardClassName = cn(
     'group flex h-full w-full flex-col rounded-2xl border border-border/80 bg-card p-5 text-left',
@@ -332,9 +332,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 size="lg"
                 className="marketing-hero-cta group inline-flex h-11 items-center gap-2 bg-transparent active:translate-y-0 hover:bg-transparent dark:bg-primary dark:hover:bg-primary/90"
                 disabled={isNavigating}
-                onClick={() => void navigateToNewQuiz()}
+                onClick={() => void navigateToNewDiagnostic()}
               >
-                <MarketingNewQuizCtaLabel isNavigating={isNavigating} />
+                <MarketingNewDiagnosticCtaLabel isNavigating={isNavigating} />
                 <ArrowRight
                   className="size-4 shrink-0 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5"
                   aria-hidden
@@ -496,7 +496,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                     type="button"
                     className={problemCardClassName}
                     disabled={isNavigating}
-                    onClick={() => void navigateToNewQuiz()}
+                    onClick={() => void navigateToNewDiagnostic()}
                   >
                     <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                       <Icon className="size-5" aria-hidden />
@@ -537,7 +537,7 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
             <MarketingServiceTabs
               items={SERVICE_TAB_ITEMS}
               isNavigating={isNavigating}
-              onStartDiagnostic={() => void navigateToNewQuiz()}
+              onStartDiagnostic={() => void navigateToNewDiagnostic()}
             />
           </MarketingSectionReveal>
           <MarketingSectionReveal className="grid gap-6 lg:grid-cols-2 lg:items-stretch" stagger>
@@ -582,9 +582,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                     type="button"
                     className="inline-flex h-11 w-fit items-center gap-2 active:translate-y-0"
                     disabled={isNavigating}
-                    onClick={() => void navigateToNewQuiz()}
+                    onClick={() => void navigateToNewDiagnostic()}
                   >
-                    <MarketingNewQuizCtaLabel isNavigating={isNavigating} label={model.ctaLabel} />
+                    <MarketingNewDiagnosticCtaLabel isNavigating={isNavigating} label={model.ctaLabel} />
                     <ArrowRight className="size-4 shrink-0" aria-hidden />
                   </Button>
                 </div>
@@ -688,9 +688,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 type="button"
                 className="inline-flex h-11 items-center gap-2 active:translate-y-0"
                 disabled={isNavigating}
-                onClick={() => void navigateToNewQuiz()}
+                onClick={() => void navigateToNewDiagnostic()}
               >
-                <MarketingNewQuizCtaLabel isNavigating={isNavigating} label="Start Your Assessment" />
+                <MarketingNewDiagnosticCtaLabel isNavigating={isNavigating} label="Start Your Assessment" />
                 <ArrowRight className="size-4 shrink-0" aria-hidden />
               </Button>
             </div>
@@ -788,9 +788,9 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
                 size="lg"
                 className="inline-flex h-11 w-full shrink-0 items-center gap-2 shadow-md active:translate-y-0 md:w-auto"
                 disabled={isNavigating}
-                onClick={() => void navigateToNewQuiz()}
+                onClick={() => void navigateToNewDiagnostic()}
               >
-                <MarketingNewQuizCtaLabel isNavigating={isNavigating} />
+                <MarketingNewDiagnosticCtaLabel isNavigating={isNavigating} />
                 <ArrowRight className="size-4 shrink-0" aria-hidden />
               </Button>
             </div>

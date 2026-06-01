@@ -13,7 +13,7 @@ export type CreateCheckoutSessionParams = {
   readonly customerCompany?: string;
   readonly customerPhone: string;
   /** Opaque marketing ref or legacy ObjectId hex; required for marketing checkout. */
-  readonly quizSessionId: string;
+  readonly diagnosticSessionId: string;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;

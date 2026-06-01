@@ -153,8 +153,8 @@ function DiagnosticReportView(props: { readonly report: AdminClientDiagnosticRep
           <MetaItem label="Manage booking" value={report.platform.manageBookingEnabled ? 'enabled' : 'disabled'} />
           <MetaItem label="Diagnostic AI" value={report.platform.diagnosticAiEnabled ? 'enabled' : 'disabled'} />
           <MetaItem
-            label="QUIZ_SESSION_URL_SECRET"
-            value={report.platform.quizUrlSecretConfigured ? 'configured' : 'missing'}
+            label="DIAGNOSTIC_SESSION_URL_SECRET"
+            value={report.platform.diagnosticUrlSecretConfigured ? 'configured' : 'missing'}
           />
         </dl>
         {report.lookup.resolvedSessionHex !== null ? (
@@ -235,7 +235,7 @@ function DiagnosticReportView(props: { readonly report: AdminClientDiagnosticRep
             <MetaItem label="Service" value={booking.serviceKey} />
             <MetaItem label="Starts" value={booking.startsAtIso} />
             <MetaItem label="Lead email" value={booking.lead.email ?? 'missing'} />
-            <MetaItem label="Diagnostic session" value={booking.quizSessionId ?? '—'} mono />
+            <MetaItem label="Diagnostic session" value={booking.diagnosticSessionId ?? '—'} mono />
             <MetaItem label="Payability" value={booking.payability.code} />
             <MetaItem label="Payment status" value={booking.paymentStatus ?? '—'} />
           </dl>

@@ -6,8 +6,8 @@ import {
   type VerifiedGuestBooking,
 } from '@/lib/data/booking-guest-manage';
 import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
-import { deleteQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
-import { cancelActiveBookingAndPaymentHold } from '@/lib/payments/release-quiz-session-slot-reservations';
+import { deleteDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
+import { cancelActiveBookingAndPaymentHold } from '@/lib/payments/release-diagnostic-session-slot-reservations';
 import { isPendingPaymentExpiredForRebook } from '@/lib/booking/pending-payment-expired-for-rebook';
 import { isOverdueUnpaidPendingBooking } from '@/lib/marketing/overdue-pending-booking';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
@@ -138,11 +138,11 @@ export async function abandonOverduePendingBooking(
     return blocked;
   }
   const db = await getDb();
-  const quizSessionId = verified.booking.quizSessionId;
-  if (quizSessionId !== undefined && quizSessionId !== null) {
-    const outcome = await deleteQuizSessionForVisitor(
+  const diagnosticSessionId = verified.booking.diagnosticSessionId;
+  if (diagnosticSessionId !== undefined && diagnosticSessionId !== null) {
+    const outcome = await deleteDiagnosticSessionForVisitor(
       verified.booking.visitorId,
-      quizSessionId.toString(),
+      diagnosticSessionId.toString(),
     );
     if (outcome.ok === false) {
       return { ok: false, code: 'session_not_found', message: 'Diagnostic could not be removed.' };

@@ -20,7 +20,7 @@ import {
 } from '@/lib/marketing/booking-reference';
 import { hasCheckoutManageContact } from '@/lib/marketing/checkout-contact';
 import { isOverdueUnpaidPendingBooking } from '@/lib/marketing/overdue-pending-booking';
-import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import { encodeDiagnosticSessionRefForMarketingUrl } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import { getDb } from '@/lib/mongodb';
 import { syncAccountProfileToVisitorLeads, isAccountVisitorId } from '@/lib/data/sync-account-profile-to-leads';
 import {
@@ -74,7 +74,7 @@ export type GuestBookingManageView = {
   readonly pendingPaymentExpiredForRebook: boolean;
   readonly hasCheckoutContact: boolean;
   readonly recordingOptIn: boolean;
-  readonly quizSessionMarketingRef: string | null;
+  readonly diagnosticSessionMarketingRef: string | null;
   readonly sessionTitle: string | null;
   readonly serviceTitle: string;
   readonly customerActionMode: BookingCustomerActionMode | null;
@@ -276,10 +276,10 @@ export async function buildGuestBookingManageView(
       startsAt: activeVerified.booking.startsAt,
       paymentStatus: activeVerified.booking.paymentStatus,
     });
-  const quizSessionId = activeVerified.booking.quizSessionId;
-  const quizSessionMarketingRef =
-    quizSessionId !== undefined && quizSessionId !== null
-      ? encodeQuizSessionRefForMarketingUrl(quizSessionId.toString())
+  const diagnosticSessionId = activeVerified.booking.diagnosticSessionId;
+  const diagnosticSessionMarketingRef =
+    diagnosticSessionId !== undefined && diagnosticSessionId !== null
+      ? encodeDiagnosticSessionRefForMarketingUrl(diagnosticSessionId.toString())
       : null;
   const payGuidance = buildBookingPayGuidance({
     payabilityCode: payability.code,
@@ -337,7 +337,7 @@ export async function buildGuestBookingManageView(
     pendingPaymentExpiredForRebook,
     hasCheckoutContact,
     recordingOptIn,
-    quizSessionMarketingRef,
+    diagnosticSessionMarketingRef,
     sessionTitle: displayTitles.sessionTitle,
     serviceTitle: displayTitles.serviceTitle,
     customerActionMode,
@@ -622,18 +622,18 @@ export async function findVerifiedGuestBookingForCheckout(
 }
 
 /**
- * Resolves a pending payable booking linked to a quiz session for the same marketing visitor.
+ * Resolves a pending payable booking linked to a diagnostic session for the same marketing visitor.
  */
-export async function findQuizSessionPendingBookingRecord(
+export async function findDiagnosticSessionPendingBookingRecord(
   visitorId: string,
-  quizSessionId: ObjectId,
+  diagnosticSessionId: ObjectId,
 ): Promise<VerifiedGuestBooking | null> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
   const db = await getDb();
   const bookingDoc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
-    { quizSessionId, visitorId, status: 'pending' },
+    { diagnosticSessionId, visitorId, status: 'pending' },
     { sort: { createdAt: 1 } },
   );
   if (bookingDoc === null || bookingDoc._id === undefined || bookingDoc.leadId === undefined) {
@@ -650,11 +650,11 @@ export async function findQuizSessionPendingBookingRecord(
   };
 }
 
-export async function findVerifiedQuizSessionPendingBookingForCheckout(
+export async function findVerifiedDiagnosticSessionPendingBookingForCheckout(
   visitorId: string,
-  quizSessionId: ObjectId,
+  diagnosticSessionId: ObjectId,
 ): Promise<VerifiedGuestBooking | null> {
-  const verified = await findQuizSessionPendingBookingRecord(visitorId, quizSessionId);
+  const verified = await findDiagnosticSessionPendingBookingRecord(visitorId, diagnosticSessionId);
   if (verified === null) {
     return null;
   }
@@ -666,18 +666,18 @@ export async function findVerifiedQuizSessionPendingBookingForCheckout(
 }
 
 /**
- * When a quiz session already has a booking that cannot pay online, returns the payability diagnosis.
+ * When a diagnostic session already has a booking that cannot pay online, returns the payability diagnosis.
  */
-export async function diagnoseQuizSessionExistingBookingPayability(
+export async function diagnoseDiagnosticSessionExistingBookingPayability(
   visitorId: string,
-  quizSessionId: ObjectId,
+  diagnosticSessionId: ObjectId,
 ): Promise<BookingPayabilityResult | null> {
   if (!process.env.MONGODB_URI) {
     return null;
   }
   const db = await getDb();
   const bookingDoc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
-    { quizSessionId, visitorId },
+    { diagnosticSessionId, visitorId },
     { sort: { createdAt: 1 } },
   );
   if (bookingDoc === null || bookingDoc._id === undefined) {

@@ -2,7 +2,7 @@
  * Founder-facing strategic advisor prompt.
  *
  * Distinct from the customer diagnostic intake at
- * `app/api/quiz/diagnostic-round/route.ts`:
+ * `app/api/diagnostic/diagnostic-round/route.ts`:
  * - Free-form prose with section headings (not a strict JSON schema).
  * - Founder/operator audience (not SMB intake).
  * - No caching: strategic prose should not be deduped by similarity.
@@ -27,7 +27,7 @@ export const DEFAULT_ADVISOR_CONTEXT: AdvisorContext = {
   targetUsers:
     'SMB leaders dealing with vendor delivery, scope, UX, budget, or governance pain on IT projects',
   coreProblem:
-    'Neutral, founder-led second opinion on troubled IT projects, delivered as a quiz to recommendation to booking funnel',
+    'Neutral, founder-led second opinion on troubled IT projects, delivered as a diagnostic to recommendation to booking funnel',
   stage: 'mvp',
   stack:
     'Turborepo + pnpm, Next.js 16 App Router, Tailwind v4, shadcn-style UI, TanStack Query and Table, MongoDB Atlas, OpenAI via AI SDK (gpt-4o-mini for intake), Railway for deploy; mock email and payments',

@@ -22,8 +22,8 @@ import { useMarketingSupportReportsUnreadCount } from '@/hooks/marketing/use-mar
 import { useMarketingChromeStore } from '@/store/marketing/marketing-chrome-store';
 import { MarketingHeaderAccountMenu } from '@/components/marketing/marketing-header-account-menu';
 import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
-import { MarketingNewQuizCtaLabel } from '@/components/marketing/marketing-new-quiz-cta-label';
-import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
+import { MarketingNewDiagnosticCtaLabel } from '@/components/marketing/marketing-new-diagnostic-cta-label';
+import { useMarketingNewDiagnosticNavigation } from '@/components/marketing/marketing-new-diagnostic-session-client';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -76,7 +76,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
   }, [router]);
   const user = props.marketingUser;
   const isAuthenticated = user !== null;
-  const { navigateToNewQuiz, isNavigating } = useMarketingNewQuizNavigation(isAuthenticated);
+  const { navigateToNewDiagnostic, isNavigating } = useMarketingNewDiagnosticNavigation(isAuthenticated);
   const executeHomeLogoClick = useCallback((): void => {
     if (pathname !== '/') {
       return;
@@ -144,9 +144,9 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
             type="button"
             className="hidden h-10 active:translate-y-0 xl:inline-flex"
             disabled={isNavigating}
-            onClick={() => void navigateToNewQuiz()}
+            onClick={() => void navigateToNewDiagnostic()}
           >
-            <MarketingNewQuizCtaLabel isNavigating={isNavigating} />
+            <MarketingNewDiagnosticCtaLabel isNavigating={isNavigating} />
           </Button>
           <Sheet open={isMobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -219,11 +219,11 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
                     disabled={isNavigating}
                     onClick={() => {
                       executeCloseMobileMenu();
-                      void navigateToNewQuiz();
+                      void navigateToNewDiagnostic();
                     }}
                   >
                     <Rocket className="size-4 shrink-0" aria-hidden />
-                    <MarketingNewQuizCtaLabel isNavigating={isNavigating} />
+                    <MarketingNewDiagnosticCtaLabel isNavigating={isNavigating} />
                   </Button>
                 </div>
               </nav>

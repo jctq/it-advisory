@@ -16,7 +16,7 @@ import { BookingDiagnosticReadonly } from '@/components/admin/booking-diagnostic
 import { AdminDetailTabsShell, type AdminDetailTabConfig } from '@/components/admin/admin-detail-tabs-shell';
 import { AdminFathomNotesLink } from '@/components/admin/admin-fathom-notes-link';
 import { AdminSessionPaymentSection } from '@/components/admin/admin-session-payment-section';
-import { QuizSessionAuditTable } from '@/components/admin/quiz-session-audit-table';
+import { DiagnosticSessionAuditTable } from '@/components/admin/diagnostic-session-audit-table';
 import {
   listAvailableSessionDetailTabs,
   resolveSessionDetailTab,
@@ -24,7 +24,7 @@ import {
   type SessionDetailTab,
   type SessionLinkedBookingRow,
 } from '@/lib/admin/admin-detail-tab-routing';
-import type { QuizAuditAdminRow, QuizSessionDetail } from '@/lib/data/quiz-session-types';
+import type { DiagnosticAuditAdminRow, DiagnosticSessionDetail } from '@/lib/data/diagnostic-session-types';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 
 export type {
@@ -40,8 +40,8 @@ type SessionDetailTabConfig = AdminDetailTabConfig<SessionDetailTab> & {
 
 type AdminSessionDetailWorkspaceProps = {
   readonly initialTab: SessionDetailTab;
-  readonly session: QuizSessionDetail;
-  readonly auditRows: readonly QuizAuditAdminRow[];
+  readonly session: DiagnosticSessionDetail;
+  readonly auditRows: readonly DiagnosticAuditAdminRow[];
   readonly checkoutTransaction: SessionCheckoutTransaction | null;
   readonly linkedBookingRows: readonly SessionLinkedBookingRow[];
 };
@@ -64,7 +64,7 @@ function buildAvailableSessionTabs(props: AdminSessionDetailWorkspaceProps): rea
   }).map((value) => SESSION_TAB_CONFIGS[value]);
 }
 
-function renderOverviewPanel(session: QuizSessionDetail): ReactElement {
+function renderOverviewPanel(session: DiagnosticSessionDetail): ReactElement {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
       <dl className="grid gap-4 sm:grid-cols-2">
@@ -127,7 +127,7 @@ function renderLinkedBookingsPanel(linkedBookingRows: readonly SessionLinkedBook
     <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
       <h2 className="text-lg font-semibold text-foreground">Linked bookings</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Web bookings that stored this session id (`bookings.quizSessionId`).
+        Web bookings that stored this session id (`bookings.diagnosticSessionId`).
       </p>
       <ul className="mt-4 space-y-3">
         {linkedBookingRows.map((booking) => {
@@ -274,11 +274,11 @@ export function AdminSessionDetailWorkspace(props: AdminSessionDetailWorkspacePr
             <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
               <h2 className="text-lg font-semibold text-foreground">Save history</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Append-only rows from quiz_audit (each diagnostic save). Use pagination and View to open the full answers JSON
+                Append-only rows from diagnostic_audit (each diagnostic save). Use pagination and View to open the full answers JSON
                 for a row.
               </p>
               <div className="mt-4">
-                <QuizSessionAuditTable rows={props.auditRows} />
+                <DiagnosticSessionAuditTable rows={props.auditRows} />
               </div>
             </div>
           );

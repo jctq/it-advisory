@@ -44,7 +44,7 @@ import {
 } from 'react';
 import {
   buildDiagnosticProgress,
-  buildQuizAnswersPayload,
+  buildDiagnosticAnswersPayload,
   MIN_PROMPT_LENGTH,
   normalizeGuidedDiagnosticRaw,
   togglePromptWithSeed,
@@ -223,8 +223,8 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
     if (client === null) {
       return;
     }
-    await client.saveQuizSession({
-      answers: buildQuizAnswersPayload(next),
+    await client.saveDiagnosticSession({
+      answers: buildDiagnosticAnswersPayload(next),
       currentStep: computeLinearStep(next),
       completed,
     });
@@ -356,7 +356,7 @@ export function DiagnosticFlowProvider(props: PropsWithChildren) {
           marketingSessionToken: marketingTokenForClient,
         });
         const [sessionPayload, diagnosticConfig] = await Promise.all([
-          clientRef.current.fetchQuizSession(),
+          clientRef.current.fetchDiagnosticSession(),
           clientRef.current.fetchDiagnosticConfig(),
         ]);
         if (!isMounted) {

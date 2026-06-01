@@ -15,9 +15,9 @@ import {
 } from '@/lib/payments/evaluate-booking-payability';
 import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { findOpenPaymentTransactionForBooking, findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
-import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
-import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
+import { encodeDiagnosticSessionRefForMarketingUrl } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { getDb } from '@/lib/mongodb';
@@ -146,8 +146,8 @@ export async function createPaymentCheckoutForVerifiedBooking(
   }
   const sessionMarketingRefFromParams = params.sessionMarketingRef?.trim() ?? '';
   const sessionMarketingRefFromBooking =
-    booking.quizSessionId !== undefined && booking.quizSessionId !== null
-      ? encodeQuizSessionRefForMarketingUrl(booking.quizSessionId.toString())
+    booking.diagnosticSessionId !== undefined && booking.diagnosticSessionId !== null
+      ? encodeDiagnosticSessionRefForMarketingUrl(booking.diagnosticSessionId.toString())
       : '';
   const sessionMarketingRef =
     sessionMarketingRefFromParams.length > 0 ? sessionMarketingRefFromParams : sessionMarketingRefFromBooking;
@@ -206,7 +206,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
     customerEmail: leadEmail,
     customerCompany: lead.company,
     customerPhone: lead.phone,
-    quizSessionIdHex: booking.quizSessionId !== undefined && booking.quizSessionId !== null ? booking.quizSessionId.toString() : null,
+    diagnosticSessionIdHex: booking.diagnosticSessionId !== undefined && booking.diagnosticSessionId !== null ? booking.diagnosticSessionId.toString() : null,
     paymentMethodLabel: resolvedPaymentMethodLabel,
     redirectUrl: null,
     metadata: {

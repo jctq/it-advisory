@@ -8,7 +8,7 @@ import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sti
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import type { PublicCatalogServiceRow, PublicCatalogServicesView } from '@/lib/data/public-catalog-services';
-import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { resolveRecommendedServiceKey } from '@/lib/marketing/resolve-recommended-service-key';
 import { scheduleScrollPageToTop } from '@/lib/marketing/scroll-page-to-top';
 import { cn } from '@/lib/utils';

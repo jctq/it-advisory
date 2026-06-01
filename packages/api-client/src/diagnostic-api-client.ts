@@ -1,4 +1,4 @@
-type QuizAnswers = Readonly<Record<string, string | string[] | number | boolean>>;
+type DiagnosticAnswers = Readonly<Record<string, string | string[] | number | boolean>>;
 
 type PublicDiagnosticTemplateQuestionType = 'multiple-choice' | 'nested-options' | 'ranked-options';
 
@@ -64,7 +64,7 @@ type DiagnosticThreadRound = {
   }[];
 };
 
-type QuizSessionLinkedBookingSlot = {
+type DiagnosticSessionLinkedBookingSlot = {
   readonly status: 'pending' | 'confirmed' | 'cancelled';
   readonly startsAtIso: string;
   readonly timezone: string;
@@ -72,24 +72,24 @@ type QuizSessionLinkedBookingSlot = {
   readonly meetingUrl: string | null;
 };
 
-type QuizSessionPayload = {
+type DiagnosticSessionPayload = {
   readonly session: {
-    readonly answers: QuizAnswers;
+    readonly answers: DiagnosticAnswers;
     readonly currentStep: number;
   } | null;
   /** Encoded ref for `/diagnostic/[sessionRef]` and scoped template loads; omitted when no row or legacy response. */
   readonly sessionId?: string | null;
   readonly readOnly?: boolean;
-  readonly linkedBookingSlot?: QuizSessionLinkedBookingSlot | null;
+  readonly linkedBookingSlot?: DiagnosticSessionLinkedBookingSlot | null;
 };
 
-type SaveQuizSessionInput = {
-  readonly answers: QuizAnswers;
+type SaveDiagnosticSessionInput = {
+  readonly answers: DiagnosticAnswers;
   readonly currentStep: number;
   readonly completed: boolean;
 };
 
-type SaveQuizSessionPayload = {
+type SaveDiagnosticSessionPayload = {
   readonly sessionId: string | null;
   readonly persisted: boolean;
 };
@@ -181,29 +181,29 @@ export class DiagnosticApiClient {
   /**
    * Loads the persisted diagnostic session for this anonymous visitor.
    */
-  public async fetchQuizSession(): Promise<QuizSessionPayload> {
-    return this.executeJsonRequest<QuizSessionPayload>({
-      pathname: '/api/quiz/session',
+  public async fetchDiagnosticSession(): Promise<DiagnosticSessionPayload> {
+    return this.executeJsonRequest<DiagnosticSessionPayload>({
+      pathname: '/api/diagnostic/session',
     });
   }
 
   /**
-   * Loads a specific quiz session by opaque marketing ref (must belong to the current visitor or account).
+   * Loads a specific diagnostic session by opaque marketing ref (must belong to the current visitor or account).
    */
-  public async fetchQuizSessionBySessionRef(sessionRef: string): Promise<QuizSessionPayload> {
+  public async fetchDiagnosticSessionBySessionRef(sessionRef: string): Promise<DiagnosticSessionPayload> {
     const trimmed = sessionRef.trim();
     const query = trimmed.length > 0 ? `?sessionId=${encodeURIComponent(trimmed)}` : '';
-    return this.executeJsonRequest<QuizSessionPayload>({
-      pathname: `/api/quiz/session${query}`,
+    return this.executeJsonRequest<DiagnosticSessionPayload>({
+      pathname: `/api/diagnostic/session${query}`,
     });
   }
 
   /**
    * Saves the current diagnostic progress for this anonymous visitor.
    */
-  public async saveQuizSession(input: SaveQuizSessionInput): Promise<SaveQuizSessionPayload> {
-    return this.executeJsonRequest<SaveQuizSessionPayload>({
-      pathname: '/api/quiz/session',
+  public async saveDiagnosticSession(input: SaveDiagnosticSessionInput): Promise<SaveDiagnosticSessionPayload> {
+    return this.executeJsonRequest<SaveDiagnosticSessionPayload>({
+      pathname: '/api/diagnostic/session',
       method: 'PATCH',
       body: {
         answers: input.answers,
@@ -218,7 +218,7 @@ export class DiagnosticApiClient {
    */
   public async createDiagnosticRound(input: DiagnosticRoundInput): Promise<DiagnosticRoundPayload> {
     return this.executeJsonRequest<DiagnosticRoundPayload>({
-      pathname: '/api/quiz/diagnostic-round',
+      pathname: '/api/diagnostic/diagnostic-round',
       method: 'POST',
       body: input,
     });
@@ -229,7 +229,7 @@ export class DiagnosticApiClient {
    */
   public async fetchDiagnosticConfig(): Promise<DiagnosticConfigPayload> {
     return this.executeJsonRequest<DiagnosticConfigPayload>({
-      pathname: '/api/quiz/diagnostic-config',
+      pathname: '/api/diagnostic/diagnostic-config',
     });
   }
 
@@ -241,7 +241,7 @@ export class DiagnosticApiClient {
     const trimmed = marketingSessionRef?.trim() ?? '';
     const query = trimmed.length > 0 ? `?sessionId=${encodeURIComponent(trimmed)}` : '';
     return this.executeJsonRequest<DiagnosticTemplatePayload>({
-      pathname: `/api/quiz/diagnostic-template${query}`,
+      pathname: `/api/diagnostic/diagnostic-template${query}`,
     });
   }
 
@@ -252,7 +252,7 @@ export class DiagnosticApiClient {
     input: DiagnosticTemplateSummaryInput,
   ): Promise<DiagnosticTemplateSummaryPayload> {
     return this.executeJsonRequest<DiagnosticTemplateSummaryPayload>({
-      pathname: '/api/quiz/diagnostic-template-summary',
+      pathname: '/api/diagnostic/diagnostic-template-summary',
       method: 'POST',
       body: input,
     });

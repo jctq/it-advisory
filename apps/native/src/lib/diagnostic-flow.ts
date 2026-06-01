@@ -12,9 +12,9 @@ import {
 export const MIN_PROMPT_LENGTH = 8;
 
 /**
- * Converts the guided diagnostic state into the persisted quiz-session answer payload.
+ * Converts the guided diagnostic state into the persisted diagnostic-session answer payload.
  */
-export function buildQuizAnswersPayload(
+export function buildDiagnosticAnswersPayload(
   guided: GuidedDiagnosticV1,
 ): Record<string, string | number | boolean | string[]> {
   return {
@@ -26,7 +26,7 @@ export function buildQuizAnswersPayload(
 }
 
 /**
- * Normalizes quiz-session payloads that may come back as either JSON strings or nested documents.
+ * Normalizes diagnostic-session payloads that may come back as either JSON strings or nested documents.
  */
 export function normalizeGuidedDiagnosticRaw(raw: unknown): string | undefined {
   if (typeof raw === 'string') {

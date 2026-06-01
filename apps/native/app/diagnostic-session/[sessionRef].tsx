@@ -92,7 +92,7 @@ export default function DiagnosticSessionDetailScreen() {
           deviceId: stableDeviceId,
           marketingSessionToken: stableSessionToken,
         });
-        const payload = await client.fetchQuizSessionBySessionRef(stableSessionRef);
+        const payload = await client.fetchDiagnosticSessionBySessionRef(stableSessionRef);
         if (isCancelled) {
           return;
         }

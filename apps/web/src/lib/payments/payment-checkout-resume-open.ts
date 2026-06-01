@@ -8,7 +8,7 @@ import {
   type PaymentTransactionRow,
 } from '@/lib/data/payment-transactions';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
-import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
+import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';

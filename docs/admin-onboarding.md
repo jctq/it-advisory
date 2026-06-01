@@ -48,7 +48,7 @@ This document is the **source of truth** for the TeqMD admin guided tour ([drive
 | `/admin` | `page-dashboard-stats`, `page-dashboard-activity` | `admin-dashboard.tsx` |
 | `/admin/diagnostic-templates` | `page-templates-list` | `diagnostic-templates-list.tsx` |
 | `/admin/blog-posts` | `page-blog-list` | `blog-posts-list.tsx` |
-| `/admin/sessions` | `page-sessions-table` | `quiz-sessions-table.tsx` |
+| `/admin/sessions` | `page-sessions-table` | `diagnostic-sessions-table.tsx` |
 | `/admin/leads` | `page-leads-table` | `leads-table.tsx` |
 | `/admin/users` | `page-users-table` | `marketing-users-table.tsx` |
 | `/admin/schedule` | `page-schedule-tabs`, `page-schedule-hours-grid`, `page-schedule-weekdays`, `page-schedule-dates`, `page-schedule-caps`, `page-schedule-preview` | `admin-advisor-schedule-manager.tsx` (tab via `?tab=` in `routeHref`) |
