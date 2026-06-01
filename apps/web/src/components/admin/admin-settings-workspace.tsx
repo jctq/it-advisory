@@ -1,7 +1,6 @@
 'use client';
 
 import { BrainCircuit, CircleDollarSign, Clapperboard, CreditCard, Globe, Headphones, Mail, Video, type LucideIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
   AdminFormStickyFooter,
@@ -129,33 +128,55 @@ function addMountedSettingsTab(
   return next;
 }
 
+function buildSettingsTabUrl(tab: SettingsTab): string {
+  const nextParams = new URLSearchParams(window.location.search);
+  if (tab === 'general') {
+    nextParams.delete('tab');
+  } else {
+    nextParams.set('tab', tab);
+  }
+  const query = nextParams.toString();
+  return query.length > 0 ? `/admin/settings?${query}` : '/admin/settings';
+}
+
 type AdminSettingsWorkspaceProps = {
   readonly initialTab: SettingsTab;
 };
 
 export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): ReactElement {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<SettingsTab>(props.initialTab);
   const [mountedTabs, setMountedTabs] = useState<ReadonlySet<SettingsTab>>(() => new Set([props.initialTab]));
-  if (props.initialTab !== activeTab) {
+  const [prevInitialTab, setPrevInitialTab] = useState<SettingsTab>(props.initialTab);
+  const tabTriggerRefs = useRef<Partial<Record<SettingsTab, HTMLButtonElement>>>({});
+  if (props.initialTab !== prevInitialTab) {
+    setPrevInitialTab(props.initialTab);
     setActiveTab(props.initialTab);
     setMountedTabs((previous) => addMountedSettingsTab(previous, props.initialTab));
   }
-  const executeChangeTab = useCallback(
-    (nextTab: SettingsTab): void => {
+  useEffect(() => {
+    const activeTrigger = tabTriggerRefs.current[activeTab];
+    if (!activeTrigger) {
+      return;
+    }
+    activeTrigger.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [activeTab]);
+  useEffect(() => {
+    const handlePopState = (): void => {
+      const tabParam = new URLSearchParams(window.location.search).get('tab');
+      const nextTab = resolveSettingsTab(tabParam ?? undefined);
       setActiveTab(nextTab);
       setMountedTabs((previous) => addMountedSettingsTab(previous, nextTab));
-      const nextParams = new URLSearchParams(window.location.search);
-      if (nextTab === 'general') {
-        nextParams.delete('tab');
-      } else {
-        nextParams.set('tab', nextTab);
-      }
-      const query = nextParams.toString();
-      router.replace(query.length > 0 ? `/admin/settings?${query}` : '/admin/settings', { scroll: false });
-    },
-    [router],
-  );
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+  const executeChangeTab = useCallback((nextTab: SettingsTab): void => {
+    setActiveTab(nextTab);
+    setMountedTabs((previous) => addMountedSettingsTab(previous, nextTab));
+    window.history.replaceState(window.history.state, '', buildSettingsTabUrl(nextTab));
+  }, []);
   const [generalState, setGeneralState] = useState<AdminSettingsFormState>(EMPTY_GENERAL_STATE);
   const [seoState, setSeoState] = useState<AdminSeoSettingsFormState>(EMPTY_SEO_STATE);
   const [pricingState, setPricingState] = useState<AdminPricingSettingsFormState>(EMPTY_PRICING_STATE);
@@ -172,14 +193,6 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
   const meetingsFormRef = useRef<AdminMeetingSettingsFormHandle>(null);
   const recordingsFormRef = useRef<AdminRecordingSettingsFormHandle>(null);
   const supportFormRef = useRef<AdminSupportSettingsFormHandle>(null);
-  const tabTriggerRefs = useRef<Partial<Record<SettingsTab, HTMLButtonElement>>>({});
-  useEffect(() => {
-    const activeTrigger = tabTriggerRefs.current[activeTab];
-    if (!activeTrigger) {
-      return;
-    }
-    activeTrigger.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }, [activeTab]);
   const activeState =
     activeTab === 'general'
       ? generalState
@@ -315,7 +328,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
           </div>
           <TabsContent
             value="general"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('general') ? (
               <div data-admin-tour="page-settings-general">
@@ -325,7 +338,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
           </TabsContent>
           <TabsContent
             value="seo"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('seo') ? (
               <div data-admin-tour="page-settings-seo">
@@ -335,7 +348,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
           </TabsContent>
           <TabsContent
             value="pricing"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('pricing') ? (
               <div data-admin-tour="page-settings-pricing">
@@ -345,7 +358,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
           </TabsContent>
           <TabsContent
             value="payments"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('payments') ? (
               <div data-admin-tour="page-settings-payments">
@@ -355,7 +368,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
           </TabsContent>
           <TabsContent
             value="email"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('email') ? (
               <div data-admin-tour="page-settings-email">
@@ -365,7 +378,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
           </TabsContent>
           <TabsContent
             value="support"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('support') ? (
               <div data-admin-tour="page-settings-support">
@@ -375,7 +388,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
           </TabsContent>
           <TabsContent
             value="meetings"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('meetings') ? (
               <div data-admin-tour="page-settings-meetings">
@@ -385,7 +398,7 @@ export function AdminSettingsWorkspace(props: AdminSettingsWorkspaceProps): Reac
           </TabsContent>
           <TabsContent
             value="recordings"
-            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden motion-safe:data-[state=active]:animate-in motion-safe:data-[state=active]:fade-in-0 motion-safe:data-[state=active]:duration-200"
+            className="mt-0 space-y-6 focus-visible:outline-none data-[state=inactive]:hidden"
           >
             {mountedTabs.has('recordings') ? (
               <div data-admin-tour="page-settings-recordings">
