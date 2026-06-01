@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GUIDED_DIAGNOSTIC_EMPTY,
   serializeGuidedDiagnostic,
-} from '@techmd/diagnostic-core/guided-diagnostic-types';
+} from '@teqmd/diagnostic-core/guided-diagnostic-types';
 import { resolveDiagnosticSessionSummaryDisplayPreview } from './diagnostic-session-summary-display';
 
 describe('resolveDiagnosticSessionSummaryDisplayPreview', () => {

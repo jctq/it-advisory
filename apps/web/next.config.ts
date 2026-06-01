@@ -4,9 +4,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: [
     '@mdxeditor/editor',
-    '@techmd/diagnostic-core',
-    '@techmd/domain',
-    '@techmd/payments',
+    '@teqmd/diagnostic-core',
+    '@teqmd/domain',
+    '@teqmd/payments',
   ],
   images: {
     localPatterns: [

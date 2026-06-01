@@ -1,1 +1,1 @@
-export * from '@techmd/domain/monetization-types';
+export * from '@teqmd/domain/monetization-types';

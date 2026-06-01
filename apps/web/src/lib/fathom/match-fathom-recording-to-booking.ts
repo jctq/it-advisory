@@ -4,7 +4,7 @@ import type { BookingDocument } from '@/domain/types';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 import { getDb } from '@/lib/mongodb';
 import { getResolvedSiteName } from '@/lib/data/app-settings';
-import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import type { ParsedFathomWebhook } from '@/lib/fathom/parse-fathom-webhook-payload';
 import { extractBookingReferenceCandidatesFromFathomText } from '@/lib/fathom/extract-booking-reference-from-fathom-text';
 

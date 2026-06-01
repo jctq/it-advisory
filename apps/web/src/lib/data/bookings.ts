@@ -2,7 +2,7 @@
  * Marketing booking persistence. Booking documents are append-only in this application:
  * there is no delete path (API or data layer) so CRM history and slot confirmations stay auditable.
  */
-import { resolveDiagnosticSessionDisplayPreview } from '@techmd/diagnostic-core/diagnostic-session-display-preview';
+import { resolveDiagnosticSessionDisplayPreview } from '@teqmd/diagnostic-core/diagnostic-session-display-preview';
 import { MongoServerError, ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { FathomMatchStatus } from '@/domain/recording-types';

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import {
   fetchMarketingServerClockOffsetMs,
-} from '@techmd/api-client/marketing-booking-api-client';
+} from '@teqmd/api-client/marketing-booking-api-client';
 import {
   BookingSessionLookupError,
   lookupAccountBookingSession,
@@ -27,8 +27,8 @@ import {
   lookupGuestBookingSessionByToken,
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
-} from '@techmd/api-client/marketing-booking-manage-api-client';
-import { PROJECT_RESCUE_SERVICE_TAGLINE } from '@techmd/diagnostic-core/project-rescue-service-context';
+} from '@teqmd/api-client/marketing-booking-manage-api-client';
+import { PROJECT_RESCUE_SERVICE_TAGLINE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import {
   resolveBookingSessionRoomHeadline,
   shouldShowBookingSessionServiceSubtitle,

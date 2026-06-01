@@ -11,7 +11,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { AccountDiagnosticsBookingStatusBadge } from '@/components/marketing/account-diagnostics-booking-status-badge';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { Badge } from '@/components/ui/badge';

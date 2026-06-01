@@ -317,7 +317,7 @@ function AdminSeoSettingsFormInner(props: AdminSeoSettingsFormProps, ref: Ref<Ad
               id="seo-default-og-image"
               value={defaultOgImageUrl}
               onChange={(event) => setDefaultOgImageUrl(event.target.value)}
-              placeholder="/brand/techmd-mark-512x512.png"
+              placeholder="/brand/teqmd-mark-512x512.png"
               maxLength={SEO_OG_IMAGE_URL_MAX_LENGTH}
               className="font-mono text-sm"
             />

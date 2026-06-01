@@ -1,5 +1,5 @@
 {
-  "name": "@techmd/payments",
+  "name": "@teqmd/payments",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -13,10 +13,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@techmd/domain": "workspace:*"
+    "@teqmd/domain": "workspace:*"
   },
   "devDependencies": {
-    "@techmd/typescript-config": "workspace:*",
+    "@teqmd/typescript-config": "workspace:*",
     "typescript": "~5.8.3",
     "vitest": "^3.2.4"
   }

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const ONBOARDING_COMPLETE_KEY = '@techmd/native/onboarding_complete' as const;
+const ONBOARDING_COMPLETE_KEY = '@teqmd/native/onboarding_complete' as const;
 
 /**
  * Returns whether the user finished the first-run intro (persists until app data is cleared).

@@ -1,6 +1,6 @@
-import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import type { PaymentGatewayId } from '@/domain/payment-types';
-import type { PaymentConfigPublic } from '@techmd/api-client/marketing-payment-api-client';
+import type { PaymentConfigPublic } from '@teqmd/api-client/marketing-payment-api-client';
 import type {
   PublicCatalogFallbackCheckout,
   PublicCatalogServiceRow,

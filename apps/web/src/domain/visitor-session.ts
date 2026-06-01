@@ -1,1 +1,1 @@
-export * from '@techmd/domain/visitor-session';
+export * from '@teqmd/domain/visitor-session';

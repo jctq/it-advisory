@@ -1,6 +1,6 @@
 const MEETING_POPUP_WIDTH = 1200;
 const MEETING_POPUP_HEIGHT = 800;
-const MEETING_POPUP_NAME = 'techmd-meeting';
+const MEETING_POPUP_NAME = 'teqmd-meeting';
 
 /**
  * Opens a video meeting in a centered popup so users stay anchored to TeqMD while the call runs.

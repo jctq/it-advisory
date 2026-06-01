@@ -1,10 +1,10 @@
-import { DiagnosticApiClient } from '@techmd/api-client/diagnostic-api-client';
+import { DiagnosticApiClient } from '@teqmd/api-client/diagnostic-api-client';
 import {
   GUIDED_DIAGNOSTIC_EMPTY,
   parseGuidedDiagnosticJson,
   type GuidedDiagnosticV1,
-} from '@techmd/diagnostic-core/guided-diagnostic-types';
-import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+} from '@teqmd/diagnostic-core/guided-diagnostic-types';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';

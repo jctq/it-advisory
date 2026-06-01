@@ -1,16 +1,20 @@
 /**
  * Creates indexes that speed up account diagnostics and payment reconciliation.
- * Run: `pnpm --filter web exec tsx scripts/ensure-mongodb-indexes.ts`
+ * Run: `pnpm --filter web db:ensure-indexes`
  */
 import { MongoClient } from 'mongodb';
-import { COLLECTIONS } from '@techmd/domain/collections';
+import { COLLECTIONS } from '@teqmd/domain/collections';
+import { loadLocalEnvIfNeeded } from './load-local-env';
 
 async function ensureIndexes(): Promise<void> {
+  loadLocalEnvIfNeeded();
   const uri = process.env.MONGODB_URI?.trim() ?? '';
   if (uri.length === 0) {
-    throw new Error('Set MONGODB_URI before running this script.');
+    throw new Error(
+      'MONGODB_URI is not set. Add it to Railway variables, or to apps/web/.env.local for local runs.',
+    );
   }
-  const dbName = process.env.MONGODB_DB_NAME ?? 'techmd';
+  const dbName = process.env.MONGODB_DB_NAME ?? 'teqmd';
   const client = new MongoClient(uri);
   await client.connect();
   const db = client.db(dbName);

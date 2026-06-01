@@ -7,13 +7,13 @@ import {
   type DiagnosticQuestionBlock,
   type DiagnosticQuestionOption,
   type DiagnosticQuestionSelection,
-} from '@techmd/diagnostic-core/guided-diagnostic-types';
+} from '@teqmd/diagnostic-core/guided-diagnostic-types';
 import {
   resolveProjectRescueBriefAssessment,
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
-} from '@techmd/diagnostic-core/project-rescue-service-context';
-import { getSituationSeed } from '@techmd/diagnostic-core/situation-options';
+} from '@teqmd/diagnostic-core/project-rescue-service-context';
+import { getSituationSeed } from '@teqmd/diagnostic-core/situation-options';
 import { useRouter } from 'expo-router';
 import { useMemo, useState, type ReactElement } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';

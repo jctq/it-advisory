@@ -1,5 +1,5 @@
 {
-  "name": "@techmd/api-client",
+  "name": "@teqmd/api-client",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -14,6 +14,6 @@
     "./marketing-my-reports-api-client": "./src/marketing-my-reports-api-client.ts"
   },
   "dependencies": {
-    "@techmd/domain": "workspace:*"
+    "@teqmd/domain": "workspace:*"
   }
 }

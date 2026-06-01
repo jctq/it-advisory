@@ -13,7 +13,7 @@ import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { getDb } from '@/lib/mongodb';
-import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
+import { createMockPaymentAdapter, resolvePaymentAdapter } from '@teqmd/payments';
 
 async function updateOpenPaymentTransactionForCheckoutResume(
   transactionId: ObjectId,

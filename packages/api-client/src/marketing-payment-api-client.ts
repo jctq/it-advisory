@@ -1,5 +1,5 @@
-import type { PaymentGatewayId } from '@techmd/domain/payment-types';
-import { VISITOR_SESSION_CONFIG } from '@techmd/domain/visitor-session';
+import type { PaymentGatewayId } from '@teqmd/domain/payment-types';
+import { VISITOR_SESSION_CONFIG } from '@teqmd/domain/visitor-session';
 
 export type PaymentConfigPublic = {
   readonly paymentsEnabled: boolean;

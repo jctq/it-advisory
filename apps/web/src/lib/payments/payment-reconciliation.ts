@@ -2,7 +2,7 @@ import type { PaymentStatus } from '@/domain/payment-types';
 import { getGatewayCredentials, getPaymentSettings } from '@/lib/data/payment-settings';
 import { findPaymentTransactionById, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
 import { applyPaymentStatusToBooking } from '@/lib/payments/payment-completion';
-import { resolvePaymentAdapter } from '@techmd/payments';
+import { resolvePaymentAdapter } from '@teqmd/payments';
 
 const RECONCILABLE_STATUSES: readonly PaymentStatus[] = ['pending', 'processing'];
 

@@ -1,11 +1,11 @@
 import { openai } from '@ai-sdk/openai';
-import { normalizeDiagnosticOptionLabels } from '@techmd/diagnostic-core/guided-diagnostic-types';
+import { normalizeDiagnosticOptionLabels } from '@teqmd/diagnostic-core/guided-diagnostic-types';
 import {
   buildProjectRescueServicePromptBlock,
   resolveProjectRescueBriefAssessment,
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
-} from '@techmd/diagnostic-core/project-rescue-service-context';
+} from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';

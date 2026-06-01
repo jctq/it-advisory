@@ -2,4 +2,4 @@ export {
   parseGuestSupportReportContact,
   type GuestSupportReportContactInput,
   type ParsedGuestSupportReportContact,
-} from '@techmd/domain/support-report-guest-contact';
+} from '@teqmd/domain/support-report-guest-contact';

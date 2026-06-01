@@ -4,7 +4,7 @@ import {
   type MarketingSupportReportDetail,
   type MarketingSupportReportReply,
   type MarketingSupportReportReplyPolicy,
-} from '@techmd/api-client/marketing-my-reports-api-client';
+} from '@teqmd/api-client/marketing-my-reports-api-client';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import {

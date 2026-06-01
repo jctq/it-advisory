@@ -1,8 +1,10 @@
 {
-  "name": "techmd",
+  "name": "teqmd",
   "private": true,
   "scripts": {
     "sign:fathom-webhook": "pnpm --filter web sign:fathom-webhook",
+    "db:migrate-quiz-to-diagnostic": "pnpm --filter web db:migrate-quiz-to-diagnostic",
+    "db:ensure-indexes": "pnpm --filter web db:ensure-indexes",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",

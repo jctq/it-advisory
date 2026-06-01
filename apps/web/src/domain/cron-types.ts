@@ -1,1 +1,1 @@
-export * from '@techmd/domain/cron-types';
+export * from '@teqmd/domain/cron-types';

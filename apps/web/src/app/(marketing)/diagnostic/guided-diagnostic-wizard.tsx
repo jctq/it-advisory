@@ -91,7 +91,7 @@ import {
   resolveProjectRescueBriefAssessment,
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
-} from '@techmd/diagnostic-core/project-rescue-service-context';
+} from '@teqmd/diagnostic-core/project-rescue-service-context';
 
 const MIN_PROMPT_LENGTH = 8;
 const MAX_ANSWER_NOTE_LENGTH = 2000;

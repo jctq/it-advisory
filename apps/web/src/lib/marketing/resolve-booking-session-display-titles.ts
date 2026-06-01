@@ -1,5 +1,5 @@
 import 'server-only';
-import { resolveDiagnosticSessionDisplayPreview } from '@techmd/diagnostic-core/diagnostic-session-display-preview';
+import { resolveDiagnosticSessionDisplayPreview } from '@teqmd/diagnostic-core/diagnostic-session-display-preview';
 import type { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { BookingDocument, DiagnosticAnswers, DiagnosticSessionDocument } from '@/domain/types';

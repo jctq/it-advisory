@@ -1,7 +1,7 @@
 import {
   buildPhilippineMobileE164FromNationalDigits,
   parsePhilippineMobileE164,
-} from '@techmd/domain/philippine-mobile-phone';
+} from '@teqmd/domain/philippine-mobile-phone';
 
 const MAX_REPORTER_NAME_LENGTH = 150;
 const MAX_REPORTER_EMAIL_LENGTH = 320;

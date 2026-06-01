@@ -28,7 +28,7 @@ import {
   fetchMarketingServerClockOffsetMs,
   getBookingAvailabilitySlots,
   resolveServerClockOffsetMilliseconds,
-} from '@techmd/api-client/marketing-booking-api-client';
+} from '@teqmd/api-client/marketing-booking-api-client';
 import { PaymentHoldExpiryPanel } from '@/components/marketing/payment-hold-expiry-panel';
 import { useServerSyncedNow } from '@/hooks/marketing/use-server-synced-now';
 import {
@@ -44,10 +44,10 @@ import {
   isPaymentConfigPromoInvalidError,
   PaymentConfigFetchError,
   type PaymentConfigPublic,
-} from '@techmd/api-client/marketing-payment-api-client';
-import { rescheduleMarketingCheckoutSlot } from '@techmd/api-client/marketing-booking-api-client';
+} from '@teqmd/api-client/marketing-payment-api-client';
+import { rescheduleMarketingCheckoutSlot } from '@teqmd/api-client/marketing-booking-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
-import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SESSION_DURATION } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SESSION_DURATION } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sticky-action-bar';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
 import { BookingMonthYearNav } from '@/components/marketing/booking-month-year-nav';
@@ -179,7 +179,7 @@ type CheckoutDraftSnapshot = {
 };
 
 function buildCheckoutDraftStorageKey(sessionRef: string): string {
-  return `techmd:book-checkout-draft:${sessionRef}`;
+  return `teqmd:book-checkout-draft:${sessionRef}`;
 }
 
 function readCheckoutDraftFromSessionStorage(sessionRef: string): CheckoutDraftSnapshot | null {

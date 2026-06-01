@@ -8,7 +8,7 @@ import {
   BRAND_LOGO_FULL_LIGHT,
 } from '@/lib/brand/brand-assets';
 
-// Intrinsic pixels from `scripts/generate-techmd-brand-assets.py` — updated after regen.
+// Intrinsic pixels from `scripts/generate-teqmd-brand-assets.py` — updated after regen.
 const LOGO_LIGHT_WIDTH_PX = 1590;
 const LOGO_LIGHT_HEIGHT_PX = 374;
 const LOGO_DARK_WIDTH_PX = 1588;
@@ -22,7 +22,7 @@ const LOGO_IMAGE_CLASS =
  * compact wordmark (no tagline) on smaller breakpoints. Light/dark pairs share one slot
  * (`dark:hidden` / `hidden dark:block`), same pattern as the admin sidebar.
  */
-export function TechmdSiteLogo(): ReactElement {
+export function TeqmdSiteLogo(): ReactElement {
   return (
     <span className="inline-flex shrink-0 items-center overflow-visible">
       <span className="hidden lg:contents">

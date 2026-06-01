@@ -5,7 +5,7 @@ import {
   waitForAdminTourElement,
 } from '@/lib/admin/admin-onboarding-navigation';
 
-export const ADMIN_ONBOARDING_WELCOME_STORAGE_KEY = 'techmd-admin-onboarding-welcome-seen';
+export const ADMIN_ONBOARDING_WELCOME_STORAGE_KEY = 'teqmd-admin-onboarding-welcome-seen';
 
 export type AdminOnboardingShellTarget =
   | 'sidebar'

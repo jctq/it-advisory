@@ -1,1 +1,1 @@
-export * from '@techmd/diagnostic-core/guided-diagnostic-types';
+export * from '@teqmd/diagnostic-core/guided-diagnostic-types';

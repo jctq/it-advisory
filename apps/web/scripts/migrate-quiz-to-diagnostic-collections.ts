@@ -1,14 +1,21 @@
 /**
  * One-time migration: legacy `quiz_*` collections and `quizSession*` fields → `diagnostic_*` naming.
  * Run after deploying code that reads the new names:
- *   pnpm --filter web exec tsx scripts/migrate-quiz-to-diagnostic-collections.ts
+ *   pnpm --filter web db:migrate-quiz-to-diagnostic
  */
 import { MongoClient } from 'mongodb';
-import { COLLECTIONS } from '@techmd/domain/collections';
+import { COLLECTIONS } from '@teqmd/domain/collections';
+import { loadLocalEnvIfNeeded } from './load-local-env';
 
 const LEGACY_COLLECTIONS = {
-  diagnosticSessions: 'diagnostic_sessions',
-  diagnosticAudit: 'diagnostic_audit',
+  quizSessions: 'quiz_sessions',
+  quizAudit: 'quiz_audit',
+} as const;
+
+const LEGACY_INDEX_NAMES = {
+  quizSessionsVisitorUpdated: 'quiz_sessions_visitor_updated',
+  bookingsQuizSessionCreated: 'bookings_quiz_session_created',
+  paymentsQuizSessionCreated: 'payments_quiz_session_created',
 } as const;
 
 async function renameCollectionIfNeeded(
@@ -30,46 +37,54 @@ async function renameCollectionIfNeeded(
   console.log(`Renamed collection ${from} → ${to}`);
 }
 
+async function dropIndexIfExists(
+  collection: ReturnType<ReturnType<MongoClient['db']>['collection']>,
+  indexName: string,
+): Promise<void> {
+  try {
+    await collection.dropIndex(indexName);
+    console.log(`Dropped index ${indexName}`);
+  } catch {
+    /* index may not exist */
+  }
+}
+
 async function migrate(): Promise<void> {
+  loadLocalEnvIfNeeded();
   const uri = process.env.MONGODB_URI?.trim() ?? '';
   if (uri.length === 0) {
-    throw new Error('Set MONGODB_URI before running this script.');
+    throw new Error(
+      'MONGODB_URI is not set. Add it to Railway variables, or to apps/web/.env.local for local runs.',
+    );
   }
-  const dbName = process.env.MONGODB_DB_NAME ?? 'techmd';
+  const dbName = process.env.MONGODB_DB_NAME ?? 'teqmd';
   const client = new MongoClient(uri);
   await client.connect();
   const db = client.db(dbName);
-  await renameCollectionIfNeeded(db, LEGACY_COLLECTIONS.diagnosticSessions, COLLECTIONS.diagnosticSessions);
-  await renameCollectionIfNeeded(db, LEGACY_COLLECTIONS.diagnosticAudit, COLLECTIONS.diagnosticAudit);
+  await renameCollectionIfNeeded(db, LEGACY_COLLECTIONS.quizSessions, COLLECTIONS.diagnosticSessions);
+  await renameCollectionIfNeeded(db, LEGACY_COLLECTIONS.quizAudit, COLLECTIONS.diagnosticAudit);
   const bookings = db.collection(COLLECTIONS.bookings);
   const bookingRename = await bookings.updateMany(
-    { diagnosticSessionId: { $exists: true } },
-    { $rename: { diagnosticSessionId: 'diagnosticSessionId' } },
+    { quizSessionId: { $exists: true } },
+    { $rename: { quizSessionId: 'diagnosticSessionId' } },
   );
-  console.log(`Bookings: renamed diagnosticSessionId on ${bookingRename.modifiedCount} document(s)`);
+  console.log(`Bookings: renamed quizSessionId → diagnosticSessionId on ${bookingRename.modifiedCount} document(s)`);
   const payments = db.collection(COLLECTIONS.paymentTransactions);
   const paymentRename = await payments.updateMany(
-    { diagnosticSessionIdHex: { $exists: true } },
-    { $rename: { diagnosticSessionIdHex: 'diagnosticSessionIdHex' } },
+    { quizSessionIdHex: { $exists: true } },
+    { $rename: { quizSessionIdHex: 'diagnosticSessionIdHex' } },
   );
-  console.log(`Payment transactions: renamed diagnosticSessionIdHex on ${paymentRename.modifiedCount} document(s)`);
-  try {
-    await bookings.dropIndex('bookings_diagnostic_session_created');
-  } catch {
-    /* index may not exist */
-  }
-  try {
-    await payments.dropIndex('payments_diagnostic_session_created');
-  } catch {
-    /* index may not exist */
-  }
-  try {
-    await db.collection(COLLECTIONS.diagnosticSessions).dropIndex('diagnostic_sessions_visitor_updated');
-  } catch {
-    /* index may not exist */
-  }
+  console.log(
+    `Payment transactions: renamed quizSessionIdHex → diagnosticSessionIdHex on ${paymentRename.modifiedCount} document(s)`,
+  );
+  await dropIndexIfExists(bookings, LEGACY_INDEX_NAMES.bookingsQuizSessionCreated);
+  await dropIndexIfExists(payments, LEGACY_INDEX_NAMES.paymentsQuizSessionCreated);
+  await dropIndexIfExists(
+    db.collection(COLLECTIONS.diagnosticSessions),
+    LEGACY_INDEX_NAMES.quizSessionsVisitorUpdated,
+  );
   await client.close();
-  console.log('Migration complete. Run ensure-mongodb-indexes.ts to create new indexes.');
+  console.log('Migration complete. Run: pnpm --filter web db:ensure-indexes');
 }
 
 void migrate().catch((error: unknown) => {

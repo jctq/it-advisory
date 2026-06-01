@@ -39,13 +39,13 @@ importers:
       '@react-native-async-storage/async-storage':
         specifier: 2.2.0
         version: 2.2.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.2.6))
-      '@techmd/api-client':
+      '@teqmd/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
-      '@techmd/diagnostic-core':
+      '@teqmd/diagnostic-core':
         specifier: workspace:*
         version: link:../../packages/diagnostic-core
-      '@techmd/domain':
+      '@teqmd/domain':
         specifier: workspace:*
         version: link:../../packages/domain
       date-fns:
@@ -196,16 +196,16 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.13.26
         version: 3.13.26(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@techmd/api-client':
+      '@teqmd/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
-      '@techmd/diagnostic-core':
+      '@teqmd/diagnostic-core':
         specifier: workspace:*
         version: link:../../packages/diagnostic-core
-      '@techmd/domain':
+      '@teqmd/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@techmd/payments':
+      '@teqmd/payments':
         specifier: workspace:*
         version: link:../../packages/payments
       '@xyflow/react':
@@ -302,7 +302,7 @@ importers:
       '@tailwindcss/postcss':
         specifier: ^4.1.7
         version: 4.3.0
-      '@techmd/typescript-config':
+      '@teqmd/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
       '@types/node':
@@ -335,13 +335,13 @@ importers:
 
   packages/api-client:
     dependencies:
-      '@techmd/domain':
+      '@teqmd/domain':
         specifier: workspace:*
         version: link:../domain
 
   packages/diagnostic-core:
     dependencies:
-      '@techmd/domain':
+      '@teqmd/domain':
         specifier: workspace:*
         version: link:../domain
 
@@ -357,7 +357,7 @@ importers:
         specifier: ^6.16.0
         version: 6.21.0
     devDependencies:
-      '@techmd/typescript-config':
+      '@teqmd/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
       typescript:
@@ -396,11 +396,11 @@ importers:
 
   packages/payments:
     dependencies:
-      '@techmd/domain':
+      '@teqmd/domain':
         specifier: workspace:*
         version: link:../domain
     devDependencies:
-      '@techmd/typescript-config':
+      '@teqmd/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
       typescript:

@@ -16,7 +16,7 @@ This document is the **source of truth** for the TeqMD admin guided tour ([drive
 | Sidebar `data-admin-tour` targets | `apps/web/src/components/admin/admin-sidebar.tsx` |
 | Popover theming | `apps/web/src/app/globals.css` (`.admin-driver-popover`), `admin-driver-popover.css` (close button, loaded after driver.js) |
 
-**First visit:** A welcome dialog opens once per browser (`techmd-admin-onboarding-welcome-seen`). The user can start the full tour or dismiss it.
+**First visit:** A welcome dialog opens once per browser (`teqmd-admin-onboarding-welcome-seen`). The user can start the full tour or dismiss it.
 
 **Replay:** The **Guide** button in the admin header restarts the tour anytime.
 
@@ -100,7 +100,7 @@ Detail/editor routes (add when needed):
 ## Testing locally
 
 ```js
-localStorage.removeItem('techmd-admin-onboarding-welcome-seen')
+localStorage.removeItem('teqmd-admin-onboarding-welcome-seen')
 ```
 
 Reload `/admin`, start the tour, and confirm each route loads before its page highlights. Run unit tests:

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   GUIDED_DIAGNOSTIC_EMPTY,
   serializeGuidedDiagnostic,
-} from '@techmd/diagnostic-core/guided-diagnostic-types';
-import { resolveDiagnosticSessionCompleted } from '@techmd/diagnostic-core/diagnostic-session-complete';
+} from '@teqmd/diagnostic-core/guided-diagnostic-types';
+import { resolveDiagnosticSessionCompleted } from '@teqmd/diagnostic-core/diagnostic-session-complete';
 
 describe('resolveDiagnosticSessionCompleted', () => {
   it('returns true when completedAt is set', () => {

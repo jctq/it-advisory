@@ -1,1 +1,1 @@
-export * from '@techmd/domain/blog-post-revision-types';
+export * from '@teqmd/domain/blog-post-revision-types';

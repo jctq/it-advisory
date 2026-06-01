@@ -1,1 +1,1 @@
-export * from '@techmd/domain/payment-log-types';
+export * from '@teqmd/domain/payment-log-types';

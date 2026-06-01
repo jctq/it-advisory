@@ -11,7 +11,7 @@ import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold
 import { resumeOpenPaymentTransactionCheckout } from '@/lib/payments/payment-checkout-resume-open';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
-import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
+import { createMockPaymentAdapter, resolvePaymentAdapter } from '@teqmd/payments';
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentTransactionDocument } from '@/domain/payment-types';

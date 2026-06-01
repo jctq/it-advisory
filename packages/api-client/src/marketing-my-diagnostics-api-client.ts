@@ -1,4 +1,4 @@
-import { VISITOR_SESSION_CONFIG } from '@techmd/domain/visitor-session';
+import { VISITOR_SESSION_CONFIG } from '@teqmd/domain/visitor-session';
 
 export type MarketingDiagnosticSessionSummary = {
   readonly id: string;

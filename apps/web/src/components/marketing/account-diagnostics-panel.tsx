@@ -11,7 +11,7 @@ import { ClipboardCopy, Loader2, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useMarketingAccountDiagnostics } from '@/hooks/marketing/use-marketing-account-diagnostics';
 import { useMobileViewport } from '@/hooks/use-mobile-viewport';
-import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';

@@ -1,5 +1,5 @@
-import { normalizePhilippineMobileNationalDigits } from '@techmd/domain/philippine-mobile-phone';
-import { parseGuestSupportReportContact } from '@techmd/domain/support-report-guest-contact';
+import { normalizePhilippineMobileNationalDigits } from '@teqmd/domain/philippine-mobile-phone';
+import { parseGuestSupportReportContact } from '@teqmd/domain/support-report-guest-contact';
 
 type SubmitSupportReportInput = {
   readonly apiBaseUrl: string;

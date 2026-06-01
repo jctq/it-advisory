@@ -2,7 +2,7 @@ import {
   fetchMarketingMyReports,
   type MarketingSupportReportListStatusFilter,
   type MarketingSupportReportSummary,
-} from '@techmd/api-client/marketing-my-reports-api-client';
+} from '@teqmd/api-client/marketing-my-reports-api-client';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import {

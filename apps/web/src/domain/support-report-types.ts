@@ -1,1 +1,1 @@
-export type { SupportReportDocument, SupportReportReplyDocument } from '@techmd/domain/support-report-types';
+export type { SupportReportDocument, SupportReportReplyDocument } from '@teqmd/domain/support-report-types';

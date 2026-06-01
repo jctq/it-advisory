@@ -1,1 +1,1 @@
-export * from '@techmd/domain/payment-types';
+export * from '@teqmd/domain/payment-types';

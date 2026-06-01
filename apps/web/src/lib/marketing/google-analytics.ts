@@ -16,7 +16,7 @@ declare global {
   interface Window {
     dataLayer?: IArguments[];
     gtag?: Gtag;
-    __techmdGtagConsentDefaultApplied?: boolean;
+    __teqmdGtagConsentDefaultApplied?: boolean;
   }
 }
 
@@ -51,7 +51,7 @@ export function ensureGtagConsentDefaults(): void {
   }
   window.dataLayer = window.dataLayer ?? [];
   installGtagStub();
-  if (window.__techmdGtagConsentDefaultApplied === true) {
+  if (window.__teqmdGtagConsentDefaultApplied === true) {
     return;
   }
   getGtag()('consent', 'default', {
@@ -63,7 +63,7 @@ export function ensureGtagConsentDefaults(): void {
     security_storage: 'granted',
     wait_for_update: 500,
   });
-  window.__techmdGtagConsentDefaultApplied = true;
+  window.__teqmdGtagConsentDefaultApplied = true;
 }
 
 export function updateGtagAnalyticsConsent(granted: boolean): void {
@@ -98,7 +98,7 @@ export function loadGoogleAnalyticsScript(measurementId: string): Promise<void> 
   if (typeof document === 'undefined') {
     return Promise.resolve();
   }
-  const existing = document.querySelector<HTMLScriptElement>(`script[data-techmd-ga="${measurementId}"]`);
+  const existing = document.querySelector<HTMLScriptElement>(`script[data-teqmd-ga="${measurementId}"]`);
   if (existing !== null) {
     return Promise.resolve();
   }
@@ -109,7 +109,7 @@ export function loadGoogleAnalyticsScript(measurementId: string): Promise<void> 
     const script = document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
-    script.dataset.techmdGa = measurementId;
+    script.dataset.teqmdGa = measurementId;
     script.onload = () => resolve();
     script.onerror = () => {
       gaScriptLoading = null;

@@ -2,4 +2,4 @@ export type {
   MarketingPageSeoKey,
   PageSeoOverride,
   SeoSettingsDocument,
-} from '@techmd/domain/seo-settings-types';
+} from '@teqmd/domain/seo-settings-types';

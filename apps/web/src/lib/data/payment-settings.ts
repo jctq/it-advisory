@@ -17,7 +17,7 @@ import {
 } from '@/lib/server/payment-credentials-crypto';
 import { getDb } from '@/lib/mongodb';
 import { formatPaymentAmountLabel } from '@/lib/payments/format-payment-amount-label';
-import type { GatewayCredentials } from '@techmd/payments';
+import type { GatewayCredentials } from '@teqmd/payments';
 
 export { formatPaymentAmountLabel } from '@/lib/payments/format-payment-amount-label';
 

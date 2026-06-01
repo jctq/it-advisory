@@ -5,7 +5,7 @@ import { RootAppearanceHydrator } from '@/components/providers/root-appearance-h
 import { QueryProvider } from '@/components/providers/query-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { brandAssetUrl } from '@/lib/brand/brand-assets';
-import { TECHMD_APPEARANCE_BOOTSTRAP_SCRIPT } from '@/lib/brand/techmd-appearance-bootstrap-script';
+import { TEQMD_APPEARANCE_BOOTSTRAP_SCRIPT } from '@/lib/brand/teqmd-appearance-bootstrap-script';
 import { resolveRootLayoutDocumentAppearance } from '@/lib/brand/resolve-root-layout-document-appearance';
 import { buildRootLayoutMetadataAsync, resolveMetadataBase } from '@/lib/seo/site-seo';
 import './globals.css';
@@ -30,24 +30,24 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: {
       icon: [
         {
-          url: brandAssetUrl('techmd-mark.png'),
+          url: brandAssetUrl('teqmd-mark.png'),
           type: 'image/png',
           sizes: '326x344',
           media: '(prefers-color-scheme: light)',
         },
         {
-          url: brandAssetUrl('techmd-mark-dark.png'),
+          url: brandAssetUrl('teqmd-mark-dark.png'),
           type: 'image/png',
           sizes: '326x344',
           media: '(prefers-color-scheme: dark)',
         },
         {
-          url: brandAssetUrl('techmd-mark-dark.png'),
+          url: brandAssetUrl('teqmd-mark-dark.png'),
           type: 'image/png',
           sizes: '326x344',
         },
       ],
-      apple: [{ url: brandAssetUrl('techmd-mark-dark.png'), sizes: '326x344', type: 'image/png' }],
+      apple: [{ url: brandAssetUrl('teqmd-mark-dark.png'), sizes: '326x344', type: 'image/png' }],
     },
   };
 }
@@ -66,7 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: TECHMD_APPEARANCE_BOOTSTRAP_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: TEQMD_APPEARANCE_BOOTSTRAP_SCRIPT }} />
       </head>
       <body className={`${sans.className} ${mono.variable} min-h-dvh antialiased`}>
         <RootAppearanceHydrator />

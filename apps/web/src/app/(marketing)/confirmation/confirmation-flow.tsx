@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { CalendarClock, CheckCircle2, Loader2, Video } from 'lucide-react';
-import { PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import { Button } from '@/components/ui/button';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';

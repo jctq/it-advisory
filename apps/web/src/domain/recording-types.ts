@@ -1,1 +1,1 @@
-export * from '@techmd/domain/recording-types';
+export * from '@teqmd/domain/recording-types';

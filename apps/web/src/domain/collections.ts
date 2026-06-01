@@ -1,1 +1,1 @@
-export * from '@techmd/domain/collections';
+export * from '@teqmd/domain/collections';

@@ -12,8 +12,8 @@ import {
   rescheduleGuestManagedBooking,
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
-} from '@techmd/api-client/marketing-booking-manage-api-client';
-import { getBookingAvailabilitySlots } from '@techmd/api-client/marketing-booking-api-client';
+} from '@teqmd/api-client/marketing-booking-manage-api-client';
+import { getBookingAvailabilitySlots } from '@teqmd/api-client/marketing-booking-api-client';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
 import { BookingMonthYearNav } from '@/components/marketing/booking-month-year-nav';
 import {

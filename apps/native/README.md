@@ -24,7 +24,7 @@ pnpm --filter native run android
 
 - Native public funnel screens: home, diagnostic, service (post-diagnostic recommendation), booking, confirmation
 - Anonymous device-backed diagnostic session persistence via `X-Device-Id`
-- Shared business logic reused from `@techmd/diagnostic-core`
+- Shared business logic reused from `@teqmd/diagnostic-core`
 - Checkout sends `appBaseUrl` and `nativeInAppPaymentReturn` so the PSP lands on `/book/payment/native-close` (minimal HTML). That lets `openAuthSessionAsync` dismiss the in-app sheet instead of leaving the full “Confirming your payment…” React page running inside it.
 
 ## Support reports

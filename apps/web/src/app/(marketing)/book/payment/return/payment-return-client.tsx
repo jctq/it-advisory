@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react';
-import { fetchPaymentTransactionStatus } from '@techmd/api-client/marketing-payment-api-client';
+import { fetchPaymentTransactionStatus } from '@teqmd/api-client/marketing-payment-api-client';
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import {

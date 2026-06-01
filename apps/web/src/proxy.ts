@@ -7,7 +7,7 @@ const LOGIN_PATH = '/admin/login';
 const LOGIN_API_PATH = '/api/admin/login';
 const ADMIN_PREFIX = '/admin';
 const ADMIN_API_PREFIX = '/api/admin';
-const APPEARANCE_SCOPE_HEADER = 'x-techmd-appearance-scope';
+const APPEARANCE_SCOPE_HEADER = 'x-teqmd-appearance-scope';
 
 function constantTimeEquals(a: string, b: string): boolean {
   const aBuffer = Buffer.from(a, 'utf8');

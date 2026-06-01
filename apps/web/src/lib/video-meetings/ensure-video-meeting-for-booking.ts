@@ -21,7 +21,7 @@ import { readEnvSiteName } from '@/lib/site/site-name';
 import { getDb } from '@/lib/mongodb';
 
 const SITE_NAME = readEnvSiteName();
-import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { fetchZoomAccessToken, requestCreateZoomScheduledMeeting } from '@/lib/zoom/zoom-api';
 
 const DEFAULT_MEETING_DURATION_MINUTES = 60 as const;

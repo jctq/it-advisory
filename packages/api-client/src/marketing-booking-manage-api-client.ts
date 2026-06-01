@@ -1,4 +1,4 @@
-import type { PaymentGatewayId } from '@techmd/domain/payment-types';
+import type { PaymentGatewayId } from '@teqmd/domain/payment-types';
 import type { PaymentConfigPublic } from './marketing-payment-api-client.js';
 
 export type BookingCustomerActionMode = 'cancel' | 'refund';

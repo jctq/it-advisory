@@ -1,10 +1,10 @@
 'use client';
 
 import { create } from 'zustand';
-import type { GuestBookingManageView } from '@techmd/api-client/marketing-booking-manage-api-client';
-import type { PaymentConfigPublic } from '@techmd/api-client/marketing-payment-api-client';
+import type { GuestBookingManageView } from '@teqmd/api-client/marketing-booking-manage-api-client';
+import type { PaymentConfigPublic } from '@teqmd/api-client/marketing-payment-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
-import type { GuestBookingManageCredentials } from '@techmd/api-client/marketing-booking-manage-api-client';
+import type { GuestBookingManageCredentials } from '@teqmd/api-client/marketing-booking-manage-api-client';
 
 export type GuestBookingManageAuthContext =
   | { readonly kind: 'guest'; readonly credentials: GuestBookingManageCredentials }

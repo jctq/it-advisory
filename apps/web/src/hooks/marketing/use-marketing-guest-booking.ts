@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { GuestBookingManageView } from '@techmd/api-client/marketing-booking-manage-api-client';
-import type { PaymentConfigPublic } from '@techmd/api-client/marketing-payment-api-client';
+import type { GuestBookingManageView } from '@teqmd/api-client/marketing-booking-manage-api-client';
+import type { PaymentConfigPublic } from '@teqmd/api-client/marketing-payment-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import {
   useMarketingGuestBookingStore,

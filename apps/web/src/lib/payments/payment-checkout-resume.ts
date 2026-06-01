@@ -18,7 +18,7 @@ import { findOpenPaymentTransactionForBooking, findPaymentTransactionById, inser
 import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
 import { encodeDiagnosticSessionRefForMarketingUrl } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
-import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payments';
+import { createMockPaymentAdapter, resolvePaymentAdapter } from '@teqmd/payments';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { getDb } from '@/lib/mongodb';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';

@@ -9,7 +9,7 @@ import type { DatesSetArg, EventInput } from '@fullcalendar/core';
 import {
   listYmdsForVisibleRange,
   type FullCalendarBusinessHourSegment,
-} from '@techmd/domain/booking-schedule';
+} from '@teqmd/domain/booking-schedule';
 
 export type AdvisorScheduleCalendarInnerProps = {
   readonly businessHours: readonly FullCalendarBusinessHourSegment[];

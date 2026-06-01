@@ -20,7 +20,7 @@ import { issueBookingSessionAccessToken } from '@/lib/marketing/booking-session-
 import {
   BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
   buildBookingCalendarLinkBundle,
-} from '@techmd/domain/booking-calendar-links';
+} from '@teqmd/domain/booking-calendar-links';
 
 const SAMPLE_BOOKING_REFERENCE = 'TMD-7K2M9P' as const;
 

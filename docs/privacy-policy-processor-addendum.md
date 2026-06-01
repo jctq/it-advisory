@@ -79,7 +79,7 @@ If you accept **analytics cookies**, TEQMD loads **Google Analytics 4** (Google 
 |------------|------|---------|
 | `it_visitor_id` | Required cookie | Saves anonymous diagnostic progress before you sign in |
 | `it_auth_session` | Required cookie | Keeps you signed in to your account |
-| `techmd-cookie-consent` | Local storage | Remembers your cookie choice (required only vs analytics) |
+| `teqmd-cookie-consent` | Local storage | Remembers your cookie choice (required only vs analytics) |
 | Appearance preferences | Local storage | Remembers display settings such as theme |
 | Payment partner cookies | Third-party | Set on payment gateway domains during checkout |
 

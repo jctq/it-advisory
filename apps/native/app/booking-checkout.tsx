@@ -2,14 +2,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { DiagnosticApiClient } from '@techmd/api-client/diagnostic-api-client';
+import { DiagnosticApiClient } from '@teqmd/api-client/diagnostic-api-client';
 import {
   createPaymentCheckoutSession,
   fetchPaymentConfigPublic,
   fetchPaymentTransactionStatus,
   type PaymentConfigPublic,
-} from '@techmd/api-client/marketing-payment-api-client';
-import type { PaymentGatewayId } from '@techmd/domain/payment-types';
+} from '@teqmd/api-client/marketing-payment-api-client';
+import type { PaymentGatewayId } from '@teqmd/domain/payment-types';
 import { AppButton } from '../src/components/app-button';
 import { AppCard } from '../src/components/app-card';
 import { AppScreen } from '../src/components/app-screen';

@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import {
   BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
   buildBookingCalendarLinkBundle,
-} from '@techmd/domain/booking-calendar-links';
+} from '@teqmd/domain/booking-calendar-links';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { AdminBookingDetailWorkspace } from '@/components/admin/admin-booking-detail-workspace';
 import {

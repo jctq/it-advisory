@@ -4,7 +4,7 @@ import { findPaymentTransactionByProviderSession } from '@/lib/data/payment-tran
 import { getGatewayCredentials } from '@/lib/data/payment-settings';
 import { processWebhookPaymentEvent } from '@/lib/payments/payment-completion';
 import { appendPaymentLog, summarizePaymentLogHeaders } from '@/lib/payments/record-payment-log';
-import { resolvePaymentAdapter } from '@techmd/payments';
+import { resolvePaymentAdapter } from '@teqmd/payments';
 
 const RAW_PAYLOAD_SNIPPET_MAX_LENGTH = 4000 as const;
 

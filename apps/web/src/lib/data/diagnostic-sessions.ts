@@ -9,8 +9,8 @@ import type {
 } from '@/domain/types';
 import type { PaymentStatus } from '@/domain/payment-types';
 import { fetchLatestPaymentTransactionsByDiagnosticSessionIds } from '@/lib/data/payment-transactions';
-import { resolveDiagnosticSessionCompleted } from '@techmd/diagnostic-core/diagnostic-session-complete';
-import { resolveDiagnosticSessionDisplayPreview } from '@techmd/diagnostic-core/diagnostic-session-display-preview';
+import { resolveDiagnosticSessionCompleted } from '@teqmd/diagnostic-core/diagnostic-session-complete';
+import { resolveDiagnosticSessionDisplayPreview } from '@teqmd/diagnostic-core/diagnostic-session-display-preview';
 import { resolveDiagnosticSessionSummaryDisplayPreview } from '@/lib/marketing/diagnostic-session-summary-display';
 import { extractGuidedDiagnosticRawFromDiagnosticAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { buildDiagnosticThreadJson, GUIDED_DIAGNOSTIC_EMPTY, serializeGuidedDiagnostic } from '@/lib/marketing/guided-diagnostic-types';

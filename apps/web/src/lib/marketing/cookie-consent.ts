@@ -1,4 +1,4 @@
-export const COOKIE_CONSENT_STORAGE_KEY = 'techmd-cookie-consent';
+export const COOKIE_CONSENT_STORAGE_KEY = 'teqmd-cookie-consent';
 
 export const COOKIE_CONSENT_VERSION = 1 as const;
 
@@ -86,7 +86,7 @@ export function readCookieConsentFromStorage(): CookieConsentRecord | null {
   return getCookieConsentSnapshot();
 }
 
-export const COOKIE_CONSENT_CHANGE_EVENT = 'techmd-cookie-consent-change';
+export const COOKIE_CONSENT_CHANGE_EVENT = 'teqmd-cookie-consent-change';
 
 export function writeCookieConsentToStorage(record: CookieConsentRecord): void {
   const serialized = JSON.stringify(record);

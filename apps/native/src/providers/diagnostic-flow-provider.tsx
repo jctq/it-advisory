@@ -1,4 +1,4 @@
-import { DiagnosticApiClient } from '@techmd/api-client/diagnostic-api-client';
+import { DiagnosticApiClient } from '@teqmd/api-client/diagnostic-api-client';
 import {
   GUIDED_DIAGNOSTIC_EMPTY,
   applyGuidedGoBack,
@@ -19,17 +19,17 @@ import {
   type GuidedDiagnosticV1,
   validateGuidedQuestionResponse,
   shouldShowQuestionDetailNoteInput,
-} from '@techmd/diagnostic-core/guided-diagnostic-types';
+} from '@teqmd/diagnostic-core/guided-diagnostic-types';
 import {
   resolveProjectRescueBriefAssessment,
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
-} from '@techmd/diagnostic-core/project-rescue-service-context';
+} from '@teqmd/diagnostic-core/project-rescue-service-context';
 import {
   buildActiveRoundFromTemplate,
   buildNextTemplateRoundFromState,
   type PublicDiagnosticTemplateValue,
-} from '@techmd/diagnostic-core/template-diagnostic-flow';
+} from '@teqmd/diagnostic-core/template-diagnostic-flow';
 import * as Haptics from 'expo-haptics';
 import { AppState } from 'react-native';
 import {

@@ -17,7 +17,7 @@ export const SITE_NAME = readEnvSiteName();
 
 export { DEFAULT_SITE_DESCRIPTION };
 
-const DEFAULT_OG_IMAGE_PATH = brandAssetUrl('techmd-mark-512x512.png');
+const DEFAULT_OG_IMAGE_PATH = brandAssetUrl('teqmd-mark-512x512.png');
 
 const NO_INDEX_ROBOTS: NonNullable<Metadata['robots']> = {
   index: false,

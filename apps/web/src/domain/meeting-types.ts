@@ -1,1 +1,1 @@
-export * from '@techmd/domain/meeting-types';
+export * from '@teqmd/domain/meeting-types';

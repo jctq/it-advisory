@@ -1,7 +1,7 @@
 import {
   BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
   buildBookingCalendarLinkBundle,
-} from '@techmd/domain/booking-calendar-links';
+} from '@teqmd/domain/booking-calendar-links';
 import * as Linking from 'expo-linking';
 import type { ReactElement } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';

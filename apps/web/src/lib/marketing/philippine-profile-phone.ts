@@ -3,4 +3,4 @@ export {
   normalizePhilippineMobileNationalDigits,
   parseNationalDigitsFromStoredPhone,
   parsePhilippineMobileE164,
-} from '@techmd/domain/philippine-mobile-phone';
+} from '@teqmd/domain/philippine-mobile-phone';

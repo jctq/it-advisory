@@ -1,5 +1,5 @@
-import { resolveDiagnosticSessionDisplayPreview } from '@techmd/diagnostic-core/diagnostic-session-display-preview';
-import type { DiagnosticSessionDisplayPreview } from '@techmd/diagnostic-core/diagnostic-session-display-preview';
+import { resolveDiagnosticSessionDisplayPreview } from '@teqmd/diagnostic-core/diagnostic-session-display-preview';
+import type { DiagnosticSessionDisplayPreview } from '@teqmd/diagnostic-core/diagnostic-session-display-preview';
 
 /**
  * List-row display copy: prefer live diagnostic answers, then booking snapshot when checkout cleared live fields.

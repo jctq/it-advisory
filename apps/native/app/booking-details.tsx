@@ -1,10 +1,10 @@
 import { useFocusEffect } from '@react-navigation/native';
-import type { MarketingAuthUser } from '@techmd/api-client/marketing-auth-api-client';
+import type { MarketingAuthUser } from '@teqmd/api-client/marketing-auth-api-client';
 import {
   buildPhilippineMobileE164FromNationalDigits,
   normalizePhilippineMobileNationalDigits,
   parseNationalDigitsFromStoredPhone,
-} from '@techmd/domain/philippine-mobile-phone';
+} from '@teqmd/domain/philippine-mobile-phone';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';

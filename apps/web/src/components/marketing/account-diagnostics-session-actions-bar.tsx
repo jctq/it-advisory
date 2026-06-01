@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import {
   BookingCancellationError,
   cancelAccountManagedBooking,
-} from '@techmd/api-client/marketing-booking-manage-api-client';
+} from '@teqmd/api-client/marketing-booking-manage-api-client';
 import type { PaymentPolicy } from '@/domain/payment-types';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {

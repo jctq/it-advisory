@@ -1,5 +1,5 @@
 {
-  "extends": "@techmd/typescript-config/base.json",
+  "extends": "@teqmd/typescript-config/base.json",
   "compilerOptions": {
     "rootDir": "src",
     "noEmit": true

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, BadgeCheck, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
-import type { GuidedDiagnosticOutcome } from '@techmd/diagnostic-core/guided-diagnostic-types';
+import type { GuidedDiagnosticOutcome } from '@teqmd/diagnostic-core/guided-diagnostic-types';
 import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sticky-action-bar';
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';

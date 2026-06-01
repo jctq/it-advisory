@@ -19,13 +19,13 @@ import {
   type BookingPayGuidance,
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
-} from '@techmd/api-client/marketing-booking-manage-api-client';
+} from '@teqmd/api-client/marketing-booking-manage-api-client';
 import { buildPaymentGatewaysUnavailableGuidance } from '@/lib/payments/booking-pay-guidance';
-import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import {
   fetchPaymentConfigPublic,
   type PaymentConfigPublic,
-} from '@techmd/api-client/marketing-payment-api-client';
+} from '@teqmd/api-client/marketing-payment-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

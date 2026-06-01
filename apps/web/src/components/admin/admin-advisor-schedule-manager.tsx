@@ -26,7 +26,7 @@ import {
   normalizeAdvisorBookingSettings,
   resolveAdvisorSchedulePreviewAnchorYmd,
   type AdvisorSlotIntervalMinutes,
-} from '@techmd/domain/booking-schedule';
+} from '@teqmd/domain/booking-schedule';
 import type { AdvisorBookingSettingsDocument, AdvisorWeekdayOverride } from '@/domain/types';
 import {
   AdminFormStickyFooter,

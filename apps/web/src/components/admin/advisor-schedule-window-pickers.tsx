@@ -5,7 +5,7 @@ import {
   listAdvisorScheduleEndHmOptions,
   listAdvisorScheduleStartHmOptions,
   type AdvisorSlotIntervalMinutes,
-} from '@techmd/domain/booking-schedule';
+} from '@teqmd/domain/booking-schedule';
 import { AdminSettingsLabel } from '@/components/admin/admin-settings-hint';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';

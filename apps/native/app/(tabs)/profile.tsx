@@ -1,11 +1,11 @@
-import { fetchMarketingMyDiagnosticSessions, type MarketingDiagnosticSessionSummary } from '@techmd/api-client/marketing-my-diagnostics-api-client';
-import { fetchMarketingMyReportsUnreadCount } from '@techmd/api-client/marketing-my-reports-api-client';
-import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
+import { fetchMarketingMyDiagnosticSessions, type MarketingDiagnosticSessionSummary } from '@teqmd/api-client/marketing-my-diagnostics-api-client';
+import { fetchMarketingMyReportsUnreadCount } from '@teqmd/api-client/marketing-my-reports-api-client';
+import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import {
   buildPhilippineMobileE164FromNationalDigits,
   normalizePhilippineMobileNationalDigits,
   parseNationalDigitsFromStoredPhone,
-} from '@techmd/domain/philippine-mobile-phone';
+} from '@teqmd/domain/philippine-mobile-phone';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';

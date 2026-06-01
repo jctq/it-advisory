@@ -21,7 +21,7 @@ import { useCallback } from 'react';
 import { useMarketingSupportReportsUnreadCount } from '@/hooks/marketing/use-marketing-support-reports-unread-count';
 import { useMarketingChromeStore } from '@/store/marketing/marketing-chrome-store';
 import { MarketingHeaderAccountMenu } from '@/components/marketing/marketing-header-account-menu';
-import { TechmdSiteLogo } from '@/components/marketing/techmd-site-logo';
+import { TeqmdSiteLogo } from '@/components/marketing/teqmd-site-logo';
 import { MarketingNewDiagnosticCtaLabel } from '@/components/marketing/marketing-new-diagnostic-cta-label';
 import { useMarketingNewDiagnosticNavigation } from '@/components/marketing/marketing-new-diagnostic-session-client';
 import { Button } from '@/components/ui/button';
@@ -104,7 +104,7 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
           onClick={executeHomeLogoClick}
           className="shrink-0 overflow-visible text-foreground outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <TechmdSiteLogo />
+          <TeqmdSiteLogo />
         </Link>
         <nav
           className="hidden min-h-10 min-w-0 flex-1 items-center justify-center gap-x-5 text-sm xl:flex xl:gap-x-7 2xl:gap-x-8"

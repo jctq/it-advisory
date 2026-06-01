@@ -2,7 +2,7 @@ import {
   MarketingAuthApiClient,
   type MarketingAuthUser,
   type MarketingPatchProfileInput,
-} from '@techmd/api-client/marketing-auth-api-client';
+} from '@teqmd/api-client/marketing-auth-api-client';
 import * as SecureStore from 'expo-secure-store';
 import {
   createContext,
@@ -17,7 +17,7 @@ import {
 import { readOrCreateDeviceId } from '../lib/device-id';
 import { readNativeAppConfig } from '../lib/native-app-config';
 
-const MARKETING_SESSION_KEY = 'techmd-marketing-auth-session';
+const MARKETING_SESSION_KEY = 'teqmd-marketing-auth-session';
 
 type MarketingAuthContextValue = {
   readonly deviceId: string | null;

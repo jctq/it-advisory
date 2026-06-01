@@ -180,7 +180,7 @@ Marketing login/register is **built-in** (email + password stored in MongoDB). N
 
 | Register | Notes |
 |----------|-------|
-| Apple Developer Program | `EXPO_PUBLIC_IOS_BUNDLE_ID` (default `com.techmd.native`) |
+| Apple Developer Program | `EXPO_PUBLIC_IOS_BUNDLE_ID` (default `com.teqmd.native`) |
 | Google Play Console | `EXPO_PUBLIC_ANDROID_PACKAGE` |
 | Expo (optional) | If using EAS builds |
 

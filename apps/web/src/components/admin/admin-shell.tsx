@@ -59,7 +59,7 @@ function resolveServerSystemPrefersDarkFromInitial(
   return initialAppearance.isDark;
 }
 
-const ADMIN_SIDEBAR_STORAGE_KEY = 'techmd-admin-sidebar-collapsed';
+const ADMIN_SIDEBAR_STORAGE_KEY = 'teqmd-admin-sidebar-collapsed';
 
 function subscribeToAdminStorage(onStoreChange: () => void): () => void {
   if (typeof window === 'undefined') {

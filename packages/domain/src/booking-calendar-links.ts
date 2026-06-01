@@ -66,7 +66,7 @@ function buildIcsCalendarContent(input: BuildBookingCalendarLinkBundleInput, end
   const dtStamp = formatUtcCompact(new Date());
   const dtStart = formatUtcCompact(input.startsAtUtc);
   const dtEnd = formatUtcCompact(endUtc);
-  const uid = `${input.icsUidSeed.replace(/[^a-zA-Z0-9-]/g, '')}@techmd-booking`;
+  const uid = `${input.icsUidSeed.replace(/[^a-zA-Z0-9-]/g, '')}@teqmd-booking`;
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',

@@ -1,4 +1,4 @@
-import type { PaymentGatewayId } from '@techmd/domain/payment-types';
+import type { PaymentGatewayId } from '@teqmd/domain/payment-types';
 
 export function resolvePaymongoPaymentMethodTypes(methodId: string): readonly string[] {
   switch (methodId) {

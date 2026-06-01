@@ -1,5 +1,5 @@
 {
-  "name": "@techmd/diagnostic-core",
+  "name": "@teqmd/diagnostic-core",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
@@ -16,6 +16,6 @@
     "./diagnostic-session-complete": "./src/diagnostic-session-complete.ts"
   },
   "dependencies": {
-    "@techmd/domain": "workspace:*"
+    "@teqmd/domain": "workspace:*"
   }
 }

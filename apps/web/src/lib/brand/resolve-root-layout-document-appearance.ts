@@ -18,7 +18,7 @@ import {
 } from '@/lib/admin/document-appearance';
 import type { AppearanceScope } from '@/lib/brand/appearance-cookies';
 
-const APPEARANCE_SCOPE_HEADER = 'x-techmd-appearance-scope';
+const APPEARANCE_SCOPE_HEADER = 'x-teqmd-appearance-scope';
 
 function resolveAppearanceScope(scopeHeader: string | null): AppearanceScope {
   return scopeHeader === 'admin' ? 'admin' : 'marketing';

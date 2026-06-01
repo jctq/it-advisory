@@ -24,7 +24,7 @@ import {
   BOOKING_SESSION_CALENDAR_DURATION_MINUTES,
   buildBookingCalendarLinkBundle,
   type BookingCalendarLinkBundle,
-} from '@techmd/domain/booking-calendar-links';
+} from '@teqmd/domain/booking-calendar-links';
 
 const BOOKING_PAYMENT_CONFIRMED_TEMPLATE_KEY = 'booking_payment_confirmed';
 

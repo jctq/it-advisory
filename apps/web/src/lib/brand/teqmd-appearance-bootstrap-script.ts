@@ -1,15 +1,33 @@
-(() => {
+import {
+  ADMIN_COLOR_MODES,
+  ADMIN_COLOR_MODE_STORAGE_KEY,
+  ADMIN_COLOR_THEMES,
+  ADMIN_COLOR_THEME_STORAGE_KEY,
+  DEFAULT_ADMIN_COLOR_MODE,
+  DEFAULT_ADMIN_COLOR_THEME,
+  DEFAULT_MARKETING_COLOR_MODE,
+  DEFAULT_MARKETING_COLOR_THEME,
+  MARKETING_COLOR_MODE_STORAGE_KEY,
+  MARKETING_COLOR_THEME_STORAGE_KEY,
+} from '../admin/admin-appearance';
+
+/**
+ * Blocking appearance bootstrap (runs before paint). Also written to
+ * `public/scripts/teqmd-appearance-bootstrap.js` via `write-appearance-bootstrap.ts`.
+ */
+export function buildTeqmdAppearanceBootstrapScript(): string {
+  return `(() => {
   const root = document.documentElement;
-  const validModes = ["light","dark","system"];
-  const validThemes = ["indigo","emerald","amber","rose"];
-  const adminDefaultMode = "system";
-  const adminDefaultTheme = "indigo";
-  const marketingDefaultMode = "dark";
-  const marketingDefaultTheme = "amber";
-  const adminModeKey = "techmd-admin-color-mode";
-  const adminThemeKey = "techmd-admin-color-theme";
-  const marketingModeKey = "techmd-marketing-color-mode";
-  const marketingThemeKey = "techmd-marketing-color-theme";
+  const validModes = ${JSON.stringify(ADMIN_COLOR_MODES)};
+  const validThemes = ${JSON.stringify(ADMIN_COLOR_THEMES)};
+  const adminDefaultMode = ${JSON.stringify(DEFAULT_ADMIN_COLOR_MODE)};
+  const adminDefaultTheme = ${JSON.stringify(DEFAULT_ADMIN_COLOR_THEME)};
+  const marketingDefaultMode = ${JSON.stringify(DEFAULT_MARKETING_COLOR_MODE)};
+  const marketingDefaultTheme = ${JSON.stringify(DEFAULT_MARKETING_COLOR_THEME)};
+  const adminModeKey = ${JSON.stringify(ADMIN_COLOR_MODE_STORAGE_KEY)};
+  const adminThemeKey = ${JSON.stringify(ADMIN_COLOR_THEME_STORAGE_KEY)};
+  const marketingModeKey = ${JSON.stringify(MARKETING_COLOR_MODE_STORAGE_KEY)};
+  const marketingThemeKey = ${JSON.stringify(MARKETING_COLOR_THEME_STORAGE_KEY)};
   const darkBackground = '#0f172a';
   const lightBackground = '#ffffff';
   try {
@@ -38,4 +56,7 @@
     root.style.backgroundColor = lightBackground;
     root.dataset.colorTheme = marketingDefaultTheme;
   }
-})();
+})();`;
+}
+
+export const TEQMD_APPEARANCE_BOOTSTRAP_SCRIPT = buildTeqmdAppearanceBootstrapScript();
