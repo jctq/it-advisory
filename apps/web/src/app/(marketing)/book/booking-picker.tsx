@@ -1368,6 +1368,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     setErrorMessage,
     setPaymentHoldExpired,
     setPendingPaymentHoldDialogOpen,
+    setRecordingOptIn,
     setServerClockOffsetMs,
     pathRefTrimmed,
     pathname,
