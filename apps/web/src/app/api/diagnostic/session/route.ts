@@ -120,9 +120,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     linkedBookingSlot.paymentStatus !== 'paid';
   const isAwaitingPaymentResume =
     !paymentHoldClosed && (hasPendingCheckout || linkedPendingUnpaid);
-  const resumePaymentSelection = isAwaitingPaymentResume
-    ? resolvePaymentSelectionFromTransaction(latestPayment)
-    : null;
+  const resumePaymentSelection =
+    isAwaitingPaymentResume && latestPayment !== null
+      ? resolvePaymentSelectionFromTransaction(latestPayment)
+      : null;
   const latestPaymentTransactionStatus = latestPayment?.status ?? null;
   const latestPaymentTransactionId = latestPayment?.id ?? null;
   const readOnly = isDiagnosticSessionEditingLocked({
