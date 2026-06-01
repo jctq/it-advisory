@@ -66,7 +66,7 @@ const FEATURE_LINKS: readonly FeatureLinkConfig[] = [
   {
     href: '/admin/diagnostic-templates',
     label: 'Templates',
-    description: 'Diagnostic quiz structure, rounds, and visibility rules.',
+    description: 'Diagnostic structure, rounds, and visibility rules.',
     icon: FileStack,
   },
   {
@@ -84,7 +84,7 @@ const FEATURE_LINKS: readonly FeatureLinkConfig[] = [
   {
     href: '/admin/users',
     label: 'Marketing users',
-    description: 'Signed-in accounts, auth sessions, and quiz snapshots.',
+    description: 'Signed-in accounts, auth sessions, and diagnostic snapshots.',
     icon: CircleUser,
   },
   {
@@ -108,7 +108,7 @@ const FEATURE_LINKS: readonly FeatureLinkConfig[] = [
   {
     href: '/admin/settings',
     label: 'Settings',
-    description: 'Quiz tuning, branding, and operational configuration.',
+    description: 'Diagnostic tuning, branding, and operational configuration.',
     icon: Settings,
   },
 ] as const;
@@ -228,7 +228,7 @@ function RecentLeadsList(props: { readonly leads: readonly AdminDashboardRecentL
   if (props.leads.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No leads yet. They appear here when customers complete a booking or quiz journey.
+        No leads yet. They appear here when customers complete a booking or diagnostic journey.
       </p>
     );
   }

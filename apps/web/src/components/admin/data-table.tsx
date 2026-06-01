@@ -65,7 +65,7 @@ export function DataTable<TData>({
   const showEmptyState = !isLoading && table.getRowModel().rows.length === 0;
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-md border border-border">
+      <div className="relative overflow-x-auto rounded-md border border-border">
         {isLoading ? (
           <div
             className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px]"
@@ -77,7 +77,7 @@ export function DataTable<TData>({
             <span className="sr-only">Loading table rows</span>
           </div>
         ) : null}
-        <table className="w-full caption-bottom text-sm">
+        <table className="w-full min-w-max caption-bottom text-sm">
           <thead className="border-b border-border bg-muted/40 [&_tr]:border-b">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-border transition-colors">

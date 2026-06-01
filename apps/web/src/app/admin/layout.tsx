@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { AdminShell } from '@/components/admin/admin-shell';
+import { resolveAdminLayoutDocumentAppearance } from '@/lib/brand/resolve-root-layout-document-appearance';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,7 @@ type AdminLayoutProps = {
   readonly children: ReactNode;
 };
 
-export default function AdminLayout(props: AdminLayoutProps) {
-  return <AdminShell>{props.children}</AdminShell>;
+export default async function AdminLayout(props: AdminLayoutProps) {
+  const initialAppearance = await resolveAdminLayoutDocumentAppearance();
+  return <AdminShell initialAppearance={initialAppearance}>{props.children}</AdminShell>;
 }

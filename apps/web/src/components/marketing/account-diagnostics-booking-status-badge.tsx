@@ -17,6 +17,8 @@ const STATUS_LABELS: Record<
   confirmed: 'Confirmed',
   completed: 'Completed',
   awaiting_payment: 'Awaiting payment',
+  refund_awaiting: 'Refund awaiting',
+  refunded: 'Refunded',
 };
 
 export function AccountDiagnosticsBookingStatusBadge(props: {
@@ -27,7 +29,14 @@ export function AccountDiagnosticsBookingStatusBadge(props: {
   if (status === 'completed' || status === 'confirmed') {
     return <Badge variant="secondary">{label}</Badge>;
   }
-  if (status === 'cancelled') {
+  if (status === 'refund_awaiting') {
+    return (
+      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
+        {label}
+      </Badge>
+    );
+  }
+  if (status === 'refunded' || status === 'cancelled') {
     return <Badge variant="outline">{label}</Badge>;
   }
   return (

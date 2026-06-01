@@ -59,6 +59,73 @@ export type FetchMarketingServerClockOffsetParams = {
 /**
  * Fetches `GET /api/server-time` and returns an offset suitable for client-side "now" in booking UIs.
  */
+export type RescheduleMarketingCheckoutSlotParams = {
+  /** Full POST URL (preferred — same origin or `NEXT_PUBLIC_API_BASE_URL` origin). */
+  readonly apiUrl?: string;
+  /** Legacy: API origin only; omit when `apiUrl` is set. */
+  readonly apiBaseUrl?: string;
+  readonly sessionRef: string;
+  readonly dateYmd: string;
+  readonly timeLabel: string;
+  readonly signal?: AbortSignal;
+};
+
+function resolveRescheduleMarketingCheckoutSlotUrl(params: RescheduleMarketingCheckoutSlotParams): string {
+  const explicit = params.apiUrl?.trim() ?? '';
+  if (explicit.length > 0) {
+    return explicit;
+  }
+  const base = params.apiBaseUrl?.replace(/\/$/, '') ?? '';
+  return base.length === 0
+    ? '/api/bookings/checkout/reschedule-slot'
+    : `${base}/api/bookings/checkout/reschedule-slot`;
+}
+
+async function readMarketingApiJsonPayload(
+  response: Response,
+): Promise<{ ok?: boolean; error?: string; code?: string }> {
+  const text = await response.text();
+  if (text.trim().length === 0) {
+    if (!response.ok) {
+      throw new Error(`Could not save your new session time. (${response.status})`);
+    }
+    return {};
+  }
+  try {
+    return JSON.parse(text) as { ok?: boolean; error?: string; code?: string };
+  } catch {
+    throw new Error(
+      response.ok
+        ? 'Could not save your new session time.'
+        : `Could not save your new session time. (${response.status})`,
+    );
+  }
+}
+
+/**
+ * Persists a new slot on the quiz session's pending booking after an expired payment hold.
+ */
+export async function rescheduleMarketingCheckoutSlot(
+  params: RescheduleMarketingCheckoutSlotParams,
+): Promise<void> {
+  const url = resolveRescheduleMarketingCheckoutSlotUrl(params);
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionRef: params.sessionRef,
+      date: params.dateYmd,
+      time: params.timeLabel,
+    }),
+    signal: params.signal,
+  });
+  const payload = await readMarketingApiJsonPayload(response);
+  if (!response.ok || payload.ok !== true) {
+    throw new Error(typeof payload.error === 'string' ? payload.error : 'Could not save your new session time.');
+  }
+}
+
 export async function fetchMarketingServerClockOffsetMs(
   params: FetchMarketingServerClockOffsetParams,
 ): Promise<number | null> {

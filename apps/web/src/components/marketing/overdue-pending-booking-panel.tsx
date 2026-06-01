@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { parse } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
@@ -34,6 +35,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { buildAvailabilityByDateFromSlots } from '@/lib/marketing/booking-availability-by-date';
+import { buildMarketingBookSessionCheckoutResumePath } from '@/lib/marketing/quiz-session-marketing-ref';
 import { resolveManilaMonthGridYmdBounds } from '@/lib/marketing/manila-calendar-grid-bounds';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -54,13 +56,14 @@ type OverduePendingBookingPanelProps = {
 };
 
 export function OverduePendingBookingPanel(props: OverduePendingBookingPanelProps): ReactElement | null {
-  if (!props.booking.overduePendingActionsAvailable) {
+  if (!props.booking.overduePendingActionsAvailable || props.booking.status !== 'pending') {
     return null;
   }
   return <OverduePendingBookingPanelBody {...props} />;
 }
 
 function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps): ReactElement {
+  const router = useRouter();
   const [visibleManilaYearMonth, setVisibleManilaYearMonth] = useState(() =>
     formatInTimeZone(new Date(), PRIMARY_TIMEZONE, 'yyyy-MM'),
   );
@@ -143,13 +146,23 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
               timeLabel: selectedTime,
             });
       props.onBookingUpdated(refreshed);
+      const sessionRef = refreshed.quizSessionMarketingRef?.trim() ?? '';
+      if (sessionRef.length > 0) {
+        router.push(
+          buildMarketingBookSessionCheckoutResumePath(sessionRef, {
+            checkoutStep: refreshed.hasCheckoutContact ? 'payment' : 'details',
+            serviceKey: refreshed.serviceKey,
+          }),
+        );
+        return;
+      }
       notifySuccess('New session time saved. You can complete payment below.');
     } catch (error: unknown) {
       notifyError(error instanceof Error ? error.message : 'Could not reschedule.');
     } finally {
       props.onSetSubmitting(false);
     }
-  }, [props, selectedManilaYmd, selectedTime]);
+  }, [props, router, selectedManilaYmd, selectedTime]);
   const executeAbandon = useCallback(async (): Promise<void> => {
     props.onSetSubmitting(true);
     try {
@@ -183,7 +196,8 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
       <div>
         <h2 className="text-sm font-semibold text-foreground">Pick a new session time</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Your original slot has passed. Choose a future time, or delete the diagnostic to cancel this booking.
+          Choose a date and time to rebook this session, then complete payment. Or delete the diagnostic to cancel this
+          booking.
         </p>
       </div>
       <div className="rounded-xl border border-border p-4">
@@ -244,16 +258,18 @@ function OverduePendingBookingPanelBody(props: OverduePendingBookingPanelProps):
           )}
         </Button>
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full text-destructive hover:text-destructive"
-        disabled={props.isSubmitting}
-        onClick={() => setAbandonDialogOpen(true)}
-      >
-        <Trash2 className="size-4" aria-hidden />
-        Delete diagnostic and cancel booking
-      </Button>
+      {props.booking.status === 'pending' ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full text-destructive hover:text-destructive"
+          disabled={props.isSubmitting}
+          onClick={() => setAbandonDialogOpen(true)}
+        >
+          <Trash2 className="size-4" aria-hidden />
+          Delete diagnostic and cancel booking
+        </Button>
+      ) : null}
       <Dialog
         open={slotDialogOpen}
         onOpenChange={(open) => {

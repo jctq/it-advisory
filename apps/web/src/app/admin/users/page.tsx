@@ -15,7 +15,7 @@ export default async function AdminMarketingUsersPage() {
       <AdminPageHeader
         eyebrow="Accounts"
         title="Marketing users"
-        description="Optional web sign-ups (MongoDB users collection). Diagnostics still work anonymously; signed-in visitors use visitor id acct: plus the Mongo user id for quiz and booking rows. Open a user for sign-in sessions and linked quiz snapshots."
+        description="Optional web sign-ups (MongoDB users collection). Diagnostics still work anonymously; signed-in visitors use visitor id acct: plus the Mongo user id for diagnostic and booking rows. Open a user for sign-in sessions and linked diagnostic snapshots."
       />
       <MarketingUsersTable initialData={users} />
     </section>

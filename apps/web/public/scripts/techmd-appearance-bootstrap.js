@@ -29,6 +29,9 @@
     root.style.colorScheme = isDark ? 'dark' : 'light';
     root.style.backgroundColor = backgroundColor;
     root.dataset.colorTheme = theme;
+    const cookieMaxAge = 60 * 60 * 24 * 365;
+    document.cookie = modeKey + '=' + encodeURIComponent(mode) + '; Path=/; Max-Age=' + cookieMaxAge + '; SameSite=Lax';
+    document.cookie = themeKey + '=' + encodeURIComponent(theme) + '; Path=/; Max-Age=' + cookieMaxAge + '; SameSite=Lax';
   } catch (error) {
     root.classList.remove('dark');
     root.style.colorScheme = 'light';

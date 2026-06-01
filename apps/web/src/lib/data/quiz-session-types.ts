@@ -78,6 +78,7 @@ export type VisitorQuizSessionSummary = {
   /** Display/search token derived from {@link bookingId} (last 8 hex chars, uppercase). */
   readonly bookingReferenceId: string | null;
   readonly bookingStatus: BookingDocument['status'] | null;
+  readonly bookingPaymentStatus: PaymentStatus | null;
   readonly bookingStartsAtIso: string | null;
   readonly bookingTimezone: string | null;
   readonly bookingServiceKey: string | null;

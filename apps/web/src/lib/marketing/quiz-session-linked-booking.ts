@@ -1,5 +1,11 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import type { PaymentStatus } from '@/domain/payment-types';
+import type { BookingDocument } from '@/domain/types';
+import {
+  isPendingPaymentExpiredForRebook,
+  isReleasedBookingSlotStartsAt,
+} from '@/lib/booking/pending-payment-expired-for-rebook';
+import { resolveAccountBookingStatus } from '@/lib/marketing/account-booking-status';
 import { DEFAULT_BOOKING_SERVICE_KEY } from '@/store/marketing';
 import { hasCheckoutManageContact } from '@/lib/marketing/checkout-contact';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
@@ -23,6 +29,7 @@ export type LinkedBookingSlotSnapshot = {
   readonly customerCompany: string | null;
   readonly customerPhone: string | null;
   readonly paymentExpiresAtIso: string | null;
+  readonly recordingOptIn: boolean;
 };
 
 export function formatPaymentExpiresAtLabel(
@@ -162,6 +169,56 @@ export function isLinkedBookingCancelled(linked: LinkedBookingSlotSnapshot): boo
   return linked.status === 'cancelled';
 }
 
+/**
+ * True when the linked pending booking still needs a new calendar slot (expired hold or released reservation).
+ */
+export function isLinkedBookingNeedsSlotRebook(
+  linked: LinkedBookingSlotSnapshot,
+  input?: { readonly serverNowMs?: number },
+): boolean {
+  if (isLinkedBookingCancelled(linked)) {
+    return true;
+  }
+  if (!isLinkedBookingPendingPayment(linked)) {
+    return false;
+  }
+  const startsAt = new Date(linked.startsAtIso);
+  if (!Number.isFinite(startsAt.getTime())) {
+    return true;
+  }
+  const paymentExpiresAtRaw = linked.paymentExpiresAtIso?.trim() ?? '';
+  const paymentExpiresAt =
+    paymentExpiresAtRaw.length > 0 ? new Date(paymentExpiresAtRaw) : null;
+  const paymentExpiresAtValid =
+    paymentExpiresAt !== null && Number.isFinite(paymentExpiresAt.getTime()) ? paymentExpiresAt : null;
+  return isPendingPaymentExpiredForRebook({
+    status: 'pending',
+    paymentStatus: (linked.paymentStatus as BookingDocument['paymentStatus'] | null) ?? null,
+    paymentExpiresAt: paymentExpiresAtValid,
+    startsAt,
+    nowMs: input?.serverNowMs,
+  });
+}
+
+/** Pending booking with a real future slot and no expired/released hold — checkout without an active timer until Pay. */
+export function isLinkedBookingDeferredCheckoutEligible(
+  linked: LinkedBookingSlotSnapshot,
+  input?: { readonly serverNowMs?: number },
+): boolean {
+  if (!isLinkedBookingPendingPayment(linked)) {
+    return false;
+  }
+  if (isLinkedBookingNeedsSlotRebook(linked, input)) {
+    return false;
+  }
+  const startsAt = new Date(linked.startsAtIso);
+  if (!Number.isFinite(startsAt.getTime()) || isReleasedBookingSlotStartsAt(startsAt)) {
+    return false;
+  }
+  const nowMs = input?.serverNowMs ?? Date.now();
+  return startsAt.getTime() > nowMs;
+}
+
 function isTerminalPaymentStatus(status: PaymentStatus | null | undefined): boolean {
   return status === 'expired' || status === 'failed' || status === 'paid';
 }
@@ -181,6 +238,7 @@ export function isLinkedBookingCheckoutResumable(
   linked: LinkedBookingSlotSnapshot,
   input: {
     readonly latestPaymentStatus: PaymentStatus | null;
+    readonly paymentHoldExpiresAtIso?: string | null;
     readonly serverNowMs: number;
   },
 ): boolean {
@@ -190,13 +248,18 @@ export function isLinkedBookingCheckoutResumable(
   if (!isLinkedBookingPendingPayment(linked)) {
     return false;
   }
-  if (isTerminalPaymentStatus(input.latestPaymentStatus)) {
+  const resolvedExpiresAtIso =
+    input.paymentHoldExpiresAtIso?.trim() ||
+    linked.paymentExpiresAtIso?.trim() ||
+    '';
+  const holdOpen = !isPaymentHoldWindowClosed({
+    paymentExpiresAtIso: resolvedExpiresAtIso.length > 0 ? resolvedExpiresAtIso : null,
+    serverNowMs: input.serverNowMs,
+  });
+  if (!holdOpen) {
     return false;
   }
   if (isTerminalPaymentStatus(linked.paymentStatus as PaymentStatus | null)) {
-    return false;
-  }
-  if (isPaymentHoldWindowClosed({ paymentExpiresAtIso: linked.paymentExpiresAtIso, serverNowMs: input.serverNowMs })) {
     return false;
   }
   return true;
@@ -268,6 +331,7 @@ export function parseLinkedBookingSlotSnapshot(value: unknown): LinkedBookingSlo
       typeof row.paymentExpiresAtIso === 'string' && row.paymentExpiresAtIso.trim().length > 0
         ? row.paymentExpiresAtIso.trim()
         : null,
+    recordingOptIn: row.recordingOptIn === true,
   };
 }
 
@@ -288,4 +352,28 @@ export function resolveDiagnosticShowBookingActions(params: {
     latestPaymentStatus: null,
     serverNowMs: Date.now(),
   });
+}
+
+/**
+ * Delete is allowed only when the diagnostic appears as Pending in account diagnostics
+ * (not awaiting payment, confirmed, completed, cancelled, or refund states).
+ */
+export function resolveCanDeleteDiagnosticSession(input: {
+  readonly hasDiagnosticContent: boolean;
+  readonly bookingStatus: BookingDocument['status'] | null;
+  readonly paymentTransactionStatus: PaymentStatus | null;
+  readonly isDiagnosticComplete: boolean;
+  readonly isBooked: boolean;
+}): boolean {
+  if (!input.hasDiagnosticContent) {
+    return false;
+  }
+  return (
+    resolveAccountBookingStatus({
+      bookingStatus: input.bookingStatus,
+      paymentTransactionStatus: input.paymentTransactionStatus,
+      isDiagnosticComplete: input.isDiagnosticComplete,
+      isBooked: input.isBooked,
+    }) === 'pending'
+  );
 }

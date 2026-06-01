@@ -30,6 +30,7 @@ import {
 } from '@/lib/marketing/guided-diagnostic-types';
 import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
 import { listVisibleTemplateRoundSummaries } from '@/lib/marketing/diagnostic-template-flow';
+import type { PaymentStatus } from '@/domain/payment-types';
 import { cn } from '@/lib/utils';
 import {
   buildMarketingBookSessionPath,
@@ -41,6 +42,7 @@ import { HorizontalProgressStepper } from '@/components/marketing/horizontal-pro
 import {
   type LinkedBookingSlotSnapshot,
   parseLinkedBookingSlotSnapshot,
+  resolveCanDeleteDiagnosticSession,
   resolveDiagnosticShowBookingActions,
 } from '@/lib/marketing/quiz-session-linked-booking';
 import { GuidedDiagnosticWizard } from './guided-diagnostic-wizard';
@@ -310,6 +312,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
   } = useMarketingDiagnosticQuiz();
   const [showBookingActions, setShowBookingActions] = useState<boolean>(true);
   const [linkedBookingSlot, setLinkedBookingSlot] = useState<LinkedBookingSlotSnapshot | null>(null);
+  const [latestPaymentTransactionStatus, setLatestPaymentTransactionStatus] = useState<PaymentStatus | null>(null);
   /** Session ref returned by PATCH/GET when the visitor uses bare `/diagnostic` (no `[sessionRef]` in the URL). */
   const [persistedSessionRef, setPersistedSessionRef] = useState<string | null>(null);
   const marketingSessionRef = sessionTargetId ?? persistedSessionRef;
@@ -446,6 +449,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           setSessionReadOnly(false);
           setShowBookingActions(true);
           setLinkedBookingSlot(null);
+          setLatestPaymentTransactionStatus(null);
           hasHydratedRef.current = true;
           setIsSessionReady(true);
           return;
@@ -454,6 +458,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           session: { answers: Record<string, string | string[] | number | boolean>; currentStep: number } | null;
           readOnly?: boolean;
           linkedBookingSlot?: unknown;
+          latestPaymentTransactionStatus?: PaymentStatus | null;
           sessionId?: string;
         };
         capturePersistedSessionRef(parseQuizSessionIdFromApiPayload(data));
@@ -462,6 +467,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           setSessionReadOnly(false);
           setShowBookingActions(true);
           setLinkedBookingSlot(null);
+          setLatestPaymentTransactionStatus(null);
           hasHydratedRef.current = true;
           setIsSessionReady(true);
           return;
@@ -471,6 +477,7 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
         sessionReadOnlyRef.current = readOnly;
         setSessionReadOnly(readOnly);
         setLinkedBookingSlot(parsedLinkedBookingSlot);
+        setLatestPaymentTransactionStatus(data.latestPaymentTransactionStatus ?? null);
         setShowBookingActions(
           resolveDiagnosticShowBookingActions({
             sessionReadOnly: readOnly,
@@ -613,6 +620,13 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
     guided.completedBundles.length > 0 ||
     guided.activeRound !== null ||
     guided.initialPrompt.trim().length > 0;
+  const canDeleteDiagnostic = resolveCanDeleteDiagnosticSession({
+    hasDiagnosticContent: showRetakeLink,
+    bookingStatus: linkedBookingSlot?.status ?? null,
+    paymentTransactionStatus: latestPaymentTransactionStatus,
+    isDiagnosticComplete: guided.outcome !== null,
+    isBooked: linkedBookingSlot !== null,
+  });
   const deleteSituationPreview = useMemo((): string | null => {
     const trimmed = guided.initialPrompt.trim();
     return trimmed.length > 0 ? trimmed : null;
@@ -918,10 +932,12 @@ export function QuizFlow(props: QuizFlowProps = {}): ReactElement {
           </Button>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {showRetakeLink && !sessionReadOnly ? (
+              <Button type="button" variant="outline" asChild>
+                <Link href={buildMarketingQuizRetakePath(marketingSessionRef)}>Retake diagnostic</Link>
+              </Button>
+            ) : null}
+            {canDeleteDiagnostic ? (
               <>
-                <Button type="button" variant="outline" asChild>
-                  <Link href={buildMarketingQuizRetakePath(marketingSessionRef)}>Retake diagnostic</Link>
-                </Button>
                 <Button
                   type="button"
                   variant="outline"

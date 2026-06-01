@@ -13,6 +13,8 @@ export const ACCOUNT_BOOKING_STATUS_VALUES = [
   'confirmed',
   'completed',
   'awaiting_payment',
+  'refund_awaiting',
+  'refunded',
 ] as const;
 
 export type AccountBookingStatus = (typeof ACCOUNT_BOOKING_STATUS_VALUES)[number];
@@ -29,6 +31,8 @@ export const BOOKING_LIST_STATUS_FILTER_OPTIONS: readonly {
   { id: 'confirmed', label: 'Confirmed' },
   { id: 'completed', label: 'Completed' },
   { id: 'cancelled', label: 'Cancelled' },
+  { id: 'refund_awaiting', label: 'Refund awaiting' },
+  { id: 'refunded', label: 'Refunded' },
 ] as const;
 
 export function normalizeBookingListStatusFilter(raw: string): BookingListStatusFilter {
@@ -38,7 +42,9 @@ export function normalizeBookingListStatusFilter(raw: string): BookingListStatus
     raw === 'pending' ||
     raw === 'confirmed' ||
     raw === 'completed' ||
-    raw === 'awaiting_payment'
+    raw === 'awaiting_payment' ||
+    raw === 'refund_awaiting' ||
+    raw === 'refunded'
   ) {
     return raw;
   }
@@ -62,6 +68,12 @@ export type ResolveAccountBookingStatusInput = {
 export function resolveAccountBookingStatus(input: ResolveAccountBookingStatusInput): AccountBookingStatus {
   const bookingStatus = input.bookingStatus;
   const paymentStatus = input.paymentTransactionStatus;
+  if (bookingStatus === 'refunded') {
+    return 'refunded';
+  }
+  if (bookingStatus === 'refund_awaiting') {
+    return 'refund_awaiting';
+  }
   if (bookingStatus === 'cancelled') {
     return 'cancelled';
   }
@@ -101,6 +113,12 @@ export function resolveAdminBookingLifecycleStatus(
   if (input.status === 'cancelled') {
     return 'cancelled';
   }
+  if (input.status === 'refunded') {
+    return 'refunded';
+  }
+  if (input.status === 'refund_awaiting') {
+    return 'refund_awaiting';
+  }
   if (input.status === 'completed') {
     return 'completed';
   }
@@ -126,6 +144,12 @@ export function buildAccountDiagnosticsBookingStatusMatch(status: BookingListSta
   }
   if (status === 'cancelled') {
     return { 'linkedBooking.status': 'cancelled' };
+  }
+  if (status === 'refunded') {
+    return { 'linkedBooking.status': 'refunded' };
+  }
+  if (status === 'refund_awaiting') {
+    return { 'linkedBooking.status': 'refund_awaiting' };
   }
   if (status === 'completed') {
     return { 'linkedBooking.status': 'completed' };
@@ -163,7 +187,13 @@ export function buildAdminBookingsRangeStatusQuery(
   if (status === 'all') {
     return null;
   }
-  if (status === 'cancelled' || status === 'completed' || status === 'confirmed') {
+  if (
+    status === 'cancelled' ||
+    status === 'completed' ||
+    status === 'confirmed' ||
+    status === 'refund_awaiting' ||
+    status === 'refunded'
+  ) {
     return { status };
   }
   if (status === 'awaiting_payment') {

@@ -571,17 +571,29 @@ export async function findLatestPaymentTransactionByQuizSessionIdHex(
   return mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } });
 }
 
-export async function listExpiredHoldTransactions(now: Date): Promise<readonly PaymentTransactionRow[]> {
+export async function listExpiredHoldTransactions(
+  now: Date,
+  holdExpiresMinutes: number,
+): Promise<readonly PaymentTransactionRow[]> {
   if (!process.env.MONGODB_URI) {
     return [];
   }
   const db = await getDb();
+  const createdBefore =
+    holdExpiresMinutes > 0
+      ? new Date(now.getTime() - holdExpiresMinutes * 60_000)
+      : null;
   const docs = await db
     .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
     .find({
       paymentPolicy: { $in: ['pay_after_hold', 'pay_before_booking'] },
       status: { $in: ['pending', 'processing'] },
-      expiresAt: { $lte: now, $ne: null },
+      $or: [
+        { expiresAt: { $lte: now, $ne: null } },
+        ...(createdBefore !== null
+          ? [{ expiresAt: null, createdAt: { $lte: createdBefore } }]
+          : []),
+      ],
     })
     .limit(200)
     .toArray();

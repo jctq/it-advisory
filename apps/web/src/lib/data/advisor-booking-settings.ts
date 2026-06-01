@@ -12,6 +12,23 @@ import { getDb } from '@/lib/mongodb';
 
 const ADVISOR_SETTINGS_ID = 'default' as const;
 
+/** Bookings that still reserve a calendar slot (excludes pending rows after checkout hold expired). */
+function buildActiveBookingSlotOccupancyFilter(): Record<string, unknown> {
+  return {
+    $or: [
+      { status: 'confirmed' },
+      {
+        status: 'pending',
+        $or: [
+          { paymentStatus: { $in: ['paid', 'pending', 'processing'] } },
+          { paymentStatus: { $exists: false } },
+          { paymentStatus: null },
+        ],
+      },
+    ],
+  };
+}
+
 function addCalendarDaysToYmd(ymd: string, days: number, timeZone: string): string {
   const base = fromZonedTime(parse(`${ymd} 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)), timeZone);
   return formatInTimeZone(addDays(base, days), timeZone, 'yyyy-MM-dd');
@@ -105,7 +122,7 @@ export async function listActiveBookingStartsUtcInYmdWindow(input: {
       .collection<{ startsAt: Date }>(COLLECTIONS.bookings)
       .find(
         {
-          status: { $in: ['pending', 'confirmed'] },
+          ...buildActiveBookingSlotOccupancyFilter(),
           startsAt: { $gte: rangeStart, $lt: rangeEndExclusive },
         },
         { projection: { startsAt: 1 } },
@@ -163,7 +180,7 @@ export async function listActiveBookingStartsUtcInYmdWindowForCheckout(input: {
       .collection<{ startsAt: Date }>(COLLECTIONS.bookings)
       .find(
         {
-          status: { $in: ['pending', 'confirmed'] },
+          ...buildActiveBookingSlotOccupancyFilter(),
           startsAt: { $gte: rangeStart, $lt: rangeEndExclusive },
           $or: [
             { quizSessionId: { $exists: false } },

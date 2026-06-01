@@ -20,6 +20,10 @@ async function ensureIndexes(): Promise<void> {
   await db.collection(COLLECTIONS.bookings).createIndexes([
     { key: { quizSessionId: 1, createdAt: 1 }, name: 'bookings_quiz_session_created' },
   ]);
+  await db.collection(COLLECTIONS.bookingRefunds).createIndexes([
+    { key: { status: 1, requestedAt: -1 }, name: 'booking_refunds_status_requested' },
+    { key: { bookingId: 1 }, name: 'booking_refunds_booking' },
+  ]);
   await db.collection(COLLECTIONS.paymentTransactions).createIndexes([
     { key: { visitorId: 1, status: 1, updatedAt: -1 }, name: 'payments_visitor_status_updated' },
     { key: { quizSessionIdHex: 1, createdAt: -1 }, name: 'payments_quiz_session_created' },

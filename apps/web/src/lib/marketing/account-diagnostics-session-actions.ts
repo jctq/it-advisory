@@ -1,13 +1,59 @@
 import { buildMarketingBookSessionPath } from '@/lib/marketing/quiz-session-marketing-ref';
 import type { VisitorQuizSessionSummary } from '@/lib/data/quiz-session-types';
+import type { PaymentPolicy } from '@/domain/payment-types';
+import {
+  isBookingPaidForCustomerAction,
+  resolveBookingCustomerActionMode,
+  type BookingCustomerActionMode,
+} from '@/lib/booking/booking-customer-action-eligibility';
 import {
   resolveAccountBookingStatusFromSummary,
   type AccountBookingStatus,
 } from '@/lib/marketing/account-booking-status';
+import { resolveCanDeleteDiagnosticSession } from '@/lib/marketing/quiz-session-linked-booking';
 
 const MONGO_OBJECT_ID_HEX = /^[a-f0-9]{24}$/i;
 
-export type AccountDiagnosticsSessionActionId = 'view' | 'manage' | 'continue';
+export type AccountDiagnosticsSessionActionId =
+  | 'view'
+  | 'manage'
+  | 'continue'
+  | 'cancel'
+  | 'refund'
+  | 'delete';
+
+function rowHasDiagnosticContent(row: VisitorQuizSessionSummary): boolean {
+  if (row.hasGuidedDiagnostic) {
+    return true;
+  }
+  if (row.situationPreview !== null && row.situationPreview.trim().length > 0) {
+    return true;
+  }
+  if (row.sessionTitlePreview !== null && row.sessionTitlePreview.trim().length > 0) {
+    return true;
+  }
+  return row.currentStep > 0;
+}
+
+export function resolveAccountDiagnosticsCanDeleteSession(row: VisitorQuizSessionSummary): boolean {
+  return resolveCanDeleteDiagnosticSession({
+    hasDiagnosticContent: rowHasDiagnosticContent(row),
+    bookingStatus: row.bookingStatus,
+    paymentTransactionStatus: row.paymentTransactionStatus,
+    isDiagnosticComplete: row.isDiagnosticComplete,
+    isBooked: row.isBooked,
+  });
+}
+
+function appendDeleteWhenEligible(
+  actions: readonly AccountDiagnosticsSessionActionId[],
+  row: VisitorQuizSessionSummary,
+): readonly AccountDiagnosticsSessionActionId[] {
+  if (!resolveAccountDiagnosticsCanDeleteSession(row)) {
+    return actions;
+  }
+  return [...actions, 'delete'];
+}
 
 function isTerminalPaymentStatus(
   status: VisitorQuizSessionSummary['paymentTransactionStatus'],
@@ -37,32 +83,78 @@ export function isSessionConfirmedForManage(row: VisitorQuizSessionSummary): boo
   return status === 'confirmed' || status === 'completed';
 }
 
+export type AccountDiagnosticsSessionActionsOptions = {
+  readonly paymentPolicy: PaymentPolicy;
+  readonly refundsEnabled?: boolean;
+};
+
+function resolveCustomerActionForRow(
+  row: VisitorQuizSessionSummary,
+  options: AccountDiagnosticsSessionActionsOptions,
+): BookingCustomerActionMode | null {
+  if (row.bookingStatus === null) {
+    return null;
+  }
+  return resolveBookingCustomerActionMode({
+    paymentPolicy: options.paymentPolicy,
+    bookingStatus: row.bookingStatus,
+    isPaid: isBookingPaidForCustomerAction({
+      bookingPaymentStatus: row.bookingPaymentStatus,
+      paymentTransactionStatus: row.paymentTransactionStatus,
+    }),
+    refundsEnabled: options.refundsEnabled,
+  });
+}
+
+function appendCustomerAction(
+  actions: readonly AccountDiagnosticsSessionActionId[],
+  mode: BookingCustomerActionMode | null,
+): readonly AccountDiagnosticsSessionActionId[] {
+  if (mode === 'cancel') {
+    return [...actions, 'cancel'];
+  }
+  if (mode === 'refund') {
+    return [...actions, 'refund'];
+  }
+  return actions;
+}
+
 /**
  * Primary actions for a diagnostics list row (My diagnostics).
  *
  * - awaiting_payment → manage
- * - pending + incomplete diagnostic → continue
- * - pending + complete diagnostic → manage
- * - confirmed / completed → view
+ * - pending + incomplete diagnostic → continue (+ delete when eligible)
+ * - pending + complete diagnostic → manage (+ delete when eligible)
+ * - confirmed → view (+ cancel or refund when eligible)
+ * - completed → view only
  * - cancelled → view
  */
 export function resolveAccountDiagnosticsSessionActions(
   row: VisitorQuizSessionSummary,
+  options: AccountDiagnosticsSessionActionsOptions,
 ): readonly AccountDiagnosticsSessionActionId[] {
   const lifecycleStatus = resolveAccountBookingStatusFromSummary(row);
-  if (lifecycleStatus === 'cancelled') {
+  const customerAction = resolveCustomerActionForRow(row, options);
+  if (lifecycleStatus === 'cancelled' || lifecycleStatus === 'refunded' || lifecycleStatus === 'refund_awaiting') {
     return ['view'];
   }
   if (lifecycleStatus === 'confirmed' || lifecycleStatus === 'completed') {
-    return ['view'];
+    return appendCustomerAction(['view'], customerAction);
   }
   if (lifecycleStatus === 'awaiting_payment') {
     return ['manage'];
   }
   if (!row.isDiagnosticComplete) {
-    return ['continue'];
+    return appendDeleteWhenEligible(['continue'], row);
   }
-  return ['manage'];
+  return appendDeleteWhenEligible(['manage'], row);
+}
+
+export function resolveAccountDiagnosticsSessionCustomerAction(
+  row: VisitorQuizSessionSummary,
+  options: AccountDiagnosticsSessionActionsOptions,
+): BookingCustomerActionMode | null {
+  return resolveCustomerActionForRow(row, options);
 }
 
 export function buildBookManageHref(bookingId: string | null): string {

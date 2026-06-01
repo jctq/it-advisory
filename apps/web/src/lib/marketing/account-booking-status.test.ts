@@ -38,6 +38,28 @@ describe('resolveAccountBookingStatus', () => {
       }),
     ).toBe('pending');
   });
+
+  it('returns refund_awaiting from booking status', () => {
+    expect(
+      resolveAccountBookingStatus({
+        bookingStatus: 'refund_awaiting',
+        paymentTransactionStatus: 'paid',
+        isDiagnosticComplete: true,
+        isBooked: true,
+      }),
+    ).toBe('refund_awaiting');
+  });
+
+  it('returns refunded from booking status', () => {
+    expect(
+      resolveAccountBookingStatus({
+        bookingStatus: 'refunded',
+        paymentTransactionStatus: 'refunded',
+        isDiagnosticComplete: true,
+        isBooked: true,
+      }),
+    ).toBe('refunded');
+  });
 });
 
 describe('resolveAdminBookingLifecycleStatus', () => {
@@ -56,6 +78,12 @@ describe('buildAccountDiagnosticsBookingStatusMatch', () => {
   it('filters completed on booking status', () => {
     expect(buildAccountDiagnosticsBookingStatusMatch('completed')).toEqual({
       'linkedBooking.status': 'completed',
+    });
+  });
+
+  it('filters refund_awaiting on booking status', () => {
+    expect(buildAccountDiagnosticsBookingStatusMatch('refund_awaiting')).toEqual({
+      'linkedBooking.status': 'refund_awaiting',
     });
   });
 });

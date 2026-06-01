@@ -5,6 +5,7 @@ import type { PaymentGatewayId, PaymentPolicy, PaymentStatus } from '@/domain/pa
 import {
   createBookingWithLatestQuizSnapshot,
   findBookingByVisitorSlot,
+  findPrimaryBookingSlotByQuizSessionId,
   insertMarketingBooking,
   linkQuizSessionToVisitorBooking,
 } from '@/lib/data/bookings';
@@ -17,6 +18,7 @@ import { executeSendBookingConfirmationEmail } from '@/lib/email/send-booking-co
 import { incrementPromoRedemptionCount } from '@/lib/data/monetization-settings';
 import { syncBookingRecordingFieldsFromTransaction } from '@/lib/booking/apply-booking-recording-fields';
 import { ensureVideoMeetingStoredForBooking } from '@/lib/video-meetings/ensure-video-meeting-for-booking';
+import { RELEASED_BOOKING_SLOT_STARTS_AT } from '@/lib/booking/released-booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
 async function ensureTransactionBookingLinkedToQuizSession(
@@ -83,10 +85,15 @@ export async function resetBookingAfterExpiredPaymentHold(bookingId: ObjectId): 
       $set: {
         status: 'pending',
         paymentStatus: 'expired',
+        startsAt: RELEASED_BOOKING_SLOT_STARTS_AT,
         updatedAt: new Date(),
       },
       $unset: {
         paymentExpiresAt: '',
+        meetingUrl: '',
+        zoomMeetingId: '',
+        googleMeetEventId: '',
+        teamsOnlineMeetingId: '',
       },
     },
   );
@@ -103,7 +110,7 @@ export async function updateBookingStatusByAdmin(
   if (!process.env.MONGODB_URI) {
     return { ok: false, code: 'database_unavailable' };
   }
-  if (status !== 'pending' && status !== 'confirmed' && status !== 'completed' && status !== 'cancelled') {
+  if (status !== 'pending' && status !== 'confirmed' && status !== 'completed' && status !== 'cancelled' && status !== 'refund_awaiting' && status !== 'refunded') {
     return { ok: false, code: 'invalid_status' };
   }
   let objectId: ObjectId;
@@ -415,6 +422,40 @@ async function loadTransactionStartsAt(transactionId: string): Promise<Date> {
   return new Date();
 }
 
+/** Re-applies slot and checkout fields on an existing booking row for a new or resumed open transaction. */
+export async function renewBookingCheckoutHoldFromOpenTransaction(input: {
+  readonly bookingId: ObjectId;
+  readonly transaction: PaymentTransactionRow;
+  readonly expiresAt: Date;
+}): Promise<void> {
+  const startsAt = await loadTransactionStartsAt(input.transaction.id);
+  const db = await getDb();
+  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
+    { _id: input.bookingId, status: { $nin: ['completed', 'cancelled'] } },
+    {
+      $set: {
+        status: 'pending',
+        paymentStatus: 'pending',
+        startsAt,
+        serviceKey: input.transaction.serviceKey,
+        timezone: input.transaction.timezone || PRIMARY_TIMEZONE,
+        paymentGatewayId: input.transaction.gatewayId,
+        paymentTransactionId: new ObjectId(input.transaction.id),
+        paymentProviderRef: input.transaction.providerRef,
+        paymentExpiresAt: input.expiresAt,
+        paymentMethodLabel: input.transaction.paymentMethodLabel,
+        updatedAt: new Date(),
+      },
+      $unset: {
+        meetingUrl: '',
+        zoomMeetingId: '',
+        googleMeetEventId: '',
+        teamsOnlineMeetingId: '',
+      },
+    },
+  );
+}
+
 export async function createPendingBookingForHoldPolicy(input: {
   readonly transaction: PaymentTransactionRow;
   readonly expiresAt: Date;
@@ -431,50 +472,57 @@ export async function createPendingBookingForHoldPolicy(input: {
     return null;
   }
   const { quizSessionId, snapshot } = await resolveQuizSnapshot(transaction.visitorId, transaction.quizSessionIdHex);
-  const inserted = await insertMarketingBooking({
-    visitorId: transaction.visitorId,
-    serviceKey: transaction.serviceKey,
-    startsAt: await loadTransactionStartsAt(transaction.id),
-    timezone: transaction.timezone || PRIMARY_TIMEZONE,
-    leadId,
-    quizSessionId,
-    guidedDiagnosticSnapshot: snapshot,
-    paymentMethodLabel: transaction.paymentMethodLabel,
-  });
-  let bookingId: ObjectId | null =
-    inserted === null || inserted.kind === 'duplicate_key'
-      ? await findBookingByVisitorSlot({
-          visitorId: transaction.visitorId,
-          serviceKey: transaction.serviceKey,
-          startsAt: await loadTransactionStartsAt(transaction.id),
-        })
-      : inserted.id;
+  const startsAt = await loadTransactionStartsAt(transaction.id);
+  let bookingId: ObjectId | null = null;
+  if (quizSessionId !== null) {
+    const primarySlot = await findPrimaryBookingSlotByQuizSessionId(quizSessionId);
+    if (primarySlot !== null) {
+      bookingId = new ObjectId(primarySlot.bookingId);
+    }
+  }
+  if (bookingId === null) {
+    const inserted = await insertMarketingBooking({
+      visitorId: transaction.visitorId,
+      serviceKey: transaction.serviceKey,
+      startsAt,
+      timezone: transaction.timezone || PRIMARY_TIMEZONE,
+      leadId,
+      quizSessionId,
+      guidedDiagnosticSnapshot: snapshot,
+      paymentMethodLabel: transaction.paymentMethodLabel,
+    });
+    bookingId =
+      inserted === null || inserted.kind === 'duplicate_key'
+        ? await findBookingByVisitorSlot({
+            visitorId: transaction.visitorId,
+            serviceKey: transaction.serviceKey,
+            startsAt,
+          })
+        : inserted.id;
+  }
   if (bookingId === null) {
     return null;
   }
   const db = await getDb();
   const existingBooking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
     { _id: bookingId },
-    { projection: { paymentExpiresAt: 1 } },
+    { projection: { paymentExpiresAt: 1, paymentStatus: 1 } },
   );
   const existingExpiresAt =
     existingBooking?.paymentExpiresAt instanceof Date ? existingBooking.paymentExpiresAt : null;
+  const hasActiveHold =
+    existingBooking?.paymentStatus === 'pending' || existingBooking?.paymentStatus === 'processing';
   const resolvedExpiresAt =
-    existingExpiresAt !== null && existingExpiresAt.getTime() > Date.now() ? existingExpiresAt : expiresAt;
-  await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
-    { _id: bookingId },
-    {
-      $set: {
-        status: 'pending',
-        paymentStatus: 'pending',
-        paymentGatewayId: transaction.gatewayId,
-        paymentTransactionId: new ObjectId(transaction.id),
-        paymentProviderRef: transaction.providerRef,
-        paymentExpiresAt: resolvedExpiresAt,
-        updatedAt: new Date(),
-      },
-    },
-  );
+    hasActiveHold &&
+    existingExpiresAt !== null &&
+    existingExpiresAt.getTime() > Date.now()
+      ? existingExpiresAt
+      : expiresAt;
+  await renewBookingCheckoutHoldFromOpenTransaction({
+    bookingId,
+    transaction,
+    expiresAt: resolvedExpiresAt,
+  });
   await db.collection(COLLECTIONS.paymentTransactions).updateOne(
     { _id: new ObjectId(transaction.id) },
     { $set: { expiresAt: resolvedExpiresAt, updatedAt: new Date() } },

@@ -1,11 +1,13 @@
 'use client';
 
-import { useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useState, useSyncExternalStore, useCallback, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Menu } from 'lucide-react';
 import {
   ADMIN_COLOR_MODE_STORAGE_KEY,
   ADMIN_COLOR_THEME_STORAGE_KEY,
+  DEFAULT_ADMIN_COLOR_MODE,
+  DEFAULT_ADMIN_COLOR_THEME,
   type AdminColorMode,
   type AdminColorTheme,
 } from '@/lib/admin/admin-appearance';
@@ -15,13 +17,12 @@ import {
   resolveClientAdminAppearanceMode,
   resolveClientAdminAppearanceTheme,
   resolveClientSystemPrefersDark,
-  resolveServerAdminAppearanceMode,
-  resolveServerAdminAppearanceTheme,
   resolveServerSystemPrefersDark,
   subscribeToAdminAppearanceStorage,
   subscribeToSystemColorScheme,
   syncMarketingDocumentAppearanceFromStorage,
 } from '@/lib/admin/document-appearance';
+import type { ResolvedLayoutDocumentAppearance } from '@/lib/brand/resolve-root-layout-document-appearance';
 import { AdminAppearanceControls } from '@/components/admin/admin-appearance-controls';
 import { AdminOnboardingGuideButton } from '@/components/admin/admin-onboarding-guide-button';
 import { AdminOnboardingProvider } from '@/components/admin/admin-onboarding-provider';
@@ -31,7 +32,32 @@ import { cn } from '@/lib/utils';
 
 type AdminShellProps = {
   readonly children: ReactNode;
+  readonly initialAppearance?: ResolvedLayoutDocumentAppearance;
 };
+
+function resolveServerAdminAppearanceModeFromInitial(
+  initialAppearance: ResolvedLayoutDocumentAppearance | undefined,
+): AdminColorMode {
+  return initialAppearance?.mode ?? DEFAULT_ADMIN_COLOR_MODE;
+}
+
+function resolveServerAdminAppearanceThemeFromInitial(
+  initialAppearance: ResolvedLayoutDocumentAppearance | undefined,
+): AdminColorTheme {
+  return initialAppearance?.colorTheme ?? DEFAULT_ADMIN_COLOR_THEME;
+}
+
+function resolveServerSystemPrefersDarkFromInitial(
+  initialAppearance: ResolvedLayoutDocumentAppearance | undefined,
+): boolean {
+  if (initialAppearance === undefined) {
+    return false;
+  }
+  if (initialAppearance.mode !== 'system') {
+    return false;
+  }
+  return initialAppearance.isDark;
+}
 
 const ADMIN_SIDEBAR_STORAGE_KEY = 'techmd-admin-sidebar-collapsed';
 
@@ -111,6 +137,18 @@ export function AdminShell(props: AdminShellProps) {
   const [collapsedOverride, setCollapsedOverride] = useState<boolean | null>(null);
   const [colorModeOverride, setColorModeOverride] = useState<AdminColorMode | null>(null);
   const [colorThemeOverride, setColorThemeOverride] = useState<AdminColorTheme | null>(null);
+  const resolveServerAdminAppearanceMode = useCallback(
+    (): AdminColorMode => resolveServerAdminAppearanceModeFromInitial(props.initialAppearance),
+    [props.initialAppearance],
+  );
+  const resolveServerAdminAppearanceTheme = useCallback(
+    (): AdminColorTheme => resolveServerAdminAppearanceThemeFromInitial(props.initialAppearance),
+    [props.initialAppearance],
+  );
+  const resolveServerSystemPrefersDarkForAdmin = useCallback(
+    (): boolean => resolveServerSystemPrefersDarkFromInitial(props.initialAppearance),
+    [props.initialAppearance],
+  );
   const storedCollapsed = useSyncExternalStore(
     subscribeToAdminStorage,
     resolveClientSidebarCollapsed,
@@ -129,7 +167,7 @@ export function AdminShell(props: AdminShellProps) {
   const systemPrefersDark = useSyncExternalStore(
     subscribeToSystemColorScheme,
     resolveClientSystemPrefersDark,
-    resolveServerSystemPrefersDark,
+    resolveServerSystemPrefersDarkForAdmin,
   );
   const collapsed = collapsedOverride ?? storedCollapsed;
   const colorMode = colorModeOverride ?? storedColorMode;

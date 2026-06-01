@@ -125,7 +125,7 @@ function renderOverviewPanel(props: AdminBookingDetailWorkspaceProps): ReactElem
         </div>
         {booking.quizSessionId !== null ? (
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quiz session</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diagnostic session</dt>
             <dd className="mt-1 text-sm">
               <Link
                 href={`/admin/sessions/${booking.quizSessionId}`}

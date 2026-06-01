@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { BookingDocument } from '@/domain/types';
 import { findBookingById } from '@/lib/data/bookings';
 import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
 import { formatPaymentAmountLabel } from '@/lib/data/payment-settings';
@@ -28,7 +29,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
   transaction = await reconcilePaymentTransactionIfPending(transaction);
   transaction = await ensurePaidTransactionFulfilled(transaction);
   let meetingUrl: string | null = null;
-  let bookingStatus: 'pending' | 'confirmed' | 'completed' | 'cancelled' | null = null;
+  let bookingStatus: BookingDocument['status'] | null = null;
   const bookingIdHex = transaction.bookingId?.trim() ?? '';
   if (bookingIdHex.length > 0) {
     const booking = await findBookingById(bookingIdHex);

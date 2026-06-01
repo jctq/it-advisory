@@ -47,6 +47,9 @@ export function resolveCheckoutRecordingOptIn(input: {
   if (input.requested === true) {
     return true;
   }
+  if (input.requested === false) {
+    return false;
+  }
   if (input.bookingRecordingOptIn === true) {
     return true;
   }

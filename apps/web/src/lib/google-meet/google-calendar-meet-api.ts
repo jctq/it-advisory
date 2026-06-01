@@ -194,3 +194,30 @@ export async function requestCreateGoogleCalendarEventWithMeet(
   }
   return { joinUrl, eventId };
 }
+
+export async function requestDeleteGoogleCalendarEvent(
+  accessToken: string,
+  credentials: GoogleMeetOAuthCredentials,
+  eventId: string,
+): Promise<boolean> {
+  const calendarSegment = encodeURIComponent(credentials.calendarId);
+  const encodedEventId = encodeURIComponent(eventId.trim());
+  if (encodedEventId.length === 0) {
+    return false;
+  }
+  const url = `${GOOGLE_CALENDAR_API_ORIGIN}/calendars/${calendarSegment}/events/${encodedEventId}?sendUpdates=all`;
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.status === 404 || response.status === 410) {
+    return true;
+  }
+  if (!response.ok) {
+    console.error('[google-meet] delete event failed', response.status);
+    return false;
+  }
+  return true;
+}

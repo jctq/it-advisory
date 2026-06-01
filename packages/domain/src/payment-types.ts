@@ -107,6 +107,8 @@ export function findPaymentMethodOption(
 export type PaymentSettingsDocument = {
   _id: string;
   paymentsEnabled: boolean;
+  /** When true, confirmed bookings can be cancelled for refund (24h policy). */
+  refundsEnabled: boolean;
   paymentPolicy: PaymentPolicy;
   currency: PaymentCurrencyCode;
   checkoutAmountCentavos: number;

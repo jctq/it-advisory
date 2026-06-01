@@ -83,3 +83,29 @@ export async function requestCreateMicrosoftTeamsOnlineMeeting(
   const meetingId = typeof rawId === 'string' && rawId.trim().length > 0 ? rawId.trim() : '';
   return { joinUrl, meetingId };
 }
+
+export async function requestDeleteMicrosoftTeamsOnlineMeeting(
+  accessToken: string,
+  credentials: MicrosoftTeamsAppCredentials,
+  meetingId: string,
+): Promise<boolean> {
+  const userSegment = encodeURIComponent(credentials.organizerUserId.trim());
+  const encodedMeetingId = encodeURIComponent(meetingId.trim());
+  if (encodedMeetingId.length === 0) {
+    return false;
+  }
+  const response = await fetch(`${GRAPH_API_ORIGIN}/users/${userSegment}/onlineMeetings/${encodedMeetingId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.status === 404) {
+    return true;
+  }
+  if (!response.ok) {
+    console.error('[microsoft-teams] delete meeting failed', response.status);
+    return false;
+  }
+  return true;
+}

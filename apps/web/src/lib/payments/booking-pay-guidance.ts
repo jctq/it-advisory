@@ -20,6 +20,7 @@ export type BuildBookingPayGuidanceInput = {
   readonly status: BookingDocument['status'];
   readonly manageKind: 'account' | 'guest';
   readonly profileSyncAvailable?: boolean;
+  readonly pendingPaymentExpiredForRebook?: boolean;
 };
 
 /**
@@ -46,6 +47,9 @@ export function buildBookingPayGuidance(input: BuildBookingPayGuidanceInput): Bo
       actions: [{ label: 'Back to home', href: '/' }],
     };
   }
+  if (input.payabilityCode === 'session_slot_in_past' && input.pendingPaymentExpiredForRebook === true) {
+    return buildPendingPaymentExpiredRebookGuidance(fallbackMessage);
+  }
   if (input.payabilityCode === 'session_slot_in_past') {
     return {
       title: 'Consultation time has passed',
@@ -59,16 +63,7 @@ export function buildBookingPayGuidance(input: BuildBookingPayGuidanceInput): Bo
     };
   }
   if (input.payabilityCode === 'payment_window_expired') {
-    return {
-      title: 'Payment window closed',
-      message: fallbackMessage,
-      steps: [
-        'The time limit to pay for this slot has passed.',
-        'Book a new consultation to pick a fresh time.',
-        'If you already paid or believe this is a mistake, contact us with your booking reference.',
-      ],
-      actions: [{ label: 'Book a new consultation', href: '/book' }],
-    };
+    return buildPendingPaymentExpiredRebookGuidance(fallbackMessage);
   }
   if (input.payabilityCode === 'payments_disabled') {
     return {
@@ -161,6 +156,30 @@ export function buildBookingPayGuidance(input: BuildBookingPayGuidanceInput): Bo
       actions: [{ label: 'Look up as guest', href: '/book/manage' }],
     };
   }
+  if (input.payabilityCode === 'status_refund_awaiting') {
+    return {
+      title: 'Refund in progress',
+      message: fallbackMessage,
+      steps: [
+        'We received your cancellation and are processing your refund.',
+        'You will not be able to pay for this booking while the refund is pending.',
+        'Contact us if you have questions about timing or the refund amount.',
+      ],
+      actions: [],
+    };
+  }
+  if (input.payabilityCode === 'status_refunded') {
+    return {
+      title: 'Booking refunded',
+      message: fallbackMessage,
+      steps: [
+        'This reservation has been refunded and no further payment is required.',
+        'Allow a few business days for the refund to appear on your statement, depending on your bank or wallet.',
+        'Contact us if you need help with this reservation.',
+      ],
+      actions: [],
+    };
+  }
   if (input.payabilityCode === 'status_not_pending') {
     return {
       title: 'Cannot pay online',
@@ -173,6 +192,20 @@ export function buildBookingPayGuidance(input: BuildBookingPayGuidanceInput): Bo
     title: 'Next steps',
     message: fallbackMessage,
     steps: ['Review the message above.', 'Contact us if you need help completing this booking.'],
+    actions: [],
+  };
+}
+
+function buildPendingPaymentExpiredRebookGuidance(fallbackMessage: string): BookingPayGuidance {
+  return {
+    title: 'Payment expired',
+    message: fallbackMessage,
+    steps: [
+      'The time to pay for your reserved slot has passed and that time is no longer held.',
+      'Choose a new date and time below to rebook this session.',
+      'Then complete payment to confirm your consultation.',
+      'Or delete the diagnostic to cancel this booking and start fresh later.',
+    ],
     actions: [],
   };
 }

@@ -30,7 +30,7 @@ export default async function AdminMarketingUserDetailPage(props: AdminMarketing
       <AdminPageHeader
         eyebrow="Accounts"
         title="Marketing user"
-        description="Account metadata, active browser sessions (user_auth_sessions), and quiz snapshots stored under this account visitor id."
+        description="Account metadata, active browser sessions (user_auth_sessions), and diagnostic snapshots stored under this account visitor id."
       />
       <div className="flex flex-wrap gap-3 text-sm">
         <Link href="/admin/users" className="font-medium text-primary underline-offset-4 hover:underline">
@@ -48,7 +48,7 @@ export default async function AdminMarketingUserDetailPage(props: AdminMarketing
             <dd className="mt-1 text-sm text-foreground">{detail.email}</dd>
           </div>
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quiz visitor id</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diagnostic visitor id</dt>
             <dd className="mt-1 font-mono text-xs break-all text-foreground">{detail.accountVisitorId}</dd>
           </div>
           <div>
@@ -107,14 +107,14 @@ export default async function AdminMarketingUserDetailPage(props: AdminMarketing
         )}
       </div>
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Quiz snapshots (this account)</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">Diagnostic snapshots (this account)</h2>
         <p className="text-sm text-muted-foreground">
           Latest rows in <span className="font-mono text-xs">quiz_sessions</span> for visitor id{' '}
           <span className="font-mono text-xs">{detail.accountVisitorId}</span>.
         </p>
         {detail.quizSnapshots.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-            No quiz rows for this account yet.
+            No diagnostic rows for this account yet.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-border">

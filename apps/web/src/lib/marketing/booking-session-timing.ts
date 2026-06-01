@@ -1,3 +1,5 @@
+import type { BookingDocument } from '@/domain/types';
+
 export const DEFAULT_BOOKING_SESSION_DURATION_MINUTES = 60 as const;
 
 /** How long before start the join button becomes available. */
@@ -95,7 +97,7 @@ export function formatBookingSessionCountdownLabel(parts: BookingSessionCountdow
 
 export function isBookingSessionEndedByFathom(input: {
   readonly sessionEndedAtIso: string | null;
-  readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  readonly bookingStatus: BookingDocument['status'];
 }): boolean {
   if (input.bookingStatus === 'completed') {
     return true;
@@ -107,7 +109,7 @@ export function isBookingSessionEndedByFathom(input: {
 export function resolveBookingSessionDisplayPhase(input: {
   readonly timing: BookingSessionTiming | null;
   readonly sessionEndedAtIso: string | null;
-  readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  readonly bookingStatus: BookingDocument['status'];
 }): BookingSessionPhase {
   if (isBookingSessionEndedByFathom(input)) {
     return 'ended';

@@ -17,9 +17,12 @@ import { AdminEmailTemplatePreviewDialog } from '@/components/admin/admin-email-
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { AdminSettingsHint, AdminSettingsLabel, AdminSettingsOptionTitle } from '@/components/admin/admin-settings-hint';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { cn } from '@/lib/utils';
 import { notifyActionResult, notifyError, notifySuccess } from '@/lib/notify';
 
 const EMAIL_SETTINGS_API_URL: string = buildApiUrl('/api/admin/email-settings');
@@ -321,37 +324,40 @@ export function AdminEmailSettingsForm(props: AdminEmailSettingsFormProps): Reac
       >
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium text-foreground">Active provider</legend>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {ACTIVE_OPTIONS.map((option) => (
-              <label
-                key={option.value}
-                className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4 has-checked:border-primary/50 has-checked:bg-primary/5"
-              >
-                <input
-                  type="radio"
-                  name="emailActiveProvider"
-                  checked={settings.activeProvider === option.value}
-                  onChange={() => {
-                    setSettings({ ...settings, activeProvider: option.value });
-                  }}
-                  className="mt-1"
-                />
-                <div>
-                  <AdminSettingsOptionTitle hint={option.description}>{option.title}</AdminSettingsOptionTitle>
-                </div>
-              </label>
-            ))}
-          </div>
+          <RadioGroup
+            value={settings.activeProvider}
+            onValueChange={(value) => {
+              setSettings({ ...settings, activeProvider: value as TransactionalEmailActiveProvider });
+            }}
+            className="grid gap-3 lg:grid-cols-2"
+          >
+            {ACTIVE_OPTIONS.map((option) => {
+              const optionId = `email-active-provider-${option.value}`;
+              return (
+                <label
+                  key={option.value}
+                  htmlFor={optionId}
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4',
+                    settings.activeProvider === option.value && 'border-primary/50 bg-primary/5',
+                  )}
+                >
+                  <RadioGroupItem value={option.value} id={optionId} />
+                  <div>
+                    <AdminSettingsOptionTitle hint={option.description}>{option.title}</AdminSettingsOptionTitle>
+                  </div>
+                </label>
+              );
+            })}
+          </RadioGroup>
         </fieldset>
         <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-          <input
+          <Checkbox
             id="emailSandboxMode"
-            type="checkbox"
             checked={settings.sandboxMode}
-            onChange={(event) => {
-              setSettings({ ...settings, sandboxMode: event.target.checked });
+            onCheckedChange={(checked) => {
+              setSettings({ ...settings, sandboxMode: checked === true });
             }}
-            className="mt-1 size-4 rounded border-input"
           />
           <div>
             <AdminSettingsLabel

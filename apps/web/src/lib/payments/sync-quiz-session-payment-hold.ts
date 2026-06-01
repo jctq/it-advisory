@@ -1,7 +1,11 @@
 import { ObjectId } from 'mongodb';
 import { findBookingById, findPrimaryBookingSlotByQuizSessionId } from '@/lib/data/bookings';
 import { findLatestPaymentTransactionByQuizSessionIdHex } from '@/lib/data/payment-transactions';
-import { applyPaymentStatusToBooking } from '@/lib/payments/payment-completion';
+import { parsePaymentHoldExpiresAtMs } from '@/lib/marketing/payment-hold-expiry';
+import {
+  applyPaymentStatusToBooking,
+  renewBookingCheckoutHoldFromOpenTransaction,
+} from '@/lib/payments/payment-completion';
 import { cancelExpiredPaymentWindowBookings } from '@/lib/payments/cancel-expired-payment-window-bookings';
 
 async function expireLatestOpenPaymentTransactionForSession(
@@ -27,6 +31,62 @@ async function expireLatestOpenPaymentTransactionForSession(
     transaction,
     nextStatus: 'expired',
     expiredBookingDisposition: 'retain_pending',
+  });
+  return true;
+}
+
+function resolveExpiresAtForOpenTransaction(
+  expiresAtIso: string | null | undefined,
+  now: Date,
+  holdExpiresMinutes: number,
+  createdAtIso: string | null | undefined,
+): Date {
+  const fromIso = parsePaymentHoldExpiresAtMs(expiresAtIso);
+  if (fromIso !== null && fromIso > now.getTime()) {
+    return new Date(fromIso);
+  }
+  const createdAtMs = parsePaymentHoldExpiresAtMs(createdAtIso);
+  if (createdAtMs !== null && holdExpiresMinutes > 0) {
+    return new Date(createdAtMs + holdExpiresMinutes * 60_000);
+  }
+  return new Date(now.getTime() + holdExpiresMinutes * 60_000);
+}
+
+async function renewStaleBookingForOpenTransaction(input: {
+  readonly bookingId: string;
+  readonly quizSessionIdHex: string;
+  readonly now: Date;
+}): Promise<boolean> {
+  const transaction = await findLatestPaymentTransactionByQuizSessionIdHex(input.quizSessionIdHex);
+  if (
+    transaction === null ||
+    (transaction.status !== 'pending' && transaction.status !== 'processing')
+  ) {
+    return false;
+  }
+  const booking = await findBookingById(input.bookingId);
+  if (booking === null || booking._id === undefined) {
+    return false;
+  }
+  const needsRenewal =
+    booking.paymentStatus === 'expired' ||
+    booking.paymentStatus === 'failed' ||
+    booking.paymentTransactionId?.toString() !== transaction.id;
+  if (!needsRenewal) {
+    return false;
+  }
+  const { getPaymentSettings } = await import('@/lib/data/payment-settings');
+  const { holdExpiresMinutes } = await getPaymentSettings();
+  const expiresAt = resolveExpiresAtForOpenTransaction(
+    transaction.expiresAtIso,
+    input.now,
+    holdExpiresMinutes,
+    transaction.createdAtIso,
+  );
+  await renewBookingCheckoutHoldFromOpenTransaction({
+    bookingId: booking._id,
+    transaction,
+    expiresAt,
   });
   return true;
 }
@@ -58,9 +118,22 @@ export async function syncQuizSessionPaymentHold(input: {
     if (syncedCount > 0) {
       expired = true;
     } else {
-      const booking = await findBookingById(primarySlot.bookingId);
-      if (booking !== null && booking.paymentStatus === 'expired') {
-        expired = true;
+      const renewed = await renewStaleBookingForOpenTransaction({
+        bookingId: primarySlot.bookingId,
+        quizSessionIdHex: input.quizSessionIdHex,
+        now,
+      });
+      if (renewed) {
+        expired = false;
+      } else {
+        const booking = await findBookingById(primarySlot.bookingId);
+        const latestPayment = await findLatestPaymentTransactionByQuizSessionIdHex(input.quizSessionIdHex);
+        const hasOpenPayment =
+          latestPayment !== null &&
+          (latestPayment.status === 'pending' || latestPayment.status === 'processing');
+        if (booking !== null && booking.paymentStatus === 'expired' && !hasOpenPayment) {
+          expired = true;
+        }
       }
     }
   }

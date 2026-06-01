@@ -1,3 +1,4 @@
+import { isReleasedBookingSlotStartsAt } from '@/lib/booking/pending-payment-expired-for-rebook';
 import type { PaymentPolicy } from '@/domain/payment-types';
 import type { BookingDocument, LeadDocument } from '@/domain/types';
 
@@ -12,6 +13,8 @@ export type BookingPayabilityCode =
   | 'ok'
   | 'status_confirmed'
   | 'status_cancelled'
+  | 'status_refund_awaiting'
+  | 'status_refunded'
   | 'status_not_pending'
   | 'payments_disabled'
   | 'manual_confirm_policy'
@@ -85,6 +88,22 @@ export function evaluateBookingPayability(input: EvaluateBookingPayabilityInput)
       debug: baseDebug,
     };
   }
+  if (input.booking.status === 'refund_awaiting') {
+    return {
+      code: 'status_refund_awaiting',
+      canPayOnline: false,
+      reason: 'Cancellation received — your refund is being processed.',
+      debug: baseDebug,
+    };
+  }
+  if (input.booking.status === 'refunded') {
+    return {
+      code: 'status_refunded',
+      canPayOnline: false,
+      reason: 'This booking has been refunded.',
+      debug: baseDebug,
+    };
+  }
   if (input.booking.status !== 'pending') {
     return {
       code: 'status_not_pending',
@@ -113,7 +132,18 @@ export function evaluateBookingPayability(input: EvaluateBookingPayabilityInput)
     return {
       code: 'payment_window_expired',
       canPayOnline: false,
-      reason: 'The payment window for this booking has expired. Contact us to rebook.',
+      reason: 'Your payment window has expired. Pick a new date and time below to rebook this session.',
+      debug: baseDebug,
+    };
+  }
+  if (
+    input.booking.paymentStatus === 'expired' ||
+    isReleasedBookingSlotStartsAt(input.booking.startsAt)
+  ) {
+    return {
+      code: 'payment_window_expired',
+      canPayOnline: false,
+      reason: 'Your payment window has expired. Pick a new date and time below to rebook this session.',
       debug: baseDebug,
     };
   }

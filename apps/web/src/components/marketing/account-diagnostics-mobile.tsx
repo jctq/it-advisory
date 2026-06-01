@@ -40,6 +40,7 @@ import type {
   BookingListStatusFilter,
   VisitorQuizSessionSummary,
 } from '@/lib/data/quiz-session-types';
+import type { PaymentPolicy } from '@/domain/payment-types';
 import { BOOKING_LIST_STATUS_FILTER_OPTIONS } from '@/lib/marketing/account-booking-status';
 import { resolveAccountBookingStatusFromSummary } from '@/lib/marketing/account-booking-status';
 import { shouldShowAccountDiagnosticsScheduledSession } from '@/lib/marketing/account-diagnostics-booking-status';
@@ -64,6 +65,12 @@ function resolveMobileStatusLine(row: VisitorQuizSessionSummary): string | null 
   }
   if (bookingStatus === 'cancelled') {
     return 'Booking cancelled';
+  }
+  if (bookingStatus === 'refund_awaiting') {
+    return 'Refund awaiting';
+  }
+  if (bookingStatus === 'refunded') {
+    return 'Refunded';
   }
   if (bookingStatus === 'awaiting_payment') {
     return 'Awaiting payment';
@@ -97,11 +104,14 @@ export type AccountDiagnosticsMobileProps = {
   readonly hasMore: boolean;
   readonly totalCount: number;
   readonly manageBookingEnabled: boolean;
+  readonly paymentPolicy: PaymentPolicy;
+  readonly refundsEnabled: boolean;
   /** When false, infinite-scroll load-more is disabled (desktop table owns pagination). */
   readonly enableInfiniteScroll: boolean;
   readonly onStatusFilterChange: (value: BookingListStatusFilter) => void;
   readonly onBookingReferenceInputChange: (value: string) => void;
   readonly onLoadMore: () => void;
+  readonly onSessionCancelled?: () => void;
 };
 
 export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): ReactElement {
@@ -114,10 +124,13 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
     hasMore,
     totalCount,
     manageBookingEnabled,
+    paymentPolicy,
+    refundsEnabled,
     onStatusFilterChange,
     onBookingReferenceInputChange,
     enableInfiniteScroll,
     onLoadMore,
+    onSessionCancelled,
   } = props;
   const [selectedSession, setSelectedSession] = useState<VisitorQuizSessionSummary | null>(null);
   const listAnchorRef = useRef<HTMLDivElement>(null);
@@ -283,7 +296,10 @@ export function AccountDiagnosticsMobile(props: AccountDiagnosticsMobileProps): 
       <MobileDiagnosticsSessionDialog
         session={selectedSession}
         manageBookingEnabled={manageBookingEnabled}
+        paymentPolicy={paymentPolicy}
+        refundsEnabled={refundsEnabled}
         onOpenChange={handleCloseDialog}
+        onSessionCancelled={onSessionCancelled}
       />
     </div>
   );
@@ -385,12 +401,21 @@ function MobileDiagnosticsLoadMoreRow(props: { readonly isLoadingMore: boolean; 
 type MobileDiagnosticsSessionDialogProps = {
   readonly session: VisitorQuizSessionSummary | null;
   readonly manageBookingEnabled: boolean;
+  readonly paymentPolicy: PaymentPolicy;
+  readonly refundsEnabled: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  readonly onSessionCancelled?: () => void;
 };
 
 function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogProps): ReactElement {
   const session = props.session;
-  const sessionActions = session !== null ? resolveAccountDiagnosticsSessionActions(session) : [];
+  const sessionActions =
+    session !== null
+      ? resolveAccountDiagnosticsSessionActions(session, {
+          paymentPolicy: props.paymentPolicy,
+          refundsEnabled: props.refundsEnabled,
+        })
+      : [];
   const showManageOnBookingTab = sessionActions.includes('manage');
   const bookingTitle = useMemo(() => {
     if (session === null) {
@@ -484,7 +509,11 @@ function MobileDiagnosticsSessionDialog(props: MobileDiagnosticsSessionDialogPro
                 <AccountDiagnosticsSessionActionsBar
                   row={session}
                   manageBookingEnabled={props.manageBookingEnabled}
+                  paymentPolicy={props.paymentPolicy}
+                  refundsEnabled={props.refundsEnabled}
                   viewLabel="View diagnostic"
+                  onCancelled={props.onSessionCancelled}
+                  onDeleted={props.onSessionCancelled}
                 />
               </TabsContent>
               <TabsContent value="booking" className="mt-0 space-y-4 pt-4">

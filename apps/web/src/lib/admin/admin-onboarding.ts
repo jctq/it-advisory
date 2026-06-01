@@ -148,7 +148,7 @@ const ADMIN_ONBOARDING_SHELL_STEP_DEFINITIONS: readonly AdminOnboardingStepDefin
   {
     target: 'nav-templates',
     title: 'Templates',
-    description: 'Diagnostic quiz templates with rounds, questions, branching, and live activation.',
+    description: 'Diagnostic templates with rounds, questions, branching, and live activation.',
     side: 'right',
   },
   {
@@ -172,7 +172,7 @@ const ADMIN_ONBOARDING_SHELL_STEP_DEFINITIONS: readonly AdminOnboardingStepDefin
   {
     target: 'nav-users',
     title: 'Marketing users',
-    description: 'Signed-in marketing accounts with auth sessions and quiz snapshots.',
+    description: 'Signed-in marketing accounts with auth sessions and diagnostic snapshots.',
     side: 'right',
   },
   {

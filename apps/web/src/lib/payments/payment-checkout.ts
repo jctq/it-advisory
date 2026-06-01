@@ -15,12 +15,11 @@ import { createMockPaymentAdapter, resolvePaymentAdapter } from '@techmd/payment
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentTransactionDocument } from '@/domain/payment-types';
+import type { BookingDocument } from '@/domain/types';
 import { getDb } from '@/lib/mongodb';
 import { countBookingsByQuizSessionId } from '@/lib/data/bookings';
-import {
-  diagnoseQuizSessionExistingBookingPayability,
-  findVerifiedQuizSessionPendingBookingForCheckout,
-} from '@/lib/data/booking-guest-manage';
+import { diagnoseQuizSessionExistingBookingPayability } from '@/lib/data/booking-guest-manage';
+import { ensureQuizSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-quiz-session-pending-booking-ready-for-checkout';
 import { buildPayabilityApiExtras } from '@/lib/payments/evaluate-booking-payability';
 import { findQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { createPaymentCheckoutForVerifiedBooking } from '@/lib/payments/payment-checkout-resume';
@@ -64,7 +63,7 @@ async function updateTransactionProvider(
 
 async function resolveBookingStatusByBookingId(
   bookingId: ObjectId | string | null,
-): Promise<'pending' | 'confirmed' | 'completed' | 'cancelled' | null> {
+): Promise<BookingDocument['status'] | null> {
   if (bookingId === null) {
     return null;
   }
@@ -107,12 +106,13 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   if (ownedQuizSession._id !== undefined) {
     const existingBookingCount = await countBookingsByQuizSessionId(ownedQuizSession._id);
     if (existingBookingCount > 0) {
-      const pendingBooking = await findVerifiedQuizSessionPendingBookingForCheckout(
+      const pendingReady = await ensureQuizSessionPendingBookingReadyForCheckout(
         params.visitorId,
         ownedQuizSession._id,
+        { dateYmd: params.date, timeLabel: params.time },
       );
-      if (pendingBooking !== null) {
-        return createPaymentCheckoutForVerifiedBooking(pendingBooking, {
+      if (pendingReady.ok) {
+        return createPaymentCheckoutForVerifiedBooking(pendingReady.verified, {
           gatewayId: params.gatewayId,
           paymentMethodId: params.paymentMethodId,
           paymentMethodLabel: params.paymentMethodLabel,
@@ -122,6 +122,14 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           recordingOptIn: params.recordingOptIn,
           sessionMarketingRef,
         });
+      }
+      if (!pendingReady.ok && pendingReady.code !== 'booking_not_found') {
+        return {
+          ok: false,
+          code: 'booking_not_payable',
+          error: pendingReady.message,
+          payabilityCode: pendingReady.code,
+        };
       }
       const diagnosis = await diagnoseQuizSessionExistingBookingPayability(params.visitorId, ownedQuizSession._id);
       if (diagnosis !== null && !diagnosis.canPayOnline) {

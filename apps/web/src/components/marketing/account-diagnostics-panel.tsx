@@ -24,7 +24,6 @@ import { AccountDiagnosticsMobile } from '@/components/marketing/account-diagnos
 import { useMarketingNewQuizNavigation } from '@/components/marketing/marketing-new-quiz-session-client';
 import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-buttons';
 import {
-  ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS,
   ACCOUNT_DIAGNOSTICS_MOBILE_PAGE_SIZE,
   ACCOUNT_DIAGNOSTICS_PAGE_SIZE,
   buildDefaultAccountDiagnosticsListRequest,
@@ -38,6 +37,7 @@ import type {
   BookingListStatusFilter,
   VisitorQuizSessionSummary,
 } from '@/lib/data/quiz-session-types';
+import type { PaymentPolicy } from '@/domain/payment-types';
 import { BOOKING_LIST_STATUS_FILTER_OPTIONS } from '@/lib/marketing/account-booking-status';
 import { shouldShowAccountDiagnosticsScheduledSession } from '@/lib/marketing/account-diagnostics-booking-status';
 import { cn } from '@/lib/utils';
@@ -107,11 +107,18 @@ function DiagnosticStatusBadge(props: { readonly row: VisitorQuizSessionSummary 
 function SessionActions(props: {
   readonly row: VisitorQuizSessionSummary;
   readonly manageBookingEnabled: boolean;
+  readonly paymentPolicy: PaymentPolicy;
+  readonly refundsEnabled: boolean;
+  readonly onCancelled?: () => void;
 }): ReactElement {
   return (
     <AccountDiagnosticsSessionActionsBar
       row={props.row}
       manageBookingEnabled={props.manageBookingEnabled}
+      paymentPolicy={props.paymentPolicy}
+      refundsEnabled={props.refundsEnabled}
+      onCancelled={props.onCancelled}
+      onDeleted={props.onCancelled}
     />
   );
 }
@@ -121,11 +128,15 @@ function SessionActions(props: {
  */
 export type AccountDiagnosticsPanelProps = {
   readonly manageBookingEnabled?: boolean;
+  readonly paymentPolicy?: PaymentPolicy;
+  readonly refundsEnabled?: boolean;
   readonly initialList?: AccountDiagnosticsInitialList;
 };
 
 export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}): ReactElement {
   const manageBookingEnabled = props.manageBookingEnabled ?? false;
+  const paymentPolicy = props.paymentPolicy ?? 'pay_after_hold';
+  const refundsEnabled = props.refundsEnabled ?? false;
   const hasServerInitialList =
     props.initialList !== undefined &&
     matchesAccountDiagnosticsListRequest(props.initialList, buildDefaultAccountDiagnosticsListRequest());
@@ -354,11 +365,17 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
         id: 'actions',
         header: () => <span className="sr-only">Actions</span>,
         cell: (info) => (
-          <SessionActions row={info.row.original} manageBookingEnabled={manageBookingEnabled} />
+          <SessionActions
+            row={info.row.original}
+            manageBookingEnabled={manageBookingEnabled}
+            paymentPolicy={paymentPolicy}
+            refundsEnabled={refundsEnabled}
+            onCancelled={() => void fetchSessions()}
+          />
         ),
       }),
     ],
-    [manageBookingEnabled],
+    [fetchSessions, manageBookingEnabled, paymentPolicy, refundsEnabled],
   );
   // TanStack Table returns unstable function references; React Compiler intentionally skips memoizing here.
   // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable is documented as incompatible with compiler memoization
@@ -416,10 +433,13 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                 hasMore={hasMoreSessions}
                 totalCount={totalCount}
                 manageBookingEnabled={manageBookingEnabled}
+                paymentPolicy={paymentPolicy}
+                refundsEnabled={refundsEnabled}
                 enableInfiniteScroll={isMobileViewport}
                 onStatusFilterChange={handleStatusFilterChange}
                 onBookingReferenceInputChange={handleBookingReferenceInputChange}
                 onLoadMore={handleLoadMoreSessions}
+                onSessionCancelled={() => void fetchSessions()}
               />
               <div className="hidden space-y-4 md:block">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
@@ -430,33 +450,43 @@ export function AccountDiagnosticsPanel(props: AccountDiagnosticsPanelProps = {}
                   disabled={isLoading}
                 />
               </div>
-              <p className="text-sm text-muted-foreground">
-                {isLoading ? (
-                  <DiagnosticsLoadingStatus />
-                ) : totalCount === 0 ? (
-                  <>
-                    No sessions match your filters
-                    {statusFilter !== 'all' ? (
-                      <>
-                        {' '}
-                        · <span className="capitalize">{statusFilter}</span>
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    Showing <span className="font-medium text-foreground">{rangeStart}</span>–
-                    <span className="font-medium text-foreground">{rangeEnd}</span> of{' '}
-                    <span className="font-medium text-foreground">{totalCount}</span>
-                    {statusFilter !== 'all' ? (
-                      <>
-                        {' '}
-                        · filter: <span className="capitalize text-foreground">{statusFilter}</span>
-                      </>
-                    ) : null}
-                  </>
-                )}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {isLoading ? (
+                    <DiagnosticsLoadingStatus />
+                  ) : totalCount === 0 ? (
+                    <>
+                      No sessions match your filters
+                      {statusFilter !== 'all' ? (
+                        <>
+                          {' '}
+                          · <span className="capitalize">{statusFilter}</span>
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      Showing <span className="font-medium text-foreground">{rangeStart}</span>–
+                      <span className="font-medium text-foreground">{rangeEnd}</span> of{' '}
+                      <span className="font-medium text-foreground">{totalCount}</span>
+                      {statusFilter !== 'all' ? (
+                        <>
+                          {' '}
+                          · filter: <span className="capitalize text-foreground">{statusFilter}</span>
+                        </>
+                      ) : null}
+                    </>
+                  )}
+                </p>
+                {!isLoading && totalPages > 1 ? (
+                  <DiagnosticsPaginationButtons
+                    page={page}
+                    totalPages={totalPages}
+                    onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+                    onNext={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  />
+                ) : null}
+              </div>
               <div className="relative overflow-hidden rounded-xl border border-border bg-card">
                 {isLoading && sessions.length > 0 ? <DiagnosticsListLoadingOverlay /> : null}
                 <div className="overflow-x-auto">
@@ -633,6 +663,24 @@ function DiagnosticsTableSkeleton(props: { readonly columnCount: number }): Reac
   );
 }
 
+function DiagnosticsPaginationButtons(props: {
+  readonly page: number;
+  readonly totalPages: number;
+  readonly onPrevious: () => void;
+  readonly onNext: () => void;
+}): ReactElement {
+  return (
+    <div className="flex gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={props.onPrevious} disabled={props.page <= 1}>
+        Previous
+      </Button>
+      <Button type="button" variant="outline" size="sm" onClick={props.onNext} disabled={props.page >= props.totalPages}>
+        Next
+      </Button>
+    </div>
+  );
+}
+
 function DiagnosticsPagination(props: {
   readonly page: number;
   readonly totalPages: number;
@@ -645,14 +693,12 @@ function DiagnosticsPagination(props: {
         Page <span className="font-medium text-foreground">{props.page}</span> of{' '}
         <span className="font-medium text-foreground">{props.totalPages}</span>
       </p>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={props.onPrevious} disabled={props.page <= 1}>
-          Previous
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={props.onNext} disabled={props.page >= props.totalPages}>
-          Next
-        </Button>
-      </div>
+      <DiagnosticsPaginationButtons
+        page={props.page}
+        totalPages={props.totalPages}
+        onPrevious={props.onPrevious}
+        onNext={props.onNext}
+      />
     </div>
   );
 }

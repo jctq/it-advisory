@@ -50,3 +50,18 @@ export function buildMarketingBookSessionPath(sessionRef: string, serviceKey?: s
   }
   return `${base}?serviceKey=${encodeURIComponent(key)}`;
 }
+
+export type MarketingBookCheckoutResumeStep = 'details' | 'payment';
+
+/** Booking checkout URL after manage-booking reschedule (defers payment hold until Pay). */
+export function buildMarketingBookSessionCheckoutResumePath(
+  sessionRef: string,
+  input: {
+    readonly checkoutStep: MarketingBookCheckoutResumeStep;
+    readonly serviceKey?: string | null;
+  },
+): string {
+  const base = buildMarketingBookSessionPath(sessionRef, input.serviceKey);
+  const separator = base.includes('?') ? '&' : '?';
+  return `${base}${separator}checkoutStep=${input.checkoutStep}&deferPaymentHold=1`;
+}

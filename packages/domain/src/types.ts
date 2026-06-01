@@ -65,7 +65,7 @@ export type BookingDocument = {
   serviceKey: string;
   startsAt: Date;
   timezone: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'refund_awaiting' | 'refunded';
   /** Human-readable payment method from checkout (e.g. GCash); optional for legacy bookings. */
   paymentMethodLabel?: string | null;
   paymentStatus?: PaymentStatus | null;
@@ -102,6 +102,33 @@ export type BookingDocument = {
   /** Raw guided diagnostic JSON (string or legacy object stringified) at booking time — full rounds, questions, options. */
   guidedDiagnosticSnapshot?: string | null;
   quizSessionId?: ObjectId | null;
+  /** Set when the customer requests a paid cancellation (refund pending admin). */
+  refundRequestedAt?: Date;
+  /** Set when admin marks the refund as completed. */
+  refundCompletedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export const BOOKING_REFUND_STATUSES = ['awaiting', 'completed'] as const;
+
+export type BookingRefundStatus = (typeof BOOKING_REFUND_STATUSES)[number];
+
+/** Customer-initiated refund request linked to a confirmed booking cancellation. */
+export type BookingRefundDocument = {
+  _id?: ObjectId;
+  bookingId: ObjectId;
+  visitorId: string;
+  paymentTransactionId: ObjectId | null;
+  requestedAmountCentavos: number;
+  refundAmountCentavos: number;
+  currency: 'PHP';
+  gatewayId: PaymentGatewayId | null;
+  status: BookingRefundStatus;
+  requestedAt: Date;
+  completedAt?: Date | null;
+  adminNotes?: string | null;
+  bookingReferenceConfirmed: string;
   createdAt: Date;
   updatedAt: Date;
 };

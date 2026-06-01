@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import type { BookingDocument } from '@/domain/types';
 import {
   countBookingsByQuizSessionId,
   createBookingWithLatestQuizSnapshot,
@@ -33,7 +34,7 @@ function resolvePaymentMethodLabel(method: PaymentMethodId): string {
 
 async function resolveBookingStatusForId(
   bookingId: string,
-): Promise<'pending' | 'confirmed' | 'completed' | 'cancelled' | null> {
+): Promise<BookingDocument['status'] | null> {
   const row = await findBookingById(bookingId);
   return row?.status ?? null;
 }

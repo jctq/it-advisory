@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { describe, expect, it } from 'vitest';
 import type { BookingDocument, LeadDocument } from '@/domain/types';
+import { RELEASED_BOOKING_SLOT_STARTS_AT } from '../booking/released-booking-slot';
 import { evaluateBookingPayability } from './evaluate-booking-payability';
 
 function buildBooking(overrides: Partial<BookingDocument> = {}): BookingDocument {
@@ -67,6 +68,22 @@ describe('evaluateBookingPayability', () => {
     expect(result.canPayOnline).toBe(false);
   });
 
+  it('blocks released slot as payment_window_expired', () => {
+    const result = evaluateBookingPayability({
+      bookingId: '674a1b2c3d4e5f6789012345',
+      booking: buildBooking({
+        startsAt: RELEASED_BOOKING_SLOT_STARTS_AT,
+        paymentStatus: 'expired',
+        paymentExpiresAt: undefined,
+      }),
+      lead: buildLead(),
+      paymentPolicy: 'pay_before_booking',
+      paymentsEnabled: true,
+    });
+    expect(result.code).toBe('payment_window_expired');
+    expect(result.reason).toContain('Pick a new date');
+  });
+
   it('blocks when session slot is in the past and unpaid', () => {
     const result = evaluateBookingPayability({
       bookingId: '674a1b2c3d4e5f6789012345',
@@ -77,6 +94,32 @@ describe('evaluateBookingPayability', () => {
     });
     expect(result.code).toBe('session_slot_in_past');
     expect(result.canPayOnline).toBe(false);
+  });
+
+  it('blocks refunded bookings with status_refunded', () => {
+    const result = evaluateBookingPayability({
+      bookingId: '674a1b2c3d4e5f6789012345',
+      booking: buildBooking({ status: 'refunded', paymentStatus: 'refunded' }),
+      lead: buildLead(),
+      paymentPolicy: 'pay_before_booking',
+      paymentsEnabled: true,
+    });
+    expect(result.code).toBe('status_refunded');
+    expect(result.canPayOnline).toBe(false);
+    expect(result.reason).toContain('refunded');
+  });
+
+  it('blocks refund_awaiting bookings with status_refund_awaiting', () => {
+    const result = evaluateBookingPayability({
+      bookingId: '674a1b2c3d4e5f6789012345',
+      booking: buildBooking({ status: 'refund_awaiting' }),
+      lead: buildLead(),
+      paymentPolicy: 'pay_before_booking',
+      paymentsEnabled: true,
+    });
+    expect(result.code).toBe('status_refund_awaiting');
+    expect(result.canPayOnline).toBe(false);
+    expect(result.reason).toContain('refund');
   });
 
   it('blocks when visitor id does not match', () => {

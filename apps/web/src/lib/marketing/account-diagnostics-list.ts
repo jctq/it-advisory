@@ -3,7 +3,7 @@ import type { BookingListStatusFilter } from '@/lib/marketing/account-booking-st
 
 export const ACCOUNT_DIAGNOSTICS_PAGE_SIZE = 8;
 export const ACCOUNT_DIAGNOSTICS_MOBILE_PAGE_SIZE = 15;
-export const ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS: BookingListStatusFilter = 'pending';
+export const ACCOUNT_DIAGNOSTICS_DEFAULT_STATUS: BookingListStatusFilter = 'all';
 
 export type AccountDiagnosticsListRequest = {
   readonly page: number;

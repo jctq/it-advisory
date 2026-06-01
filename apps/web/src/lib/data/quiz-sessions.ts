@@ -113,6 +113,7 @@ function mapQuizSessionListRow(
 type LinkedBookingSummary = {
   readonly bookingId: string;
   readonly bookingStatus: BookingDocument['status'];
+  readonly bookingPaymentStatus: PaymentStatus | null;
   readonly bookingStartsAtIso: string;
   readonly bookingTimezone: string;
   readonly bookingServiceKey: string;
@@ -146,6 +147,7 @@ async function fetchPrimaryBookingByQuizSessionIds(
           _id: 1,
           quizSessionId: 1,
           status: 1,
+          paymentStatus: 1,
           startsAt: 1,
           timezone: 1,
           serviceKey: 1,
@@ -186,6 +188,7 @@ async function fetchPrimaryBookingByQuizSessionIds(
     result.set(sessionKey, {
       bookingId: primary._id.toString(),
       bookingStatus: normalizedStatus,
+      bookingPaymentStatus: primary.paymentStatus ?? null,
       bookingStartsAtIso: primary.startsAt.toISOString(),
       bookingTimezone: primary.timezone,
       bookingServiceKey: primary.serviceKey,
@@ -209,6 +212,7 @@ function mapBookingDocumentToLinkedSummary(doc: BookingDocument & { _id: ObjectI
   return {
     bookingId: doc._id.toString(),
     bookingStatus: normalizedStatus,
+    bookingPaymentStatus: doc.paymentStatus ?? null,
     bookingStartsAtIso: doc.startsAt.toISOString(),
     bookingTimezone: doc.timezone,
     bookingServiceKey: doc.serviceKey,
@@ -245,6 +249,7 @@ async function fetchLinkedBookingSummariesByBookingIds(
         projection: {
           _id: 1,
           status: 1,
+          paymentStatus: 1,
           startsAt: 1,
           timezone: 1,
           serviceKey: 1,
@@ -511,6 +516,7 @@ function mapVisitorQuizSessionSummary(
     bookingId,
     bookingReferenceId: bookingId !== null ? formatBookingReferenceId(bookingId) : null,
     bookingStatus: normalizeBookingDocumentStatus(linkedBooking?.bookingStatus),
+    bookingPaymentStatus: linkedBooking?.bookingPaymentStatus ?? null,
     bookingStartsAtIso: linkedBooking?.bookingStartsAtIso ?? linkedPayment?.checkoutStartsAtIso ?? null,
     bookingTimezone: linkedBooking?.bookingTimezone ?? linkedPayment?.checkoutTimezone ?? null,
     bookingServiceKey: linkedBooking?.bookingServiceKey ?? linkedPayment?.checkoutServiceKey ?? null,
@@ -578,6 +584,7 @@ type AggregatedVisitorQuizSessionRow = QuizSessionDocument & {
   linkedBooking: {
     _id: ObjectId;
     status: BookingDocument['status'];
+    paymentStatus?: PaymentStatus | null;
     startsAt: Date;
     timezone: string;
     serviceKey: string;
@@ -675,6 +682,7 @@ export async function listQuizSessionsForVisitorPaginated(input: {
             $project: {
               _id: 1,
               status: 1,
+              paymentStatus: 1,
               startsAt: 1,
               timezone: 1,
               serviceKey: 1,
@@ -800,6 +808,7 @@ export async function listQuizSessionsForVisitorPaginated(input: {
             return {
               bookingId: row.linkedBooking._id.toString(),
               bookingStatus: normalizeBookingDocumentStatus(row.linkedBooking.status) ?? row.linkedBooking.status,
+              bookingPaymentStatus: row.linkedBooking.paymentStatus ?? null,
               bookingStartsAtIso: row.linkedBooking.startsAt.toISOString(),
               bookingTimezone: row.linkedBooking.timezone,
               bookingServiceKey: row.linkedBooking.serviceKey,

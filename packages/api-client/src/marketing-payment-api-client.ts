@@ -3,6 +3,7 @@ import { VISITOR_SESSION_CONFIG } from '@techmd/domain/visitor-session';
 
 export type PaymentConfigPublic = {
   readonly paymentsEnabled: boolean;
+  readonly refundsEnabled: boolean;
   readonly paymentPolicy: 'pay_before_booking' | 'pay_after_hold' | 'manual_confirm';
   readonly currency: 'PHP';
   readonly checkoutAmountCentavos: number;

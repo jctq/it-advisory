@@ -3,6 +3,7 @@
 import { useState, type FormEvent, type ReactElement } from 'react';
 import type { BookingDetailRow } from '@/lib/data/bookings';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { buildApiUrl } from '@/lib/config/build-api-url';
@@ -142,9 +143,9 @@ export function AdminBookingFathomSection(props: AdminBookingFathomSectionProps)
             className="mt-2"
           />
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={sendEmail} onChange={(event) => setSendEmail(event.target.checked)} />
-          Email customer after linking
+        <label className="flex cursor-pointer items-start gap-3 text-sm">
+          <Checkbox checked={sendEmail} onCheckedChange={(checked) => setSendEmail(checked === true)} />
+          <span className="font-medium text-foreground">Email customer after linking</span>
         </label>
         <Button type="submit" size="sm" disabled={isSaving}>
           {isSaving ? 'Saving…' : 'Link recording'}

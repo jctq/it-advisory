@@ -1,6 +1,12 @@
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
-import type { PaymentPolicy } from '@/domain/payment-types';
+import type { PaymentPolicy, PaymentStatus } from '@/domain/payment-types';
+import type { BookingCustomerActionMode } from '@/lib/booking/booking-customer-action-eligibility';
+import {
+  isBookingPaidForCustomerAction,
+  resolveBookingCustomerActionMode,
+} from '@/lib/booking/booking-customer-action-eligibility';
+import { isPendingPaymentExpiredForRebook } from '@/lib/booking/pending-payment-expired-for-rebook';
 import type { BookingDocument, LeadDocument } from '@/domain/types';
 import { findBookingById } from '@/lib/data/bookings';
 import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
@@ -12,6 +18,7 @@ import {
   normalizeBookingReferenceInput,
   normalizeGuestManageEmail,
 } from '@/lib/marketing/booking-reference';
+import { hasCheckoutManageContact } from '@/lib/marketing/checkout-contact';
 import { isOverdueUnpaidPendingBooking } from '@/lib/marketing/overdue-pending-booking';
 import { encodeQuizSessionRefForMarketingUrl } from '@/lib/server/quiz-session-marketing-ref-crypto';
 import { getDb } from '@/lib/mongodb';
@@ -64,9 +71,13 @@ export type GuestBookingManageView = {
   readonly fathomSummaryPreview: string | null;
   readonly sessionEndedAtIso: string | null;
   readonly overduePendingActionsAvailable: boolean;
+  readonly pendingPaymentExpiredForRebook: boolean;
+  readonly hasCheckoutContact: boolean;
+  readonly recordingOptIn: boolean;
   readonly quizSessionMarketingRef: string | null;
   readonly sessionTitle: string | null;
   readonly serviceTitle: string;
+  readonly customerActionMode: BookingCustomerActionMode | null;
 };
 
 export type VerifiedGuestBooking = {
@@ -252,14 +263,22 @@ export async function buildGuestBookingManageView(
         ? activeVerified.booking.updatedAt.toISOString()
         : null;
   const manageKind = options?.manageKind ?? 'guest';
-  const overduePendingActionsAvailable = isOverdueUnpaidPendingBooking({
+  const pendingPaymentExpiredForRebook = isPendingPaymentExpiredForRebook({
     status: activeVerified.booking.status,
-    startsAt: activeVerified.booking.startsAt,
     paymentStatus: activeVerified.booking.paymentStatus,
+    paymentExpiresAt,
+    startsAt: activeVerified.booking.startsAt,
   });
+  const overduePendingActionsAvailable =
+    pendingPaymentExpiredForRebook ||
+    isOverdueUnpaidPendingBooking({
+      status: activeVerified.booking.status,
+      startsAt: activeVerified.booking.startsAt,
+      paymentStatus: activeVerified.booking.paymentStatus,
+    });
   const quizSessionId = activeVerified.booking.quizSessionId;
   const quizSessionMarketingRef =
-    overduePendingActionsAvailable && quizSessionId !== undefined && quizSessionId !== null
+    quizSessionId !== undefined && quizSessionId !== null
       ? encodeQuizSessionRefForMarketingUrl(quizSessionId.toString())
       : null;
   const payGuidance = buildBookingPayGuidance({
@@ -269,8 +288,30 @@ export async function buildGuestBookingManageView(
     status: activeVerified.booking.status,
     manageKind,
     profileSyncAvailable,
+    pendingPaymentExpiredForRebook,
   });
   const displayTitles = await resolveBookingSessionDisplayTitles(activeVerified.booking);
+  const paymentTransactionId = activeVerified.booking.paymentTransactionId?.toString() ?? null;
+  let paymentTransactionStatus: PaymentStatus | null = null;
+  if (paymentTransactionId !== null) {
+    const transaction = await findPaymentTransactionById(paymentTransactionId);
+    paymentTransactionStatus = transaction?.status ?? null;
+  }
+  const isPaid = isBookingPaidForCustomerAction({
+    bookingPaymentStatus: activeVerified.booking.paymentStatus,
+    paymentTransactionStatus,
+  });
+  const customerActionMode = resolveBookingCustomerActionMode({
+    paymentPolicy: publicSettings.paymentPolicy,
+    bookingStatus: activeVerified.booking.status,
+    isPaid,
+    refundsEnabled: publicSettings.refundsEnabled,
+  });
+  const hasCheckoutContact = hasCheckoutManageContact({
+    fullName: lead.name,
+    email: typeof lead.email === 'string' ? lead.email : '',
+    phone: typeof lead.phone === 'string' ? lead.phone : '',
+  });
   return {
     bookingReference: formatBookingReferenceId(activeVerified.bookingId),
     status: activeVerified.booking.status,
@@ -293,9 +334,13 @@ export async function buildGuestBookingManageView(
     fathomSummaryPreview,
     sessionEndedAtIso,
     overduePendingActionsAvailable,
+    pendingPaymentExpiredForRebook,
+    hasCheckoutContact,
+    recordingOptIn,
     quizSessionMarketingRef,
     sessionTitle: displayTitles.sessionTitle,
     serviceTitle: displayTitles.serviceTitle,
+    customerActionMode,
   };
 }
 
@@ -579,7 +624,7 @@ export async function findVerifiedGuestBookingForCheckout(
 /**
  * Resolves a pending payable booking linked to a quiz session for the same marketing visitor.
  */
-export async function findVerifiedQuizSessionPendingBookingForCheckout(
+export async function findQuizSessionPendingBookingRecord(
   visitorId: string,
   quizSessionId: ObjectId,
 ): Promise<VerifiedGuestBooking | null> {
@@ -598,11 +643,21 @@ export async function findVerifiedQuizSessionPendingBookingForCheckout(
   if (leadDoc === null || leadDoc._id === undefined) {
     return null;
   }
-  const verified: VerifiedGuestBooking = {
+  return {
     bookingId: bookingDoc._id.toString(),
     booking: bookingDoc as BookingDocument & { _id: ObjectId },
     lead: leadDoc as LeadDocument & { _id: ObjectId },
   };
+}
+
+export async function findVerifiedQuizSessionPendingBookingForCheckout(
+  visitorId: string,
+  quizSessionId: ObjectId,
+): Promise<VerifiedGuestBooking | null> {
+  const verified = await findQuizSessionPendingBookingRecord(visitorId, quizSessionId);
+  if (verified === null) {
+    return null;
+  }
   const view = await buildGuestBookingManageView(verified, { expectedVisitorId: visitorId });
   if (!view.canPayOnline) {
     return null;

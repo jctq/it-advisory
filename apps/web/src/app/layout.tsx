@@ -5,6 +5,7 @@ import { RootAppearanceHydrator } from '@/components/providers/root-appearance-h
 import { QueryProvider } from '@/components/providers/query-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { brandAssetUrl } from '@/lib/brand/brand-assets';
+import { TECHMD_APPEARANCE_BOOTSTRAP_SCRIPT } from '@/lib/brand/techmd-appearance-bootstrap-script';
 import { resolveRootLayoutDocumentAppearance } from '@/lib/brand/resolve-root-layout-document-appearance';
 import { buildRootLayoutMetadataAsync, resolveMetadataBase } from '@/lib/seo/site-seo';
 import './globals.css';
@@ -64,6 +65,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       }}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: TECHMD_APPEARANCE_BOOTSTRAP_SCRIPT }} />
+      </head>
       <body className={`${sans.className} ${mono.variable} min-h-dvh antialiased`}>
         <RootAppearanceHydrator />
         <AppTopLoader />

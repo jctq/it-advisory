@@ -13,7 +13,7 @@ export type MarketingDiagnosticSessionSummary = {
   readonly isBooked: boolean;
   readonly bookingId: string | null;
   readonly bookingReferenceId: string | null;
-  readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | null;
+  readonly bookingStatus: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'refund_awaiting' | 'refunded' | null;
   readonly bookingStartsAtIso: string | null;
   readonly bookingTimezone: string | null;
   readonly bookingServiceKey: string | null;

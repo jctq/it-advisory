@@ -6,9 +6,9 @@ import {
   type VerifiedGuestBooking,
 } from '@/lib/data/booking-guest-manage';
 import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
-import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { deleteQuizSessionForVisitor } from '@/lib/data/quiz-sessions';
 import { cancelActiveBookingAndPaymentHold } from '@/lib/payments/release-quiz-session-slot-reservations';
+import { isPendingPaymentExpiredForRebook } from '@/lib/booking/pending-payment-expired-for-rebook';
 import { isOverdueUnpaidPendingBooking } from '@/lib/marketing/overdue-pending-booking';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
@@ -19,17 +19,23 @@ export type ManageBookingOverdueActionResult =
   | { readonly ok: false; readonly code: string; readonly message: string };
 
 function assertOverdueUnpaidPending(booking: BookingDocument): ManageBookingOverdueActionResult | null {
-  if (
-    !isOverdueUnpaidPendingBooking({
+  const canRebook =
+    isPendingPaymentExpiredForRebook({
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      paymentExpiresAt: booking.paymentExpiresAt,
+      startsAt: booking.startsAt,
+    }) ||
+    isOverdueUnpaidPendingBooking({
       status: booking.status,
       startsAt: booking.startsAt,
       paymentStatus: booking.paymentStatus,
-    })
-  ) {
+    });
+  if (!canRebook) {
     return {
       ok: false,
       code: 'not_overdue_pending',
-      message: 'This action is only available for unpaid bookings whose session time has passed.',
+      message: 'This action is only available for unpaid bookings that need a new session time.',
     };
   }
   return null;
@@ -85,8 +91,6 @@ export async function rescheduleOverduePendingBooking(
   })) {
     return { ok: false, code: 'slot_taken', message: 'That time was just taken. Pick another slot.' };
   }
-  const publicSettings = await getPaymentSettingsPublicView();
-  const paymentExpiresAt = new Date(Date.now() + publicSettings.holdExpiresMinutes * 60_000);
   const db = await getDb();
   await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
     { _id: verified.booking._id },
@@ -94,8 +98,16 @@ export async function rescheduleOverduePendingBooking(
       $set: {
         startsAt: startsAtUtc,
         timezone: PRIMARY_TIMEZONE,
-        paymentExpiresAt,
         updatedAt: new Date(),
+      },
+      $unset: {
+        paymentStatus: '',
+        paymentTransactionId: '',
+        paymentExpiresAt: '',
+        meetingUrl: '',
+        zoomMeetingId: '',
+        googleMeetEventId: '',
+        teamsOnlineMeetingId: '',
       },
     },
   );

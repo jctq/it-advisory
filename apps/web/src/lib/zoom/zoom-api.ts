@@ -88,3 +88,24 @@ export async function requestCreateZoomScheduledMeeting(
   const meetingId = rawId === undefined || rawId === null ? '' : String(rawId);
   return { joinUrl, meetingId };
 }
+
+export async function requestDeleteZoomMeeting(accessToken: string, meetingId: string): Promise<boolean> {
+  const encodedMeetingId = encodeURIComponent(meetingId.trim());
+  if (encodedMeetingId.length === 0) {
+    return false;
+  }
+  const response = await fetch(`${ZOOM_API_ORIGIN}/meetings/${encodedMeetingId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (response.status === 404) {
+    return true;
+  }
+  if (!response.ok) {
+    console.error('[zoom] delete meeting failed', response.status);
+    return false;
+  }
+  return true;
+}

@@ -143,7 +143,7 @@ function EmptyState() {
       <p className="font-medium text-foreground">No conversation yet.</p>
       <p>Try asking:</p>
       <ul className="list-disc pl-5">
-        <li>What is the riskiest assumption in the quiz funnel right now?</li>
+        <li>What is the riskiest assumption in the diagnostic funnel right now?</li>
         <li>Should I add Stripe / PayMongo before launch, or keep mock payments?</li>
         <li>Is the diagnostic cache premature optimisation at this stage?</li>
         <li>What is the smallest auth I can ship that does not embarrass me?</li>

@@ -1,6 +1,8 @@
 import type { PaymentGatewayId } from '@techmd/domain/payment-types';
 import type { PaymentConfigPublic } from './marketing-payment-api-client.js';
 
+export type BookingCustomerActionMode = 'cancel' | 'refund';
+
 export type BookingPayGuidanceAction = {
   readonly label: string;
   readonly href: string;
@@ -15,7 +17,7 @@ export type BookingPayGuidance = {
 
 export type GuestBookingManageView = {
   readonly bookingReference: string;
-  readonly status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  readonly status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'refund_awaiting' | 'refunded';
   readonly startsAtIso: string;
   readonly timezone: string;
   readonly serviceKey: string;
@@ -28,6 +30,9 @@ export type GuestBookingManageView = {
   readonly payGuidance: BookingPayGuidance | null;
   readonly profileSyncAvailable: boolean;
   readonly overduePendingActionsAvailable: boolean;
+  readonly pendingPaymentExpiredForRebook: boolean;
+  readonly hasCheckoutContact: boolean;
+  readonly recordingOptIn: boolean;
   readonly quizSessionMarketingRef: string | null;
   readonly payabilityCode: string;
   readonly checkoutAmountLabel: string;
@@ -38,6 +43,7 @@ export type GuestBookingManageView = {
   readonly sessionEndedAtIso: string | null;
   readonly sessionTitle: string | null;
   readonly serviceTitle: string;
+  readonly customerActionMode: BookingCustomerActionMode | null;
 };
 
 export type GuestBookingManageCredentials = {
@@ -270,6 +276,101 @@ export async function createGuestBookingManageCheckout(params: {
     bookingId: payload.bookingId ?? null,
     mock: payload.mock,
   };
+}
+
+export type BookingCancellationErrorCode =
+  | 'cancellation_too_late'
+  | 'invalid_booking_reference'
+  | 'booking_not_confirmed'
+  | 'booking_not_found'
+  | 'cancellation_unavailable'
+  | 'refunds_disabled'
+  | 'server_error'
+  | 'auth_required';
+
+export type BookingCustomerActionResult = {
+  readonly mode: BookingCustomerActionMode;
+  readonly refundId: string | null;
+};
+
+export class BookingCancellationError extends Error {
+  readonly code: BookingCancellationErrorCode;
+
+  constructor(message: string, code: BookingCancellationErrorCode) {
+    super(message);
+    this.name = 'BookingCancellationError';
+    this.code = code;
+  }
+}
+
+export async function cancelAccountManagedBooking(params: {
+  readonly apiBaseUrl: string;
+  readonly bookingId: string;
+  readonly bookingReference: string;
+  readonly signal?: AbortSignal;
+}): Promise<BookingCustomerActionResult> {
+  const response = await fetch(buildApiUrl(params.apiBaseUrl, '/api/bookings/manage/cancel-account'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bookingId: params.bookingId,
+      bookingReference: params.bookingReference,
+    }),
+    signal: params.signal,
+  });
+  const payload = (await response.json()) as {
+    ok?: boolean;
+    error?: string;
+    code?: string;
+    mode?: BookingCustomerActionMode;
+    refundId?: string | null;
+  };
+  if (response.ok && payload.ok === true && payload.mode !== undefined) {
+    return {
+      mode: payload.mode,
+      refundId: payload.refundId ?? null,
+    };
+  }
+  const message = typeof payload.error === 'string' ? payload.error : 'Cancellation failed.';
+  const code = (typeof payload.code === 'string' ? payload.code : 'server_error') as BookingCancellationErrorCode;
+  throw new BookingCancellationError(message, code);
+}
+
+export async function cancelGuestManagedBooking(params: {
+  readonly apiBaseUrl: string;
+  readonly credentials: GuestBookingManageCredentials;
+  readonly confirmReference: string;
+  readonly signal?: AbortSignal;
+}): Promise<BookingCustomerActionResult> {
+  const response = await fetch(buildApiUrl(params.apiBaseUrl, '/api/bookings/manage/cancel'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bookingReference: params.credentials.bookingReference,
+      email: params.credentials.email,
+      phoneLastFour: params.credentials.phoneLastFour,
+      confirmReference: params.confirmReference,
+    }),
+    signal: params.signal,
+  });
+  const payload = (await response.json()) as {
+    ok?: boolean;
+    error?: string;
+    code?: string;
+    mode?: BookingCustomerActionMode;
+    refundId?: string | null;
+  };
+  if (response.ok && payload.ok === true && payload.mode !== undefined) {
+    return {
+      mode: payload.mode,
+      refundId: payload.refundId ?? null,
+    };
+  }
+  const message = typeof payload.error === 'string' ? payload.error : 'Cancellation failed.';
+  const code = (typeof payload.code === 'string' ? payload.code : 'server_error') as BookingCancellationErrorCode;
+  throw new BookingCancellationError(message, code);
 }
 
 async function postManageBookingMutation(params: {

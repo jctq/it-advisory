@@ -27,6 +27,7 @@ const DEFAULT_CHECKOUT_AMOUNT_CENTAVOS = 600_000;
 
 export type PaymentSettingsValues = {
   readonly paymentsEnabled: boolean;
+  readonly refundsEnabled: boolean;
   readonly paymentPolicy: PaymentPolicy;
   readonly currency: 'PHP';
   readonly checkoutAmountCentavos: number;
@@ -52,6 +53,7 @@ export type PaymentSettingsAdminView = PaymentSettingsValues & {
 
 export type PaymentSettingsPublicView = {
   readonly paymentsEnabled: boolean;
+  readonly refundsEnabled: boolean;
   readonly paymentPolicy: PaymentPolicy;
   readonly currency: 'PHP';
   readonly checkoutAmountCentavos: number;
@@ -93,6 +95,7 @@ function normalizePaymentPolicy(policy: PaymentPolicy | undefined, fallback: Pay
 function defaultSettings(): PaymentSettingsValues {
   return {
     paymentsEnabled: false,
+    refundsEnabled: false,
     paymentPolicy: 'pay_after_hold',
     currency: 'PHP',
     checkoutAmountCentavos: DEFAULT_CHECKOUT_AMOUNT_CENTAVOS,
@@ -154,6 +157,7 @@ function mergeDocument(doc: PaymentSettingsDocument | null): PaymentSettingsValu
   const policy = normalizePaymentPolicy(doc.paymentPolicy, base.paymentPolicy);
   return {
     paymentsEnabled: typeof doc.paymentsEnabled === 'boolean' ? doc.paymentsEnabled : base.paymentsEnabled,
+    refundsEnabled: typeof doc.refundsEnabled === 'boolean' ? doc.refundsEnabled : base.refundsEnabled,
     paymentPolicy: policy,
     currency: 'PHP',
     checkoutAmountCentavos: clampAmountCentavos(doc.checkoutAmountCentavos),
@@ -247,6 +251,7 @@ export async function getPaymentSettingsPublicView(): Promise<PaymentSettingsPub
     }));
   return {
     paymentsEnabled: settings.paymentsEnabled,
+    refundsEnabled: settings.refundsEnabled,
     paymentPolicy: settings.paymentPolicy,
     currency: settings.currency,
     checkoutAmountCentavos: settings.checkoutAmountCentavos,
@@ -259,6 +264,7 @@ export async function getPaymentSettingsPublicView(): Promise<PaymentSettingsPub
 
 export type UpdatePaymentSettingsPatch = Partial<{
   paymentsEnabled: boolean;
+  refundsEnabled: boolean;
   paymentPolicy: PaymentPolicy;
   checkoutAmountCentavos: number;
   holdExpiresMinutes: number;
@@ -272,6 +278,7 @@ export async function updatePaymentSettings(patch: UpdatePaymentSettingsPatch): 
   const blobs = await loadCredentialsDocument();
   const next: PaymentSettingsValues = {
     paymentsEnabled: patch.paymentsEnabled !== undefined ? patch.paymentsEnabled : current.paymentsEnabled,
+    refundsEnabled: patch.refundsEnabled !== undefined ? patch.refundsEnabled : current.refundsEnabled,
     paymentPolicy:
       patch.paymentPolicy !== undefined
         ? normalizePaymentPolicy(patch.paymentPolicy, current.paymentPolicy)

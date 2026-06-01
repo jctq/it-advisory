@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentGatewayId, PaymentTransactionDocument } from '@/domain/payment-types';
+import type { BookingDocument } from '@/domain/types';
 import { getGatewayCredentials, getPaymentSettings } from '@/lib/data/payment-settings';
 import {
   findPaymentTransactionById,
@@ -87,7 +88,7 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   readonly customerEmail: string;
   readonly customerCompany: string | null;
   readonly customerPhone: string;
-  readonly bookingStatus: 'pending' | 'confirmed' | 'completed' | 'cancelled' | null;
+  readonly bookingStatus: BookingDocument['status'] | null;
 }): Promise<CreateCheckoutSessionResult> {
   if (input.transaction.visitorId !== input.visitorId) {
     return { ok: false, code: 'transaction_not_found', error: 'Could not load payment session.' };

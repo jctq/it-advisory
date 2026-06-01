@@ -121,3 +121,30 @@ export function isOpenPaymentTransactionHoldActive(
   }
   return expiresAtMs > nowMs;
 }
+
+export type AwaitingPaymentHoldExpiryInput = {
+  readonly bookingPaymentExpiresAt: Date | null | undefined;
+  readonly transactionExpiresAtIso: string | null | undefined;
+  readonly transactionCreatedAtIso: string | null | undefined;
+  readonly holdExpiresMinutes: number;
+  readonly nowMs: number;
+};
+
+/** True when an awaiting-payment hold deadline has passed (booking, transaction, or configured window). */
+export function isAwaitingPaymentHoldExpired(input: AwaitingPaymentHoldExpiryInput): boolean {
+  const bookingExpiresAtIso =
+    input.bookingPaymentExpiresAt instanceof Date &&
+    Number.isFinite(input.bookingPaymentExpiresAt.getTime())
+      ? input.bookingPaymentExpiresAt.toISOString()
+      : null;
+  const expiresAtIso = resolvePaymentHoldExpiresAtIso({
+    bookingPaymentExpiresAtIso: bookingExpiresAtIso,
+    transactionExpiresAtIso: input.transactionExpiresAtIso,
+    transactionCreatedAtIso: input.transactionCreatedAtIso,
+    holdExpiresMinutes: input.holdExpiresMinutes,
+  });
+  return isPaymentHoldExpiredByServerClock({
+    serverNowMs: input.nowMs,
+    expiresAtIso,
+  });
+}

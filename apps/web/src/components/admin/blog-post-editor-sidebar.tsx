@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Copy, RefreshCw } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,12 +51,10 @@ function ToggleRow(props: {
       htmlFor={props.id}
       className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/80 bg-muted/15 p-3 transition-colors hover:bg-muted/25"
     >
-      <input
+      <Checkbox
         id={props.id}
-        type="checkbox"
         checked={props.checked}
-        onChange={(event) => props.onCheckedChange(event.target.checked)}
-        className="mt-0.5 size-4 rounded border-input"
+        onCheckedChange={(checked) => props.onCheckedChange(checked === true)}
       />
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-foreground">{props.label}</span>

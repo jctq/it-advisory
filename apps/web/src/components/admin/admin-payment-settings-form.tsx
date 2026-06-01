@@ -15,9 +15,12 @@ import { ADMIN_PAYMENT_POLICIES, PAYMENT_GATEWAY_IDS, type PaymentGatewayId, typ
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { AdminSettingsHint, AdminSettingsLabel, AdminSettingsOptionTitle } from '@/components/admin/admin-settings-hint';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { cn } from '@/lib/utils';
 import { notifyActionResult, notifyError, notifySuccess } from '@/lib/notify';
 
 const PAYMENT_SETTINGS_API_URL: string = buildApiUrl('/api/admin/payment-settings');
@@ -34,6 +37,7 @@ type GatewayRow = {
 
 type SettingsPayload = {
   readonly paymentsEnabled: boolean;
+  readonly refundsEnabled: boolean;
   readonly paymentPolicy: PaymentPolicy;
   readonly checkoutAmountCentavos: number;
   readonly holdExpiresMinutes: number;
@@ -129,6 +133,7 @@ function arePaymentSettingsEqual(
   }
   if (
     left.paymentsEnabled !== right.paymentsEnabled ||
+    left.refundsEnabled !== right.refundsEnabled ||
     left.paymentPolicy !== right.paymentPolicy ||
     left.checkoutAmountCentavos !== right.checkoutAmountCentavos ||
     left.holdExpiresMinutes !== right.holdExpiresMinutes ||
@@ -198,6 +203,7 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           paymentsEnabled: settings.paymentsEnabled,
+          refundsEnabled: settings.refundsEnabled,
           paymentPolicy: settings.paymentPolicy,
           checkoutAmountCentavos: settings.checkoutAmountCentavos,
           holdExpiresMinutes: settings.holdExpiresMinutes,
@@ -284,14 +290,12 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
       >
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-            <input
+            <Checkbox
               id="paymentsEnabled"
-              type="checkbox"
               checked={settings.paymentsEnabled}
-              onChange={(event) => {
-                setSettings({ ...settings, paymentsEnabled: event.target.checked });
+              onCheckedChange={(checked) => {
+                setSettings({ ...settings, paymentsEnabled: checked === true });
               }}
-              className="mt-1 size-4 rounded border-input"
             />
             <div>
               <AdminSettingsLabel
@@ -303,14 +307,29 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
             </div>
           </div>
           <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-            <input
-              id="sandboxMode"
-              type="checkbox"
-              checked={settings.sandboxMode}
-              onChange={(event) => {
-                setSettings({ ...settings, sandboxMode: event.target.checked });
+            <Checkbox
+              id="refundsEnabled"
+              checked={settings.refundsEnabled}
+              onCheckedChange={(checked) => {
+                setSettings({ ...settings, refundsEnabled: checked === true });
               }}
-              className="mt-1 size-4 rounded border-input"
+            />
+            <div>
+              <AdminSettingsLabel
+                htmlFor="refundsEnabled"
+                hint="When enabled, customers with paid reserve-then-pay bookings can request a refund. Manual-confirmation bookings can always be cancelled without payment."
+              >
+                Enable booking refunds
+              </AdminSettingsLabel>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
+            <Checkbox
+              id="sandboxMode"
+              checked={settings.sandboxMode}
+              onCheckedChange={(checked) => {
+                setSettings({ ...settings, sandboxMode: checked === true });
+              }}
             />
             <div>
               <AdminSettingsLabel
@@ -369,30 +388,33 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
         </div>
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium text-foreground">Payment timing</legend>
-          <div className="grid gap-3 lg:grid-cols-3">
+          <RadioGroup
+            value={settings.paymentPolicy}
+            onValueChange={(value) => {
+              setSettings({ ...settings, paymentPolicy: value as PaymentPolicy });
+            }}
+            className="grid gap-3 lg:grid-cols-3"
+          >
             {ADMIN_PAYMENT_POLICIES.map((policy) => {
               const meta = POLICY_LABELS[policy]!;
+              const optionId = `payment-policy-${policy}`;
               return (
                 <label
                   key={policy}
-                  className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4 has-checked:border-primary/50 has-checked:bg-primary/5"
+                  htmlFor={optionId}
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4',
+                    settings.paymentPolicy === policy && 'border-primary/50 bg-primary/5',
+                  )}
                 >
-                  <input
-                    type="radio"
-                    name="paymentPolicy"
-                    checked={settings.paymentPolicy === policy}
-                    onChange={() => {
-                      setSettings({ ...settings, paymentPolicy: policy });
-                    }}
-                    className="mt-1"
-                  />
+                  <RadioGroupItem value={policy} id={optionId} />
                   <div>
                     <AdminSettingsOptionTitle hint={meta.description}>{meta.title}</AdminSettingsOptionTitle>
                   </div>
                 </label>
               );
             })}
-          </div>
+          </RadioGroup>
         </fieldset>
       </SettingsCard>
       <SettingsCard
@@ -408,18 +430,16 @@ export function AdminPaymentSettingsForm(props: AdminPaymentSettingsFormProps): 
                 key={gateway.id}
                 className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4 has-checked:border-primary/50 has-checked:bg-primary/5"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={gateway.enabled}
-                  onChange={(event) => {
+                  onCheckedChange={(checked) => {
                     setSettings({
                       ...settings,
                       gateways: settings.gateways.map((row) =>
-                        row.id === gateway.id ? { ...row, enabled: event.target.checked } : row,
+                        row.id === gateway.id ? { ...row, enabled: checked === true } : row,
                       ),
                     });
                   }}
-                  className="mt-1 size-4 rounded border-input"
                 />
                 <div>
                   <AdminSettingsOptionTitle hint={gateway.description}>{gateway.label}</AdminSettingsOptionTitle>

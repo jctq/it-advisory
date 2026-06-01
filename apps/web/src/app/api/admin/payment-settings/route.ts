@@ -13,6 +13,7 @@ const gatewayCredentialsSchema = z.record(z.string(), z.string()).nullable().opt
 
 const patchSchema = z.object({
   paymentsEnabled: z.boolean().optional(),
+  refundsEnabled: z.boolean().optional(),
   paymentPolicy: z.enum(ADMIN_PAYMENT_POLICIES).optional(),
   checkoutAmountCentavos: z.number().int().min(100).max(100_000_000).optional(),
   holdExpiresMinutes: z.number().int().min(5).max(1440).optional(),
@@ -60,6 +61,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   const body = parsed.data;
   if (
     body.paymentsEnabled === undefined &&
+    body.refundsEnabled === undefined &&
     body.paymentPolicy === undefined &&
     body.checkoutAmountCentavos === undefined &&
     body.holdExpiresMinutes === undefined &&
@@ -82,6 +84,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     }
     const updated = await updatePaymentSettings({
       paymentsEnabled: body.paymentsEnabled,
+      refundsEnabled: body.refundsEnabled,
       paymentPolicy: body.paymentPolicy,
       checkoutAmountCentavos: body.checkoutAmountCentavos,
       holdExpiresMinutes: body.holdExpiresMinutes,

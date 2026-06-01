@@ -30,6 +30,7 @@ import {
   applyBookingRecordingFieldsFromCheckout,
   resolveCheckoutRecordingOptIn,
 } from '@/lib/booking/apply-booking-recording-fields';
+import { renewBookingCheckoutHoldFromOpenTransaction } from '@/lib/payments/payment-completion';
 
 type ResumeCheckoutParams = {
   readonly credentials: GuestBookingManageCredentials;
@@ -119,14 +120,15 @@ export async function createPaymentCheckoutForVerifiedBooking(
   const recordingOptIn = resolveCheckoutRecordingOptIn({
     requested: params.recordingOptIn,
     bookingRecordingOptIn: booking.recordingOptIn,
-    transactionMetadata: existingOpenTransaction?.metadata,
+    transactionMetadata:
+      existingOpenTransaction !== null && isOpenPaymentTransactionHoldActive(existingOpenTransaction)
+        ? existingOpenTransaction.metadata
+        : undefined,
   });
-  if (recordingOptIn && !booking.recordingOptIn) {
-    await applyBookingRecordingFieldsFromCheckout({
-      bookingId: booking._id,
-      recordingOptIn: true,
-    });
-  }
+  await applyBookingRecordingFieldsFromCheckout({
+    bookingId: booking._id,
+    recordingOptIn,
+  });
   let resolvedPricing;
   try {
     resolvedPricing = await resolveCheckoutAmountCentavos({
@@ -289,6 +291,13 @@ export async function createPaymentCheckoutForVerifiedBooking(
   await updateTransactionProvider(insertedId, providerSession);
   const refreshed = await findPaymentTransactionById(transactionId);
   if (refreshed !== null) {
+    if (expiresAt !== null) {
+      await renewBookingCheckoutHoldFromOpenTransaction({
+        bookingId: booking._id,
+        transaction: refreshed,
+        expiresAt,
+      });
+    }
     void executeSendBookingPaymentReminderEmail({
       transaction: refreshed,
     });

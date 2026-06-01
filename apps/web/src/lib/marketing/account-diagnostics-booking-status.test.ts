@@ -23,6 +23,7 @@ function buildRow(
     bookingId: '507f1f77bcf86cd799439012',
     bookingReferenceId: '439012',
     bookingStatus: 'pending',
+    bookingPaymentStatus: null,
     bookingStartsAtIso: '2026-06-01T02:00:00.000Z',
     bookingTimezone: 'Asia/Manila',
     bookingServiceKey: 'project-rescue',

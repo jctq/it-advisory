@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -501,12 +502,10 @@ function OptionInspector(
           {question.selectionMode === 'single' ? (
             <div className={cn('px-3 py-3', WORKSPACE_INSPECTOR_SURFACE_CLASS)}>
               <label className="flex cursor-pointer items-start gap-3 text-sm text-foreground">
-                <input
-                  type="checkbox"
-                  className="mt-1 size-4 shrink-0 rounded border-input"
+                <Checkbox
                   checked={option.requestDetailNoteWhenSelected}
-                  onChange={(event) => {
-                    const checked = event.target.checked;
+                  onCheckedChange={(checkedState) => {
+                    const checked = checkedState === true;
                     props.updateTemplate((current) => ({
                       ...current,
                       rounds: current.rounds.map((candidateRound) =>

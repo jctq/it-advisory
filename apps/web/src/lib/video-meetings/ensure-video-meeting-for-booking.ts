@@ -17,8 +17,10 @@ import {
   fetchMicrosoftGraphAppAccessToken,
   requestCreateMicrosoftTeamsOnlineMeeting,
 } from '@/lib/microsoft-teams/microsoft-graph-teams-meetings-api';
-import { SITE_NAME } from '@/lib/seo/site-seo';
+import { readEnvSiteName } from '@/lib/site/site-name';
 import { getDb } from '@/lib/mongodb';
+
+const SITE_NAME = readEnvSiteName();
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@techmd/diagnostic-core/project-rescue-service-context';
 import { fetchZoomAccessToken, requestCreateZoomScheduledMeeting } from '@/lib/zoom/zoom-api';
 

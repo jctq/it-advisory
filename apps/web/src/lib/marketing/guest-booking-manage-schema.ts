@@ -57,3 +57,11 @@ export const guestBookingManageRescheduleSchema = guestBookingManageCredentialsS
 export const accountBookingManageRescheduleSchema = accountBookingManageLookupSchema.extend(
   bookingSlotRescheduleFieldsSchema.shape,
 );
+
+export const accountBookingCancellationSchema = accountBookingManageLookupSchema.extend({
+  bookingReference: z.string().trim().min(4).max(12),
+});
+
+export const guestBookingCancellationSchema = guestBookingManageCredentialsSchema.extend({
+  confirmReference: z.string().trim().min(4).max(12),
+});

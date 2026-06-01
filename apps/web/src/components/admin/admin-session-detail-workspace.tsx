@@ -274,7 +274,7 @@ export function AdminSessionDetailWorkspace(props: AdminSessionDetailWorkspacePr
             <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
               <h2 className="text-lg font-semibold text-foreground">Save history</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Append-only rows from quiz_audit (each quiz save). Use pagination and View to open the full answers JSON
+                Append-only rows from quiz_audit (each diagnostic save). Use pagination and View to open the full answers JSON
                 for a row.
               </p>
               <div className="mt-4">

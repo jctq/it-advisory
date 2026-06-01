@@ -203,6 +203,8 @@ export type AdminBookingCalendarStatusCounts = {
   readonly awaiting_payment: number;
   readonly cancelled: number;
   readonly completed: number;
+  readonly refund_awaiting: number;
+  readonly refunded: number;
 };
 
 export type ListBookingsForAdminCalendarInRangeInput = {
@@ -351,14 +353,16 @@ async function buildAdminBookingLifecycleStatusCounts(
     }
     return collection.countDocuments({ ...rangeFilter, ...statusQuery });
   };
-  const [pending, awaiting_payment, confirmed, completed, cancelled] = await Promise.all([
+  const [pending, awaiting_payment, confirmed, completed, cancelled, refund_awaiting, refunded] = await Promise.all([
     countForFilter('pending'),
     countForFilter('awaiting_payment'),
     countForFilter('confirmed'),
     countForFilter('completed'),
     countForFilter('cancelled'),
+    countForFilter('refund_awaiting'),
+    countForFilter('refunded'),
   ]);
-  return { all, confirmed, pending, awaiting_payment, cancelled, completed };
+  return { all, confirmed, pending, awaiting_payment, cancelled, completed, refund_awaiting, refunded };
 }
 
 /**
@@ -374,6 +378,8 @@ export async function listBookingsForAdminCalendarInRange(
     awaiting_payment: 0,
     cancelled: 0,
     completed: 0,
+    refund_awaiting: 0,
+    refunded: 0,
   };
   if (!process.env.MONGODB_URI) {
     return { bookings: [], countsByStatus: emptyCounts };
@@ -699,6 +705,7 @@ export type PrimaryBookingSlotRow = {
   readonly customerCompany: string | null;
   readonly customerPhone: string | null;
   readonly paymentExpiresAtIso: string | null;
+  readonly recordingOptIn: boolean;
 };
 
 /**
@@ -759,6 +766,7 @@ export async function findPrimaryBookingSlotByQuizSessionId(quizSessionId: Objec
     customerPhone,
     paymentExpiresAtIso:
       doc.paymentExpiresAt instanceof Date ? doc.paymentExpiresAt.toISOString() : null,
+    recordingOptIn: doc.recordingOptIn === true,
   };
 }
 

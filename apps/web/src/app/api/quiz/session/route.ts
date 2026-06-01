@@ -114,13 +114,12 @@ export async function GET(request: Request): Promise<NextResponse> {
       : null;
   const paymentHoldClosed =
     paymentHoldExpiresAtIso !== null && Date.parse(paymentHoldExpiresAtIso) <= serverNow.getTime();
+  const linkedPendingUnpaid =
+    linkedBookingSlot !== null &&
+    linkedBookingSlot.status === 'pending' &&
+    linkedBookingSlot.paymentStatus !== 'paid';
   const isAwaitingPaymentResume =
-    hasOpenPaymentTransaction &&
-    !paymentHoldClosed &&
-    (hasPendingCheckout ||
-      (linkedBookingSlot !== null &&
-        linkedBookingSlot.status === 'pending' &&
-        linkedBookingSlot.paymentStatus !== 'paid'));
+    !paymentHoldClosed && (hasPendingCheckout || linkedPendingUnpaid);
   const resumePaymentSelection = isAwaitingPaymentResume
     ? resolvePaymentSelectionFromTransaction(latestPayment)
     : null;
@@ -162,6 +161,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             customerCompany: linkedBookingSlot.customerCompany,
             customerPhone: linkedBookingSlot.customerPhone,
             paymentExpiresAtIso: linkedBookingSlot.paymentExpiresAtIso,
+            recordingOptIn: linkedBookingSlot.recordingOptIn,
           },
   });
 }

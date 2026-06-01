@@ -27,6 +27,32 @@ describe('buildBookingPayGuidance', () => {
     expect(guidance?.steps.some((step) => step.includes('Sync profile'))).toBe(true);
   });
 
+  it('returns refunded guidance for status_refunded', () => {
+    const guidance = buildBookingPayGuidance({
+      payabilityCode: 'status_refunded',
+      blockedReason: 'This booking has been refunded.',
+      canPayOnline: false,
+      status: 'refunded',
+      manageKind: 'guest',
+    });
+    expect(guidance?.title).toBe('Booking refunded');
+    expect(guidance?.message).toContain('refunded');
+    expect(guidance?.steps.some((step) => step.includes('refunded'))).toBe(true);
+  });
+
+  it('returns payment expired rebook guidance when hold expired', () => {
+    const guidance = buildBookingPayGuidance({
+      payabilityCode: 'payment_window_expired',
+      blockedReason: 'Your payment window has expired.',
+      canPayOnline: false,
+      status: 'pending',
+      manageKind: 'guest',
+      pendingPaymentExpiredForRebook: true,
+    });
+    expect(guidance?.title).toBe('Payment expired');
+    expect(guidance?.steps.some((step) => step.includes('Choose a new date'))).toBe(true);
+  });
+
   it('returns sign-in guidance for account visitor_mismatch', () => {
     const guidance = buildBookingPayGuidance({
       payabilityCode: 'visitor_mismatch',

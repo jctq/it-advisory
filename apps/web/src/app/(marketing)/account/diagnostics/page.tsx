@@ -7,6 +7,7 @@ import {
   type AccountDiagnosticsInitialList,
 } from '@/lib/marketing/account-diagnostics-list';
 import { readManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
+import { readCustomerBookingActionSettings } from '@/lib/marketing/refunds-gate';
 import { scheduleVisitorPaymentReconciliationIfNeeded } from '@/lib/payments/reconcile-visitor-payments';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
@@ -19,9 +20,10 @@ export const metadata = buildNoIndexMetadata({
 export const dynamic = 'force-dynamic';
 
 export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
-  const [user, manageBookingEnabled] = await Promise.all([
+  const [user, manageBookingEnabled, customerActionSettings] = await Promise.all([
     getAuthenticatedMarketingUser(),
     readManageBookingEnabled(),
+    readCustomerBookingActionSettings(),
   ]);
   if (user === null) {
     redirect('/login?next=%2Faccount%2Fdiagnostics');
@@ -47,7 +49,12 @@ export default async function AccountDiagnosticsPage(): Promise<ReactElement> {
           </p>
         </div>
       </div>
-      <AccountDiagnosticsPanel manageBookingEnabled={manageBookingEnabled} initialList={initialList} />
+      <AccountDiagnosticsPanel
+        manageBookingEnabled={manageBookingEnabled}
+        paymentPolicy={customerActionSettings.paymentPolicy}
+        refundsEnabled={customerActionSettings.refundsEnabled}
+        initialList={initialList}
+      />
     </main>
   );
 }

@@ -61,6 +61,8 @@ const STATUS_FILTER_ICONS: Record<BookingListStatusFilter, typeof Inbox> = {
   confirmed: CalendarCheck2,
   completed: CircleCheckBig,
   cancelled: CalendarX2,
+  refund_awaiting: CircleHelp,
+  refunded: CalendarX2,
 };
 
 const STATUS_FILTER_OPTIONS: readonly StatusFilterOption[] = BOOKING_LIST_STATUS_FILTER_OPTIONS.map(
@@ -79,6 +81,8 @@ const EMPTY_COUNTS: AdminBookingCalendarStatusCounts = {
   awaiting_payment: 0,
   cancelled: 0,
   completed: 0,
+  refund_awaiting: 0,
+  refunded: 0,
 };
 
 type ReferenceSearchFeedback =

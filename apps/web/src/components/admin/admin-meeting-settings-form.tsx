@@ -21,8 +21,10 @@ import { AdminSettingsOptionTitle } from '@/components/admin/admin-settings-hint
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { getAdminPrimaryActionButtonClass } from '@/components/admin/admin-settings-action-button-classes';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { cn } from '@/lib/utils';
 import { notifyActionResult, notifyError, notifySuccess } from '@/lib/notify';
 
 const MEETING_SETTINGS_API_URL: string = buildApiUrl('/api/admin/meeting-settings');
@@ -379,29 +381,34 @@ export function AdminMeetingSettingsForm(props: AdminMeetingSettingsFormProps): 
       >
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium text-foreground">Active provider</legend>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {ACTIVE_OPTIONS.map((option) => (
-              <label
-                key={option.value}
-                className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4 has-checked:border-primary/50 has-checked:bg-primary/5"
-              >
-                <input
-                  type="radio"
-                  name="meetingActiveProvider"
-                  checked={settings.activeProvider === option.value}
-                  onChange={() => {
-                    setSettings((previous) =>
-                      previous === null ? previous : { ...previous, activeProvider: option.value },
-                    );
-                  }}
-                  className="mt-1"
-                />
-                <div>
-                  <AdminSettingsOptionTitle hint={option.description}>{option.title}</AdminSettingsOptionTitle>
-                </div>
-              </label>
-            ))}
-          </div>
+          <RadioGroup
+            value={settings.activeProvider}
+            onValueChange={(value) => {
+              setSettings((previous) =>
+                previous === null ? previous : { ...previous, activeProvider: value as VideoMeetingActiveProvider },
+              );
+            }}
+            className="grid gap-3 lg:grid-cols-2"
+          >
+            {ACTIVE_OPTIONS.map((option) => {
+              const optionId = `meeting-active-provider-${option.value}`;
+              return (
+                <label
+                  key={option.value}
+                  htmlFor={optionId}
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-background p-4',
+                    settings.activeProvider === option.value && 'border-primary/50 bg-primary/5',
+                  )}
+                >
+                  <RadioGroupItem value={option.value} id={optionId} />
+                  <div>
+                    <AdminSettingsOptionTitle hint={option.description}>{option.title}</AdminSettingsOptionTitle>
+                  </div>
+                </label>
+              );
+            })}
+          </RadioGroup>
         </fieldset>
       </SettingsCard>
       {VIDEO_MEETING_PROVIDER_IDS.map((providerId) => {

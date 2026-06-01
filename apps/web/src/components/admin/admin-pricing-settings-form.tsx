@@ -30,6 +30,7 @@ import {
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { AdminSettingsHint } from '@/components/admin/admin-settings-hint';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -551,16 +552,14 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
               Promo codes
             </TabsTrigger>
           </TabsList>
-          <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
+          <label className="flex min-h-10 cursor-pointer items-start gap-3 text-sm text-muted-foreground">
+            <Checkbox
               checked={showDeleted}
-              onChange={(event) => {
-                setShowDeleted(event.target.checked);
+              onCheckedChange={(checked) => {
+                setShowDeleted(checked === true);
               }}
-              className="size-4 rounded border-input"
             />
-            Show deleted
+            <span>Show deleted</span>
           </label>
         </div>
         <TabsContent value="catalog" className="mt-0 space-y-4 focus-visible:outline-none">
@@ -1017,17 +1016,15 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
                 />
               </div>
             ) : null}
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <input
+            <div className="flex items-start gap-3 sm:col-span-2">
+              <Checkbox
                 id="catalog-enabled"
-                type="checkbox"
                 checked={catalogDraft.enabled}
-                onChange={(event) => {
-                  setCatalogDraft((draft) => ({ ...draft, enabled: event.target.checked }));
+                onCheckedChange={(checked) => {
+                  setCatalogDraft((draft) => ({ ...draft, enabled: checked === true }));
                 }}
-                className="size-4 rounded border-input"
               />
-              <Label htmlFor="catalog-enabled" className="cursor-pointer font-normal">
+              <Label htmlFor="catalog-enabled" className="cursor-pointer font-normal leading-none">
                 Enabled at checkout
               </Label>
             </div>
@@ -1138,17 +1135,15 @@ export function AdminPricingSettingsForm(props: AdminPricingSettingsFormProps): 
                 }}
               />
             </div>
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <input
+            <div className="flex items-start gap-3 sm:col-span-2">
+              <Checkbox
                 id="promo-enabled"
-                type="checkbox"
                 checked={promoDraft.enabled}
-                onChange={(event) => {
-                  setPromoDraft((draft) => ({ ...draft, enabled: event.target.checked }));
+                onCheckedChange={(checked) => {
+                  setPromoDraft((draft) => ({ ...draft, enabled: checked === true }));
                 }}
-                className="size-4 rounded border-input"
               />
-              <Label htmlFor="promo-enabled" className="cursor-pointer font-normal">
+              <Label htmlFor="promo-enabled" className="cursor-pointer font-normal leading-none">
                 Enabled
               </Label>
             </div>

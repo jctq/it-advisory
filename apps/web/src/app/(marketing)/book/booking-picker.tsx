@@ -45,6 +45,7 @@ import {
   PaymentConfigFetchError,
   type PaymentConfigPublic,
 } from '@techmd/api-client/marketing-payment-api-client';
+import { rescheduleMarketingCheckoutSlot } from '@techmd/api-client/marketing-booking-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SESSION_DURATION } from '@techmd/diagnostic-core/project-rescue-service-context';
 import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sticky-action-bar';
@@ -54,6 +55,7 @@ import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-but
 import { BookingConfirmedServiceCard } from '@/components/marketing/booking-confirmed-service-card';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -78,6 +80,8 @@ import { hasCheckoutManageContact } from '@/lib/marketing/checkout-contact';
 import {
   isLinkedBookingCancelled,
   isLinkedBookingCheckoutResumable,
+  isLinkedBookingDeferredCheckoutEligible,
+  isLinkedBookingNeedsSlotRebook,
   isLinkedBookingPendingPayment,
   isPendingCheckoutResumable,
   linkedBookingHasManageContact,
@@ -105,6 +109,7 @@ const BOOKINGS_API_URL = '/api/bookings';
 const QUIZ_SESSION_API_URL = '/api/quiz/session';
 const PAYMENT_CONFIG_API_URL = buildApiUrl('/api/checkout/payment-config');
 const AVAILABILITY_API_URL = buildApiUrl('/api/booking/availability');
+const CHECKOUT_RESCHEDULE_SLOT_API_URL = buildApiUrl('/api/bookings/checkout/reschedule-slot');
 const AUTH_ME_API_URL = buildApiUrl('/api/auth/me');
 
 type MarketingProfilePrefill = {
@@ -296,7 +301,7 @@ const BOOKING_STEPS: readonly {
 }[] = [
   { id: 'date', barLabel: 'DATE & TIME', headline: 'Date & Time' },
   { id: 'details', barLabel: 'YOUR DETAILS', headline: 'Your details' },
-  { id: 'payment', barLabel: 'PAYMENT', headline: 'Payment' },
+  { id: 'payment', barLabel: 'CHECKOUT', headline: 'Checkout' },
 ];
 
 function formatConfirmedSlotFromStartsAt(startsAtIso: string, timezone: string): ConfirmedSlotDisplay {
@@ -528,11 +533,15 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     useState<AwaitingPaymentReservedSlotState | null>(null);
   const [paymentHoldExpired, setPaymentHoldExpired] = useState<boolean>(false);
   const [holdExpiredRequiresRebook, setHoldExpiredRequiresRebook] = useState<boolean>(false);
+  const [mustPersistSlotBeforeCheckout, setMustPersistSlotBeforeCheckout] = useState<boolean>(false);
+  const [isPersistingCheckoutSlot, setIsPersistingCheckoutSlot] = useState<boolean>(false);
   const [dateActionsUnpinElement, setDateActionsUnpinElement] = useState<HTMLElement | null>(null);
   const [detailsActionsUnpinElement, setDetailsActionsUnpinElement] = useState<HTMLElement | null>(null);
   const [paymentActionsUnpinElement, setPaymentActionsUnpinElement] = useState<HTMLElement | null>(null);
   const [availabilityRefreshToken, setAvailabilityRefreshToken] = useState<number>(0);
   const paymentHoldSyncInFlightRef = useRef<boolean>(false);
+  /** When true, user is picking a new slot after hold expiry — do not force the gate back to error. */
+  const manualSlotRebookRef = useRef<boolean>(false);
   const resumePaymentSelectionPendingRef = useRef<{
     readonly gatewayId: PaymentGatewayId;
     readonly paymentMethodId: string;
@@ -579,9 +588,6 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     },
     [executeActivatePaymentHold],
   );
-  const executeDismissPendingPaymentHoldNotice = useCallback((): void => {
-    setPendingPaymentHoldDialogOpen(false);
-  }, []);
   const executeSyncPaymentHoldExpiry = useCallback(async (): Promise<boolean> => {
     if (!hasValidQuizSessionParam) {
       return false;
@@ -659,6 +665,50 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       clearCheckoutDraftFromSessionStorage(quizSessionRef);
     }
   }, [hasValidQuizSessionParam, quizSessionRef, setSelectedDate, setSelectedTime]);
+  const executeReturnToFreshCheckoutDateStep = useCallback((): void => {
+    manualSlotRebookRef.current = true;
+    setMustPersistSlotBeforeCheckout(true);
+    setHoldExpiredRequiresRebook(false);
+    setPaymentHoldExpired(false);
+    setActivePaymentHold(null);
+    setIsAwaitingPaymentCheckout(false);
+    setAwaitingPaymentReservedSlot(null);
+    setPendingPaymentHoldDialogOpen(false);
+    setErrorMessage(null);
+    setPaymentCancelledNotice(false);
+    clearCheckoutSlotSelection();
+    resumePaymentSelectionPendingRef.current = null;
+    if (hasValidQuizSessionParam) {
+      checkoutResumeHandledRef.current = quizSessionRef;
+    }
+    setPhase('date');
+    setAvailabilityRefreshToken((previous) => previous + 1);
+    if (hasValidQuizSessionParam && hasPathSegment) {
+      router.replace(buildMarketingBookSessionPath(quizSessionRef, checkoutServiceKeyForApi));
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (hasValidQuizSessionParam) {
+      void executeSyncPaymentHoldExpiry().catch(() => undefined);
+    }
+  }, [
+    checkoutServiceKeyForApi,
+    clearCheckoutSlotSelection,
+    executeSyncPaymentHoldExpiry,
+    hasPathSegment,
+    hasValidQuizSessionParam,
+    quizSessionRef,
+    router,
+    setErrorMessage,
+    setPaymentCancelledNotice,
+    setPhase,
+  ]);
+  const executeDismissPendingPaymentHoldNotice = useCallback((): void => {
+    if (isPaymentHoldBlocked || paymentHoldExpired) {
+      executeReturnToFreshCheckoutDateStep();
+      return;
+    }
+    setPendingPaymentHoldDialogOpen(false);
+  }, [executeReturnToFreshCheckoutDateStep, isPaymentHoldBlocked, paymentHoldExpired]);
   const restoreCheckoutDraftFromSnapshot = useCallback((draft: CheckoutDraftSnapshot): void => {
     try {
       const slotUtc = parseBookingSlotToUtc(draft.date, draft.time);
@@ -961,6 +1011,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (sessionGateResolvedRef.current === ref && !isCheckoutPaymentSuccessReturn()) {
       return;
     }
+    if (manualSlotRebookRef.current) {
+      sessionGateResolvedRef.current = ref;
+      queueMicrotask(() => {
+        setSessionGateStatus('ready');
+      });
+      return;
+    }
     let cancelled = false;
     const controller = new AbortController();
     queueMicrotask(() => {
@@ -1057,6 +1114,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             if (isLinkedBookingCancelled(linkedBooking)) {
               setPaymentHoldExpired(true);
               setHoldExpiredRequiresRebook(true);
+              setMustPersistSlotBeforeCheckout(true);
               setActivePaymentHold(null);
               setIsAwaitingPaymentCheckout(false);
               setAwaitingPaymentReservedSlot(null);
@@ -1073,11 +1131,66 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               canResumePaymentCheckout &&
               isLinkedBookingCheckoutResumable(linkedBooking, {
                 latestPaymentStatus,
+                paymentHoldExpiresAtIso,
                 serverNowMs: resolvedGateServerNowMs,
               });
             if (isLinkedBookingPendingPayment(linkedBooking) && !linkedCheckoutResumable) {
+              if (manualSlotRebookRef.current) {
+                sessionGateResolvedRef.current = ref;
+                setSessionGateStatus('ready');
+                return;
+              }
+              if (
+                isLinkedBookingDeferredCheckoutEligible(linkedBooking, {
+                  serverNowMs: resolvedGateServerNowMs,
+                })
+              ) {
+                if (checkoutResumeHandledRef.current !== ref) {
+                  checkoutResumeHandledRef.current = ref;
+                  applyResumePaymentSelection();
+                  restoreCheckoutDraftFromSnapshot(linkedBookingToCheckoutDraft(linkedBooking));
+                  setRecordingOptIn(linkedBooking.recordingOptIn === true);
+                  setIsAwaitingPaymentCheckout(false);
+                  setActivePaymentHold(null);
+                  setPendingPaymentHoldDialogOpen(false);
+                  setAwaitingPaymentReservedSlot({
+                    startsAtIso: linkedBooking.startsAtIso,
+                    timezone: linkedBooking.timezone,
+                  });
+                  setPaymentCancelledNotice(paymentCancelledReturn);
+                  setMustPersistSlotBeforeCheckout(false);
+                  setHoldExpiredRequiresRebook(false);
+                  setPaymentHoldExpired(false);
+                  const checkoutStepParam = searchParams.get('checkoutStep');
+                  const forcedCheckoutStep =
+                    checkoutStepParam === 'details' || checkoutStepParam === 'payment'
+                      ? checkoutStepParam
+                      : null;
+                  if (phase !== 'date' && phase !== 'details' && phase !== 'payment') {
+                    setPhase(
+                      forcedCheckoutStep ??
+                        (linkedBookingHasManageContact(linkedBooking) ? 'payment' : 'details'),
+                    );
+                  }
+                  const currentServiceKey = searchParams.get('serviceKey')?.trim() ?? '';
+                  if (currentServiceKey !== linkedBooking.serviceKey) {
+                    router.replace(buildMarketingBookSessionPath(ref, linkedBooking.serviceKey));
+                  }
+                }
+                sessionGateResolvedRef.current = ref;
+                setSessionGateStatus('ready');
+                return;
+              }
+              if (
+                !isLinkedBookingNeedsSlotRebook(linkedBooking, { serverNowMs: resolvedGateServerNowMs })
+              ) {
+                sessionGateResolvedRef.current = ref;
+                setSessionGateStatus('ready');
+                return;
+              }
               setPaymentHoldExpired(true);
               setHoldExpiredRequiresRebook(true);
+              setMustPersistSlotBeforeCheckout(true);
               setActivePaymentHold(null);
               setIsAwaitingPaymentCheckout(false);
               setAwaitingPaymentReservedSlot(null);
@@ -1099,21 +1212,41 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               checkoutResumeHandledRef.current = ref;
               applyResumePaymentSelection();
               restoreCheckoutDraftFromSnapshot(linkedBookingToCheckoutDraft(linkedBooking));
-              const linkedExpiresAtIso =
-                paymentHoldExpiresAtIso.length > 0
-                  ? paymentHoldExpiresAtIso
-                  : (linkedBooking.paymentExpiresAtIso?.trim() ?? '');
-              resumeAwaitingPaymentCheckout({
-                expiresAtIso: linkedExpiresAtIso,
-                timezone: linkedBooking.timezone,
-                startsAtIso: linkedBooking.startsAtIso,
-              });
+              setRecordingOptIn(linkedBooking.recordingOptIn === true);
+              const deferPaymentHold = searchParams.get('deferPaymentHold') === '1';
+              if (!deferPaymentHold) {
+                const linkedExpiresAtIso =
+                  paymentHoldExpiresAtIso.length > 0
+                    ? paymentHoldExpiresAtIso
+                    : (linkedBooking.paymentExpiresAtIso?.trim() ?? '');
+                resumeAwaitingPaymentCheckout({
+                  expiresAtIso: linkedExpiresAtIso,
+                  timezone: linkedBooking.timezone,
+                  startsAtIso: linkedBooking.startsAtIso,
+                });
+              } else {
+                setIsAwaitingPaymentCheckout(false);
+                setActivePaymentHold(null);
+                setPendingPaymentHoldDialogOpen(false);
+                setAwaitingPaymentReservedSlot({
+                  startsAtIso: linkedBooking.startsAtIso,
+                  timezone: linkedBooking.timezone,
+                });
+              }
               setPaymentCancelledNotice(paymentCancelledReturn);
-              setPhase(linkedBookingHasManageContact(linkedBooking) ? 'payment' : 'details');
+              const checkoutStepParam = searchParams.get('checkoutStep');
+              const forcedCheckoutStep =
+                checkoutStepParam === 'details' || checkoutStepParam === 'payment' ? checkoutStepParam : null;
+              setPhase(
+                forcedCheckoutStep ??
+                  (linkedBookingHasManageContact(linkedBooking) ? 'payment' : 'details'),
+              );
               const currentServiceKey = searchParams.get('serviceKey')?.trim() ?? '';
               const shouldNormalizeUrl =
                 paymentCancelledReturn ||
                 searchParams.has('transactionId') ||
+                searchParams.has('checkoutStep') ||
+                searchParams.has('deferPaymentHold') ||
                 currentServiceKey !== linkedBooking.serviceKey;
               if (shouldNormalizeUrl) {
                 router.replace(buildMarketingBookSessionPath(ref, linkedBooking.serviceKey));
@@ -1514,6 +1647,10 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         if (!didCancel) {
           return;
         }
+        if (phase === 'payment' || phase === 'processing') {
+          executeReturnToFreshCheckoutDateStep();
+          return;
+        }
         setPaymentHoldExpired(true);
         setHoldExpiredRequiresRebook(true);
         setPendingPaymentHoldDialogOpen(false);
@@ -1529,10 +1666,12 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         paymentHoldSyncInFlightRef.current = false;
       });
   }, [
+    executeReturnToFreshCheckoutDateStep,
     executeSyncPaymentHoldExpiry,
     hasValidQuizSessionParam,
     isPaymentHoldBlocked,
     pendingPaymentHoldDialogOpen,
+    phase,
     setErrorMessage,
     setPhase,
   ]);
@@ -1703,12 +1842,49 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     ? buildMarketingQuizSessionPath(quizSessionRef)
     : '/diagnostic';
 
+  const resetCheckoutSessionGate = useCallback((): void => {
+    sessionGateResolvedRef.current = null;
+    checkoutResumeHandledRef.current = null;
+    linkedConfirmationHandledRef.current = null;
+  }, []);
   const executeContinueFromDate = (): void => {
     if (!selectedDate || !selectedTime) {
       return;
     }
-    setPhase('details');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    void (async (): Promise<void> => {
+      if (mustPersistSlotBeforeCheckout && hasValidQuizSessionParam) {
+        setIsPersistingCheckoutSlot(true);
+        try {
+          const dateYmd = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
+          await rescheduleMarketingCheckoutSlot({
+            apiUrl: CHECKOUT_RESCHEDULE_SLOT_API_URL,
+            sessionRef: quizSessionRef,
+            dateYmd,
+            timeLabel: selectedTime,
+          });
+          manualSlotRebookRef.current = false;
+          setMustPersistSlotBeforeCheckout(false);
+          setPaymentHoldExpired(false);
+          setHoldExpiredRequiresRebook(false);
+          setActivePaymentHold(null);
+          setIsAwaitingPaymentCheckout(false);
+          const persistedSlotUtc = parseBookingSlotToUtc(dateYmd, selectedTime);
+          setAwaitingPaymentReservedSlot({
+            startsAtIso: persistedSlotUtc.toISOString(),
+            timezone: PRIMARY_TIMEZONE,
+          });
+          setPendingPaymentHoldDialogOpen(false);
+          checkoutResumeHandledRef.current = quizSessionRef;
+        } catch (error: unknown) {
+          notifyError(error instanceof Error ? error.message : 'Could not save your new session time.');
+          return;
+        } finally {
+          setIsPersistingCheckoutSlot(false);
+        }
+      }
+      setPhase('details');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    })();
   };
 
   const executeContinueFromDetails = (): void => {
@@ -1820,8 +1996,25 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           phone: phone.trim(),
           serviceKey: checkoutServiceKeyForApi,
         });
+        manualSlotRebookRef.current = false;
+        setMustPersistSlotBeforeCheckout(false);
+        setHoldExpiredRequiresRebook(false);
         window.location.href = session.redirectUrl;
       } catch (error: unknown) {
+        const payabilityCode =
+          error instanceof Error && 'payabilityCode' in error && typeof error.payabilityCode === 'string'
+            ? error.payabilityCode
+            : null;
+        if (
+          payabilityCode === 'payment_window_expired' ||
+          payabilityCode === 'session_slot_in_past' ||
+          payabilityCode === 'payment_hold_expired'
+        ) {
+          manualSlotRebookRef.current = true;
+          setMustPersistSlotBeforeCheckout(true);
+          setHoldExpiredRequiresRebook(true);
+          setPaymentHoldExpired(false);
+        }
         notifyError(error instanceof Error ? error.message : 'Could not start payment.');
         setErrorMessage(error instanceof Error ? error.message : 'Could not start payment.');
         setPhase('error');
@@ -1934,6 +2127,9 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
 
   const executeBackToDate = (): void => {
     setFieldErrors({});
+    if (mustPersistSlotBeforeCheckout || holdExpiredRequiresRebook) {
+      manualSlotRebookRef.current = true;
+    }
     setPhase('date');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1949,11 +2145,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     setActivePaymentHold(null);
     setIsAwaitingPaymentCheckout(false);
     setAwaitingPaymentReservedSlot(null);
-    if (holdExpiredRequiresRebook) {
+    setPendingPaymentHoldDialogOpen(false);
+    if (holdExpiredRequiresRebook || mustPersistSlotBeforeCheckout) {
+      manualSlotRebookRef.current = true;
       setHoldExpiredRequiresRebook(false);
+      setMustPersistSlotBeforeCheckout(true);
+      setSessionGateStatus('ready');
       setPhase('date');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    resetCheckoutSessionGate();
     setPhase('payment');
   };
 
@@ -2165,7 +2367,11 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         open={pendingPaymentHoldDialogOpen && isAwaitingPaymentCheckout}
         onOpenChange={(open) => {
           if (!open) {
-            executeDismissPendingPaymentHoldNotice();
+            if (isPaymentHoldBlocked || paymentHoldExpired) {
+              executeReturnToFreshCheckoutDateStep();
+            } else {
+              executeDismissPendingPaymentHoldNotice();
+            }
           }
         }}
       >
@@ -2205,10 +2411,13 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             <Button
               type="button"
               className="w-full sm:w-auto"
-              disabled={isPaymentHoldBlocked}
-              onClick={executeDismissPendingPaymentHoldNotice}
+              onClick={
+                isPaymentHoldBlocked || paymentHoldExpired
+                  ? executeReturnToFreshCheckoutDateStep
+                  : executeDismissPendingPaymentHoldNotice
+              }
             >
-              Continue to payment
+              {isPaymentHoldBlocked || paymentHoldExpired ? 'Pick a new time' : 'Continue to payment'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2221,7 +2430,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
           {visibleCheckoutPhase === 'date' && 'Choose Date & Time'}
           {visibleCheckoutPhase === 'details' && 'Your Details'}
-          {visibleCheckoutPhase === 'payment' && 'Payment'}
+          {visibleCheckoutPhase === 'payment' && 'Checkout'}
         </h1>
         <p
           className={cn(
@@ -2403,6 +2612,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                       className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2.5 text-center leading-snug"
                       size="lg"
                       disabled={
+                        isPersistingCheckoutSlot ||
                         !selectedDate ||
                         !selectedTime ||
                         availabilityStatus === 'loading' ||
@@ -2410,7 +2620,14 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                       }
                       onClick={executeContinueFromDate}
                     >
-                      Next
+                      {isPersistingCheckoutSlot ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                          Saving your time…
+                        </>
+                      ) : (
+                        'Next'
+                      )}
                     </Button>
                   </div>
                 </DiagnosticStickyActionBar>
@@ -2740,29 +2957,27 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               {paymentConfig?.recordingsEnabled === true ? (
                 <label
                   className={cn(
-                    'flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-card p-3',
+                    'grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 rounded-xl border border-border bg-card p-3',
                     isPaymentHoldBlocked && 'pointer-events-none opacity-60',
                   )}
                 >
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 size-3.5 shrink-0 accent-primary"
+                  <Checkbox
                     checked={recordingOptIn}
-                    onChange={(event) => setRecordingOptIn(event.target.checked)}
+                    className="row-start-1 self-center"
+                    disabled={isPaymentHoldBlocked}
+                    onCheckedChange={(checked) => setRecordingOptIn(checked === true)}
                   />
-                  <span className="min-w-0">
-                    <span className="text-xs font-medium leading-snug text-foreground">
-                      AI meeting notes &amp; recording
-                      {paymentConfig.recordingOptInPriceCentavos > 0
-                        ? ` (+${paymentConfig.recordingOptInPriceLabel})`
-                        : ' (included)'}
-                    </span>
-                    <span
-                      className="mt-0.5 block text-[10px] leading-tight text-muted-foreground"
-                      title="A visible Fathom notetaker may join your video call to capture notes and a summary. By opting in, you consent to recording and transcription for this consultation."
-                    >
-                      Fathom may join your call. Opt-in = recording consent.
-                    </span>
+                  <span className="row-start-1 min-w-0 text-xs font-medium leading-snug text-foreground">
+                    AI meeting notes &amp; recording
+                    {paymentConfig.recordingOptInPriceCentavos > 0
+                      ? ` (+${paymentConfig.recordingOptInPriceLabel})`
+                      : ' (included)'}
+                  </span>
+                  <span
+                    className="col-start-2 row-start-2 text-[10px] leading-tight text-muted-foreground"
+                    title="A visible Fathom notetaker may join your video call to capture notes and a summary. By opting in, you consent to recording and transcription for this consultation."
+                  >
+                    Fathom may join your call. Opt-in = recording consent.
                   </span>
                 </label>
               ) : null}

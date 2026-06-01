@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, type FormEvent, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement, type ReactNode } from 'react';
 import { useMarketingGuestBooking } from '@/hooks/marketing/use-marketing-guest-booking';
-import type { GuestBookingManagePhase } from '@/store/marketing/marketing-guest-booking-store';
+import type { GuestBookingManageAuthContext, GuestBookingManagePhase } from '@/store/marketing/marketing-guest-booking-store';
 import { formatInTimeZone } from 'date-fns-tz';
 import { AlertCircle, CalendarClock, CheckCircle2, CreditCard, Loader2, Search, Video } from 'lucide-react';
 import {
@@ -13,6 +13,9 @@ import {
   lookupAccountManagedBooking,
   lookupGuestBooking,
   syncAccountProfileToManagedBooking,
+  cancelGuestManagedBooking,
+  cancelAccountManagedBooking,
+  BookingCancellationError,
   type BookingPayGuidance,
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
@@ -34,6 +37,7 @@ import {
   type OverduePendingManageContext,
 } from '@/components/marketing/overdue-pending-booking-panel';
 import { notifyError, notifySuccess } from '@/lib/notify';
+import { BookingCancellationDialog } from '@/components/marketing/booking-cancellation-dialog';
 import { resolveBookingJoinCalendarLocation, resolveBookingSessionRoomHref } from '@/lib/marketing/booking-session-room-path';
 import { cn } from '@/lib/utils';
 
@@ -65,7 +69,10 @@ function formatSlotDisplay(startsAtIso: string, timezone: string): { readonly da
   };
 }
 
-function StatusBadge(props: { readonly status: GuestBookingManageView['status'] }): ReactElement {
+function StatusBadge(props: {
+  readonly status: GuestBookingManageView['status'];
+  readonly pendingPaymentExpiredForRebook: boolean;
+}): ReactElement {
   if (props.status === 'confirmed') {
     return (
       <Badge className="bg-emerald-600/15 text-emerald-800 hover:bg-emerald-600/15 dark:text-emerald-200">Confirmed</Badge>
@@ -78,8 +85,25 @@ function StatusBadge(props: { readonly status: GuestBookingManageView['status'] 
       </Badge>
     );
   }
+  if (props.status === 'refund_awaiting') {
+    return (
+      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
+        Refund awaiting
+      </Badge>
+    );
+  }
+  if (props.status === 'refunded') {
+    return <Badge variant="outline">Refunded</Badge>;
+  }
   if (props.status === 'cancelled') {
     return <Badge variant="outline">Cancelled</Badge>;
+  }
+  if (props.pendingPaymentExpiredForRebook) {
+    return (
+      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
+        Payment expired
+      </Badge>
+    );
   }
   return (
     <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-100">
@@ -351,7 +375,11 @@ export function GuestBookingManageFlow(props: {
   }
   const slotDisplay = formatSlotDisplay(booking.startsAtIso, booking.timezone);
   const hasPaymentGateways = paymentConfig !== null && paymentConfig.gateways.length > 0;
-  const showPaymentSection = booking.canPayOnline && hasPaymentGateways;
+  const showPaymentSection =
+    booking.canPayOnline &&
+    hasPaymentGateways &&
+    booking.status !== 'refund_awaiting' &&
+    booking.status !== 'refunded';
   const payGuidance: BookingPayGuidance | null =
     booking.payGuidance ??
     (booking.canPayOnline && !hasPaymentGateways ? buildPaymentGatewaysUnavailableGuidance() : null);
@@ -369,6 +397,27 @@ export function GuestBookingManageFlow(props: {
       phase={phase}
       apiBaseUrl={MARKETING_CLIENT_API_BASE_URL}
       overdueManageContext={overdueManageContext}
+      manageContext={manageContext}
+      onBookingCancelled={async (): Promise<void> => {
+        if (manageContext === null) {
+          return;
+        }
+        try {
+          const refreshed =
+            manageContext.kind === 'guest'
+              ? await lookupGuestBooking({
+                  apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+                  credentials: manageContext.credentials,
+                })
+              : await lookupAccountManagedBooking({
+                  apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+                  bookingId: manageContext.bookingId,
+                });
+          setBooking(refreshed);
+        } catch {
+          setBooking({ ...booking, status: 'refund_awaiting' });
+        }
+      }}
       onBookingUpdated={setBooking}
       onSetSubmitting={setIsSubmitting}
       showPaymentSection={showPaymentSection}
@@ -575,6 +624,8 @@ type ResultViewProps = {
   readonly phase: GuestBookingManagePhase;
   readonly apiBaseUrl: string;
   readonly overdueManageContext: OverduePendingManageContext;
+  readonly manageContext: GuestBookingManageAuthContext;
+  readonly onBookingCancelled: () => Promise<void>;
   readonly onBookingUpdated: (booking: GuestBookingManageView) => void;
   readonly onSetSubmitting: (value: boolean) => void;
   readonly showPaymentSection: boolean;
@@ -591,6 +642,44 @@ type ResultViewProps = {
 };
 
 function ResultView(props: ResultViewProps): ReactElement {
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const executeCancel = useCallback(
+    async (referenceInput: string): Promise<void> => {
+      setIsCancelling(true);
+      try {
+        const result =
+          props.manageContext.kind === 'guest'
+            ? await cancelGuestManagedBooking({
+                apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+                credentials: props.manageContext.credentials,
+                confirmReference: referenceInput,
+              })
+            : await cancelAccountManagedBooking({
+                apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+                bookingId: props.manageContext.bookingId,
+                bookingReference: referenceInput,
+              });
+        notifySuccess(
+          result.mode === 'refund'
+            ? 'Refund request submitted. We will email you when it is processed.'
+            : 'Booking cancelled.',
+        );
+        setIsCancelDialogOpen(false);
+        await props.onBookingCancelled();
+      } catch (error: unknown) {
+        if (error instanceof BookingCancellationError) {
+          notifyError(error.message);
+          return;
+        }
+        notifyError(error instanceof Error ? error.message : 'Request failed.');
+      } finally {
+        setIsCancelling(false);
+      }
+    },
+    [props],
+  );
+  const customerActionMode = props.booking.customerActionMode;
   const hasMultipleGateways = (props.paymentConfig?.gateways.length ?? 0) > 1;
   const sessionRoomHref = resolveBookingSessionRoomHref(
     props.booking.bookingReference,
@@ -606,9 +695,17 @@ function ResultView(props: ResultViewProps): ReactElement {
   const mobileSubtitle =
     props.booking.status === 'confirmed'
       ? 'Your consultation is confirmed.'
-      : props.booking.status === 'cancelled'
-        ? 'This booking has been cancelled.'
-        : 'Complete payment to confirm your session.';
+      : props.booking.status === 'completed'
+        ? 'This consultation is complete.'
+      : props.booking.status === 'refund_awaiting'
+        ? 'Cancellation received — refund pending.'
+        : props.booking.status === 'refunded'
+          ? 'This booking has been refunded.'
+          : props.booking.status === 'cancelled'
+            ? 'This booking has been cancelled.'
+            : props.booking.pendingPaymentExpiredForRebook
+              ? 'Payment expired — pick a new session time below.'
+              : 'Complete payment to confirm your session.';
   const paymentSection = props.showPaymentSection ? (
     <section
       className={cn(manageBookingCardClass, 'space-y-5 p-4 md:p-6')}
@@ -720,7 +817,10 @@ function ResultView(props: ResultViewProps): ReactElement {
               </p>
               <p className="mt-2 text-sm font-medium text-foreground">{bookingTitle}</p>
             </div>
-            <StatusBadge status={props.booking.status} />
+            <StatusBadge
+              status={props.booking.status}
+              pendingPaymentExpiredForRebook={props.booking.pendingPaymentExpiredForRebook}
+            />
           </div>
           {props.booking.status === 'confirmed' ? (
             <div className="flex gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
@@ -776,56 +876,58 @@ function ResultView(props: ResultViewProps): ReactElement {
             />
           ) : null}
         </section>
-        <section className={cn(manageBookingCardClass, 'p-4 md:p-6')} aria-labelledby="manage-booking-details-heading">
-          <h2 id="manage-booking-details-heading" className="text-sm font-semibold text-foreground">
-            Session details
-          </h2>
-          <dl className="mt-4 space-y-4 text-sm">
-            <div className="flex gap-3">
-              <CalendarClock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-              <div className="min-w-0">
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Scheduled session</dt>
-                <dd className="mt-1 font-medium text-foreground">{props.slotDisplay.date}</dd>
-                <dd className="font-medium text-foreground">{props.slotDisplay.time}</dd>
-                <dd className="mt-0.5 text-xs text-muted-foreground">{props.booking.timezone}</dd>
+        {!props.booking.pendingPaymentExpiredForRebook ? (
+          <section className={cn(manageBookingCardClass, 'p-4 md:p-6')} aria-labelledby="manage-booking-details-heading">
+            <h2 id="manage-booking-details-heading" className="text-sm font-semibold text-foreground">
+              Session details
+            </h2>
+            <dl className="mt-4 space-y-4 text-sm">
+              <div className="flex gap-3">
+                <CalendarClock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                <div className="min-w-0">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Scheduled session</dt>
+                  <dd className="mt-1 font-medium text-foreground">{props.slotDisplay.date}</dd>
+                  <dd className="font-medium text-foreground">{props.slotDisplay.time}</dd>
+                  <dd className="mt-0.5 text-xs text-muted-foreground">{props.booking.timezone}</dd>
+                </div>
               </div>
-            </div>
-            {props.booking.status === 'confirmed' ? (
+              {props.booking.status === 'confirmed' ? (
+                <div>
+                  <dt className="sr-only">Add to calendar</dt>
+                  <dd>
+                    <AddToCalendarButtons
+                      startsAtIso={props.booking.startsAtIso}
+                      title={bookingTitle}
+                      description={calendarDescription}
+                      location={resolveBookingJoinCalendarLocation({
+                        useSessionRoomLinks: props.bookingSessionRoomLinksEnabled,
+                        bookingReference: props.booking.bookingReference,
+                        meetingUrl: props.booking.meetingUrl,
+                      })}
+                      icsUidSeed={props.booking.bookingReference}
+                    />
+                  </dd>
+                </div>
+              ) : null}
               <div>
-                <dt className="sr-only">Add to calendar</dt>
-                <dd>
-                  <AddToCalendarButtons
-                    startsAtIso={props.booking.startsAtIso}
-                    title={bookingTitle}
-                    description={calendarDescription}
-                    location={resolveBookingJoinCalendarLocation({
-                      useSessionRoomLinks: props.bookingSessionRoomLinksEnabled,
-                      bookingReference: props.booking.bookingReference,
-                      meetingUrl: props.booking.meetingUrl,
-                    })}
-                    icsUidSeed={props.booking.bookingReference}
-                  />
-                </dd>
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Name</dt>
+                <dd className="mt-1 font-medium text-foreground">{props.booking.customerName}</dd>
               </div>
-            ) : null}
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Name</dt>
-              <dd className="mt-1 font-medium text-foreground">{props.booking.customerName}</dd>
-            </div>
-            {props.booking.paymentExpiresAtIso !== null ? (
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pay before</dt>
-                <dd className="mt-1 font-medium tabular-nums text-foreground">
-                  {formatInTimeZone(
-                    new Date(props.booking.paymentExpiresAtIso),
-                    props.booking.timezone,
-                    'MMM d, yyyy · h:mm a',
-                  )}
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-        </section>
+              {props.booking.paymentExpiresAtIso !== null ? (
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pay before</dt>
+                  <dd className="mt-1 font-medium tabular-nums text-foreground">
+                    {formatInTimeZone(
+                      new Date(props.booking.paymentExpiresAtIso),
+                      props.booking.timezone,
+                      'MMM d, yyyy · h:mm a',
+                    )}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </section>
+        ) : null}
         <OverduePendingBookingPanel
           booking={props.booking}
           apiBaseUrl={props.apiBaseUrl}
@@ -834,6 +936,25 @@ function ResultView(props: ResultViewProps): ReactElement {
           onSetSubmitting={props.onSetSubmitting}
           onBookingUpdated={props.onBookingUpdated}
         />
+        {customerActionMode === 'cancel' ? (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsCancelDialogOpen(true)}>
+              Cancel booking
+            </Button>
+          </div>
+        ) : null}
+        {customerActionMode === 'refund' ? (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsCancelDialogOpen(true)}>
+              Request refund
+            </Button>
+          </div>
+        ) : null}
+        {props.booking.status === 'refund_awaiting' ? (
+          <p className="text-sm text-muted-foreground">
+            Your refund request was received. We will process it manually and update this booking when complete.
+          </p>
+        ) : null}
         </div>
         {paymentSection !== null ? (
           <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">{paymentSection}</aside>
@@ -842,6 +963,17 @@ function ResultView(props: ResultViewProps): ReactElement {
       <Button type="button" variant="outline" className="mt-4 w-full md:mt-6" onClick={props.onResetLookup}>
         Look up a different booking
       </Button>
+      {customerActionMode !== null ? (
+        <BookingCancellationDialog
+          open={isCancelDialogOpen}
+          onOpenChange={setIsCancelDialogOpen}
+          mode={customerActionMode}
+          isCompletedBooking={props.booking.status === 'completed'}
+          expectedReference={props.booking.bookingReference}
+          isSubmitting={isCancelling}
+          onConfirm={executeCancel}
+        />
+      ) : null}
     </ManageBookingShell>
   );
 }

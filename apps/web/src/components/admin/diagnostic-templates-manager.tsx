@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -1865,7 +1866,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                       placeholder="Example: SMB intake template"
                     />
                     <p className="text-xs text-muted-foreground">
-                      The active template is what customer-facing quiz flows will use whenever AI Diagnostic is off.
+                      The active template is what customer-facing diagnostic flows will use whenever AI Diagnostic is off.
                     </p>
                   </div>
                 </div>
@@ -2246,7 +2247,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                   ),
                               })}
                               <p className="mt-2 text-xs text-muted-foreground">
-                                Choose how this question should render in the web quiz.
+                                Choose how this question should render in the web diagnostic.
                               </p>
                               {question.type === 'ranked-options' ? (
                                 <div className="mt-4 space-y-2">
@@ -2510,12 +2511,10 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                                         {question.selectionMode === 'single' ? (
                                           <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-3">
                                             <label className="flex cursor-pointer items-start gap-3 text-sm text-foreground">
-                                              <input
-                                                type="checkbox"
-                                                className="mt-1 size-4 shrink-0 rounded border-input"
+                                              <Checkbox
                                                 checked={option.requestDetailNoteWhenSelected}
-                                                onChange={(event) => {
-                                                  const checked = event.target.checked;
+                                                onCheckedChange={(checkedState) => {
+                                                  const checked = checkedState === true;
                                                   updateSelectedTemplate((template) => ({
                                                     ...template,
                                                     rounds: template.rounds.map((candidateRound) =>

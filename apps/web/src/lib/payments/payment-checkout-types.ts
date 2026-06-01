@@ -1,4 +1,5 @@
 import type { PaymentGatewayId } from '@/domain/payment-types';
+import type { BookingDocument } from '@/domain/types';
 import type { BookingPayabilityCode } from '@/lib/payments/evaluate-booking-payability';
 
 export type CreateCheckoutSessionParams = {
@@ -30,7 +31,7 @@ export type CreateCheckoutSessionResult =
       readonly bookingId: string | null;
       readonly manualConfirm: boolean;
       readonly mock?: boolean;
-      readonly bookingStatus: 'pending' | 'confirmed' | 'completed' | 'cancelled' | null;
+      readonly bookingStatus: BookingDocument['status'] | null;
     }
   | {
       readonly ok: false;

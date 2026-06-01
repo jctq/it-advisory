@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { AdminSettingsHint, AdminSettingsLabel } from '@/components/admin/admin-settings-hint';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { notifyError, notifySuccess } from '@/lib/notify';
@@ -338,21 +339,19 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
       >
         <div className="space-y-5">
           <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-            <input
+            <Checkbox
               id="diagnosticAiEnabled"
-              type="checkbox"
               checked={diagnosticAiEnabled}
-              onChange={(event) => {
-                setDiagnosticAiEnabled(event.target.checked);
+              onCheckedChange={(checked) => {
+                setDiagnosticAiEnabled(checked === true);
               }}
-              className="mt-1 size-4 rounded border-input"
             />
             <div>
               <AdminSettingsLabel
                 htmlFor="diagnosticAiEnabled"
                 hint={
                   <>
-                    When enabled, the quiz generates question blocks with AI. When disabled, customers use the active
+                    When enabled, the diagnostic generates question blocks with AI. When disabled, customers use the active
                     diagnostic template from Templates.
                   </>
                 }
@@ -450,14 +449,12 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         description="Control whether guests can open the manage-booking page, look up reservations, and pay outstanding balances."
       >
         <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-          <input
+          <Checkbox
             id="diagnosticManageBookingEnabled"
-            type="checkbox"
             checked={diagnosticManageBookingEnabled}
-            onChange={(event) => {
-              setDiagnosticManageBookingEnabled(event.target.checked);
+            onCheckedChange={(checked) => {
+              setDiagnosticManageBookingEnabled(checked === true);
             }}
-            className="mt-1 size-4 rounded border-input"
           />
           <div>
             <AdminSettingsLabel
@@ -480,14 +477,12 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         description="Choose whether clients join through your branded session room or a direct Google Meet / Zoom / Teams link."
       >
         <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-          <input
+          <Checkbox
             id="bookingSessionRoomLinksEnabled"
-            type="checkbox"
             checked={bookingSessionRoomLinksEnabled}
-            onChange={(event) => {
-              setBookingSessionRoomLinksEnabled(event.target.checked);
+            onCheckedChange={(checked) => {
+              setBookingSessionRoomLinksEnabled(checked === true);
             }}
-            className="mt-1 size-4 rounded border-input"
           />
           <div>
             <AdminSettingsLabel
@@ -511,14 +506,12 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         description="Control whether users can submit in-app support reports, view My reports, and send follow-up messages."
       >
         <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-          <input
+          <Checkbox
             id="supportModuleEnabled"
-            type="checkbox"
             checked={supportModuleEnabled}
-            onChange={(event) => {
-              setSupportModuleEnabled(event.target.checked);
+            onCheckedChange={(checked) => {
+              setSupportModuleEnabled(checked === true);
             }}
-            className="mt-1 size-4 rounded border-input"
           />
           <div>
             <AdminSettingsLabel
@@ -541,14 +534,12 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         description="Control whether the homepage can show a client testimonials section once published quotes exist."
       >
         <div className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4">
-          <input
+          <Checkbox
             id="reviewsModuleEnabled"
-            type="checkbox"
             checked={reviewsModuleEnabled}
-            onChange={(event) => {
-              setReviewsModuleEnabled(event.target.checked);
+            onCheckedChange={(checked) => {
+              setReviewsModuleEnabled(checked === true);
             }}
-            className="mt-1 size-4 rounded border-input"
           />
           <div>
             <AdminSettingsLabel
@@ -572,21 +563,19 @@ export function AdminSettingsForm(props: AdminSettingsFormProps): ReactElement {
         description="Optional tooling for cache provenance and API response debugging during development."
       >
         <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
-          <input
+          <Checkbox
             id="diagnosticCacheDebugEnabled"
-            type="checkbox"
             checked={diagnosticCacheDebugEnabled}
-            onChange={(event) => {
-              setDiagnosticCacheDebugEnabled(event.target.checked);
+            onCheckedChange={(checked) => {
+              setDiagnosticCacheDebugEnabled(checked === true);
             }}
-            className="mt-1 size-4 rounded border-input"
           />
           <div>
             <AdminSettingsLabel
               htmlFor="diagnosticCacheDebugEnabled"
               hint={
                 <>
-                  Shows cache vs AI provenance on the public quiz. Successful API responses may include{' '}
+                  Shows cache vs AI provenance on the public diagnostic. Successful API responses may include{' '}
                   <span className="font-mono text-[11px]">_diagnosticDebug</span>; headers always include tier/source.
                 </>
               }

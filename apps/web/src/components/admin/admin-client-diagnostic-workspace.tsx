@@ -235,7 +235,7 @@ function DiagnosticReportView(props: { readonly report: AdminClientDiagnosticRep
             <MetaItem label="Service" value={booking.serviceKey} />
             <MetaItem label="Starts" value={booking.startsAtIso} />
             <MetaItem label="Lead email" value={booking.lead.email ?? 'missing'} />
-            <MetaItem label="Quiz session" value={booking.quizSessionId ?? '—'} mono />
+            <MetaItem label="Diagnostic session" value={booking.quizSessionId ?? '—'} mono />
             <MetaItem label="Payability" value={booking.payability.code} />
             <MetaItem label="Payment status" value={booking.paymentStatus ?? '—'} />
           </dl>

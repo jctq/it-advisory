@@ -14,6 +14,7 @@ import {
 import type { RecordingActiveProvider } from '@/domain/recording-types';
 import { AdminFormLoadingPanel } from '@/components/admin/admin-form-loading-panel';
 import { AdminSettingsHint, AdminSettingsLabel } from '@/components/admin/admin-settings-hint';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { buildApiUrl } from '@/lib/config/build-api-url';
@@ -228,11 +229,10 @@ export function AdminRecordingSettingsForm(props: AdminRecordingSettingsFormProp
         description="When enabled, customers can opt in at checkout for AI meeting notes (Fathom). Set the surcharge for that opt-in."
       >
         <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={settings.recordingsEnabled}
-            onChange={(event) => {
-              const enabled = event.target.checked;
+            onCheckedChange={(checked) => {
+              const enabled = checked === true;
               setSettings((previous) =>
                 previous === null
                   ? previous
@@ -243,7 +243,6 @@ export function AdminRecordingSettingsForm(props: AdminRecordingSettingsFormProp
                     },
               );
             }}
-            className="mt-1"
           />
           <span className="flex items-center gap-1.5">
             <span className="text-sm font-medium text-foreground">Enable consultation recordings</span>

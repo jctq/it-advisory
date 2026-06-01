@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  CircleDollarSign,
   CircleUser,
   ClipboardList,
   FileStack,
@@ -98,6 +99,12 @@ const ADMIN_SIDEBAR_ITEMS: readonly AdminSidebarItem[] = [
     href: '/admin/bookings',
     label: 'Bookings',
     icon: CalendarDays,
+    tourTarget: 'nav-bookings',
+  },
+  {
+    href: '/admin/refunds',
+    label: 'Refunds',
+    icon: CircleDollarSign,
     tourTarget: 'nav-bookings',
   },
   {

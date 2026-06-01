@@ -2,29 +2,57 @@ import { ObjectId } from 'mongodb';
 import type { Filter } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { BookingDocument } from '@/domain/types';
-import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
+import { getPaymentSettings } from '@/lib/data/payment-settings';
+import { findPaymentTransactionById, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
+import { isAwaitingPaymentHoldExpired } from '@/lib/marketing/payment-hold-expiry';
 import {
   applyPaymentStatusToBooking,
   resetBookingAfterExpiredPaymentHold,
 } from '@/lib/payments/payment-completion';
 import { getDb } from '@/lib/mongodb';
 
-const EXPIRED_PAYMENT_WINDOW_FILTER = (now: Date): Filter<BookingDocument> => ({
-  status: 'pending',
-  paymentExpiresAt: { $lte: now, $ne: null },
+const OPEN_CHECKOUT_PAYMENT_STATUSES: Filter<BookingDocument> = {
   $or: [
     { paymentStatus: { $exists: false } },
     { paymentStatus: null },
-    { paymentStatus: { $ne: 'paid' } },
+    { paymentStatus: { $in: ['pending', 'processing'] } },
   ],
+};
+
+/** Pending bookings with an open checkout that may have an expired hold window. */
+const STALE_AWAITING_PAYMENT_BOOKING_FILTER = (): Filter<BookingDocument> => ({
+  status: 'pending',
+  paymentTransactionId: { $ne: null },
+  ...OPEN_CHECKOUT_PAYMENT_STATUSES,
 });
+
+function isOpenCheckoutPaymentStatus(status: BookingDocument['paymentStatus']): boolean {
+  return status === undefined || status === null || status === 'pending' || status === 'processing';
+}
+
+function resolveAwaitingPaymentHoldExpired(input: {
+  readonly booking: BookingDocument;
+  readonly transaction: PaymentTransactionRow | null;
+  readonly holdExpiresMinutes: number;
+  readonly now: Date;
+}): boolean {
+  return isAwaitingPaymentHoldExpired({
+    bookingPaymentExpiresAt: input.booking.paymentExpiresAt,
+    transactionExpiresAtIso: input.transaction?.expiresAtIso ?? null,
+    transactionCreatedAtIso: input.transaction?.createdAtIso ?? null,
+    holdExpiresMinutes: input.holdExpiresMinutes,
+    nowMs: input.now.getTime(),
+  });
+}
 
 async function syncPendingBookingForExpiredPaymentWindow(
   booking: BookingDocument & { readonly _id: ObjectId },
+  input: { readonly transaction: PaymentTransactionRow | null; readonly now: Date },
 ): Promise<boolean> {
   const paymentTransactionId = booking.paymentTransactionId;
   if (paymentTransactionId !== undefined && paymentTransactionId !== null) {
-    const transaction = await findPaymentTransactionById(paymentTransactionId.toString());
+    const transaction =
+      input.transaction ?? (await findPaymentTransactionById(paymentTransactionId.toString()));
     if (
       transaction !== null &&
       (transaction.status === 'pending' || transaction.status === 'processing')
@@ -34,6 +62,14 @@ async function syncPendingBookingForExpiredPaymentWindow(
         nextStatus: 'expired',
         expiredBookingDisposition: 'retain_pending',
       });
+      return true;
+    }
+    if (
+      transaction !== null &&
+      transaction.status === 'expired' &&
+      isOpenCheckoutPaymentStatus(booking.paymentStatus)
+    ) {
+      await resetBookingAfterExpiredPaymentHold(booking._id);
       return true;
     }
   }
@@ -57,8 +93,9 @@ export async function cancelExpiredPaymentWindowBookings(
     return 0;
   }
   const now = input.now ?? new Date();
+  const { holdExpiresMinutes } = await getPaymentSettings();
   const filter: Filter<BookingDocument> = {
-    ...EXPIRED_PAYMENT_WINDOW_FILTER(now),
+    ...STALE_AWAITING_PAYMENT_BOOKING_FILTER(),
   };
   if (input.visitorId !== undefined && input.visitorId.trim().length > 0) {
     filter.visitorId = input.visitorId.trim();
@@ -81,8 +118,24 @@ export async function cancelExpiredPaymentWindowBookings(
     if (doc._id === undefined) {
       continue;
     }
+    const paymentTransactionId = doc.paymentTransactionId;
+    let transaction: PaymentTransactionRow | null = null;
+    if (paymentTransactionId !== undefined && paymentTransactionId !== null) {
+      transaction = await findPaymentTransactionById(paymentTransactionId.toString());
+    }
+    if (
+      !resolveAwaitingPaymentHoldExpired({
+        booking: doc,
+        transaction,
+        holdExpiresMinutes,
+        now,
+      })
+    ) {
+      continue;
+    }
     const synced = await syncPendingBookingForExpiredPaymentWindow(
       doc as BookingDocument & { _id: ObjectId },
+      { transaction, now },
     );
     if (synced) {
       count += 1;
