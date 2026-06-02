@@ -57,7 +57,7 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   const [sectionElement, setSectionElement] = useState<HTMLElement | null>(null);
   const [isInView, setIsInView] = useState(false);
   const [isBoosted, setIsBoosted] = useState(false);
-  const [parallaxSnapshot, setParallaxSnapshot] = useState<HeroParallaxSnapshot | null>(null);
+  const parallaxSnapshotRef = useRef<HeroParallaxSnapshot | null>(null);
   const boostUntilRef = useRef(0);
   const pointerX = useMotionValue(HERO_PARALLAX_CENTER);
   const pointerY = useMotionValue(HERO_PARALLAX_CENTER);
@@ -164,14 +164,14 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
   ]);
   useLayoutEffect(() => {
     if (isDocumentVisible) {
-      setParallaxSnapshot(null);
+      parallaxSnapshotRef.current = null;
       return;
     }
-    setParallaxSnapshot({
+    parallaxSnapshotRef.current = {
       fx: springX.get(),
       fy: springY.get(),
       boost: springBoost.get(),
-    });
+    };
   }, [isDocumentVisible, springBoost, springX, springY]);
   useEffect(() => {
     if (!isParallaxEnabled) {
@@ -215,30 +215,31 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
       section.style.setProperty('--hero-boost', '0');
       return;
     }
-    if (parallaxSnapshot !== null) {
-      section.style.setProperty('--hero-fx', String(parallaxSnapshot.fx));
-      section.style.setProperty('--hero-fy', String(parallaxSnapshot.fy));
-      section.style.setProperty('--hero-boost', String(parallaxSnapshot.boost));
+    const snapshot = isDocumentVisible ? null : parallaxSnapshotRef.current;
+    if (snapshot !== null) {
+      section.style.setProperty('--hero-fx', String(snapshot.fx));
+      section.style.setProperty('--hero-fy', String(snapshot.fy));
+      section.style.setProperty('--hero-boost', String(snapshot.boost));
       return;
     }
     section.style.setProperty('--hero-fx', String(springX.get()));
     section.style.setProperty('--hero-fy', String(springY.get()));
     section.style.setProperty('--hero-boost', String(springBoost.get()));
-  }, [isParallaxEnabled, parallaxSnapshot, sectionElement, springBoost, springX, springY]);
+  }, [isDocumentVisible, isParallaxEnabled, sectionElement, springBoost, springX, springY]);
   useMotionValueEvent(springX, 'change', (latest) => {
-    if (!isParallaxEnabled || sectionElement === null || parallaxSnapshot !== null) {
+    if (!isParallaxEnabled || sectionElement === null || !isDocumentVisible) {
       return;
     }
     sectionElement.style.setProperty('--hero-fx', String(latest));
   });
   useMotionValueEvent(springY, 'change', (latest) => {
-    if (!isParallaxEnabled || sectionElement === null || parallaxSnapshot !== null) {
+    if (!isParallaxEnabled || sectionElement === null || !isDocumentVisible) {
       return;
     }
     sectionElement.style.setProperty('--hero-fy', String(latest));
   });
   useMotionValueEvent(springBoost, 'change', (latest) => {
-    if (!isParallaxEnabled || sectionElement === null || parallaxSnapshot !== null) {
+    if (!isParallaxEnabled || sectionElement === null || !isDocumentVisible) {
       return;
     }
     sectionElement.style.setProperty('--hero-boost', String(latest));
