@@ -6,7 +6,6 @@ import {
   BadgeCheck,
   BookOpen,
   Briefcase,
-  ChevronDown,
   ClipboardList,
   Clock,
   Compass,
@@ -23,10 +22,10 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { MarketingHeroBackground } from '@/components/marketing/marketing-hero-background';
+import { MarketingParallaxHero } from '@/components/marketing/marketing-parallax-hero';
+import { MarketingParallaxHeroBody } from '@/components/marketing/marketing-parallax-hero-body';
 import { MarketingSectionArt } from '@/components/marketing/marketing-section-art';
 import { MarketingSectionReveal } from '@/components/marketing/marketing-section-reveal';
-import { useMarketingHeroInteraction } from '@/components/marketing/use-marketing-hero-interaction';
 import { MarketingParallaxSection } from '@/components/marketing/marketing-parallax-section';
 import { MarketingSectionHeader } from '@/components/marketing/marketing-section-header';
 import { MarketingServiceTabs } from '@/components/marketing/marketing-service-tabs';
@@ -296,7 +295,6 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
   const { isAuthenticated, siteName, reviewsModuleEnabled, testimonials } = props;
   const showTestimonialsSection = reviewsModuleEnabled && testimonials.length > 0;
   const { navigateToNewDiagnostic, isNavigating } = useMarketingNewDiagnosticNavigation(isAuthenticated);
-  const { sectionRef: heroSectionRef, isBoosted, isInView, isDocumentVisible, rootStyle } = useMarketingHeroInteraction();
   const problemCardClassName = cn(
     'group flex h-full w-full flex-col rounded-2xl border border-border/80 bg-card p-5 text-left',
     'marketing-card-elevated transition-[border-color,transform] duration-200 motion-safe:hover:-translate-y-0.5',
@@ -305,61 +303,12 @@ export function HomePageContent(props: HomePageContentProps): ReactElement {
   );
   return (
     <main className="relative">
-      <MarketingParallaxSection
-        ref={heroSectionRef}
-        reveal={false}
-        className="relative flex min-h-[88dvh] flex-col justify-end border-b border-border px-6 pb-14 pt-28 md:min-h-[92dvh] md:pb-20 md:pt-32"
-        speed={0.11}
-        backgroundSpeed={0}
-        background={<MarketingHeroBackground interaction={{ isBoosted, isInView, isDocumentVisible, rootStyle }} />}
-      >
-        <div className="mx-auto w-full min-w-0 max-w-6xl">
-          <div className="max-w-2xl min-w-0">
-            <h1 className="text-balance text-4xl font-semibold tracking-[-0.04em] text-foreground sm:text-5xl md:text-6xl md:leading-[1.04] lg:text-[3.75rem] lg:leading-[1.02]">
-              Every technology problem has a root cause.
-            </h1>
-            <p className="mt-6 text-pretty text-xl font-medium leading-snug text-foreground/90 md:text-2xl md:leading-snug">
-              Identify the challenges affecting your systems, processes, and software investments before they become
-              costly problems
-            </p>
-            <p className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground">
-              A guided assessment, tailored recommendations, and expert consultation — all designed to help you make
-              smarter technology decisions.
-            </p>
-            <div className="mt-10 flex flex-wrap gap-3">
-              <Button
-                type="button"
-                size="lg"
-                className="marketing-hero-cta group inline-flex h-11 items-center gap-2 bg-transparent active:translate-y-0 hover:bg-transparent dark:bg-primary dark:hover:bg-primary/90"
-                disabled={isNavigating}
-                onClick={() => void navigateToNewDiagnostic()}
-              >
-                <MarketingNewDiagnosticCtaLabel isNavigating={isNavigating} />
-                <ArrowRight
-                  className="size-4 shrink-0 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5"
-                  aria-hidden
-                />
-              </Button>
-            </div>
-          </div>
-          <div className="mt-10 flex flex-col gap-8 sm:mt-12 md:mt-14 md:flex-row md:items-end md:justify-between md:gap-6">
-            <p className="text-sm text-muted-foreground md:pb-1">Assessment takes less than 5 minutes.</p>
-            <a
-              href="#proof"
-              className="marketing-scroll-cue ml-auto shrink-0 motion-safe:hover:text-foreground md:ml-0"
-            >
-              <span className="sr-only">Scroll to learn more</span>
-              <span className="text-center" aria-hidden>
-                Scroll
-              </span>
-              <span className="flex flex-col items-center" aria-hidden>
-                <span className="marketing-scroll-cue-line" />
-                <ChevronDown className="size-4 opacity-70" />
-              </span>
-            </a>
-          </div>
-        </div>
-      </MarketingParallaxSection>
+      <MarketingParallaxHero scrollCueHref="#proof" footerNote="Assessment takes less than 5 minutes.">
+        <MarketingParallaxHeroBody
+          isNavigating={isNavigating}
+          onStartDiagnostic={() => void navigateToNewDiagnostic()}
+        />
+      </MarketingParallaxHero>
       <MarketingParallaxSection
         id="proof"
         reveal={false}

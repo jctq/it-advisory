@@ -305,9 +305,391 @@
    * Layer-specific px/deg below are relative weights; strength scales all transform shifts together.
    */
   .marketing-hero-interactive {
-    --hero-parallax-strength: 5;
+    --hero-parallax-strength: 1;
     overflow: clip;
     contain: paint;
+  }
+  /* Photo hero — full-bleed image with edge fades into page background */
+  .marketing-parallax-hero--image {
+    --marketing-header-offset: 4.5rem;
+    min-height: 100dvh;
+  }
+  @media (min-width: 640px) {
+    .marketing-parallax-hero--image {
+      --marketing-header-offset: 5rem;
+    }
+  }
+  .marketing-parallax-hero--image .marketing-parallax-hero-backdrop,
+  .marketing-hero-image-backdrop,
+  .marketing-hero-image-parallax-shift,
+  .marketing-hero-image-layer-base {
+    min-height: 100%;
+  }
+  .marketing-hero-image-backdrop {
+    overflow: hidden;
+    contain: strict;
+  }
+  .marketing-hero-image-layer-base {
+    position: absolute;
+  }
+  .marketing-hero-image-layer-base > span {
+    position: absolute !important;
+    inset: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .marketing-parallax-hero--image .marketing-hero-image-parallax-shift {
+      transform: translate3d(0, calc(var(--hero-scroll-delta) * 0.05), 0) scale(1.03);
+      transform-origin: center center;
+    }
+  }
+  .marketing-hero-image-scrim {
+    background: linear-gradient(
+      105deg,
+      oklch(0.12 0.02 264 / 0.82) 0%,
+      oklch(0.14 0.025 264 / 0.55) 36%,
+      oklch(0.1 0.02 264 / 0.22) 58%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+  .marketing-hero-image-scrim-top {
+    background: linear-gradient(
+      to bottom,
+      var(--background) 0%,
+      color-mix(in oklch, var(--background) 88%, transparent) 14%,
+      color-mix(in oklch, var(--background) 45%, transparent) 26%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+  .marketing-hero-image-scrim-bottom {
+    background: linear-gradient(
+      to top,
+      var(--background) 0%,
+      color-mix(in oklch, var(--background) 96%, transparent) 10%,
+      color-mix(in oklch, var(--background) 72%, transparent) 28%,
+      color-mix(in oklch, var(--background) 28%, transparent) 48%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+  .marketing-hero-image-backdrop--light .marketing-hero-image-scrim {
+    background: linear-gradient(
+      105deg,
+      oklch(0.98 0.01 264 / 0.88) 0%,
+      oklch(0.97 0.015 264 / 0.65) 40%,
+      oklch(0.98 0.01 264 / 0.25) 68%,
+      transparent 100%
+    );
+  }
+  .marketing-hero-image-backdrop--balanced .marketing-hero-image-scrim {
+    background: linear-gradient(
+      100deg,
+      oklch(0.14 0.03 264 / 0.78) 0%,
+      oklch(0.16 0.025 264 / 0.48) 45%,
+      transparent 100%
+    );
+  }
+  .dark .marketing-hero-image-backdrop--light .marketing-hero-image-scrim {
+    background: linear-gradient(
+      105deg,
+      oklch(0.14 0.02 264 / 0.9) 0%,
+      oklch(0.16 0.025 264 / 0.65) 42%,
+      transparent 100%
+    );
+  }
+  .marketing-parallax-hero--image .marketing-parallax-hero-content {
+    opacity: calc(1 - var(--hero-scroll-progress) * 0.22);
+  }
+  .marketing-hero-image-backdrop--topology-only .marketing-hero-text-fade {
+    opacity: 1;
+  }
+  .marketing-parallax-hero-body--on-image .marketing-section-eyebrow {
+    color: color-mix(in oklch, var(--primary) 70%, white);
+  }
+  .dark .marketing-parallax-hero-body--on-image .marketing-section-eyebrow {
+    color: color-mix(in oklch, var(--primary) 55%, white);
+  }
+  .marketing-parallax-hero-body--on-image .marketing-parallax-hero-stat {
+    border-color: oklch(1 0 0 / 0.22);
+    background: oklch(1 0 0 / 0.1);
+    backdrop-filter: blur(14px);
+  }
+  .marketing-parallax-hero-body--on-image .marketing-hero-lead {
+    color: color-mix(in oklch, var(--foreground) 94%, white);
+    text-shadow: 0 1px 24px oklch(0.12 0.02 264 / 0.45);
+  }
+  .marketing-parallax-hero-body--on-image .marketing-hero-support {
+    color: color-mix(in oklch, var(--foreground) 78%, transparent);
+    text-shadow: 0 1px 20px oklch(0.12 0.02 264 / 0.4);
+  }
+  .marketing-parallax-hero-body--on-image h1 {
+    text-shadow: 0 2px 32px oklch(0.1 0.02 264 / 0.55);
+  }
+  .marketing-hero-footer-note {
+    color: color-mix(in oklch, var(--foreground) 72%, transparent);
+    text-shadow: 0 1px 16px oklch(0.12 0.02 264 / 0.35);
+  }
+  @media (max-width: 639px) {
+    .marketing-hero-image-backdrop--balanced .marketing-hero-image-scrim {
+      background: linear-gradient(
+        180deg,
+        oklch(0.1 0.02 264 / 0.72) 0%,
+        oklch(0.12 0.025 264 / 0.58) 28%,
+        oklch(0.14 0.03 264 / 0.42) 52%,
+        oklch(0.12 0.025 264 / 0.78) 100%
+      );
+    }
+    .marketing-hero-image-backdrop .marketing-hero-image-scrim-top {
+      height: 38%;
+      background: linear-gradient(
+        to bottom,
+        var(--background) 0%,
+        color-mix(in oklch, var(--background) 92%, transparent) 18%,
+        color-mix(in oklch, var(--background) 55%, transparent) 32%,
+        transparent 100%
+      );
+    }
+    .marketing-hero-image-backdrop .marketing-hero-image-scrim-bottom {
+      height: 48%;
+    }
+    .marketing-hero-image-backdrop .marketing-hero-image-art-layer {
+      opacity: 0.32;
+    }
+    .marketing-hero-image-backdrop .marketing-hero-photo {
+      object-position: 55% 28% !important;
+    }
+    .marketing-parallax-hero--layout-centered .marketing-parallax-hero-content {
+      padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
+    }
+    .marketing-parallax-hero-body--on-image .marketing-hero-lead {
+      max-width: 22rem;
+    }
+    .marketing-parallax-hero-body--on-image .marketing-hero-support {
+      max-width: 20.5rem;
+    }
+  }
+  .marketing-parallax-hero--layout-centered .marketing-parallax-hero-content {
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding-bottom: 5rem;
+  }
+  .marketing-parallax-hero--layout-minimal .marketing-parallax-hero-content {
+    justify-content: flex-end;
+  }
+  .marketing-parallax-hero--layout-asymmetric {
+    min-height: max(100dvh, 720px);
+  }
+  /* Webflow-style scroll parallax: section top drives per-layer depth via --hero-scroll-delta */
+  .marketing-parallax-hero {
+    --hero-scroll-delta: 0px;
+    --hero-scroll-progress: 0;
+    --hero-scroll-sky-factor: 0.07;
+    --hero-scroll-float-a-factor: 0.2;
+    --hero-scroll-float-b-factor: 0.32;
+    --hero-scroll-float-c-factor: 0.42;
+    --hero-scroll-content-factor: -0.06;
+    --hero-scroll-content-fade: 0.28;
+    --hero-scroll-deep-factor: 0.11;
+    --hero-scroll-mid-factor: 0.2;
+    --hero-scroll-light-factor: 0.28;
+    --hero-scroll-panel-factor: 0.24;
+    --hero-scroll-wireframe-factor: 0.36;
+    --hero-scroll-stat-a-factor: 0.38;
+    --hero-scroll-stat-b-factor: 0.26;
+    justify-content: flex-end;
+  }
+  .marketing-parallax-hero--centered-cinematic {
+    justify-content: center;
+    padding-bottom: 4rem;
+    --hero-scroll-content-factor: -0.04;
+    --hero-scroll-content-fade: 0.2;
+    --hero-scroll-float-a-factor: 0.14;
+    --hero-scroll-float-c-factor: 0.28;
+  }
+  .marketing-parallax-hero--minimal-soft {
+    --hero-scroll-sky-factor: 0.04;
+    --hero-scroll-float-a-factor: 0.1;
+    --hero-scroll-float-b-factor: 0.16;
+    --hero-scroll-float-c-factor: 0.2;
+    --hero-scroll-content-fade: 0.15;
+    --hero-scroll-deep-factor: 0.06;
+    --hero-scroll-mid-factor: 0.1;
+    --hero-scroll-wireframe-factor: 0.2;
+  }
+  .marketing-parallax-hero--art-dominant .marketing-hero-art-panel-shift {
+    scale: 1.08;
+  }
+  .marketing-parallax-hero--art-dominant .marketing-hero-text-fade {
+    background-image: linear-gradient(
+      to right,
+      var(--background) 0%,
+      color-mix(in oklch, var(--background) 92%, transparent) 28%,
+      color-mix(in oklch, var(--background) 55%, transparent) 48%,
+      transparent 78%
+    );
+  }
+  .marketing-parallax-hero--art-dominant {
+    --hero-scroll-panel-factor: 0.34;
+    --hero-scroll-wireframe-factor: 0.48;
+    --hero-scroll-float-c-factor: 0.52;
+  }
+  .marketing-parallax-hero--dark-immersive {
+    --hero-scroll-content-fade: 0.38;
+    --hero-scroll-sky-factor: 0.1;
+  }
+  .marketing-parallax-hero--dark-immersive .marketing-hero-base-wash {
+    filter: brightness(0.92) saturate(1.08);
+  }
+  .dark .marketing-parallax-hero--dark-immersive .marketing-hero-base-wash {
+    filter: brightness(1.05) saturate(1.12);
+  }
+  .marketing-parallax-hero--extreme-depth {
+    --hero-scroll-sky-factor: 0.12;
+    --hero-scroll-float-a-factor: 0.38;
+    --hero-scroll-float-b-factor: 0.55;
+    --hero-scroll-float-c-factor: 0.68;
+    --hero-scroll-content-factor: -0.1;
+    --hero-scroll-deep-factor: 0.2;
+    --hero-scroll-mid-factor: 0.36;
+    --hero-scroll-light-factor: 0.45;
+    --hero-scroll-panel-factor: 0.42;
+    --hero-scroll-wireframe-factor: 0.58;
+    --hero-scroll-stat-a-factor: 0.55;
+    --hero-scroll-stat-b-factor: 0.4;
+  }
+  .marketing-parallax-hero--editorial-left {
+    justify-content: flex-end;
+    padding-top: 7rem;
+  }
+  .marketing-parallax-hero--glass-float .marketing-parallax-hero-stat {
+    background: color-mix(in oklch, var(--card) 62%, transparent);
+    backdrop-filter: blur(16px);
+    border-color: color-mix(in oklch, var(--marketing-hero-wireframe-border) 90%, transparent);
+  }
+  .marketing-parallax-hero--glass-float {
+    --hero-scroll-stat-a-factor: 0.45;
+    --hero-scroll-stat-b-factor: 0.32;
+  }
+  .marketing-parallax-hero--grid-tech .marketing-hero-grid-group {
+    opacity: 0.55 !important;
+  }
+  .marketing-parallax-hero--grid-tech {
+    --hero-scroll-light-factor: 0.38;
+    --hero-scroll-float-b-factor: 0.4;
+  }
+  .marketing-parallax-hero--asymmetric {
+    justify-content: flex-end;
+    min-height: max(100dvh, 720px);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .marketing-parallax-hero--image .marketing-parallax-hero-layer-sky {
+      transform: none;
+    }
+    .marketing-parallax-hero-layer-sky {
+      transform: translate3d(0, calc(var(--hero-scroll-delta) * var(--hero-scroll-sky-factor)), 0);
+    }
+    .marketing-parallax-hero-content {
+      transform: translate3d(0, calc(var(--hero-scroll-delta) * var(--hero-scroll-content-factor)), 0);
+      opacity: calc(1 - var(--hero-scroll-progress) * var(--hero-scroll-content-fade));
+    }
+    .marketing-parallax-hero .marketing-hero-parallax-deep {
+      transform: translate3d(
+        calc((var(--hero-fx, 0.5) - 0.5) * 10px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+        calc(
+          (var(--hero-fy, 0.5) - 0.5) * 8px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0) +
+            var(--hero-scroll-delta) * var(--hero-scroll-deep-factor)
+        ),
+        0
+      );
+    }
+    .marketing-parallax-hero .marketing-hero-parallax-mid {
+      transform: translate3d(
+        calc((var(--hero-fx, 0.5) - 0.5) * 16px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+        calc(
+          (var(--hero-fy, 0.5) - 0.5) * 12px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0) +
+            var(--hero-scroll-delta) * var(--hero-scroll-mid-factor)
+        ),
+        0
+      );
+    }
+    .marketing-parallax-hero .marketing-hero-parallax-light {
+      transform: translate3d(
+        calc((0.5 - var(--hero-fx, 0.5)) * 6px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+        calc(
+          (0.5 - var(--hero-fy, 0.5)) * 5px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0) +
+            var(--hero-scroll-delta) * var(--hero-scroll-light-factor)
+        ),
+        0
+      );
+    }
+    .marketing-parallax-hero .marketing-hero-art-panel-shift {
+      transform: translate3d(
+          calc((var(--hero-fx, 0.5) - 0.5) * 20px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+          calc(
+            (var(--hero-fy, 0.5) - 0.5) * 16px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0) +
+              var(--hero-scroll-delta) * var(--hero-scroll-panel-factor)
+          ),
+          0
+        )
+        rotateY(calc((var(--hero-fx, 0.5) - 0.5) * 3deg * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)));
+    }
+    .marketing-parallax-hero .marketing-hero-wireframe-stack {
+      transform: translate3d(
+        calc((var(--hero-fx, 0.5) - 0.5) * 22px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0)),
+        calc(
+          (var(--hero-fy, 0.5) - 0.5) * 16px * var(--hero-parallax-strength, 1) * var(--hero-boost, 0) +
+            var(--hero-scroll-delta) * var(--hero-scroll-wireframe-factor)
+        ),
+        0
+      );
+    }
+    .marketing-parallax-hero-stat-a {
+      transform: translate3d(0, calc(var(--hero-scroll-delta) * var(--hero-scroll-stat-a-factor)), 0);
+    }
+    .marketing-parallax-hero-stat-b {
+      transform: translate3d(0, calc(var(--hero-scroll-delta) * var(--hero-scroll-stat-b-factor)), 0);
+    }
+  }
+  .marketing-parallax-hero-stats {
+    position: relative;
+    min-height: 220px;
+  }
+  .marketing-parallax-hero-stat {
+    position: absolute;
+    min-width: 9.5rem;
+    border-radius: 1rem;
+    border: 1px solid color-mix(in oklch, var(--marketing-hero-wireframe-border) 80%, transparent);
+    background: color-mix(in oklch, var(--card) 88%, transparent);
+    padding: 1rem 1.15rem;
+    box-shadow: var(--marketing-elevation-md);
+    backdrop-filter: blur(10px);
+  }
+  .marketing-parallax-hero-stat-a {
+    right: 8%;
+    top: 8%;
+  }
+  .marketing-parallax-hero-stat-b {
+    left: 4%;
+    bottom: 6%;
+  }
+  .marketing-parallax-hero-stat-c {
+    right: 2%;
+    top: 42%;
+  }
+  .marketing-parallax-hero--grid-tech .marketing-parallax-hero-stats {
+    min-height: 260px;
+  }
+  .marketing-parallax-hero--asymmetric .marketing-parallax-hero-stat-a {
+    right: 4%;
+    top: 0;
+  }
+  .marketing-parallax-hero--asymmetric .marketing-parallax-hero-stat-b {
+    left: auto;
+    right: 32%;
+    bottom: 0;
   }
   .marketing-hero-bleed {
     inset: -3px;
@@ -461,12 +843,35 @@
     background-image: linear-gradient(
       to right,
       var(--background) 0%,
-      color-mix(in oklch, var(--background) 98%, transparent) 22%,
-      color-mix(in oklch, var(--background) 88%, transparent) 34%,
-      color-mix(in oklch, var(--background) 62%, transparent) 46%,
-      color-mix(in oklch, var(--background) 28%, transparent) 58%,
-      transparent 82%
+      color-mix(in oklch, var(--background) 94%, transparent) 38%,
+      color-mix(in oklch, var(--background) 78%, transparent) 52%,
+      color-mix(in oklch, var(--background) 42%, transparent) 62%,
+      transparent 76%
     );
+  }
+  .marketing-hero-panel-surface {
+    fill: color-mix(in oklch, var(--card) 70%, var(--marketing-hero-sky));
+    stroke: var(--marketing-hero-wireframe-border);
+  }
+  .marketing-hero-panel-card {
+    fill: color-mix(in oklch, var(--card) 50%, transparent);
+    stroke: color-mix(in oklch, var(--marketing-hero-wireframe-border) 65%, transparent);
+  }
+  .marketing-hero-panel-divider {
+    stroke: var(--marketing-hero-wireframe-border);
+  }
+  .marketing-hero-panel-bar {
+    fill: color-mix(in oklch, var(--marketing-hero-line) 75%, transparent);
+  }
+  .marketing-hero-panel-bar-muted {
+    fill: color-mix(in oklch, var(--marketing-hero-line-soft) 45%, transparent);
+  }
+  .marketing-hero-panel-label,
+  .marketing-hero-panel-caption {
+    fill: var(--marketing-hero-line-soft);
+  }
+  .marketing-hero-panels {
+    filter: drop-shadow(0 16px 40px color-mix(in oklch, var(--primary) 8%, transparent));
   }
   .marketing-hero-highlight {
     background-image:
@@ -634,12 +1039,35 @@
     position: absolute;
     left: 0;
     top: 0;
+    display: flex;
     width: 72%;
     height: 52%;
+    flex-direction: column;
+    gap: 0.4rem;
     border-radius: 14px;
     border: 1px solid var(--marketing-hero-wireframe-border);
     background: var(--marketing-hero-wireframe-fill);
+    padding: 0.65rem 0.75rem;
     box-shadow: 0 0 24px color-mix(in oklch, var(--marketing-hero-line) 12%, transparent);
+  }
+  .marketing-hero-wireframe-line {
+    display: block;
+    height: 4px;
+    width: 100%;
+    border-radius: 2px;
+    background: color-mix(in oklch, var(--marketing-hero-line-soft) 50%, transparent);
+  }
+  .marketing-hero-wireframe-line-lg {
+    width: 72%;
+    height: 5px;
+    background: color-mix(in oklch, var(--marketing-hero-line) 55%, transparent);
+  }
+  .marketing-hero-wireframe-line-accent {
+    width: 48%;
+    background: color-mix(in oklch, var(--primary) 45%, transparent);
+  }
+  .marketing-hero-wireframe-line-short {
+    width: 58%;
   }
   .marketing-hero-wireframe-card-back {
     opacity: 0.35;
@@ -660,6 +1088,9 @@
       translate3d(36%, 28%, 16px);
   }
   @media (max-width: 767px) {
+    .marketing-hero-panels {
+      opacity: 0.5;
+    }
     .marketing-hero-art-accent {
       opacity: 0.65;
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMotionValue, useSpring } from 'framer-motion';
+import { useMotionValue, useMotionValueEvent, useSpring } from 'framer-motion';
 import {
   useCallback,
   useEffect,
@@ -19,7 +19,7 @@ const HERO_IN_VIEW_THRESHOLD = 0.12;
 const HERO_IDLE_CHECK_MS = 200;
 const HERO_PARALLAX_CENTER = 0.5;
 /** Global mouse-parallax intensity (0 = off, 1 = default, 1.5 = stronger). Scales all hero layer shifts in globals.css. */
-export const HERO_PARALLAX_STRENGTH = 5;
+export const HERO_PARALLAX_STRENGTH = 1;
 const HERO_SPRING_CONFIG = { stiffness: 52, damping: 32, restDelta: 0.0008, restSpeed: 0.008 };
 const HERO_BOOST_SPRING_CONFIG = { stiffness: 120, damping: 34, restDelta: 0.001, restSpeed: 0.01 };
 
@@ -199,19 +199,49 @@ export function useMarketingHeroInteraction(): MarketingHeroInteraction {
       sectionElement.removeEventListener('pointerdown', executeOnTap);
     };
   }, [isParallaxEnabled, executeTapBoost, executeUpdatePointer, sectionElement]);
-  const rootStyle =
-    parallaxSnapshot === null
-      ? ({
-          '--hero-fx': springX,
-          '--hero-fy': springY,
-          '--hero-boost': springBoost,
-          '--hero-parallax-strength': isParallaxEnabled ? HERO_PARALLAX_STRENGTH : 0,
-        } as CSSProperties)
-      : ({
-          '--hero-fx': parallaxSnapshot.fx,
-          '--hero-fy': parallaxSnapshot.fy,
-          '--hero-boost': parallaxSnapshot.boost,
-          '--hero-parallax-strength': isParallaxEnabled ? HERO_PARALLAX_STRENGTH : 0,
-        } as CSSProperties);
+  const rootStyle = {
+    '--hero-parallax-strength': isParallaxEnabled ? HERO_PARALLAX_STRENGTH : 0,
+  } as CSSProperties;
+  useEffect(() => {
+    const section = sectionElement;
+    if (section === null) {
+      return;
+    }
+    const strength = isParallaxEnabled ? String(HERO_PARALLAX_STRENGTH) : '0';
+    section.style.setProperty('--hero-parallax-strength', strength);
+    if (!isParallaxEnabled) {
+      section.style.setProperty('--hero-fx', String(HERO_PARALLAX_CENTER));
+      section.style.setProperty('--hero-fy', String(HERO_PARALLAX_CENTER));
+      section.style.setProperty('--hero-boost', '0');
+      return;
+    }
+    if (parallaxSnapshot !== null) {
+      section.style.setProperty('--hero-fx', String(parallaxSnapshot.fx));
+      section.style.setProperty('--hero-fy', String(parallaxSnapshot.fy));
+      section.style.setProperty('--hero-boost', String(parallaxSnapshot.boost));
+      return;
+    }
+    section.style.setProperty('--hero-fx', String(springX.get()));
+    section.style.setProperty('--hero-fy', String(springY.get()));
+    section.style.setProperty('--hero-boost', String(springBoost.get()));
+  }, [isParallaxEnabled, parallaxSnapshot, sectionElement, springBoost, springX, springY]);
+  useMotionValueEvent(springX, 'change', (latest) => {
+    if (!isParallaxEnabled || sectionElement === null || parallaxSnapshot !== null) {
+      return;
+    }
+    sectionElement.style.setProperty('--hero-fx', String(latest));
+  });
+  useMotionValueEvent(springY, 'change', (latest) => {
+    if (!isParallaxEnabled || sectionElement === null || parallaxSnapshot !== null) {
+      return;
+    }
+    sectionElement.style.setProperty('--hero-fy', String(latest));
+  });
+  useMotionValueEvent(springBoost, 'change', (latest) => {
+    if (!isParallaxEnabled || sectionElement === null || parallaxSnapshot !== null) {
+      return;
+    }
+    sectionElement.style.setProperty('--hero-boost', String(latest));
+  });
   return { isBoosted, isInView, isDocumentVisible, rootStyle, sectionRef };
 }

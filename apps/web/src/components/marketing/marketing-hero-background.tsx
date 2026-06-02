@@ -33,7 +33,6 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
   return (
     <motion.div
       className="pointer-events-none absolute inset-0 overflow-clip marketing-hero-interactive"
-      style={interaction.rootStyle}
       data-hero-boosted={interaction.isBoosted ? '' : undefined}
       data-hero-paused={interaction.isDocumentVisible ? undefined : ''}
       aria-hidden
@@ -77,30 +76,21 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
               </filter>
             </defs>
             <g className="marketing-hero-parallax-deep marketing-hero-stroke" strokeWidth="1.5" opacity="0.45">
-              <ellipse
-                cx="260"
-                cy="400"
-                rx="200"
-                ry="200"
-                stroke="url(#hero-arc-left)"
-                className="marketing-hero-flow-arc"
-              />
-              <ellipse
-                cx="980"
-                cy="300"
-                rx="320"
-                ry="320"
+              <path
+                className="marketing-hero-flow-path"
+                d="M40 520 C 180 420, 320 200, 480 140 S 820 60, 1100 180"
                 stroke="url(#hero-arc-a)"
-                className="marketing-hero-flow-arc"
+                strokeLinecap="round"
+                fill="none"
               />
-              <ellipse
-                cx="1040"
-                cy="340"
-                rx="240"
-                ry="240"
+              <path
+                className="marketing-hero-flow-path"
+                d="M120 380 C 240 320, 400 360, 560 280 S 900 140, 1280 220"
                 stroke="url(#hero-arc-b)"
                 strokeWidth="1.25"
-                className="marketing-hero-flow-arc"
+                strokeDasharray="8 12"
+                strokeLinecap="round"
+                fill="none"
               />
             </g>
             <g className="marketing-hero-parallax-mid marketing-hero-stroke" strokeWidth="1.5" opacity="0.5">
@@ -149,8 +139,18 @@ export function MarketingHeroBackground(props: MarketingHeroBackgroundProps): Re
               <circle cx="1220" cy="380" r="6" className="marketing-hero-fill-primary marketing-hero-satellite-node" />
               <circle cx="860" cy="500" r="5" className="marketing-hero-fill-primary marketing-hero-satellite-node" />
               <circle cx="1100" cy="480" r="5" className="marketing-hero-fill-primary marketing-hero-satellite-node" />
-              <circle cx="320" cy="420" r="5" className="marketing-hero-fill-primary marketing-hero-satellite-node marketing-hero-left-node" />
-              <circle cx="180" cy="300" r="4" className="marketing-hero-fill-primary marketing-hero-satellite-node marketing-hero-left-node" />
+              <circle
+                cx="320"
+                cy="420"
+                r="5"
+                className="marketing-hero-fill-primary marketing-hero-satellite-node marketing-hero-left-node"
+              />
+              <circle
+                cx="180"
+                cy="300"
+                r="4"
+                className="marketing-hero-fill-primary marketing-hero-satellite-node marketing-hero-left-node"
+              />
               <line
                 x1="980"
                 y1="280"

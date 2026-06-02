@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
         // Brand logos use `brandAssetUrl()` cache-busting query params (`?v=…`).
         pathname: '/brand/**',
       },
+      {
+        pathname: '/marketing/**',
+      },
     ],
   },
   async headers() {
