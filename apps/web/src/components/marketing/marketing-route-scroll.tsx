@@ -2,6 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useLayoutEffect, useState } from 'react';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { resolveMarketingHashScrollBehavior, scrollToMarketingHash } from '@/lib/marketing/marketing-hash-scroll';
 
 const HASH_SCROLL_MAX_ATTEMPTS = 24;
 
@@ -18,24 +20,12 @@ function readLocationHash(): string {
   return window.location.hash;
 }
 
-function scrollToHashTarget(hash: string): boolean {
-  if (!hash || hash === '#') {
-    return false;
-  }
-  const id = decodeURIComponent(hash.slice(1));
-  const target = document.getElementById(id);
-  if (!target) {
-    return false;
-  }
-  target.scrollIntoView({ behavior: 'auto', block: 'start' });
-  return true;
-}
-
-function scheduleHashScroll(hash: string): () => void {
+function scheduleHashScroll(hash: string, prefersReducedMotion: boolean): () => void {
+  const behavior = resolveMarketingHashScrollBehavior(prefersReducedMotion);
   let attempts = 0;
   let frameId = 0;
   const run = (): void => {
-    if (scrollToHashTarget(hash)) {
+    if (scrollToMarketingHash(hash, behavior)) {
       return;
     }
     attempts += 1;
@@ -50,9 +40,9 @@ function scheduleHashScroll(hash: string): () => void {
   };
 }
 
-function applyRouteScroll(hash: string): () => void {
+function applyRouteScroll(hash: string, prefersReducedMotion: boolean): () => void {
   if (hash && hash !== '#') {
-    return scheduleHashScroll(hash);
+    return scheduleHashScroll(hash, prefersReducedMotion);
   }
   scrollWindowToTop();
   return () => {};
@@ -65,6 +55,7 @@ function applyRouteScroll(hash: string): () => void {
  */
 export function MarketingRouteScroll(): null {
   const pathname = usePathname();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [hash, setHash] = useState(readLocationHash);
   useEffect(() => {
     const syncHash = (): void => {
@@ -79,7 +70,7 @@ export function MarketingRouteScroll(): null {
     };
   }, [pathname]);
   useLayoutEffect(() => {
-    return applyRouteScroll(readLocationHash());
-  }, [pathname, hash]);
+    return applyRouteScroll(readLocationHash(), prefersReducedMotion);
+  }, [pathname, hash, prefersReducedMotion]);
   return null;
 }

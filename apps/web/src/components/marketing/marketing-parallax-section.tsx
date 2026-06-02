@@ -1,29 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactElement, type ReactNode, type Ref } from 'react';
+import { useCallback, useEffect, useState, type ReactElement, type ReactNode, type Ref } from 'react';
 import { MarketingSectionReveal } from '@/components/marketing/marketing-section-reveal';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { subscribeMarketingScrollFrame } from '@/lib/marketing/subscribe-marketing-scroll-frame';
+import { useMarketingSectionInView } from '@/lib/marketing/use-marketing-section-in-view';
 import { cn } from '@/lib/utils';
 
 const MAX_CONTENT_OFFSET_PX = 52;
 const MAX_BACKGROUND_OFFSET_PX = 72;
-
-function mergeRefs<T>(...refs: readonly (Ref<T> | undefined)[]): (node: T | null) => void {
-  return (node: T | null): void => {
-    refs.forEach((ref) => {
-      if (typeof ref === 'function') {
-        ref(node);
-        return;
-      }
-      if (ref !== undefined && ref !== null) {
-        ref.current = node;
-      }
-    });
-  };
-}
+const SECTION_PARALLAX_Y_PROPERTY = '--section-parallax-y';
+const SECTION_PARALLAX_BG_Y_PROPERTY = '--section-parallax-bg-y';
 
 function clampOffset(value: number, max: number): number {
   return Math.max(-max, Math.min(max, value));
+}
+
+function executeResetSectionParallax(section: HTMLElement): void {
+  section.style.setProperty(SECTION_PARALLAX_Y_PROPERTY, '0px');
+  section.style.setProperty(SECTION_PARALLAX_BG_Y_PROPERTY, '0px');
 }
 
 export type MarketingParallaxSectionProps = {
@@ -62,51 +57,72 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
   const reveal = revealProp ?? true;
   const revealStagger = revealStaggerProp ?? false;
   const hasBackground = background !== undefined;
-  const internalSectionRef = useRef<HTMLElement>(null);
-  const sectionRef = mergeRefs(forwardedRef, internalSectionRef);
-  const [contentOffset, setContentOffset] = useState(0);
-  const [backgroundOffset, setBackgroundOffset] = useState(0);
+  const isParallaxEnabled = speed > 0 || (hasBackground && backgroundSpeed > 0);
+  const [sectionElement, setSectionElement] = useState<HTMLElement | null>(null);
+  const executeAssignSectionRef = useCallback(
+    (node: HTMLElement | null): void => {
+      setSectionElement(node);
+      if (typeof forwardedRef === 'function') {
+        forwardedRef(node);
+        return;
+      }
+      if (forwardedRef !== undefined && forwardedRef !== null) {
+        forwardedRef.current = node;
+      }
+    },
+    [forwardedRef],
+  );
   const prefersReducedMotion = usePrefersReducedMotion();
   const isRevealEnabled = reveal && !prefersReducedMotion;
+  const isInView = useMarketingSectionInView(sectionElement);
   useEffect(() => {
-    if (prefersReducedMotion) {
-      return;
-    }
-    const section = internalSectionRef.current;
+    const section = sectionElement;
     if (section === null) {
       return;
     }
-    let raf = 0;
+    if (prefersReducedMotion || !isParallaxEnabled) {
+      executeResetSectionParallax(section);
+      return;
+    }
+    let lastContentY = '';
+    let lastBackgroundY = '';
     const executeUpdate = (): void => {
+      if (!isInView) {
+        return;
+      }
       const rect = section.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
       const sectionCenterY = rect.top + rect.height / 2;
       const viewportCenterY = viewportHeight / 2;
       const delta = viewportCenterY - sectionCenterY;
-      setContentOffset(clampOffset(delta * speed, MAX_CONTENT_OFFSET_PX));
+      const contentOffsetPx = Math.round(clampOffset(delta * speed, MAX_CONTENT_OFFSET_PX));
+      const contentY = `${contentOffsetPx}px`;
+      if (contentY !== lastContentY) {
+        section.style.setProperty(SECTION_PARALLAX_Y_PROPERTY, contentY);
+        lastContentY = contentY;
+      }
       if (hasBackground) {
-        setBackgroundOffset(clampOffset(delta * backgroundSpeed, MAX_BACKGROUND_OFFSET_PX));
+        const backgroundOffsetPx = Math.round(clampOffset(delta * backgroundSpeed, MAX_BACKGROUND_OFFSET_PX));
+        const backgroundY = `${backgroundOffsetPx}px`;
+        if (backgroundY !== lastBackgroundY) {
+          section.style.setProperty(SECTION_PARALLAX_BG_Y_PROPERTY, backgroundY);
+          lastBackgroundY = backgroundY;
+        }
       }
     };
-    const executeRequestFrame = (): void => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(executeUpdate);
-    };
-    executeUpdate();
-    window.addEventListener('scroll', executeRequestFrame, { passive: true });
-    window.addEventListener('resize', executeRequestFrame, { passive: true });
+    const unsubscribe = subscribeMarketingScrollFrame(executeUpdate);
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', executeRequestFrame);
-      window.removeEventListener('resize', executeRequestFrame);
+      unsubscribe();
+      executeResetSectionParallax(section);
     };
-  }, [prefersReducedMotion, speed, backgroundSpeed, hasBackground]);
-  const contentTransform =
-    prefersReducedMotion || contentOffset === 0 ? undefined : `translate3d(0, ${contentOffset}px, 0)`;
-  const backgroundTransform =
-    prefersReducedMotion || !hasBackground || backgroundOffset === 0
-      ? undefined
-      : `translate3d(0, ${backgroundOffset}px, 0)`;
+  }, [backgroundSpeed, hasBackground, isInView, isParallaxEnabled, prefersReducedMotion, sectionElement, speed]);
+  useEffect(() => {
+    const section = sectionElement;
+    if (section === null || prefersReducedMotion || isInView || !isParallaxEnabled) {
+      return;
+    }
+    executeResetSectionParallax(section);
+  }, [isInView, isParallaxEnabled, prefersReducedMotion, sectionElement]);
   const content = isRevealEnabled ? (
     <MarketingSectionReveal className={contentClassName} stagger={revealStagger}>
       {children}
@@ -116,29 +132,24 @@ export function MarketingParallaxSection(props: MarketingParallaxSectionProps): 
   );
   return (
     <section
-      ref={sectionRef as Ref<HTMLElement>}
-      className={cn('relative', hasBackground && 'isolate', className)}
+      ref={executeAssignSectionRef}
+      className={cn(
+        'marketing-parallax-section relative',
+        isParallaxEnabled && !prefersReducedMotion && 'marketing-parallax-section--active',
+        hasBackground && 'isolate',
+        className,
+      )}
       id={id}
     >
       {hasBackground ? (
         <div
-          className="pointer-events-none absolute inset-0 z-0 min-h-full overflow-clip"
-          style={{
-            transform: backgroundTransform,
-            willChange: backgroundTransform === undefined ? undefined : 'transform',
-          }}
+          className="marketing-parallax-section__background pointer-events-none absolute inset-0 z-0 min-h-full overflow-clip"
           aria-hidden
         >
           {background}
         </div>
       ) : null}
-      <div
-        className={cn('relative z-10 min-w-0', !isRevealEnabled && contentClassName)}
-        style={{
-          transform: contentTransform,
-          willChange: contentTransform === undefined ? undefined : 'transform',
-        }}
-      >
+      <div className={cn('marketing-parallax-section__content relative z-10 min-w-0', !isRevealEnabled && contentClassName)}>
         {content}
       </div>
     </section>

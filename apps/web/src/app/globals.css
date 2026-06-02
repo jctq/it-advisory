@@ -243,11 +243,6 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
-  @media (prefers-reduced-motion: no-preference) {
-    html.marketing-smooth-scroll {
-      scroll-behavior: smooth;
-    }
-  }
 }
 
 /**
@@ -309,6 +304,20 @@
     overflow: clip;
     contain: paint;
   }
+  .marketing-parallax-section {
+    --section-parallax-y: 0px;
+    --section-parallax-bg-y: 0px;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 28rem;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .marketing-parallax-section--active .marketing-parallax-section__content {
+      transform: translate3d(0, var(--section-parallax-y), 0);
+    }
+    .marketing-parallax-section--active .marketing-parallax-section__background {
+      transform: translate3d(0, var(--section-parallax-bg-y), 0);
+    }
+  }
   /* Photo hero — full-bleed image with edge fades into page background */
   .marketing-parallax-hero--image {
     --marketing-header-offset: 4.5rem;
@@ -328,6 +337,9 @@
   .marketing-hero-image-backdrop {
     overflow: hidden;
     contain: strict;
+  }
+  .marketing-hero-image-art-layer {
+    isolation: isolate;
   }
   .marketing-hero-image-layer-base {
     position: absolute;
@@ -400,8 +412,10 @@
       transparent 100%
     );
   }
-  .marketing-parallax-hero--image .marketing-parallax-hero-content {
-    opacity: calc(1 - var(--hero-scroll-progress) * 0.22);
+  @media (prefers-reduced-motion: no-preference) {
+    .marketing-parallax-hero--image .marketing-parallax-hero-content {
+      opacity: calc(1 - var(--hero-scroll-progress) * 0.22);
+    }
   }
   .marketing-hero-image-backdrop--topology-only .marketing-hero-text-fade {
     opacity: 1;

@@ -1,19 +1,51 @@
 'use client';
 
 import { useEffect } from 'react';
-
-const MARKETING_SMOOTH_SCROLL_CLASS = 'marketing-smooth-scroll';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import {
+  isSameDocumentMarketingHashLink,
+  readHashFromAnchor,
+  resolveMarketingHashScrollBehavior,
+  scrollToMarketingHash,
+} from '@/lib/marketing/marketing-hash-scroll';
 
 /**
- * Applies document-level smooth scrolling for hash / in-page navigation while marketing chrome is active.
+ * Smooth scroll for in-page / home hash links (e.g. `/#services` in the header).
+ * Avoids `scroll-behavior: smooth` on `html`, which makes wheel / trackpad scrolling feel heavy.
  */
 export function MarketingSmoothScroll(): null {
+  const prefersReducedMotion = usePrefersReducedMotion();
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.add(MARKETING_SMOOTH_SCROLL_CLASS);
-    return () => {
-      root.classList.remove(MARKETING_SMOOTH_SCROLL_CLASS);
+    const executeOnAnchorClick = (event: MouseEvent): void => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const anchor = target.closest('a[href*="#"]');
+      if (!(anchor instanceof HTMLAnchorElement)) {
+        return;
+      }
+      if (!isSameDocumentMarketingHashLink(anchor)) {
+        return;
+      }
+      const hash = readHashFromAnchor(anchor);
+      if (hash === null) {
+        return;
+      }
+      const sectionId = decodeURIComponent(hash.slice(1));
+      if (document.getElementById(sectionId) === null) {
+        return;
+      }
+      event.preventDefault();
+      scrollToMarketingHash(hash, resolveMarketingHashScrollBehavior(prefersReducedMotion));
     };
-  }, []);
+    document.addEventListener('click', executeOnAnchorClick);
+    return () => {
+      document.removeEventListener('click', executeOnAnchorClick);
+    };
+  }, [prefersReducedMotion]);
   return null;
 }
