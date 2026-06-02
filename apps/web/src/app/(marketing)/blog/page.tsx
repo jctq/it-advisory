@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { MarketingBlogIndex } from '@/components/marketing/blog/marketing-blog-index';
+import { JsonLd } from '@/components/seo/json-ld';
 import { listPublishedBlogPostsPage } from '@/lib/data/blog-posts';
+import { buildBlogIndexPageJsonLd } from '@/lib/seo/marketing-page-structured-data';
 import {
   BLOG_LIST_PAGE_SIZE,
   buildBlogListPageHref,
@@ -45,13 +47,17 @@ export default async function BlogIndexPage(props: BlogIndexPageProps): Promise<
   if (pageResult.totalPages > 0 && requestedPage > pageResult.totalPages) {
     redirect(buildBlogListPageHref(pageResult.totalPages));
   }
+  const structuredData = await buildBlogIndexPageJsonLd();
   return (
-    <MarketingBlogIndex
-      posts={pageResult.posts}
-      page={pageResult.page}
-      pageSize={pageResult.pageSize}
-      totalCount={pageResult.totalCount}
-      totalPages={pageResult.totalPages}
-    />
+    <>
+      {structuredData.length > 0 ? <JsonLd data={structuredData} /> : null}
+      <MarketingBlogIndex
+        posts={pageResult.posts}
+        page={pageResult.page}
+        pageSize={pageResult.pageSize}
+        totalCount={pageResult.totalCount}
+        totalPages={pageResult.totalPages}
+      />
+    </>
   );
 }

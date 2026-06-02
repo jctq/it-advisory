@@ -7,6 +7,7 @@ import {
   getResolvedSeoSettings,
   resolveDefaultMetaDescription,
   resolvePageSeo,
+  resolveTitleSeparator,
   type ResolvedSeoSettings,
 } from '@/lib/data/seo-settings';
 import { readEnvSiteName } from '@/lib/site/site-name';
@@ -88,6 +89,20 @@ export function resolveOpenGraphImagePath(
   return DEFAULT_OG_IMAGE_PATH;
 }
 
+/**
+ * Ensures document titles include the site name using the configured separator when missing.
+ */
+export function formatSeoDocumentTitle(pageTitle: string, siteName: string, settings: ResolvedSeoSettings): string {
+  const trimmedTitle = pageTitle.trim();
+  if (trimmedTitle.length === 0) {
+    return siteName;
+  }
+  if (trimmedTitle.includes(siteName)) {
+    return trimmedTitle;
+  }
+  return `${trimmedTitle}${resolveTitleSeparator(settings)}${siteName}`;
+}
+
 function mergeKeywords(
   pageKeywords: readonly string[] | undefined,
   globalKeywords: readonly string[],
@@ -156,15 +171,16 @@ export function buildMarketingMetadataWithContext(
 ): Metadata {
   const keywords = mergeKeywords(input.keywords, context.settings.parsedKeywords);
   const robots = context.settings.noIndexSiteWide ? NO_INDEX_ROBOTS : undefined;
+  const title = formatSeoDocumentTitle(input.title, context.siteName, context.settings);
   return {
-    title: input.title,
+    title,
     description: input.description,
     ...(keywords !== undefined ? { keywords } : {}),
     ...(robots !== undefined ? { robots } : {}),
     alternates: {
       canonical: input.pathname,
     },
-    ...buildSocialMetadata(input, context),
+    ...buildSocialMetadata({ ...input, title }, context),
   };
 }
 
@@ -174,7 +190,7 @@ export function buildMarketingMetadataWithContext(
  */
 export function buildRootLayoutMetadataWithContext(context: SeoContext): Metadata {
   const description = resolveDefaultMetaDescription(context.settings);
-  const title = `${context.siteName} — Technology Consultation`;
+  const title = formatSeoDocumentTitle('Technology Consultation', context.siteName, context.settings);
   return {
     title,
     description,
@@ -198,16 +214,17 @@ export function buildNoIndexMetadataWithContext(
   context: SeoContext,
 ): Metadata {
   const description = input.description ?? resolveDefaultMetaDescription(context.settings);
+  const title = formatSeoDocumentTitle(input.title, context.siteName, context.settings);
   return {
-    title: input.title,
+    title,
     description,
     robots: NO_INDEX_ROBOTS,
     openGraph: {
-      title: input.title,
+      title,
       description,
     },
     twitter: {
-      title: input.title,
+      title,
       description,
     },
   };

@@ -14,6 +14,8 @@ export type MarketingSectionHeaderProps = {
   readonly className?: string;
   readonly action?: ReactNode;
   readonly reveal?: boolean;
+  /** Page-level sections (e.g. blog index) should use `h1`; in-page sections use `h2` (default). */
+  readonly titleAs?: 'h1' | 'h2';
 };
 
 /**
@@ -36,6 +38,7 @@ export function MarketingSectionHeader(props: MarketingSectionHeaderProps): Reac
     props.inverted ? 'marketing-band-muted' : 'text-muted-foreground',
     align === 'center' && 'mx-auto',
   );
+  const TitleTag = props.titleAs === 'h1' ? 'h1' : 'h2';
   const titleBlock = (
     <div
       className={cn(
@@ -44,7 +47,7 @@ export function MarketingSectionHeader(props: MarketingSectionHeaderProps): Reac
       )}
     >
       <div className={cn('space-y-3', align === 'center' && 'max-w-3xl')}>
-        <h2 className={titleClassName}>{props.title}</h2>
+        <TitleTag className={titleClassName}>{props.title}</TitleTag>
         {props.description !== undefined ? <p className={descriptionClassName}>{props.description}</p> : null}
       </div>
       {props.action !== undefined ? <div className="shrink-0">{props.action}</div> : null}

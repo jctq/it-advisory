@@ -28,6 +28,7 @@ export function MarketingBlogIndex(props: MarketingBlogIndexProps): ReactElement
         <MarketingSectionHeader
           eyebrow="Resources"
           title="Blog"
+          titleAs="h1"
           description="Practical technology guidance for teams in the Philippines — diagnostics, tooling, and delivery."
         />
         {props.totalCount === 0 ? (

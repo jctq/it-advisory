@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { MarketingBlogProse } from '@/components/marketing/blog/marketing-blog-prose';
+import { JsonLd } from '@/components/seo/json-ld';
+import { buildBlogArticlePageJsonLd } from '@/lib/seo/marketing-page-structured-data';
 import { resolveBlogPostOpenGraphImageUrl } from '@/lib/blog-post-cover-image';
 import {
   getBlogPostDisplayTitle,
@@ -53,8 +55,10 @@ export default async function BlogArticlePage(props: BlogArticlePageProps): Prom
     post.publishedAtIso !== null
       ? format(new Date(post.publishedAtIso), 'MMMM d, yyyy')
       : format(new Date(post.updatedAtIso), 'MMMM d, yyyy');
+  const structuredData = await buildBlogArticlePageJsonLd(post);
   return (
     <main className="mx-auto max-w-6xl px-6 py-16">
+      {structuredData.length > 0 ? <JsonLd data={structuredData} /> : null}
       <div className="mx-auto">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">
           <Link href="/blog" className="hover:underline">
@@ -63,7 +67,9 @@ export default async function BlogArticlePage(props: BlogArticlePageProps): Prom
         </p>
         {post.showTitle ? (
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
-        ) : null}
+        ) : (
+          <h1 className="sr-only">{title}</h1>
+        )}
         {(post.description?.trim().length ?? 0) > 0 ? (
           <p className={cn('text-sm leading-relaxed text-muted-foreground', post.showTitle ? 'mt-3' : 'mt-2')}>
             {post.description?.trim()}

@@ -6,11 +6,16 @@ import { MarketingSmoothScroll } from '@/components/marketing/marketing-smooth-s
 import { MarketingAppearanceProvider } from '@/components/marketing/marketing-appearance-provider';
 import { MarketingSiteFooter } from '@/components/marketing/marketing-site-footer';
 import { SiteHeader } from '@/components/marketing/site-header';
+import { getResolvedSiteName } from '@/lib/data/app-settings';
+import { buildNoIndexMetadataAsync } from '@/lib/seo/site-seo';
 
-export const metadata: Metadata = {
-  title: 'Page not found — TeqMD',
-  description: 'The page you requested could not be found. Return to TeqMD home, blog, or start a guided diagnostic.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const siteName = await getResolvedSiteName();
+  return buildNoIndexMetadataAsync({
+    title: 'Page not found',
+    description: `The page you requested could not be found. Return to ${siteName} home, blog, or start a guided diagnostic.`,
+  });
+}
 
 /**
  * Global 404 for URLs outside route groups (e.g. mistyped paths). Marketing segment uses `(marketing)/not-found.tsx`.

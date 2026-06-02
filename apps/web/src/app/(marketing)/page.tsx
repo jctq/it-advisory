@@ -1,8 +1,10 @@
 import { HomePageContent } from './home-page-content';
+import { JsonLd } from '@/components/seo/json-ld';
 import { getResolvedSiteName } from '@/lib/data/app-settings';
 import { listPublishedMarketingTestimonials } from '@/lib/data/testimonials';
 import { readReviewsModuleEnabled } from '@/lib/marketing/reviews-module-gate';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
+import { buildHomePageJsonLd } from '@/lib/seo/marketing-page-structured-data';
 import { buildPageMetadata } from '@/lib/seo/site-seo';
 
 export async function generateMetadata() {
@@ -16,13 +18,16 @@ export default async function HomePage() {
     readReviewsModuleEnabled(),
     listPublishedMarketingTestimonials(),
   ]);
-  console.log('testimonials', testimonials);
+  const structuredData = await buildHomePageJsonLd();
   return (
-    <HomePageContent
-      isAuthenticated={user !== null}
-      siteName={siteName}
-      reviewsModuleEnabled={reviewsModuleEnabled}
-      testimonials={testimonials}
-    />
+    <>
+      {structuredData.length > 0 ? <JsonLd data={structuredData} /> : null}
+      <HomePageContent
+        isAuthenticated={user !== null}
+        siteName={siteName}
+        reviewsModuleEnabled={reviewsModuleEnabled}
+        testimonials={testimonials}
+      />
+    </>
   );
 }

@@ -20,6 +20,7 @@ function formatBlogPostDateLabel(post: BlogPostValue): string {
 type BlogPostCardThumbnailProps = {
   readonly coverImageUrl: string;
   readonly isFeatured: boolean;
+  readonly alt: string;
 };
 
 function BlogPostCardThumbnail(props: BlogPostCardThumbnailProps): ReactElement {
@@ -33,7 +34,7 @@ function BlogPostCardThumbnail(props: BlogPostCardThumbnailProps): ReactElement 
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={props.coverImageUrl}
-        alt=""
+        alt={props.alt}
         loading="lazy"
         decoding="async"
         className="size-full object-cover transition-transform duration-200 motion-safe:group-hover:scale-[1.02]"
@@ -62,7 +63,7 @@ export function MarketingBlogPostCard(props: MarketingBlogPostCardProps): ReactE
         )}
       >
         {coverImageUrl !== null ? (
-          <BlogPostCardThumbnail coverImageUrl={coverImageUrl} isFeatured={isFeatured} />
+          <BlogPostCardThumbnail coverImageUrl={coverImageUrl} isFeatured={isFeatured} alt={title} />
         ) : null}
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
