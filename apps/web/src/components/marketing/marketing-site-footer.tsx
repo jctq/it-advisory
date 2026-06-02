@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { MarketingCookiePreferencesLink } from '@/components/marketing/cookie-consent/marketing-cookie-preferences-link';
+import { MarketingHomeLink } from '@/components/marketing/marketing-home-link';
 import { TeqmdSiteLogo } from '@/components/marketing/teqmd-site-logo';
 import { listPublishedMarketingTestimonials } from '@/lib/data/testimonials';
 import { LEGAL_DOCUMENT_PATHS } from '@/lib/marketing/legal-document-id';
@@ -39,12 +40,9 @@ export async function MarketingSiteFooter(): Promise<ReactElement> {
       <div className="mx-auto max-w-6xl px-6 py-14 md:py-16">
         <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between lg:gap-16">
           <div className="space-y-4 md:max-w-xs lg:max-w-sm">
-            <Link
-              href="/"
-              className="inline-block text-foreground outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
-            >
+            <MarketingHomeLink className="inline-block text-foreground outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring">
               <TeqmdSiteLogo />
-            </Link>
+            </MarketingHomeLink>
             <p className="text-sm leading-relaxed text-muted-foreground">
               TeqMD helps organizations diagnose challenges, evaluate options, and make confident technology
               decisions before investing time and money.

@@ -72,8 +72,10 @@ export function MarketingRouteScroll(): null {
     };
     syncHash();
     window.addEventListener('hashchange', syncHash);
+    window.addEventListener('popstate', syncHash);
     return () => {
       window.removeEventListener('hashchange', syncHash);
+      window.removeEventListener('popstate', syncHash);
     };
   }, [pathname]);
   useLayoutEffect(() => {

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   BookOpen,
   Briefcase,
@@ -18,6 +18,7 @@ import { MarketingHeaderAccountMenuPanel } from '@/components/marketing/marketin
 import { SupportReportsUnreadBadge } from '@/components/marketing/support-reports-unread-badge';
 import type { ReactElement } from 'react';
 import { useCallback } from 'react';
+import { MarketingHomeLink } from '@/components/marketing/marketing-home-link';
 import { useMarketingSupportReportsUnreadCount } from '@/hooks/marketing/use-marketing-support-reports-unread-count';
 import { useMarketingChromeStore } from '@/store/marketing/marketing-chrome-store';
 import { MarketingHeaderAccountMenu } from '@/components/marketing/marketing-header-account-menu';
@@ -68,7 +69,6 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
     ? [...exploreNavLinks, MANAGE_BOOKING_NAV_LINK]
     : exploreNavLinks;
   const router = useRouter();
-  const pathname = usePathname();
   const executeSignOut = useCallback(async (): Promise<void> => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     router.replace('/');
@@ -77,12 +77,6 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
   const user = props.marketingUser;
   const isAuthenticated = user !== null;
   const { navigateToNewDiagnostic, isNavigating } = useMarketingNewDiagnosticNavigation(isAuthenticated);
-  const executeHomeLogoClick = useCallback((): void => {
-    if (pathname !== '/') {
-      return;
-    }
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  }, [pathname]);
   const isMobileMenuOpen = useMarketingChromeStore((state) => state.isMobileMenuOpen);
   const setMobileMenuOpen = useMarketingChromeStore((state) => state.setMobileMenuOpen);
   const executeCloseMobileMenu = useMarketingChromeStore((state) => state.executeCloseMobileMenu);
@@ -99,13 +93,9 @@ export function SiteHeaderClient(props: SiteHeaderClientProps): ReactElement {
       )}
     >
       <div className="mx-auto flex min-h-14 max-w-6xl items-center gap-3 px-4 py-2 sm:min-h-16 sm:gap-4 md:px-4 lg:px-2 lg:gap-6">
-        <Link
-          href="/"
-          onClick={executeHomeLogoClick}
-          className="shrink-0 overflow-visible text-foreground outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <MarketingHomeLink className="shrink-0 overflow-visible text-foreground outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring">
           <TeqmdSiteLogo />
-        </Link>
+        </MarketingHomeLink>
         <nav
           className="hidden min-h-10 min-w-0 flex-1 items-center justify-center gap-x-5 text-sm xl:flex xl:gap-x-7 2xl:gap-x-8"
           aria-label="Primary"
