@@ -4,6 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { MouseEvent, ReactElement, ReactNode } from 'react';
 import { useCallback } from 'react';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import {
+  resolveMarketingHashScrollBehavior,
+  scrollToMarketingTop,
+} from '@/lib/marketing/marketing-hash-scroll';
 
 export type MarketingHomeLinkProps = {
   readonly className?: string;
@@ -18,18 +23,24 @@ export type MarketingHomeLinkProps = {
 export function MarketingHomeLink(props: MarketingHomeLinkProps): ReactElement {
   const pathname = usePathname();
   const router = useRouter();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const executeClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>): void => {
       if (pathname !== '/') {
         return;
       }
       event.preventDefault();
+      const scrollBehavior = resolveMarketingHashScrollBehavior(prefersReducedMotion);
       if (window.location.hash.length > 0) {
+        const pathWithoutHash = `${window.location.pathname}${window.location.search}`;
+        history.replaceState(window.history.state, '', pathWithoutHash);
+        window.dispatchEvent(new Event('hashchange'));
         router.replace('/');
+      } else {
+        scrollToMarketingTop(scrollBehavior);
       }
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     },
-    [pathname, router],
+    [pathname, prefersReducedMotion, router],
   );
   return (
     <Link href="/" className={props.className} onClick={executeClick}>

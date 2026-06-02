@@ -19,6 +19,13 @@ const START_HERE_FOOTER_LINKS: readonly FooterLink[] = [
   { href: '/login', label: 'Sign In' },
 ] as const;
 
+const FOOTER_NAV_LINK_CLASS =
+  'inline-block rounded-sm py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background';
+
+function isMarketingInPageHashHref(href: string): boolean {
+  return href.includes('#');
+}
+
 /**
  * Multi-column marketing footer inspired by premium agency one-page layouts.
  */
@@ -58,12 +65,15 @@ export async function MarketingSiteFooter(): Promise<ReactElement> {
                 <ul className="mt-4 space-y-1">
                   {group.links.map((link) => (
                     <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        className="inline-block rounded-sm py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-                      >
-                        {link.label}
-                      </Link>
+                      {isMarketingInPageHashHref(link.href) ? (
+                        <a href={link.href} className={FOOTER_NAV_LINK_CLASS}>
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link href={link.href} className={FOOTER_NAV_LINK_CLASS}>
+                          {link.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>

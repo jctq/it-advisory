@@ -1,9 +1,13 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { resolveMarketingHashScrollBehavior, scrollToMarketingHash } from '@/lib/marketing/marketing-hash-scroll';
+import {
+  resolveMarketingHashScrollBehavior,
+  scrollToMarketingHash,
+  scrollToMarketingTop,
+} from '@/lib/marketing/marketing-hash-scroll';
 
 const HASH_SCROLL_MAX_ATTEMPTS = 24;
 
@@ -40,11 +44,15 @@ function scheduleHashScroll(hash: string, prefersReducedMotion: boolean): () => 
   };
 }
 
-function applyRouteScroll(hash: string, prefersReducedMotion: boolean): () => void {
+function applyRouteScroll(hash: string, pathnameChanged: boolean, prefersReducedMotion: boolean): () => void {
   if (hash && hash !== '#') {
     return scheduleHashScroll(hash, prefersReducedMotion);
   }
-  scrollWindowToTop();
+  if (pathnameChanged) {
+    scrollWindowToTop();
+    return () => {};
+  }
+  scrollToMarketingTop(resolveMarketingHashScrollBehavior(prefersReducedMotion));
   return () => {};
 }
 
@@ -57,6 +65,7 @@ export function MarketingRouteScroll(): null {
   const pathname = usePathname();
   const prefersReducedMotion = usePrefersReducedMotion();
   const [hash, setHash] = useState(readLocationHash);
+  const previousPathnameRef = useRef(pathname);
   useEffect(() => {
     const syncHash = (): void => {
       setHash(readLocationHash());
@@ -70,7 +79,9 @@ export function MarketingRouteScroll(): null {
     };
   }, [pathname]);
   useLayoutEffect(() => {
-    return applyRouteScroll(readLocationHash(), prefersReducedMotion);
+    const pathnameChanged = previousPathnameRef.current !== pathname;
+    previousPathnameRef.current = pathname;
+    return applyRouteScroll(readLocationHash(), pathnameChanged, prefersReducedMotion);
   }, [pathname, hash, prefersReducedMotion]);
   return null;
 }

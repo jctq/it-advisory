@@ -23,6 +23,10 @@ export function isSameDocumentMarketingHashLink(anchor: HTMLAnchorElement): bool
   return url.pathname === window.location.pathname && url.search === window.location.search;
 }
 
+export function scrollToMarketingTop(behavior: MarketingHashScrollBehavior): void {
+  window.scrollTo({ top: 0, left: 0, behavior });
+}
+
 export function scrollToMarketingHash(hash: string, behavior: MarketingHashScrollBehavior): boolean {
   if (!hash || hash === '#') {
     return false;
@@ -34,4 +38,22 @@ export function scrollToMarketingHash(hash: string, behavior: MarketingHashScrol
   }
   target.scrollIntoView({ behavior, block: 'start' });
   return true;
+}
+
+/**
+ * Updates the address bar hash after programmatic same-document navigation.
+ * `pushState` does not fire `hashchange`; dispatch it so `MarketingRouteScroll` stays in sync.
+ */
+export function writeMarketingLocationHash(hash: string): void {
+  if (!hash || hash === '#') {
+    return;
+  }
+  const currentUrl = new URL(window.location.href);
+  const nextPath = `${currentUrl.pathname}${currentUrl.search}${hash}`;
+  const currentPath = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
+  if (nextPath === currentPath) {
+    return;
+  }
+  history.pushState(window.history.state, '', nextPath);
+  window.dispatchEvent(new Event('hashchange'));
 }

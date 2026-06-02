@@ -7,6 +7,7 @@ import {
   readHashFromAnchor,
   resolveMarketingHashScrollBehavior,
   scrollToMarketingHash,
+  writeMarketingLocationHash,
 } from '@/lib/marketing/marketing-hash-scroll';
 
 /**
@@ -41,6 +42,7 @@ export function MarketingSmoothScroll(): null {
       }
       event.preventDefault();
       scrollToMarketingHash(hash, resolveMarketingHashScrollBehavior(prefersReducedMotion));
+      writeMarketingLocationHash(hash);
     };
     document.addEventListener('click', executeOnAnchorClick);
     return () => {
