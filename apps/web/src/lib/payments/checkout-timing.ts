@@ -6,6 +6,17 @@ export type CheckoutTimingCollector = {
   logAndFinish: () => void;
 };
 
+/** Runs async work, then records elapsed ms under segment (accurate durations). */
+export async function timeCheckoutSegment<T>(
+  timing: CheckoutTimingCollector | undefined,
+  segment: string,
+  execute: () => Promise<T>,
+): Promise<T> {
+  const result = await execute();
+  timing?.mark(segment);
+  return result;
+}
+
 export function createCheckoutTiming(flow: string): CheckoutTimingCollector {
   const startedAt = Date.now();
   let lastMarkAt = startedAt;

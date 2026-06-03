@@ -21,6 +21,33 @@ export type CheckoutPaymentContext = {
   readonly gatewayConfigured: boolean;
 };
 
+const PAYMENT_SETTINGS_CHECKOUT_CACHE_TTL_MS = 60_000 as const;
+let paymentSettingsCheckoutCache: {
+  readonly doc: PaymentSettingsDocument | null;
+  readonly cachedAtMs: number;
+} | null = null;
+
+async function loadPaymentSettingsDocumentForCheckout(): Promise<PaymentSettingsDocument | null> {
+  const nowMs = Date.now();
+  if (
+    paymentSettingsCheckoutCache !== null &&
+    nowMs - paymentSettingsCheckoutCache.cachedAtMs < PAYMENT_SETTINGS_CHECKOUT_CACHE_TTL_MS
+  ) {
+    return paymentSettingsCheckoutCache.doc;
+  }
+  const db = await getDb();
+  const doc = await db
+    .collection<PaymentSettingsDocument>(COLLECTIONS.paymentSettings)
+    .findOne({ _id: PAYMENT_SETTINGS_DOCUMENT_ID });
+  paymentSettingsCheckoutCache = { doc, cachedAtMs: nowMs };
+  return doc;
+}
+
+/** Clears the in-process checkout settings cache (e.g. after admin updates credentials). */
+export function invalidateCheckoutPaymentSettingsCache(): void {
+  paymentSettingsCheckoutCache = null;
+}
+
 /**
  * Single Mongo read + decrypt only the selected gateway (checkout hot path).
  */
@@ -29,10 +56,7 @@ export async function loadCheckoutPaymentContext(gatewayId: PaymentGatewayId): P
     const settings = mergePaymentSettingsDocument(null);
     return { settings, credentials: null, gatewayConfigured: false };
   }
-  const db = await getDb();
-  const doc = await db
-    .collection<PaymentSettingsDocument>(COLLECTIONS.paymentSettings)
-    .findOne({ _id: PAYMENT_SETTINGS_DOCUMENT_ID });
+  const doc = await loadPaymentSettingsDocumentForCheckout();
   const settings = mergePaymentSettingsDocument(doc);
   const blob = doc?.gatewayCredentials?.[gatewayId];
   if (blob === undefined) {

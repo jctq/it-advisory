@@ -20,23 +20,27 @@ export function usePaymentCheckoutPrepare(input: {
   readonly preparedEntry: PaymentCheckoutPrepCacheEntry | null;
   readonly invalidatePrep: () => void;
 } {
-  const debounceMs = input.debounceMs ?? PAYMENT_CHECKOUT_PREP_DEBOUNCE_MS;
+  const { scope, enabled, prepKey, prepare, debounceMs: inputDebounceMs } = input;
+  const debounceMs = inputDebounceMs ?? PAYMENT_CHECKOUT_PREP_DEBOUNCE_MS;
   const [isPreparing, setIsPreparing] = useState(false);
   const [preparedEntry, setPreparedEntry] = useState<PaymentCheckoutPrepCacheEntry | null>(null);
   const prepareGenerationRef = useRef(0);
+  const shouldPrepare = enabled && prepKey !== null && prepKey.length > 0;
+  const cachedEntry = shouldPrepare && prepKey !== null ? readPaymentCheckoutPrep(scope) : null;
+  const cachedPreparedEntry = cachedEntry !== null && cachedEntry.prepKey === prepKey ? cachedEntry : null;
+  const asyncPreparedEntry = preparedEntry !== null && preparedEntry.prepKey === prepKey ? preparedEntry : null;
+  const effectivePreparedEntry = shouldPrepare ? (asyncPreparedEntry ?? cachedPreparedEntry) : null;
+  const effectiveIsPreparing = shouldPrepare && isPreparing;
   const invalidatePrep = useCallback((): void => {
-    clearPaymentCheckoutPrep(input.scope);
+    clearPaymentCheckoutPrep(scope);
     setPreparedEntry(null);
     prepareGenerationRef.current += 1;
-  }, [input.scope]);
+  }, [scope]);
   useEffect(() => {
-    if (!input.enabled || input.prepKey === null || input.prepKey.length === 0) {
-      setPreparedEntry(null);
+    if (!shouldPrepare || prepKey === null) {
       return;
     }
-    const cached = readPaymentCheckoutPrep(input.scope);
-    if (cached !== null && cached.prepKey === input.prepKey) {
-      setPreparedEntry(cached);
+    if (cachedPreparedEntry !== null) {
       return;
     }
     const generation = prepareGenerationRef.current + 1;
@@ -44,8 +48,7 @@ export function usePaymentCheckoutPrepare(input: {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       setIsPreparing(true);
-      void input
-        .prepare(controller.signal)
+      void prepare(controller.signal)
         .then((result) => {
           if (prepareGenerationRef.current !== generation || controller.signal.aborted) {
             return;
@@ -55,12 +58,12 @@ export function usePaymentCheckoutPrepare(input: {
             return;
           }
           const entry: PaymentCheckoutPrepCacheEntry = {
-            prepKey: input.prepKey!,
+            prepKey,
             transactionId: result.transactionId,
             redirectUrl: result.redirectUrl,
             preparedAt: Date.now(),
           };
-          writePaymentCheckoutPrep(input.scope, entry);
+          writePaymentCheckoutPrep(scope, entry);
           setPreparedEntry(entry);
         })
         .catch(() => {
@@ -78,6 +81,6 @@ export function usePaymentCheckoutPrepare(input: {
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [debounceMs, input.enabled, input.prepKey, input.prepare, input.scope]);
-  return { isPreparing, preparedEntry, invalidatePrep };
+  }, [cachedPreparedEntry, debounceMs, prepKey, prepare, scope, shouldPrepare]);
+  return { isPreparing: effectiveIsPreparing, preparedEntry: effectivePreparedEntry, invalidatePrep };
 }

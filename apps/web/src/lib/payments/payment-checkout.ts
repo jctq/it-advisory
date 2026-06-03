@@ -25,6 +25,7 @@ import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-a
 import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { loadCheckoutPaymentContext } from '@/lib/payments/payment-checkout-context';
+import { timeCheckoutSegment } from '@/lib/payments/checkout-timing';
 import { validateCheckoutGatewayMethod } from '@/lib/payments/validate-checkout-gateway';
 import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
 import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
@@ -100,8 +101,9 @@ function buildTransactionRowFromInsert(
 
 export async function createPaymentCheckoutSession(params: CreateCheckoutSessionParams): Promise<CreateCheckoutSessionResult> {
   const timing = params.timing;
-  timing?.mark('settings_load');
-  const checkoutContext = await loadCheckoutPaymentContext(params.gatewayId);
+  const checkoutContext = await timeCheckoutSegment(timing, 'settings_load', () =>
+    loadCheckoutPaymentContext(params.gatewayId),
+  );
   const gatewayValidation = validateCheckoutGatewayMethod({
     context: checkoutContext,
     gatewayId: params.gatewayId,
@@ -120,8 +122,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   if (resolvedDiagnosticSessionHex === null) {
     return { ok: false, code: 'diagnostic_session_invalid_id', error: 'Invalid diagnostic session reference.' };
   }
-  timing?.mark('session_load');
-  const ownedDiagnosticSession = await findDiagnosticSessionForVisitor(params.visitorId, resolvedDiagnosticSessionHex);
+  const ownedDiagnosticSession = await timeCheckoutSegment(timing, 'session_load', () =>
+    findDiagnosticSessionForVisitor(params.visitorId, resolvedDiagnosticSessionHex),
+  );
   if (ownedDiagnosticSession === null) {
     return {
       ok: false,
@@ -129,14 +132,18 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       error: 'This diagnostic was not found or you no longer have access to it.',
     };
   }
-  if (ownedDiagnosticSession._id !== undefined) {
-    timing?.mark('existing_booking_check');
-    const existingBookingCount = await countBookingsByDiagnosticSessionId(ownedDiagnosticSession._id);
+  const diagnosticSessionObjectId = ownedDiagnosticSession._id;
+  if (diagnosticSessionObjectId !== undefined) {
+    const existingBookingCount = await timeCheckoutSegment(timing, 'existing_booking_count', () =>
+      countBookingsByDiagnosticSessionId(diagnosticSessionObjectId),
+    );
     if (existingBookingCount > 0) {
-      const pendingReady = await ensureDiagnosticSessionPendingBookingReadyForCheckout(
-        params.visitorId,
-        ownedDiagnosticSession._id,
-        { dateYmd: params.date, timeLabel: params.time },
+      const pendingReady = await timeCheckoutSegment(timing, 'pending_booking_ready', () =>
+        ensureDiagnosticSessionPendingBookingReadyForCheckout(
+          params.visitorId,
+          diagnosticSessionObjectId,
+          { dateYmd: params.date, timeLabel: params.time },
+        ),
       );
       if (pendingReady.ok) {
         return createPaymentCheckoutForVerifiedBooking(pendingReady.verified, {
@@ -149,6 +156,8 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           recordingOptIn: params.recordingOptIn,
           sessionMarketingRef,
           timing,
+          checkoutContext,
+          resolvedPaymentMethodLabel,
         });
       }
       if (!pendingReady.ok && pendingReady.code !== 'booking_not_found') {
@@ -160,7 +169,10 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           ...(payabilityCode !== undefined ? { payabilityCode } : {}),
         };
       }
-      const diagnosis = await diagnoseDiagnosticSessionExistingBookingPayability(params.visitorId, ownedDiagnosticSession._id);
+      const diagnosis = await diagnoseDiagnosticSessionExistingBookingPayability(
+        params.visitorId,
+        diagnosticSessionObjectId,
+      );
       if (diagnosis !== null && !diagnosis.canPayOnline) {
         return {
           ok: false,
@@ -189,23 +201,24 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     company: params.customerCompany?.trim() ?? '',
     phone: params.customerPhone.trim(),
   };
-  timing?.mark('pricing_and_open_tx');
   let resolvedPricing: Awaited<ReturnType<typeof resolveCheckoutAmountCentavos>>;
   let existingOpenTransaction: PaymentTransactionRow | null;
   try {
-    [resolvedPricing, existingOpenTransaction] = await Promise.all([
-      resolveCheckoutAmountCentavos({
-        serviceKey: params.serviceKey,
-        promoCode: params.promoCode,
-        recordingOptIn: params.recordingOptIn === true,
-      }),
-      findOpenPaymentTransactionForCheckoutSlot({
-        visitorId: params.visitorId,
-        diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
-        serviceKey: params.serviceKey,
-        startsAtUtc: startsAt,
-      }),
-    ]);
+    [resolvedPricing, existingOpenTransaction] = await timeCheckoutSegment(timing, 'pricing_and_open_tx', () =>
+      Promise.all([
+        resolveCheckoutAmountCentavos({
+          serviceKey: params.serviceKey,
+          promoCode: params.promoCode,
+          recordingOptIn: params.recordingOptIn === true,
+        }),
+        findOpenPaymentTransactionForCheckoutSlot({
+          visitorId: params.visitorId,
+          diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
+          serviceKey: params.serviceKey,
+          startsAtUtc: startsAt,
+        }),
+      ]),
+    );
   } catch (error: unknown) {
     return {
       ok: false,
@@ -248,17 +261,19 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       timing,
     });
   }
-  timing?.mark('slot_check');
-  const slotOk = await isMarketingSlotInPublishedAvailabilityForCheckout({
+  const slotOk = await timeCheckoutSegment(timing, 'slot_check', () =>
+    isMarketingSlotInPublishedAvailabilityForCheckout({
     serviceKey: params.serviceKey,
     startsAtUtc: startsAt,
-    diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
-  });
+      diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
+    }),
+  );
   if (!slotOk) {
     return { ok: false, code: 'booking_slot_unavailable', error: 'This time is no longer available.' };
   }
-  timing?.mark('db_writes');
-  const leadId = await insertMarketingBookingLead(params.visitorId, contact);
+  const leadId = await timeCheckoutSegment(timing, 'lead_insert', () =>
+    insertMarketingBookingLead(params.visitorId, contact),
+  );
   if (leadId === null) {
     return { ok: false, code: 'database_unavailable', error: 'Database unavailable.' };
   }
@@ -267,7 +282,8 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     settings.paymentPolicy === 'pay_after_hold'
       ? new Date(Date.now() + settings.holdExpiresMinutes * 60_000)
       : null;
-  const insertedId = await insertPaymentTransaction({
+  const insertedId = await timeCheckoutSegment(timing, 'transaction_insert', () =>
+    insertPaymentTransaction({
     gatewayId: params.gatewayId,
     providerRef: bookingDraftId,
     providerSessionId: bookingDraftId,
@@ -301,8 +317,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
         ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
         : {}),
     },
-    expiresAt,
-  });
+      expiresAt,
+    }),
+  );
   if (insertedId === null) {
     return { ok: false, code: 'database_unavailable', error: 'Could not create payment session.' };
   }
@@ -318,8 +335,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     paymentPolicy: settings.paymentPolicy,
   });
   if (settings.paymentPolicy === 'manual_confirm') {
-    timing?.mark('manual_confirm');
-    const bookingId = await createManualConfirmBooking({ transaction: row });
+    const bookingId = await timeCheckoutSegment(timing, 'manual_confirm', () =>
+      createManualConfirmBooking({ transaction: row }),
+    );
     return {
       ok: true,
       transactionId,
@@ -330,8 +348,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     };
   }
   if (settings.paymentPolicy === 'pay_after_hold' && expiresAt !== null) {
-    timing?.mark('hold_booking');
-    await createPendingBookingForHoldPolicy({ transaction: row, expiresAt });
+    await timeCheckoutSegment(timing, 'hold_booking', () =>
+      createPendingBookingForHoldPolicy({ transaction: row, expiresAt }),
+    );
   }
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: params.appBaseUrl,
@@ -366,8 +385,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   if (!providerResult.ok) {
     return providerResult;
   }
-  timing?.mark('provider_persist');
-  await updatePaymentTransactionProvider(insertedId, providerResult.session);
+  await timeCheckoutSegment(timing, 'provider_persist', () =>
+    updatePaymentTransactionProvider(insertedId, providerResult.session),
+  );
   dispatchPaymentReminderEmailAfterCheckout({ transaction: row });
   return {
     ok: true,

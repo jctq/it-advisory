@@ -9,7 +9,7 @@ import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { getDb } from '@/lib/mongodb';
 import type { CheckoutPaymentContext } from '@/lib/payments/payment-checkout-context';
-import type { CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
+import { timeCheckoutSegment, type CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
 import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
 import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
 
@@ -75,8 +75,8 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
     return { ok: false, code: 'payment_hold_expired', error: 'The payment window has expired.' };
   }
   const transactionObjectId = new ObjectId(input.transaction.id);
-  input.timing?.mark('resume_tx_update');
-  await updateOpenPaymentTransactionForCheckoutResume(transactionObjectId, {
+  await timeCheckoutSegment(input.timing, 'resume_tx_update', () =>
+    updateOpenPaymentTransactionForCheckoutResume(transactionObjectId, {
     gatewayId: input.gatewayId,
     amountCentavos: input.amountCentavos,
     paymentMethodLabel: input.paymentMethodLabel,
@@ -84,8 +84,9 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
     customerName: input.customerName,
     customerEmail: input.customerEmail,
     customerCompany: input.customerCompany,
-    customerPhone: input.customerPhone,
-  });
+      customerPhone: input.customerPhone,
+    }),
+  );
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: input.appBaseUrl,
     transactionId: input.transaction.id,
@@ -120,8 +121,9 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   if (!providerResult.ok) {
     return providerResult;
   }
-  input.timing?.mark('provider_persist');
-  await updatePaymentTransactionProvider(transactionObjectId, providerResult.session);
+  await timeCheckoutSegment(input.timing, 'provider_persist', () =>
+    updatePaymentTransactionProvider(transactionObjectId, providerResult.session),
+  );
   void executeSendBookingPaymentReminderEmail({ transaction: input.transaction });
   return {
     ok: true,
