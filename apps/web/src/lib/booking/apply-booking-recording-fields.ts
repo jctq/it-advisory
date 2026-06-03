@@ -1,8 +1,27 @@
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
+import type { FathomMatchStatus } from '@/domain/recording-types';
 import type { BookingDocument } from '@/domain/types';
 import { getRecordingSettings } from '@/lib/data/recording-settings';
 import { getDb } from '@/lib/mongodb';
+
+export type CheckoutRecordingFieldSnapshot = {
+  readonly recordingOptIn: boolean;
+  readonly recordingOptInPriceCentavos: number;
+  readonly fathomMatchStatus: FathomMatchStatus;
+};
+
+export async function resolveRecordingFieldsForCheckout(
+  recordingOptIn: boolean,
+): Promise<CheckoutRecordingFieldSnapshot> {
+  const settings = await getRecordingSettings();
+  const resolvedOptIn = settings.recordingsEnabled && recordingOptIn;
+  return {
+    recordingOptIn: resolvedOptIn,
+    recordingOptInPriceCentavos: resolvedOptIn ? settings.recordingOptInPriceCentavos : 0,
+    fathomMatchStatus: resolvedOptIn ? 'pending' : 'skipped',
+  };
+}
 
 export async function applyBookingRecordingFieldsFromCheckout(input: {
   readonly bookingId: ObjectId;
@@ -11,17 +30,15 @@ export async function applyBookingRecordingFieldsFromCheckout(input: {
   if (!process.env.MONGODB_URI) {
     return;
   }
-  const settings = await getRecordingSettings();
-  const recordingOptIn = settings.recordingsEnabled && input.recordingOptIn;
-  const snapshotPrice = recordingOptIn ? settings.recordingOptInPriceCentavos : 0;
+  const fields = await resolveRecordingFieldsForCheckout(input.recordingOptIn);
   const db = await getDb();
   await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
     { _id: input.bookingId },
     {
       $set: {
-        recordingOptIn,
-        recordingOptInPriceCentavos: snapshotPrice,
-        fathomMatchStatus: recordingOptIn ? 'pending' : 'skipped',
+        recordingOptIn: fields.recordingOptIn,
+        recordingOptInPriceCentavos: fields.recordingOptInPriceCentavos,
+        fathomMatchStatus: fields.fathomMatchStatus,
         updatedAt: new Date(),
       },
     },

@@ -475,6 +475,16 @@ export async function findBookingById(bookingId: string): Promise<BookingDetailR
   );
 }
 
+export type MarketingBookingCheckoutHoldInput = {
+  readonly paymentGatewayId: PaymentGatewayId;
+  readonly paymentTransactionId: ObjectId;
+  readonly paymentProviderRef: string;
+  readonly paymentExpiresAt: Date;
+  readonly recordingOptIn: boolean;
+  readonly recordingOptInPriceCentavos: number;
+  readonly fathomMatchStatus: FathomMatchStatus;
+};
+
 export type CreateMarketingBookingInput = {
   readonly visitorId: string;
   readonly serviceKey: string;
@@ -484,6 +494,7 @@ export type CreateMarketingBookingInput = {
   readonly diagnosticSessionId: ObjectId | null;
   readonly guidedDiagnosticSnapshot: string | null;
   readonly paymentMethodLabel?: string | null;
+  readonly checkoutHold?: MarketingBookingCheckoutHoldInput;
 };
 
 export type InsertMarketingBookingResult =
@@ -497,6 +508,7 @@ export async function insertMarketingBooking(input: CreateMarketingBookingInput)
   }
   const db = await getDb();
   const now = new Date();
+  const hold = input.checkoutHold;
   const doc: Omit<BookingDocument, '_id'> = {
     leadId: input.leadId,
     visitorId: input.visitorId,
@@ -509,6 +521,18 @@ export async function insertMarketingBooking(input: CreateMarketingBookingInput)
     diagnosticSessionId: input.diagnosticSessionId,
     createdAt: now,
     updatedAt: now,
+    ...(hold !== undefined
+      ? {
+          paymentStatus: 'pending' as const,
+          paymentGatewayId: hold.paymentGatewayId,
+          paymentTransactionId: hold.paymentTransactionId,
+          paymentProviderRef: hold.paymentProviderRef,
+          paymentExpiresAt: hold.paymentExpiresAt,
+          recordingOptIn: hold.recordingOptIn,
+          recordingOptInPriceCentavos: hold.recordingOptInPriceCentavos,
+          fathomMatchStatus: hold.fathomMatchStatus,
+        }
+      : {}),
   };
   try {
     const result = await db.collection<BookingDocument>(COLLECTIONS.bookings).insertOne(doc);
@@ -717,7 +741,12 @@ export async function findPrimaryBookingSlotByDiagnosticSessionId(diagnosticSess
   }
   const db = await getDb();
   const { pickPrimaryBookingForDiagnosticSession } = await import('@/lib/data/pick-primary-booking-for-diagnostic-session');
-  const docs = await db.collection<BookingDocument>(COLLECTIONS.bookings).find({ diagnosticSessionId }).toArray();
+  const docs = await db
+    .collection<BookingDocument>(COLLECTIONS.bookings)
+    .find({ diagnosticSessionId })
+    .sort({ createdAt: 1 })
+    .limit(32)
+    .toArray();
   const doc = pickPrimaryBookingForDiagnosticSession(docs);
   if (doc === null || doc._id === undefined || doc.startsAt === undefined) {
     return null;

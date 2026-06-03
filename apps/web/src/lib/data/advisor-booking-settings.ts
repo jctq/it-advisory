@@ -29,7 +29,7 @@ function buildActiveBookingSlotOccupancyFilter(): Record<string, unknown> {
   };
 }
 
-function addCalendarDaysToYmd(ymd: string, days: number, timeZone: string): string {
+export function addCalendarDaysToYmd(ymd: string, days: number, timeZone: string): string {
   const base = fromZonedTime(parse(`${ymd} 12:00`, 'yyyy-MM-dd HH:mm', new Date(0)), timeZone);
   return formatInTimeZone(addDays(base, days), timeZone, 'yyyy-MM-dd');
 }

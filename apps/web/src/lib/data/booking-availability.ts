@@ -7,6 +7,7 @@ import {
 } from '@teqmd/domain/booking-schedule';
 import { formatInTimeZone } from 'date-fns-tz';
 import {
+  addCalendarDaysToYmd,
   findAdvisorBookingSettingsDocument,
   listActiveBookingStartsUtcInYmdWindow,
   listActiveBookingStartsUtcInYmdWindowForCheckout,
@@ -76,6 +77,7 @@ export async function isMarketingSlotInPublishedAvailability(input: {
 /**
  * Checkout availability: same as {@link isMarketingSlotInPublishedAvailability} but allows a slot
  * already reserved by the current diagnostic session (retry during an active hold window).
+ * Loads occupancy for the slot's ISO week only (weekly caps), not ±14 days around a single day.
  */
 export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
   readonly serviceKey: string;
@@ -89,11 +91,15 @@ export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
       : normalizeAdvisorBookingSettings(createDefaultAdvisorBookingSettingsDocument(new Date()));
   const tz = normalized.timezone;
   const dayKey = formatInTimeZone(input.startsAtUtc, tz, 'yyyy-MM-dd');
+  const isoDow = Number.parseInt(formatInTimeZone(input.startsAtUtc, tz, 'i'), 10);
+  const daysFromMonday = isoDow === 7 ? 6 : isoDow - 1;
+  const weekFromYmd = addCalendarDaysToYmd(dayKey, -daysFromMonday, tz);
+  const weekToYmd = addCalendarDaysToYmd(weekFromYmd, 6, tz);
   const active = await listActiveBookingStartsUtcInYmdWindowForCheckout({
     serviceKey: input.serviceKey,
-    fromYmd: dayKey,
-    toYmd: dayKey,
-    bufferDays: CAP_BUFFER_DAYS,
+    fromYmd: weekFromYmd,
+    toYmd: weekToYmd,
+    bufferDays: 0,
     timeZone: tz,
     excludeDiagnosticSessionIdHex: input.diagnosticSessionIdHex,
   });

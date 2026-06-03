@@ -14,6 +14,7 @@ import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { ObjectId } from 'mongodb';
 import { countBookingsByDiagnosticSessionId } from '@/lib/data/bookings';
+import { extractGuidedDiagnosticRawFromDiagnosticAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { diagnoseDiagnosticSessionExistingBookingPayability } from '@/lib/data/booking-guest-manage';
 import { ensureDiagnosticSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-diagnostic-session-pending-booking-ready-for-checkout';
 import { buildPayabilityApiExtras, parseBookingPayabilityCode } from '@/lib/payments/evaluate-booking-payability';
@@ -133,10 +134,12 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     };
   }
   const diagnosticSessionObjectId = ownedDiagnosticSession._id;
+  let hasExistingBookingForSession = false;
   if (diagnosticSessionObjectId !== undefined) {
     const existingBookingCount = await timeCheckoutSegment(timing, 'existing_booking_count', () =>
       countBookingsByDiagnosticSessionId(diagnosticSessionObjectId),
     );
+    hasExistingBookingForSession = existingBookingCount > 0;
     if (existingBookingCount > 0) {
       const pendingReady = await timeCheckoutSegment(timing, 'pending_booking_ready', () =>
         ensureDiagnosticSessionPendingBookingReadyForCheckout(
@@ -349,8 +352,23 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     };
   }
   if (settings.paymentPolicy === 'pay_after_hold' && expiresAt !== null) {
+    const diagnosticSnapshot =
+      ownedDiagnosticSession.answers !== undefined
+        ? extractGuidedDiagnosticRawFromDiagnosticAnswers(ownedDiagnosticSession.answers)
+        : null;
     await timeCheckoutSegment(timing, 'hold_booking', () =>
-      createPendingBookingForHoldPolicy({ transaction: row, expiresAt }),
+      createPendingBookingForHoldPolicy({
+        transaction: row,
+        expiresAt,
+        startsAt,
+        diagnosticContext: {
+          diagnosticSessionId: diagnosticSessionObjectId ?? null,
+          snapshot: diagnosticSnapshot,
+        },
+        skipPrimarySlotLookup: !hasExistingBookingForSession,
+        recordingOptIn: resolvedPricing.recordingOptIn === true,
+        timing,
+      }),
     );
   }
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({

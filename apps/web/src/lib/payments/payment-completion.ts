@@ -16,7 +16,12 @@ import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions'
 import { getDb } from '@/lib/mongodb';
 import { executeSendBookingConfirmationEmail } from '@/lib/email/send-booking-confirmation-email';
 import { incrementPromoRedemptionCount } from '@/lib/data/monetization-settings';
-import { syncBookingRecordingFieldsFromTransaction } from '@/lib/booking/apply-booking-recording-fields';
+import {
+  resolveRecordingFieldsForCheckout,
+  syncBookingRecordingFieldsFromTransaction,
+} from '@/lib/booking/apply-booking-recording-fields';
+import type { CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
+import { timeCheckoutSegment } from '@/lib/payments/checkout-timing';
 import { ensureVideoMeetingStoredForBooking } from '@/lib/video-meetings/ensure-video-meeting-for-booking';
 import { RELEASED_BOOKING_SLOT_STARTS_AT } from '@/lib/booking/released-booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
@@ -422,13 +427,19 @@ async function loadTransactionStartsAt(transactionId: string): Promise<Date> {
   return new Date();
 }
 
+function parseTransactionStartsAt(transaction: PaymentTransactionRow): Date {
+  const parsed = Date.parse(transaction.startsAtIso);
+  return Number.isFinite(parsed) ? new Date(parsed) : new Date();
+}
+
 /** Re-applies slot and checkout fields on an existing booking row for a new or resumed open transaction. */
 export async function renewBookingCheckoutHoldFromOpenTransaction(input: {
   readonly bookingId: ObjectId;
   readonly transaction: PaymentTransactionRow;
   readonly expiresAt: Date;
+  readonly startsAt?: Date;
 }): Promise<void> {
-  const startsAt = await loadTransactionStartsAt(input.transaction.id);
+  const startsAt = input.startsAt ?? (await loadTransactionStartsAt(input.transaction.id));
   const db = await getDb();
   await db.collection<BookingDocument>(COLLECTIONS.bookings).updateOne(
     { _id: input.bookingId, status: { $nin: ['completed', 'cancelled'] } },
@@ -456,11 +467,44 @@ export async function renewBookingCheckoutHoldFromOpenTransaction(input: {
   );
 }
 
-export async function createPendingBookingForHoldPolicy(input: {
+export type CreatePendingBookingForHoldPolicyInput = {
   readonly transaction: PaymentTransactionRow;
   readonly expiresAt: Date;
-}): Promise<ObjectId | null> {
-  const { transaction, expiresAt } = input;
+  readonly startsAt?: Date;
+  readonly diagnosticContext?: {
+    readonly diagnosticSessionId: ObjectId | null;
+    readonly snapshot: string | null;
+  };
+  /** When true, skips primary-slot lookup (checkout already counted zero session bookings). */
+  readonly skipPrimarySlotLookup?: boolean;
+  readonly recordingOptIn?: boolean;
+  readonly timing?: CheckoutTimingCollector;
+};
+
+async function linkTransactionToCheckoutHoldBooking(input: {
+  readonly transaction: PaymentTransactionRow;
+  readonly bookingId: ObjectId;
+  readonly resolvedExpiresAt: Date;
+}): Promise<void> {
+  const db = await getDb();
+  await db.collection(COLLECTIONS.paymentTransactions).updateOne(
+    { _id: new ObjectId(input.transaction.id) },
+    {
+      $set: {
+        expiresAt: input.resolvedExpiresAt,
+        status: 'processing',
+        bookingId: input.bookingId,
+        updatedAt: new Date(),
+      },
+    },
+  );
+}
+
+export async function createPendingBookingForHoldPolicy(
+  input: CreatePendingBookingForHoldPolicyInput,
+): Promise<ObjectId | null> {
+  const { transaction, expiresAt, timing } = input;
+  const startsAt = input.startsAt ?? parseTransactionStartsAt(transaction);
   let leadId: ObjectId | null =
     transaction.leadId !== null && transaction.leadId.trim().length > 0
       ? new ObjectId(transaction.leadId)
@@ -472,31 +516,77 @@ export async function createPendingBookingForHoldPolicy(input: {
       company: transaction.customerCompany ?? '',
       phone: transaction.customerPhone ?? '',
     };
-    leadId = await insertMarketingBookingLead(transaction.visitorId, contact);
+    leadId = await timeCheckoutSegment(timing, 'hold_lead_insert', () =>
+      insertMarketingBookingLead(transaction.visitorId, contact),
+    );
     if (leadId === null) {
       return null;
     }
   }
-  const { diagnosticSessionId, snapshot } = await resolveDiagnosticSnapshot(transaction.visitorId, transaction.diagnosticSessionIdHex);
-  const startsAt = await loadTransactionStartsAt(transaction.id);
+  const diagnosticResolved =
+    input.diagnosticContext ??
+    (await timeCheckoutSegment(timing, 'hold_diagnostic_resolve', () =>
+      resolveDiagnosticSnapshot(transaction.visitorId, transaction.diagnosticSessionIdHex),
+    ));
+  const { diagnosticSessionId, snapshot } = diagnosticResolved;
   let bookingId: ObjectId | null = null;
-  if (diagnosticSessionId !== null) {
-    const primarySlot = await findPrimaryBookingSlotByDiagnosticSessionId(diagnosticSessionId);
+  let insertedWithCheckoutHold = false;
+  if (!input.skipPrimarySlotLookup && diagnosticSessionId !== null) {
+    const primarySlot = await timeCheckoutSegment(timing, 'hold_primary_slot', () =>
+      findPrimaryBookingSlotByDiagnosticSessionId(diagnosticSessionId),
+    );
     if (primarySlot !== null) {
       bookingId = new ObjectId(primarySlot.bookingId);
     }
   }
-  if (bookingId === null) {
-    const inserted = await insertMarketingBooking({
-      visitorId: transaction.visitorId,
-      serviceKey: transaction.serviceKey,
-      startsAt,
-      timezone: transaction.timezone || PRIMARY_TIMEZONE,
-      leadId,
-      diagnosticSessionId,
-      guidedDiagnosticSnapshot: snapshot,
-      paymentMethodLabel: transaction.paymentMethodLabel,
-    });
+  if (bookingId === null && input.skipPrimarySlotLookup === true) {
+    const recordingFields = await timeCheckoutSegment(timing, 'hold_recording_resolve', () =>
+      resolveRecordingFieldsForCheckout(input.recordingOptIn === true),
+    );
+    const inserted = await timeCheckoutSegment(timing, 'hold_booking_insert', () =>
+      insertMarketingBooking({
+        visitorId: transaction.visitorId,
+        serviceKey: transaction.serviceKey,
+        startsAt,
+        timezone: transaction.timezone || PRIMARY_TIMEZONE,
+        leadId,
+        diagnosticSessionId,
+        guidedDiagnosticSnapshot: snapshot,
+        paymentMethodLabel: transaction.paymentMethodLabel,
+        checkoutHold: {
+          paymentGatewayId: transaction.gatewayId,
+          paymentTransactionId: new ObjectId(transaction.id),
+          paymentProviderRef: transaction.providerRef,
+          paymentExpiresAt: expiresAt,
+          recordingOptIn: recordingFields.recordingOptIn,
+          recordingOptInPriceCentavos: recordingFields.recordingOptInPriceCentavos,
+          fathomMatchStatus: recordingFields.fathomMatchStatus,
+        },
+      }),
+    );
+    if (inserted !== null && inserted.kind === 'inserted') {
+      bookingId = inserted.id;
+      insertedWithCheckoutHold = true;
+    } else if (inserted === null || inserted.kind === 'duplicate_key') {
+      bookingId = await findBookingByVisitorSlot({
+        visitorId: transaction.visitorId,
+        serviceKey: transaction.serviceKey,
+        startsAt,
+      });
+    }
+  } else if (bookingId === null) {
+    const inserted = await timeCheckoutSegment(timing, 'hold_booking_insert', () =>
+      insertMarketingBooking({
+        visitorId: transaction.visitorId,
+        serviceKey: transaction.serviceKey,
+        startsAt,
+        timezone: transaction.timezone || PRIMARY_TIMEZONE,
+        leadId,
+        diagnosticSessionId,
+        guidedDiagnosticSnapshot: snapshot,
+        paymentMethodLabel: transaction.paymentMethodLabel,
+      }),
+    );
     bookingId =
       inserted === null || inserted.kind === 'duplicate_key'
         ? await findBookingByVisitorSlot({
@@ -510,9 +600,11 @@ export async function createPendingBookingForHoldPolicy(input: {
     return null;
   }
   const db = await getDb();
-  const existingBooking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
-    { _id: bookingId },
-    { projection: { paymentExpiresAt: 1, paymentStatus: 1 } },
+  const existingBooking = await timeCheckoutSegment(timing, 'hold_existing_read', () =>
+    db.collection<BookingDocument>(COLLECTIONS.bookings).findOne(
+      { _id: bookingId },
+      { projection: { paymentExpiresAt: 1, paymentStatus: 1 } },
+    ),
   );
   const existingExpiresAt =
     existingBooking?.paymentExpiresAt instanceof Date ? existingBooking.paymentExpiresAt : null;
@@ -524,25 +616,34 @@ export async function createPendingBookingForHoldPolicy(input: {
     existingExpiresAt.getTime() > Date.now()
       ? existingExpiresAt
       : expiresAt;
-  await renewBookingCheckoutHoldFromOpenTransaction({
-    bookingId,
-    transaction,
-    expiresAt: resolvedExpiresAt,
-  });
-  await db.collection(COLLECTIONS.paymentTransactions).updateOne(
-    { _id: new ObjectId(transaction.id) },
-    { $set: { expiresAt: resolvedExpiresAt, updatedAt: new Date() } },
+  if (!insertedWithCheckoutHold) {
+    await timeCheckoutSegment(timing, 'hold_renew', () =>
+      renewBookingCheckoutHoldFromOpenTransaction({
+        bookingId,
+        transaction,
+        expiresAt: resolvedExpiresAt,
+        startsAt,
+      }),
+    );
+    await timeCheckoutSegment(timing, 'hold_recording_sync', () =>
+      syncBookingRecordingFieldsFromTransaction({
+        bookingId,
+        metadata: transaction.metadata,
+      }),
+    );
+  }
+  await timeCheckoutSegment(timing, 'hold_tx_link', () =>
+    linkTransactionToCheckoutHoldBooking({
+      transaction,
+      bookingId,
+      resolvedExpiresAt,
+    }),
   );
-  await updatePaymentTransactionStatus({
-    transactionId: transaction.id,
-    status: 'processing',
-    bookingId,
-  });
-  await syncBookingRecordingFieldsFromTransaction({
-    bookingId,
-    metadata: transaction.metadata,
-  });
-  await ensureTransactionBookingLinkedToDiagnosticSession(transaction, bookingId);
+  if (!insertedWithCheckoutHold && diagnosticSessionId !== null) {
+    await timeCheckoutSegment(timing, 'hold_session_link', () =>
+      ensureTransactionBookingLinkedToDiagnosticSession(transaction, bookingId),
+    );
+  }
   return bookingId;
 }
 

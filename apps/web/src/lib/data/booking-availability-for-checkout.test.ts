@@ -1,10 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { isMarketingSlotInPublishedAvailabilityForCheckout } from '@/lib/data/booking-availability';
 
-vi.mock('@/lib/data/advisor-booking-settings', () => ({
-  findAdvisorBookingSettingsDocument: vi.fn(async () => null),
-  listActiveBookingStartsUtcInYmdWindowForCheckout: vi.fn(async () => [new Date('2026-06-01T02:00:00.000Z')]),
-}));
+vi.mock('@/lib/data/advisor-booking-settings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/data/advisor-booking-settings')>();
+  return {
+    ...actual,
+    findAdvisorBookingSettingsDocument: vi.fn(async () => null),
+    listActiveBookingStartsUtcInYmdWindowForCheckout: vi.fn(async () => [new Date('2026-06-01T02:00:00.000Z')]),
+  };
+});
 
 describe('isMarketingSlotInPublishedAvailabilityForCheckout', () => {
   beforeEach(() => {
@@ -24,6 +28,7 @@ describe('isMarketingSlotInPublishedAvailabilityForCheckout', () => {
     expect(listActiveBookingStartsUtcInYmdWindowForCheckout).toHaveBeenCalledWith(
       expect.objectContaining({
         excludeDiagnosticSessionIdHex: '674a1b2c3d4e5f6789012345',
+        bufferDays: 0,
       }),
     );
     expect(available).toBe(false);
