@@ -1,6 +1,7 @@
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import type { BookingDocument } from '@/domain/types';
 import type { BookingPayabilityCode } from '@/lib/payments/evaluate-booking-payability';
+import type { CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
 
 export type CreateCheckoutSessionParams = {
   readonly gatewayId: PaymentGatewayId;
@@ -21,6 +22,9 @@ export type CreateCheckoutSessionParams = {
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string | null;
   readonly recordingOptIn?: boolean;
+  /** When set, skips redundant diagnostic session fetch (route already validated). */
+  readonly diagnosticSessionObjectIdHex?: string;
+  readonly timing?: CheckoutTimingCollector;
 };
 
 export type CreateCheckoutSessionResult =

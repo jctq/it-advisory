@@ -1,6 +1,4 @@
 import { ObjectId } from 'mongodb';
-import { COLLECTIONS } from '@/domain/collections';
-import { findPaymentMethodOption, type PaymentGatewayId, type PaymentTransactionDocument } from '@/domain/payment-types';
 import {
   diagnoseAccountBookingPayability,
   diagnoseGuestBookingPayability,
@@ -13,14 +11,15 @@ import {
   buildPayabilityApiExtras,
   evaluateBookingPayability,
 } from '@/lib/payments/evaluate-booking-payability';
-import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
-import { findOpenPaymentTransactionForBooking, findPaymentTransactionById, insertPaymentTransaction } from '@/lib/data/payment-transactions';
+import {
+  findOpenPaymentTransactionForBooking,
+  findPaymentTransactionById,
+  insertPaymentTransaction,
+} from '@/lib/data/payment-transactions';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { formatBookingSlotPartsFromStartsAt } from '@/lib/marketing/booking-slot-from-starts-at';
 import { encodeDiagnosticSessionRefForMarketingUrl } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
-import { createMockPaymentAdapter, resolvePaymentAdapter } from '@teqmd/payments';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
-import { getDb } from '@/lib/mongodb';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
 import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
@@ -31,79 +30,61 @@ import {
   resolveCheckoutRecordingOptIn,
 } from '@/lib/booking/apply-booking-recording-fields';
 import { renewBookingCheckoutHoldFromOpenTransaction } from '@/lib/payments/payment-completion';
+import { loadCheckoutPaymentContext } from '@/lib/payments/payment-checkout-context';
+import { validateCheckoutGatewayMethod } from '@/lib/payments/validate-checkout-gateway';
+import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
+import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
+import type { CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
 
 type ResumeCheckoutParams = {
   readonly credentials: GuestBookingManageCredentials;
-  readonly gatewayId: PaymentGatewayId;
+  readonly gatewayId: import('@/domain/payment-types').PaymentGatewayId;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string | null;
   readonly recordingOptIn?: boolean;
+  readonly timing?: CheckoutTimingCollector;
 };
 
 type ResumeCheckoutCommonParams = {
-  readonly gatewayId: PaymentGatewayId;
+  readonly gatewayId: import('@/domain/payment-types').PaymentGatewayId;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string | null;
-  /** Customer opted in at checkout (may differ from booking row until synced). */
   readonly recordingOptIn?: boolean;
-  /** When set, PSP cancel returns to `/book/[ref]?payment=cancelled` instead of manage booking. */
   readonly sessionMarketingRef?: string;
+  readonly timing?: CheckoutTimingCollector;
 };
-
-async function updateTransactionProvider(
-  transactionId: ObjectId,
-  input: {
-    readonly providerRef: string;
-    readonly providerSessionId: string;
-    readonly redirectUrl: string;
-  },
-): Promise<void> {
-  const db = await getDb();
-  await db.collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions).updateOne(
-    { _id: transactionId },
-    {
-      $set: {
-        providerRef: input.providerRef,
-        providerSessionId: input.providerSessionId,
-        redirectUrl: input.redirectUrl,
-        updatedAt: new Date(),
-      },
-    },
-  );
-}
 
 export async function createPaymentCheckoutForVerifiedBooking(
   verified: VerifiedGuestBooking,
   params: ResumeCheckoutCommonParams,
 ): Promise<CreateCheckoutSessionResult> {
-  const publicSettings = await getPaymentSettingsPublicView();
-  if (!publicSettings.paymentsEnabled) {
-    return { ok: false, code: 'payments_disabled', error: 'Online payments are not enabled.' };
+  const timing = params.timing;
+  timing?.mark('settings_load');
+  const checkoutContext = await loadCheckoutPaymentContext(params.gatewayId);
+  const gatewayValidation = validateCheckoutGatewayMethod({
+    context: checkoutContext,
+    gatewayId: params.gatewayId,
+    paymentMethodId: params.paymentMethodId,
+    paymentMethodLabel: params.paymentMethodLabel,
+  });
+  if (!gatewayValidation.ok) {
+    return gatewayValidation;
   }
-  const gateway = publicSettings.gateways.find((row) => row.id === params.gatewayId);
-  if (gateway === undefined) {
-    return { ok: false, code: 'gateway_unavailable', error: 'This payment gateway is not available.' };
-  }
-  const methodOption = findPaymentMethodOption(params.gatewayId, params.paymentMethodId);
-  if (methodOption === null) {
-    return { ok: false, code: 'payment_method_invalid', error: 'This payment method is not available for the selected gateway.' };
-  }
-  const settings = await getPaymentSettings();
-  const resolvedPaymentMethodLabel = params.paymentMethodLabel ?? methodOption.label;
+  const { settings, resolvedPaymentMethodLabel } = gatewayValidation.validated;
   const booking = verified.booking;
   const lead = verified.lead;
   const payability = evaluateBookingPayability({
     bookingId: verified.bookingId,
     booking,
     lead,
-    paymentPolicy: publicSettings.paymentPolicy,
-    paymentsEnabled: publicSettings.paymentsEnabled,
+    paymentPolicy: settings.paymentPolicy,
+    paymentsEnabled: settings.paymentsEnabled,
   });
   if (!payability.canPayOnline) {
     return {
@@ -116,6 +97,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
   const leadEmail = typeof lead.email === 'string' ? lead.email.trim() : '';
   const slotParts = formatBookingSlotPartsFromStartsAt(booking.startsAt, booking.timezone);
   const bookingDraftId = verified.bookingId;
+  timing?.mark('open_tx_and_recording');
   const existingOpenTransaction = await findOpenPaymentTransactionForBooking(verified.bookingId);
   const recordingOptIn = resolveCheckoutRecordingOptIn({
     requested: params.recordingOptIn,
@@ -162,6 +144,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
       nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
       sessionMarketingRef: sessionMarketingRef.length > 0 ? sessionMarketingRef : verified.bookingId,
       amountCentavos: resolvedPricing.amountCentavos,
+      checkoutContext,
       metadata: {
         bookingDraftId,
         paymentMethodId: params.paymentMethodId,
@@ -183,8 +166,10 @@ export async function createPaymentCheckoutForVerifiedBooking(
       customerCompany: typeof lead.company === 'string' && lead.company.trim().length > 0 ? lead.company.trim() : null,
       customerPhone: typeof lead.phone === 'string' ? lead.phone.trim() : '',
       bookingStatus: verified.booking.status,
+      timing,
     });
   }
+  timing?.mark('db_writes');
   const holdExpiresAt = booking.paymentExpiresAt ?? null;
   const expiresAt =
     settings.paymentPolicy === 'pay_after_hold'
@@ -232,11 +217,6 @@ export async function createPaymentCheckoutForVerifiedBooking(
     return { ok: false, code: 'database_unavailable', error: 'Could not create payment session.' };
   }
   const transactionId = insertedId.toString();
-  if ((await findPaymentTransactionById(transactionId)) === null) {
-    return { ok: false, code: 'database_unavailable', error: 'Could not load payment session.' };
-  }
-  const gatewayCredentials = await getGatewayCredentials(params.gatewayId);
-  const useMock = gatewayCredentials === null && process.env.NODE_ENV === 'development';
   const cancelRelativeUrl =
     sessionMarketingRef.length > 0
       ? `${buildMarketingBookSessionPath(sessionMarketingRef)}?payment=cancelled`
@@ -248,22 +228,14 @@ export async function createPaymentCheckoutForVerifiedBooking(
     cancelRelativeUrl,
     sessionMarketingRef: sessionMarketingRef.length > 0 ? sessionMarketingRef : undefined,
   });
-  const adapter =
-    useMock
-      ? createMockPaymentAdapter(successUrl)
-      : gatewayCredentials !== null
-        ? resolvePaymentAdapter(params.gatewayId, gatewayCredentials)
-        : null;
-  if (adapter === null) {
-    return { ok: false, code: 'gateway_not_configured', error: 'Payment gateway credentials are not configured.' };
-  }
-  let providerSession: { readonly providerRef: string; readonly providerSessionId: string; readonly redirectUrl: string };
-  try {
-    providerSession = await adapter.createCheckoutSession({
+  const providerResult = await runProviderCheckout({
+    checkoutContext,
+    gatewayId: params.gatewayId,
+    successUrl,
+    sessionInput: {
       amountCentavos: resolvedPricing.amountCentavos,
       currency: 'PHP',
       description: 'TeqMD Consultation Booking',
-      successUrl,
       cancelUrl,
       referenceId: bookingDraftId,
       metadata: {
@@ -275,47 +247,41 @@ export async function createPaymentCheckoutForVerifiedBooking(
         date: slotParts.date,
         time: slotParts.time,
       },
-      sandboxMode: settings.sandboxMode,
       paymentMethodId: params.paymentMethodId,
       customerName: lead.name,
       customerEmail: leadEmail,
       customerPhone: typeof lead.phone === 'string' ? lead.phone.trim() : '',
-    });
-  } catch (error: unknown) {
-    return {
-      ok: false,
-      code: 'gateway_error',
-      error: error instanceof Error ? error.message : 'Payment provider error.',
-    };
+    },
+    timing,
+  });
+  if (!providerResult.ok) {
+    return providerResult;
   }
-  await updateTransactionProvider(insertedId, providerSession);
+  timing?.mark('provider_persist');
+  await updatePaymentTransactionProvider(insertedId, providerResult.session);
   const refreshed = await findPaymentTransactionById(transactionId);
   if (refreshed !== null) {
     if (expiresAt !== null) {
+      timing?.mark('hold_renew');
       await renewBookingCheckoutHoldFromOpenTransaction({
         bookingId: booking._id,
         transaction: refreshed,
         expiresAt,
       });
     }
-    void executeSendBookingPaymentReminderEmail({
-      transaction: refreshed,
-    });
+    void executeSendBookingPaymentReminderEmail({ transaction: refreshed });
   }
   return {
     ok: true,
     transactionId,
-    redirectUrl: providerSession.redirectUrl,
+    redirectUrl: providerResult.session.redirectUrl,
     bookingId: verified.bookingId,
     manualConfirm: false,
-    mock: useMock,
+    mock: providerResult.session.useMock,
     bookingStatus: verified.booking.status,
   };
 }
 
-/**
- * Starts a new gateway checkout for an existing pending booking (guest manage flow).
- */
 export async function createPaymentCheckoutForExistingBooking(
   params: ResumeCheckoutParams,
 ): Promise<CreateCheckoutSessionResult> {
@@ -339,22 +305,21 @@ export async function createPaymentCheckoutForExistingBooking(
     nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
     promoCode: params.promoCode,
     recordingOptIn: params.recordingOptIn,
+    timing: params.timing,
   });
 }
 
-/**
- * Starts checkout for a booking owned by the signed-in marketing account (no guest credential form).
- */
 export async function createPaymentCheckoutForAccountBooking(params: {
   readonly bookingId: string;
   readonly visitorId: string;
-  readonly gatewayId: PaymentGatewayId;
+  readonly gatewayId: import('@/domain/payment-types').PaymentGatewayId;
   readonly paymentMethodId: string;
   readonly paymentMethodLabel?: string;
   readonly appBaseUrl: string;
   readonly nativeInAppPaymentReturn?: boolean;
   readonly promoCode?: string | null;
   readonly recordingOptIn?: boolean;
+  readonly timing?: CheckoutTimingCollector;
 }): Promise<CreateCheckoutSessionResult> {
   const verified = await findVerifiedAccountBookingForCheckout(params.bookingId, params.visitorId);
   if (verified === null) {
@@ -376,5 +341,6 @@ export async function createPaymentCheckoutForAccountBooking(params: {
     nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
     promoCode: params.promoCode,
     recordingOptIn: params.recordingOptIn,
+    timing: params.timing,
   });
 }

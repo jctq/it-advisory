@@ -1,22 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { findPaymentMethodOption, type PaymentGatewayId } from '@/domain/payment-types';
 import { isMarketingSlotInPublishedAvailabilityForCheckout } from '@/lib/data/booking-availability';
-import { findBookingById } from '@/lib/data/bookings';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
-import { getGatewayCredentials, getPaymentSettings, getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
-import { findPaymentTransactionById, findOpenPaymentTransactionForCheckoutSlot, insertPaymentTransaction, type PaymentTransactionRow } from '@/lib/data/payment-transactions';
+import {
+  findOpenPaymentTransactionForCheckoutSlot,
+  insertPaymentTransaction,
+  type PaymentTransactionRow,
+} from '@/lib/data/payment-transactions';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
 import { createManualConfirmBooking, createPendingBookingForHoldPolicy } from '@/lib/payments/payment-completion';
 import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
 import { resumeOpenPaymentTransactionCheckout } from '@/lib/payments/payment-checkout-resume-open';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
-import { createMockPaymentAdapter, resolvePaymentAdapter } from '@teqmd/payments';
 import { ObjectId } from 'mongodb';
-import { COLLECTIONS } from '@/domain/collections';
-import type { PaymentTransactionDocument } from '@/domain/payment-types';
-import type { BookingDocument } from '@/domain/types';
-import { getDb } from '@/lib/mongodb';
 import { countBookingsByDiagnosticSessionId } from '@/lib/data/bookings';
 import { diagnoseDiagnosticSessionExistingBookingPayability } from '@/lib/data/booking-guest-manage';
 import { ensureDiagnosticSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-diagnostic-session-pending-booking-ready-for-checkout';
@@ -28,73 +24,103 @@ import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
+import { loadCheckoutPaymentContext } from '@/lib/payments/payment-checkout-context';
+import { validateCheckoutGatewayMethod } from '@/lib/payments/validate-checkout-gateway';
+import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
+import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
 
 export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
-async function dispatchPaymentReminderEmailAfterCheckout(input: {
+function dispatchPaymentReminderEmailAfterCheckout(input: {
   readonly transaction: PaymentTransactionRow;
-}): Promise<void> {
+}): void {
   void executeSendBookingPaymentReminderEmail({
     transaction: input.transaction,
   });
 }
 
-async function updateTransactionProvider(
-  transactionId: ObjectId,
+function buildTransactionRowFromInsert(
+  insertedId: ObjectId,
+  params: CreateCheckoutSessionParams,
   input: {
-    readonly providerRef: string;
-    readonly providerSessionId: string;
-    readonly redirectUrl: string;
+    readonly bookingDraftId: string;
+    readonly resolvedPaymentMethodLabel: string;
+    readonly resolvedPricing: Awaited<ReturnType<typeof resolveCheckoutAmountCentavos>>;
+    readonly leadId: ObjectId;
+    readonly startsAt: Date;
+    readonly resolvedDiagnosticSessionHex: string;
+    readonly expiresAt: Date | null;
+    readonly paymentPolicy: import('@/domain/payment-types').PaymentPolicy;
   },
-): Promise<void> {
-  const db = await getDb();
-  await db.collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions).updateOne(
-    { _id: transactionId },
-    {
-      $set: {
-        providerRef: input.providerRef,
-        providerSessionId: input.providerSessionId,
-        redirectUrl: input.redirectUrl,
-        updatedAt: new Date(),
-      },
+): PaymentTransactionRow {
+  const nowIso = new Date().toISOString();
+  return {
+    id: insertedId.toString(),
+    gatewayId: params.gatewayId,
+    providerRef: input.bookingDraftId,
+    providerSessionId: input.bookingDraftId,
+    status: 'pending',
+    paymentPolicy: input.paymentPolicy,
+    amountCentavos: input.resolvedPricing.amountCentavos,
+    currency: 'PHP',
+    visitorId: params.visitorId,
+    bookingDraftId: input.bookingDraftId,
+    serviceKey: params.serviceKey,
+    timezone: PRIMARY_TIMEZONE,
+    leadId: input.leadId.toString(),
+    customerName: params.customerName.trim(),
+    customerEmail: params.customerEmail.trim(),
+    customerCompany: params.customerCompany?.trim() ?? null,
+    customerPhone: params.customerPhone.trim(),
+    diagnosticSessionIdHex: input.resolvedDiagnosticSessionHex,
+    paymentMethodLabel: input.resolvedPaymentMethodLabel,
+    redirectUrl: null,
+    bookingId: null,
+    metadata: {
+      bookingDraftId: input.bookingDraftId,
+      paymentMethodId: params.paymentMethodId,
+      pricingSource: input.resolvedPricing.source,
+      ...(input.resolvedPricing.appliedPromoCode !== undefined
+        ? { promoCode: input.resolvedPricing.appliedPromoCode }
+        : {}),
+      ...(input.resolvedPricing.catalogServiceKey !== undefined
+        ? { catalogServiceKey: input.resolvedPricing.catalogServiceKey }
+        : {}),
+      recordingOptIn: input.resolvedPricing.recordingOptIn ? 'true' : 'false',
+      ...(input.resolvedPricing.recordingSurchargeCentavos > 0
+        ? { recordingSurchargeCentavos: String(input.resolvedPricing.recordingSurchargeCentavos) }
+        : {}),
     },
-  );
-}
-
-async function resolveBookingStatusByBookingId(
-  bookingId: ObjectId | string | null,
-): Promise<BookingDocument['status'] | null> {
-  if (bookingId === null) {
-    return null;
-  }
-  const id = typeof bookingId === 'string' ? bookingId.trim() : bookingId.toString();
-  if (id.length === 0) {
-    return null;
-  }
-  const booking = await findBookingById(id);
-  return booking?.status ?? null;
+    startsAtIso: input.startsAt.toISOString(),
+    expiresAtIso: input.expiresAt !== null ? input.expiresAt.toISOString() : null,
+    createdAtIso: nowIso,
+    paidAtIso: null,
+  };
 }
 
 export async function createPaymentCheckoutSession(params: CreateCheckoutSessionParams): Promise<CreateCheckoutSessionResult> {
-  const publicSettings = await getPaymentSettingsPublicView();
-  if (!publicSettings.paymentsEnabled) {
-    return { ok: false, code: 'payments_disabled', error: 'Online payments are not enabled.' };
+  const timing = params.timing;
+  timing?.mark('settings_load');
+  const checkoutContext = await loadCheckoutPaymentContext(params.gatewayId);
+  const gatewayValidation = validateCheckoutGatewayMethod({
+    context: checkoutContext,
+    gatewayId: params.gatewayId,
+    paymentMethodId: params.paymentMethodId,
+    paymentMethodLabel: params.paymentMethodLabel,
+  });
+  if (!gatewayValidation.ok) {
+    return gatewayValidation;
   }
-  const gateway = publicSettings.gateways.find((row) => row.id === params.gatewayId);
-  if (gateway === undefined) {
-    return { ok: false, code: 'gateway_unavailable', error: 'This payment gateway is not available.' };
-  }
-  const methodOption = findPaymentMethodOption(params.gatewayId, params.paymentMethodId);
-  if (methodOption === null) {
-    return { ok: false, code: 'payment_method_invalid', error: 'This payment method is not available for the selected gateway.' };
-  }
-  const resolvedPaymentMethodLabel = params.paymentMethodLabel ?? methodOption.label;
-  const settings = await getPaymentSettings();
+  const { settings, resolvedPaymentMethodLabel } = gatewayValidation.validated;
   const sessionMarketingRef = params.diagnosticSessionId.trim();
-  const resolvedDiagnosticSessionHex = resolveDiagnosticSessionObjectIdHexFromMarketingRef(sessionMarketingRef);
+  const resolvedDiagnosticSessionHex =
+    params.diagnosticSessionObjectIdHex?.trim() ??
+    resolveDiagnosticSessionObjectIdHexFromMarketingRef(sessionMarketingRef) ??
+    null;
   if (resolvedDiagnosticSessionHex === null) {
     return { ok: false, code: 'diagnostic_session_invalid_id', error: 'Invalid diagnostic session reference.' };
   }
+  timing?.mark('session_load');
   const ownedDiagnosticSession = await findDiagnosticSessionForVisitor(params.visitorId, resolvedDiagnosticSessionHex);
   if (ownedDiagnosticSession === null) {
     return {
@@ -104,6 +130,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     };
   }
   if (ownedDiagnosticSession._id !== undefined) {
+    timing?.mark('existing_booking_check');
     const existingBookingCount = await countBookingsByDiagnosticSessionId(ownedDiagnosticSession._id);
     if (existingBookingCount > 0) {
       const pendingReady = await ensureDiagnosticSessionPendingBookingReadyForCheckout(
@@ -121,6 +148,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           promoCode: params.promoCode,
           recordingOptIn: params.recordingOptIn,
           sessionMarketingRef,
+          timing,
         });
       }
       if (!pendingReady.ok && pendingReady.code !== 'booking_not_found') {
@@ -161,13 +189,23 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     company: params.customerCompany?.trim() ?? '',
     phone: params.customerPhone.trim(),
   };
-  let resolvedPricing;
+  timing?.mark('pricing_and_open_tx');
+  let resolvedPricing: Awaited<ReturnType<typeof resolveCheckoutAmountCentavos>>;
+  let existingOpenTransaction: PaymentTransactionRow | null;
   try {
-    resolvedPricing = await resolveCheckoutAmountCentavos({
-      serviceKey: params.serviceKey,
-      promoCode: params.promoCode,
-      recordingOptIn: params.recordingOptIn === true,
-    });
+    [resolvedPricing, existingOpenTransaction] = await Promise.all([
+      resolveCheckoutAmountCentavos({
+        serviceKey: params.serviceKey,
+        promoCode: params.promoCode,
+        recordingOptIn: params.recordingOptIn === true,
+      }),
+      findOpenPaymentTransactionForCheckoutSlot({
+        visitorId: params.visitorId,
+        diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
+        serviceKey: params.serviceKey,
+        startsAtUtc: startsAt,
+      }),
+    ]);
   } catch (error: unknown) {
     return {
       ok: false,
@@ -175,12 +213,6 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       error: error instanceof Error ? error.message : 'Invalid promo code.',
     };
   }
-  const existingOpenTransaction = await findOpenPaymentTransactionForCheckoutSlot({
-    visitorId: params.visitorId,
-    diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
-    serviceKey: params.serviceKey,
-    startsAtUtc: startsAt,
-  });
   if (existingOpenTransaction !== null && isOpenPaymentTransactionHoldActive(existingOpenTransaction)) {
     return resumeOpenPaymentTransactionCheckout({
       transaction: existingOpenTransaction,
@@ -192,6 +224,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       nativeInAppPaymentReturn: params.nativeInAppPaymentReturn,
       sessionMarketingRef,
       amountCentavos: resolvedPricing.amountCentavos,
+      checkoutContext,
       metadata: {
         bookingDraftId: existingOpenTransaction.bookingDraftId,
         paymentMethodId: params.paymentMethodId,
@@ -212,8 +245,10 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       customerCompany: contact.company.length > 0 ? contact.company : null,
       customerPhone: contact.phone,
       bookingStatus: null,
+      timing,
     });
   }
+  timing?.mark('slot_check');
   const slotOk = await isMarketingSlotInPublishedAvailabilityForCheckout({
     serviceKey: params.serviceKey,
     startsAtUtc: startsAt,
@@ -222,6 +257,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   if (!slotOk) {
     return { ok: false, code: 'booking_slot_unavailable', error: 'This time is no longer available.' };
   }
+  timing?.mark('db_writes');
   const leadId = await insertMarketingBookingLead(params.visitorId, contact);
   if (leadId === null) {
     return { ok: false, code: 'database_unavailable', error: 'Database unavailable.' };
@@ -271,27 +307,32 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     return { ok: false, code: 'database_unavailable', error: 'Could not create payment session.' };
   }
   const transactionId = insertedId.toString();
-  const row = await findPaymentTransactionById(transactionId, params.visitorId);
-  if (row === null) {
-    return { ok: false, code: 'database_unavailable', error: 'Could not load payment session.' };
-  }
+  const row = buildTransactionRowFromInsert(insertedId, params, {
+    bookingDraftId,
+    resolvedPaymentMethodLabel,
+    resolvedPricing,
+    leadId,
+    startsAt,
+    resolvedDiagnosticSessionHex,
+    expiresAt,
+    paymentPolicy: settings.paymentPolicy,
+  });
   if (settings.paymentPolicy === 'manual_confirm') {
+    timing?.mark('manual_confirm');
     const bookingId = await createManualConfirmBooking({ transaction: row });
-    const bookingStatus = await resolveBookingStatusByBookingId(bookingId);
     return {
       ok: true,
       transactionId,
       redirectUrl: null,
       bookingId: bookingId?.toString() ?? null,
       manualConfirm: true,
-      bookingStatus,
+      bookingStatus: null,
     };
   }
   if (settings.paymentPolicy === 'pay_after_hold' && expiresAt !== null) {
+    timing?.mark('hold_booking');
     await createPendingBookingForHoldPolicy({ transaction: row, expiresAt });
   }
-  const credentials = await getGatewayCredentials(params.gatewayId);
-  const useMock = credentials === null && process.env.NODE_ENV === 'development';
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: params.appBaseUrl,
     transactionId,
@@ -299,22 +340,14 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     cancelRelativeUrl: `${buildMarketingBookSessionPath(sessionMarketingRef)}?payment=cancelled`,
     sessionMarketingRef,
   });
-  const adapter =
-    useMock
-      ? createMockPaymentAdapter(successUrl)
-      : credentials !== null
-        ? resolvePaymentAdapter(params.gatewayId, credentials)
-        : null;
-  if (adapter === null) {
-    return { ok: false, code: 'gateway_not_configured', error: 'Payment gateway credentials are not configured.' };
-  }
-  let providerSession: { readonly providerRef: string; readonly providerSessionId: string; readonly redirectUrl: string };
-  try {
-    providerSession = await adapter.createCheckoutSession({
+  const providerResult = await runProviderCheckout({
+    checkoutContext,
+    gatewayId: params.gatewayId,
+    successUrl,
+    sessionInput: {
       amountCentavos: resolvedPricing.amountCentavos,
       currency: 'PHP',
       description: 'TeqMD Consultation Booking',
-      successUrl,
       cancelUrl,
       referenceId: bookingDraftId,
       metadata: {
@@ -323,34 +356,26 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
         bookingDraftId,
         paymentMethodId: params.paymentMethodId,
       },
-      sandboxMode: settings.sandboxMode,
       paymentMethodId: params.paymentMethodId,
       customerName: contact.name,
       customerEmail: contact.email,
       customerPhone: contact.phone,
-    });
-  } catch (error: unknown) {
-    return {
-      ok: false,
-      code: 'gateway_error',
-      error: error instanceof Error ? error.message : 'Payment provider error.',
-    };
+    },
+    timing,
+  });
+  if (!providerResult.ok) {
+    return providerResult;
   }
-  await updateTransactionProvider(insertedId, providerSession);
-  const refreshedForReminder = await findPaymentTransactionById(transactionId, params.visitorId);
-  if (refreshedForReminder !== null) {
-    await dispatchPaymentReminderEmailAfterCheckout({
-      transaction: refreshedForReminder,
-    });
-  }
-  const bookingStatus = await resolveBookingStatusByBookingId(row.bookingId);
+  timing?.mark('provider_persist');
+  await updatePaymentTransactionProvider(insertedId, providerResult.session);
+  dispatchPaymentReminderEmailAfterCheckout({ transaction: row });
   return {
     ok: true,
     transactionId,
-    redirectUrl: providerSession.redirectUrl,
+    redirectUrl: providerResult.session.redirectUrl,
     bookingId: row.bookingId,
     manualConfirm: false,
-    mock: useMock,
-    bookingStatus,
+    mock: providerResult.session.useMock,
+    bookingStatus: null,
   };
 }

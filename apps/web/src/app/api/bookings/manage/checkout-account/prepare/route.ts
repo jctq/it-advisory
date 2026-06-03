@@ -9,7 +9,7 @@ import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 import { createCheckoutTiming } from '@/lib/payments/checkout-timing';
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const rateLimited = await executeRateLimitOrResponse(request, 'payment_checkout_session');
+  const rateLimited = await executeRateLimitOrResponse(request, 'payment_checkout_prepare');
   if (rateLimited !== null) {
     return rateLimited;
   }
@@ -32,7 +32,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return jsonApiValidationError(parsed.error);
   }
   const visitorId = buildAccountVisitorId(user.id);
-  const timing = createCheckoutTiming('account_manage_checkout');
+  const timing = createCheckoutTiming('account_manage_checkout_prepare');
   const result = await createPaymentCheckoutForAccountBooking({
     bookingId: parsed.data.bookingId,
     visitorId,
@@ -57,10 +57,18 @@ export async function POST(request: Request): Promise<NextResponse> {
         error: result.error,
         code: result.code,
         ...(result.payabilityCode !== undefined ? { payabilityCode: result.payabilityCode } : {}),
-        ...(result.debug !== undefined ? { debug: result.debug } : {}),
       },
       { status },
     );
   }
-  return NextResponse.json(result);
+  if (result.redirectUrl === null || result.redirectUrl.length === 0) {
+    return NextResponse.json({ error: 'No redirect URL for this checkout.', code: 'no_redirect' }, { status: 400 });
+  }
+  return NextResponse.json({
+    ok: true,
+    transactionId: result.transactionId,
+    redirectUrl: result.redirectUrl,
+    bookingId: result.bookingId,
+    mock: result.mock,
+  });
 }

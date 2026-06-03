@@ -461,15 +461,21 @@ export async function createPendingBookingForHoldPolicy(input: {
   readonly expiresAt: Date;
 }): Promise<ObjectId | null> {
   const { transaction, expiresAt } = input;
-  const contact: MarketingBookingLeadContact = {
-    name: transaction.customerName ?? '',
-    email: transaction.customerEmail ?? '',
-    company: transaction.customerCompany ?? '',
-    phone: transaction.customerPhone ?? '',
-  };
-  const leadId = await insertMarketingBookingLead(transaction.visitorId, contact);
+  let leadId: ObjectId | null =
+    transaction.leadId !== null && transaction.leadId.trim().length > 0
+      ? new ObjectId(transaction.leadId)
+      : null;
   if (leadId === null) {
-    return null;
+    const contact: MarketingBookingLeadContact = {
+      name: transaction.customerName ?? '',
+      email: transaction.customerEmail ?? '',
+      company: transaction.customerCompany ?? '',
+      phone: transaction.customerPhone ?? '',
+    };
+    leadId = await insertMarketingBookingLead(transaction.visitorId, contact);
+    if (leadId === null) {
+      return null;
+    }
   }
   const { diagnosticSessionId, snapshot } = await resolveDiagnosticSnapshot(transaction.visitorId, transaction.diagnosticSessionIdHex);
   const startsAt = await loadTransactionStartsAt(transaction.id);

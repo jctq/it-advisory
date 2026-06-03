@@ -2,18 +2,16 @@ import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentGatewayId, PaymentTransactionDocument } from '@/domain/payment-types';
 import type { BookingDocument } from '@/domain/types';
-import { getGatewayCredentials, getPaymentSettings } from '@/lib/data/payment-settings';
-import {
-  findPaymentTransactionById,
-  type PaymentTransactionRow,
-} from '@/lib/data/payment-transactions';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { getDb } from '@/lib/mongodb';
-import { createMockPaymentAdapter, resolvePaymentAdapter } from '@teqmd/payments';
+import type { CheckoutPaymentContext } from '@/lib/payments/payment-checkout-context';
+import type { CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
+import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
+import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
 
 async function updateOpenPaymentTransactionForCheckoutResume(
   transactionId: ObjectId,
@@ -48,33 +46,11 @@ async function updateOpenPaymentTransactionForCheckoutResume(
   );
 }
 
-async function updateTransactionProvider(
-  transactionId: ObjectId,
-  input: {
-    readonly providerRef: string;
-    readonly providerSessionId: string;
-    readonly redirectUrl: string;
-  },
-): Promise<void> {
-  const db = await getDb();
-  await db.collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions).updateOne(
-    { _id: transactionId },
-    {
-      $set: {
-        providerRef: input.providerRef,
-        providerSessionId: input.providerSessionId,
-        redirectUrl: input.redirectUrl,
-        updatedAt: new Date(),
-      },
-    },
-  );
-}
-
 /**
  * Reuses an existing open checkout transaction so the payment hold deadline is not extended on every Pay click.
  */
 export async function resumeOpenPaymentTransactionCheckout(input: {
-  readonly transaction: PaymentTransactionRow;
+  readonly transaction: import('@/lib/data/payment-transactions').PaymentTransactionRow;
   readonly visitorId: string;
   readonly gatewayId: PaymentGatewayId;
   readonly paymentMethodId: string;
@@ -89,6 +65,8 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   readonly customerCompany: string | null;
   readonly customerPhone: string;
   readonly bookingStatus: BookingDocument['status'] | null;
+  readonly checkoutContext: CheckoutPaymentContext;
+  readonly timing?: CheckoutTimingCollector;
 }): Promise<CreateCheckoutSessionResult> {
   if (input.transaction.visitorId !== input.visitorId) {
     return { ok: false, code: 'transaction_not_found', error: 'Could not load payment session.' };
@@ -96,8 +74,8 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   if (!isOpenPaymentTransactionHoldActive(input.transaction)) {
     return { ok: false, code: 'payment_hold_expired', error: 'The payment window has expired.' };
   }
-  const settings = await getPaymentSettings();
   const transactionObjectId = new ObjectId(input.transaction.id);
+  input.timing?.mark('resume_tx_update');
   await updateOpenPaymentTransactionForCheckoutResume(transactionObjectId, {
     gatewayId: input.gatewayId,
     amountCentavos: input.amountCentavos,
@@ -108,8 +86,6 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
     customerCompany: input.customerCompany,
     customerPhone: input.customerPhone,
   });
-  const credentials = await getGatewayCredentials(input.gatewayId);
-  const useMock = credentials === null && process.env.NODE_ENV === 'development';
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: input.appBaseUrl,
     transactionId: input.transaction.id,
@@ -117,22 +93,14 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
     cancelRelativeUrl: `${buildMarketingBookSessionPath(input.sessionMarketingRef)}?payment=cancelled`,
     sessionMarketingRef: input.sessionMarketingRef,
   });
-  const adapter =
-    useMock
-      ? createMockPaymentAdapter(successUrl)
-      : credentials !== null
-        ? resolvePaymentAdapter(input.gatewayId, credentials)
-        : null;
-  if (adapter === null) {
-    return { ok: false, code: 'gateway_not_configured', error: 'Payment gateway credentials are not configured.' };
-  }
-  let providerSession: { readonly providerRef: string; readonly providerSessionId: string; readonly redirectUrl: string };
-  try {
-    providerSession = await adapter.createCheckoutSession({
+  const providerResult = await runProviderCheckout({
+    checkoutContext: input.checkoutContext,
+    gatewayId: input.gatewayId,
+    successUrl,
+    sessionInput: {
       amountCentavos: input.amountCentavos,
       currency: 'PHP',
       description: 'TeqMD Consultation Booking',
-      successUrl,
       cancelUrl,
       referenceId: input.transaction.bookingDraftId,
       metadata: {
@@ -142,31 +110,26 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
         paymentMethodId: input.paymentMethodId,
         ...(input.transaction.bookingId !== null ? { bookingId: input.transaction.bookingId } : {}),
       },
-      sandboxMode: settings.sandboxMode,
       paymentMethodId: input.paymentMethodId,
       customerName: input.customerName,
       customerEmail: input.customerEmail,
       customerPhone: input.customerPhone,
-    });
-  } catch (error: unknown) {
-    return {
-      ok: false,
-      code: 'gateway_error',
-      error: error instanceof Error ? error.message : 'Payment provider error.',
-    };
+    },
+    timing: input.timing,
+  });
+  if (!providerResult.ok) {
+    return providerResult;
   }
-  await updateTransactionProvider(transactionObjectId, providerSession);
-  const refreshed = await findPaymentTransactionById(input.transaction.id, input.visitorId);
-  if (refreshed !== null) {
-    void executeSendBookingPaymentReminderEmail({ transaction: refreshed });
-  }
+  input.timing?.mark('provider_persist');
+  await updatePaymentTransactionProvider(transactionObjectId, providerResult.session);
+  void executeSendBookingPaymentReminderEmail({ transaction: input.transaction });
   return {
     ok: true,
     transactionId: input.transaction.id,
-    redirectUrl: providerSession.redirectUrl,
+    redirectUrl: providerResult.session.redirectUrl,
     bookingId: input.transaction.bookingId,
     manualConfirm: false,
-    mock: useMock,
+    mock: providerResult.session.useMock,
     bookingStatus: input.bookingStatus,
   };
 }

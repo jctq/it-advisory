@@ -29,7 +29,7 @@ const postBodySchema = z.object({
 });
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const rateLimited = await executeRateLimitOrResponse(request, 'payment_checkout_session');
+  const rateLimited = await executeRateLimitOrResponse(request, 'payment_checkout_prepare');
   if (rateLimited !== null) {
     return rateLimited;
   }
@@ -58,7 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 404 },
     );
   }
-  const timing = createCheckoutTiming('marketing_checkout');
+  const timing = createCheckoutTiming('marketing_checkout_prepare');
   const result = await createPaymentCheckoutSession({
     gatewayId: parsed.data.gatewayId,
     visitorId,
@@ -84,22 +84,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     const status =
       result.code === 'booking_slot_unavailable' || result.code === 'diagnostic_session_already_booked'
         ? 409
-        : result.code === 'diagnostic_session_not_found'
-          ? 404
-          : result.code === 'database_unavailable'
-            ? 503
-            : result.code === 'promo_invalid'
-              ? 400
-              : 400;
+        : result.code === 'database_unavailable'
+          ? 503
+          : 400;
     return NextResponse.json(
       {
         error: result.error,
         code: result.code,
         ...(result.payabilityCode !== undefined ? { payabilityCode: result.payabilityCode } : {}),
-        ...(result.debug !== undefined ? { debug: result.debug } : {}),
       },
       { status },
     );
   }
-  return NextResponse.json(result);
+  if (result.redirectUrl === null || result.redirectUrl.length === 0) {
+    return NextResponse.json({ error: 'No redirect URL for this checkout.', code: 'no_redirect' }, { status: 400 });
+  }
+  return NextResponse.json({
+    ok: true,
+    transactionId: result.transactionId,
+    redirectUrl: result.redirectUrl,
+    bookingId: result.bookingId,
+    mock: result.mock,
+  });
 }

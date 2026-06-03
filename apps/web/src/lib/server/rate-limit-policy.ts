@@ -13,6 +13,7 @@ export type RateLimitScope =
   | 'booking_create'
   | 'booking_token_lookup'
   | 'payment_checkout_session'
+  | 'payment_checkout_prepare'
   | 'diagnostic_session'
   | 'support_report'
   | 'support_report_reply'
@@ -52,6 +53,8 @@ const BOOKING_AVAILABILITY_DEFAULT_LIMIT_PER_HOUR = 60 as const;
 const BOOKING_AVAILABILITY_WINDOW_MS = 60 * 60 * 1000;
 const PAYMENT_CHECKOUT_SESSION_DEFAULT_LIMIT_PER_HOUR = 10 as const;
 const PAYMENT_CHECKOUT_SESSION_WINDOW_MS = 60 * 60 * 1000;
+const PAYMENT_CHECKOUT_PREPARE_DEFAULT_LIMIT_PER_HOUR = 40 as const;
+const PAYMENT_CHECKOUT_PREPARE_WINDOW_MS = 60 * 60 * 1000;
 const SUPPORT_REPORT_REPLY_LIMIT = 10 as const;
 const SUPPORT_REPORT_REPLY_WINDOW_MS = 60 * 60 * 1000;
 
@@ -134,6 +137,14 @@ export function resolveRateLimitPolicy(scope: RateLimitScope): { readonly limit:
           PAYMENT_CHECKOUT_SESSION_DEFAULT_LIMIT_PER_HOUR,
         ),
         windowMs: PAYMENT_CHECKOUT_SESSION_WINDOW_MS,
+      };
+    case 'payment_checkout_prepare':
+      return {
+        limit: readEnvLimitPerHour(
+          'RATE_LIMIT_PAYMENT_CHECKOUT_PREPARE_PER_HOUR',
+          PAYMENT_CHECKOUT_PREPARE_DEFAULT_LIMIT_PER_HOUR,
+        ),
+        windowMs: PAYMENT_CHECKOUT_PREPARE_WINDOW_MS,
       };
     case 'support_report':
       return { limit: SUPPORT_REPORT_LIMIT, windowMs: SUPPORT_REPORT_WINDOW_MS };

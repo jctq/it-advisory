@@ -149,7 +149,7 @@ function mergeEnabledGateways(
   return next;
 }
 
-function mergeDocument(doc: PaymentSettingsDocument | null): PaymentSettingsValues {
+export function mergePaymentSettingsDocument(doc: PaymentSettingsDocument | null): PaymentSettingsValues {
   const base = defaultSettings();
   if (doc === null) {
     return base;
@@ -175,7 +175,7 @@ export async function getPaymentSettings(): Promise<PaymentSettingsValues> {
   const doc = await db
     .collection<PaymentSettingsDocument>(COLLECTIONS.paymentSettings)
     .findOne({ _id: PAYMENT_SETTINGS_DOCUMENT_ID });
-  return mergeDocument(doc);
+  return mergePaymentSettingsDocument(doc);
 }
 
 async function loadCredentialsDocument(): Promise<Partial<Record<PaymentGatewayId, EncryptedCredentialBlob>>> {

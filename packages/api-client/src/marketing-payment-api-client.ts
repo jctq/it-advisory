@@ -212,6 +212,79 @@ export async function createPaymentCheckoutSession(
   };
 }
 
+export type PreparePaymentCheckoutSessionParams = CreatePaymentCheckoutSessionParams;
+
+export type PreparePaymentCheckoutSessionResult = {
+  readonly ok: true;
+  readonly transactionId: string;
+  readonly redirectUrl: string;
+  readonly bookingId: string | null;
+  readonly mock?: boolean;
+};
+
+export async function preparePaymentCheckoutSession(
+  params: PreparePaymentCheckoutSessionParams,
+): Promise<PreparePaymentCheckoutSessionResult> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/payments/checkout-session/prepare');
+  const body: Record<string, string | boolean> = {
+    gatewayId: params.gatewayId,
+    date: params.date,
+    time: params.time,
+    serviceKey: params.serviceKey ?? 'project-rescue',
+    customerName: params.customerName,
+    customerEmail: params.customerEmail,
+    customerPhone: params.customerPhone,
+    diagnosticSessionId: params.diagnosticSessionId,
+    paymentMethodId: params.paymentMethodId,
+  };
+  if (params.customerCompany !== undefined && params.customerCompany.trim().length > 0) {
+    body.customerCompany = params.customerCompany.trim();
+  }
+  if (params.paymentMethodLabel !== undefined) {
+    body.paymentMethodLabel = params.paymentMethodLabel;
+  }
+  const trimmedAppBase = params.appBaseUrl?.trim() ?? '';
+  if (trimmedAppBase.length > 0) {
+    body.appBaseUrl = trimmedAppBase;
+  }
+  if (params.nativeInAppPaymentReturn === true) {
+    body.nativeInAppPaymentReturn = true;
+  }
+  const promoCode = params.promoCode?.trim() ?? '';
+  if (promoCode.length > 0) {
+    body.promoCode = promoCode;
+  }
+  if (params.recordingOptIn === true) {
+    body.recordingOptIn = true;
+  }
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildDeviceIdHeaders(params.deviceId),
+      ...buildMarketingAuthHeaders(params.marketingSessionToken),
+    },
+    body: JSON.stringify(body),
+    signal: params.signal,
+  });
+  const payload = (await response.json()) as PreparePaymentCheckoutSessionResult & {
+    ok?: boolean;
+    error?: string;
+    code?: string;
+  };
+  if (!response.ok || payload.ok !== true || typeof payload.redirectUrl !== 'string') {
+    throw new Error(typeof payload.error === 'string' ? payload.error : 'Checkout prepare failed');
+  }
+  return {
+    ok: true,
+    transactionId: payload.transactionId,
+    redirectUrl: payload.redirectUrl,
+    bookingId: payload.bookingId ?? null,
+    mock: payload.mock,
+  };
+}
+
 export type PaymentTransactionStatusPayload = {
   readonly transactionId: string;
   readonly status: string;

@@ -277,6 +277,65 @@ export async function createGuestBookingManageCheckout(params: {
   };
 }
 
+export async function prepareGuestBookingManageCheckout(params: {
+  readonly apiBaseUrl: string;
+  readonly credentials: GuestBookingManageCredentials;
+  readonly gatewayId: PaymentGatewayId;
+  readonly paymentMethodId: string;
+  readonly paymentMethodLabel?: string;
+  readonly appBaseUrl?: string;
+  readonly nativeInAppPaymentReturn?: boolean;
+  readonly signal?: AbortSignal;
+}): Promise<{
+  readonly transactionId: string;
+  readonly redirectUrl: string;
+  readonly bookingId: string | null;
+  readonly mock?: boolean;
+}> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/manage/checkout/prepare');
+  const body: Record<string, string | boolean> = {
+    bookingReference: params.credentials.bookingReference,
+    email: params.credentials.email,
+    phoneLastFour: params.credentials.phoneLastFour,
+    gatewayId: params.gatewayId,
+    paymentMethodId: params.paymentMethodId,
+  };
+  if (params.paymentMethodLabel !== undefined) {
+    body.paymentMethodLabel = params.paymentMethodLabel;
+  }
+  const trimmedAppBase = params.appBaseUrl?.trim() ?? '';
+  if (trimmedAppBase.length > 0) {
+    body.appBaseUrl = trimmedAppBase;
+  }
+  if (params.nativeInAppPaymentReturn === true) {
+    body.nativeInAppPaymentReturn = true;
+  }
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: params.signal,
+  });
+  const payload = (await response.json()) as {
+    ok?: boolean;
+    transactionId?: string;
+    redirectUrl?: string;
+    bookingId?: string | null;
+    mock?: boolean;
+    error?: string;
+  };
+  if (!response.ok || payload.ok !== true || typeof payload.redirectUrl !== 'string') {
+    throw new Error(typeof payload.error === 'string' ? payload.error : 'Checkout prepare failed.');
+  }
+  return {
+    transactionId: payload.transactionId ?? '',
+    redirectUrl: payload.redirectUrl,
+    bookingId: payload.bookingId ?? null,
+    mock: payload.mock,
+  };
+}
+
 export type BookingCancellationErrorCode =
   | 'cancellation_too_late'
   | 'invalid_booking_reference'
@@ -525,6 +584,63 @@ export async function createAccountBookingManageCheckout(params: {
   return {
     transactionId: payload.transactionId ?? '',
     redirectUrl: payload.redirectUrl ?? null,
+    bookingId: payload.bookingId ?? null,
+    mock: payload.mock,
+  };
+}
+
+export async function prepareAccountBookingManageCheckout(params: {
+  readonly apiBaseUrl: string;
+  readonly bookingId: string;
+  readonly gatewayId: PaymentGatewayId;
+  readonly paymentMethodId: string;
+  readonly paymentMethodLabel?: string;
+  readonly appBaseUrl?: string;
+  readonly nativeInAppPaymentReturn?: boolean;
+  readonly signal?: AbortSignal;
+}): Promise<{
+  readonly transactionId: string;
+  readonly redirectUrl: string;
+  readonly bookingId: string | null;
+  readonly mock?: boolean;
+}> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/manage/checkout-account/prepare');
+  const body: Record<string, string | boolean> = {
+    bookingId: params.bookingId,
+    gatewayId: params.gatewayId,
+    paymentMethodId: params.paymentMethodId,
+  };
+  if (params.paymentMethodLabel !== undefined) {
+    body.paymentMethodLabel = params.paymentMethodLabel;
+  }
+  const trimmedAppBase = params.appBaseUrl?.trim() ?? '';
+  if (trimmedAppBase.length > 0) {
+    body.appBaseUrl = trimmedAppBase;
+  }
+  if (params.nativeInAppPaymentReturn === true) {
+    body.nativeInAppPaymentReturn = true;
+  }
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: params.signal,
+  });
+  const payload = (await response.json()) as {
+    ok?: boolean;
+    transactionId?: string;
+    redirectUrl?: string;
+    bookingId?: string | null;
+    mock?: boolean;
+    error?: string;
+  };
+  if (!response.ok || payload.ok !== true || typeof payload.redirectUrl !== 'string') {
+    throw new Error(typeof payload.error === 'string' ? payload.error : 'Checkout prepare failed.');
+  }
+  return {
+    transactionId: payload.transactionId ?? '',
+    redirectUrl: payload.redirectUrl,
     bookingId: payload.bookingId ?? null,
     mock: payload.mock,
   };

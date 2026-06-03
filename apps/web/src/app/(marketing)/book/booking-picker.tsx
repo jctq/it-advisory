@@ -42,9 +42,16 @@ import {
   fetchPaymentConfigPublic,
   fetchPaymentTransactionStatus,
   isPaymentConfigPromoInvalidError,
+  preparePaymentCheckoutSession,
   PaymentConfigFetchError,
   type PaymentConfigPublic,
 } from '@teqmd/api-client/marketing-payment-api-client';
+import { usePaymentCheckoutPrepare } from '@/hooks/use-payment-checkout-prepare';
+import {
+  buildMarketingCheckoutPrepKey,
+  readPaymentCheckoutPrep,
+} from '@/lib/marketing/payment-checkout-prep-cache';
+import { PaymentProcessingDialog } from '@/components/marketing/payment-processing-dialog';
 import { rescheduleMarketingCheckoutSlot } from '@teqmd/api-client/marketing-booking-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SESSION_DURATION } from '@teqmd/diagnostic-core/project-rescue-service-context';
@@ -1587,6 +1594,98 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const isLivePaymentsCheckout =
     paymentConfig?.paymentsEnabled === true && (paymentConfig.gateways.length ?? 0) > 0;
   const hasMultiplePaymentGateways = (paymentConfig?.gateways.length ?? 0) > 1;
+  const marketingCheckoutPrepKey = useMemo((): string | null => {
+    if (
+      phase !== 'payment' ||
+      !isLivePaymentsCheckout ||
+      selectedGatewayId === null ||
+      selectedPaymentMethodId === null ||
+      selectedDate === null ||
+      selectedTime === null ||
+      !hasValidDiagnosticSessionParam
+    ) {
+      return null;
+    }
+    return buildMarketingCheckoutPrepKey({
+      diagnosticSessionId: diagnosticSessionRef,
+      gatewayId: selectedGatewayId,
+      paymentMethodId: selectedPaymentMethodId,
+      date: formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd'),
+      time: selectedTime,
+      serviceKey: checkoutServiceKeyForApi,
+      amountCentavos: paymentConfig?.checkoutAmountCentavos ?? 0,
+      promoCode: debouncedPromoCode,
+      recordingOptIn,
+    });
+  }, [
+    checkoutServiceKeyForApi,
+    debouncedPromoCode,
+    diagnosticSessionRef,
+    hasValidDiagnosticSessionParam,
+    isLivePaymentsCheckout,
+    paymentConfig?.checkoutAmountCentavos,
+    phase,
+    recordingOptIn,
+    selectedDate,
+    selectedGatewayId,
+    selectedPaymentMethodId,
+    selectedTime,
+  ]);
+  const executePrepareMarketingCheckout = useCallback(
+    async (signal: AbortSignal): Promise<{ readonly redirectUrl: string; readonly transactionId: string } | null> => {
+      if (
+        selectedGatewayId === null ||
+        selectedPaymentMethodId === null ||
+        selectedDate === null ||
+        selectedTime === null
+      ) {
+        return null;
+      }
+      const methodOption = availablePaymentMethods.find((method) => method.id === selectedPaymentMethodId);
+      const resolvedPaymentLabel = methodOption?.label ?? selectedPaymentMethodId;
+      const dateParam = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
+      const result = await preparePaymentCheckoutSession({
+        apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+        appBaseUrl: MARKETING_CLIENT_API_BASE_URL.length > 0 ? MARKETING_CLIENT_API_BASE_URL : undefined,
+        gatewayId: selectedGatewayId,
+        paymentMethodId: selectedPaymentMethodId,
+        date: dateParam,
+        time: selectedTime,
+        serviceKey: checkoutServiceKeyForApi,
+        customerName: fullName.trim(),
+        customerEmail: email.trim(),
+        customerPhone: phone.trim(),
+        customerCompany: company.trim().length > 0 ? company.trim() : undefined,
+        diagnosticSessionId: diagnosticSessionRef,
+        paymentMethodLabel: resolvedPaymentLabel,
+        promoCode: promoCode.trim().length > 0 ? promoCode.trim() : undefined,
+        recordingOptIn,
+        signal,
+      });
+      return { redirectUrl: result.redirectUrl, transactionId: result.transactionId };
+    },
+    [
+      availablePaymentMethods,
+      checkoutServiceKeyForApi,
+      company,
+      diagnosticSessionRef,
+      email,
+      fullName,
+      phone,
+      promoCode,
+      recordingOptIn,
+      selectedDate,
+      selectedGatewayId,
+      selectedPaymentMethodId,
+      selectedTime,
+    ],
+  );
+  const { isPreparing: isPreparingCheckout, preparedEntry: preparedCheckoutEntry } = usePaymentCheckoutPrepare({
+    scope: 'marketing_booking',
+    enabled: phase === 'payment' && isLivePaymentsCheckout && !isPaymentHoldBlocked && sessionGateStatus === 'ready',
+    prepKey: marketingCheckoutPrepKey,
+    prepare: executePrepareMarketingCheckout,
+  });
   useEffect(() => {
     if (availablePaymentMethods.length === 0) {
       queueMicrotask(() => {
@@ -1947,6 +2046,29 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       setPhase('processing');
       setErrorMessage(null);
       const dateParam = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
+      const cachedPrep =
+        preparedCheckoutEntry ?? readPaymentCheckoutPrep('marketing_booking');
+      if (
+        marketingCheckoutPrepKey !== null &&
+        cachedPrep !== null &&
+        cachedPrep.prepKey === marketingCheckoutPrepKey &&
+        cachedPrep.redirectUrl.length > 0
+      ) {
+        writeCheckoutDraftToSessionStorage(diagnosticSessionRef, {
+          date: dateParam,
+          time: selectedTime,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          company: company.trim(),
+          phone: phone.trim(),
+          serviceKey: checkoutServiceKeyForApi,
+        });
+        manualSlotRebookRef.current = false;
+        setMustPersistSlotBeforeCheckout(false);
+        setHoldExpiredRequiresRebook(false);
+        window.location.href = cachedPrep.redirectUrl;
+        return;
+      }
       try {
         const session = await createPaymentCheckoutSession({
           apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
@@ -3070,37 +3192,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           </div>
         ) : null}
       </div>
-      <Dialog open={phase === 'processing'}>
-        <DialogContent
-          className="gap-0 sm:max-w-md"
-          showCloseButton={false}
-          onPointerDownOutside={(event) => {
-            event.preventDefault();
-          }}
-          onEscapeKeyDown={(event) => {
-            event.preventDefault();
-          }}
-        >
-          <DialogHeader className="space-y-2 text-center sm:text-left">
-            <DialogTitle>Confirming your booking</DialogTitle>
-            <DialogDescription>Please wait while we confirm your booking.</DialogDescription>
-          </DialogHeader>
-          <div className="mt-6 flex flex-col items-center rounded-2xl border border-border bg-primary/5 px-6 py-10">
-            <div className="flex size-24 items-center justify-center rounded-full bg-primary/10">
-              <Lock className="size-11 text-primary" aria-hidden />
-            </div>
-            <Loader2 className="mt-6 size-8 animate-spin text-primary" aria-hidden />
-            <p className="mt-5 text-center text-sm font-semibold text-foreground">Processing your payment…</p>
-            <p className="mt-2 text-center text-sm text-muted-foreground">This will only take a few seconds.</p>
-          </div>
-          <div className="mt-5 flex gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
-            <Shield className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-            <p>
-              <span className="font-semibold">Do not close this window or refresh the page.</span>
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PaymentProcessingDialog open={phase === 'processing'} />
     </div>
   );
 }

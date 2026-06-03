@@ -10,6 +10,8 @@ import { AlertCircle, CalendarClock, CheckCircle2, CreditCard, Loader2, Search, 
 import {
   createAccountBookingManageCheckout,
   createGuestBookingManageCheckout,
+  prepareAccountBookingManageCheckout,
+  prepareGuestBookingManageCheckout,
   lookupAccountManagedBooking,
   lookupGuestBooking,
   syncAccountProfileToManagedBooking,
@@ -20,6 +22,13 @@ import {
   type GuestBookingManageCredentials,
   type GuestBookingManageView,
 } from '@teqmd/api-client/marketing-booking-manage-api-client';
+import { usePaymentCheckoutPrepare } from '@/hooks/use-payment-checkout-prepare';
+import {
+  buildAccountManageCheckoutPrepKey,
+  buildManageCheckoutPrepKey,
+  readPaymentCheckoutPrep,
+} from '@/lib/marketing/payment-checkout-prep-cache';
+import { PaymentProcessingDialog } from '@/components/marketing/payment-processing-dialog';
 import { buildPaymentGatewaysUnavailableGuidance } from '@/lib/payments/booking-pay-guidance';
 import { PROJECT_RESCUE_SERVICE_TITLE } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import {
@@ -244,6 +253,87 @@ export function GuestBookingManageFlow(props: {
     return paymentConfig.gateways.find((gateway) => gateway.id === selectedGatewayId) ?? null;
   }, [paymentConfig, selectedGatewayId]);
   const availablePaymentMethods = selectedGateway?.methods ?? [];
+  const manageCheckoutPrepScope =
+    manageContext?.kind === 'account' ? 'account_manage_booking' : 'guest_manage_booking';
+  const manageCheckoutPrepKey = useMemo((): string | null => {
+    if (
+      booking === null ||
+      selectedGatewayId === null ||
+      selectedPaymentMethodId === null ||
+      !booking.canPayOnline ||
+      paymentConfig === null ||
+      paymentConfig.gateways.length === 0
+    ) {
+      return null;
+    }
+    const amountCentavos = paymentConfig.checkoutAmountCentavos;
+    if (manageContext?.kind === 'account') {
+      return buildAccountManageCheckoutPrepKey({
+        bookingId: manageContext.bookingId,
+        gatewayId: selectedGatewayId,
+        paymentMethodId: selectedPaymentMethodId,
+        amountCentavos,
+      });
+    }
+    if (manageContext?.kind === 'guest') {
+      return buildManageCheckoutPrepKey({
+        bookingReference: booking.bookingReference,
+        gatewayId: selectedGatewayId,
+        paymentMethodId: selectedPaymentMethodId,
+        amountCentavos,
+      });
+    }
+    return null;
+  }, [booking, manageContext, paymentConfig, selectedGatewayId, selectedPaymentMethodId]);
+  const executePrepareManageCheckout = useCallback(
+    async (signal: AbortSignal): Promise<{ readonly redirectUrl: string; readonly transactionId: string } | null> => {
+      if (
+        manageContext === null ||
+        booking === null ||
+        selectedGatewayId === null ||
+        selectedPaymentMethodId === null
+      ) {
+        return null;
+      }
+      const paymentMethodLabel = selectedGateway?.methods.find((method) => method.id === selectedPaymentMethodId)?.label;
+      const appBaseUrl = MARKETING_CLIENT_API_BASE_URL.length > 0 ? MARKETING_CLIENT_API_BASE_URL : undefined;
+      const result =
+        manageContext.kind === 'guest'
+          ? await prepareGuestBookingManageCheckout({
+              apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+              appBaseUrl,
+              credentials: manageContext.credentials,
+              gatewayId: selectedGatewayId,
+              paymentMethodId: selectedPaymentMethodId,
+              paymentMethodLabel,
+              signal,
+            })
+          : await prepareAccountBookingManageCheckout({
+              apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+              appBaseUrl,
+              bookingId: manageContext.bookingId,
+              gatewayId: selectedGatewayId,
+              paymentMethodId: selectedPaymentMethodId,
+              paymentMethodLabel,
+              signal,
+            });
+      return { redirectUrl: result.redirectUrl, transactionId: result.transactionId };
+    },
+    [booking, manageContext, selectedGateway, selectedGatewayId, selectedPaymentMethodId],
+  );
+  const { preparedEntry: preparedManageCheckoutEntry } = usePaymentCheckoutPrepare({
+    scope: manageCheckoutPrepScope,
+    enabled:
+      phase === 'result' &&
+      booking !== null &&
+      booking.canPayOnline &&
+      paymentConfig !== null &&
+      paymentConfig.gateways.length > 0 &&
+      selectedPaymentMethodId !== null &&
+      selectedGatewayId !== null,
+    prepKey: manageCheckoutPrepKey,
+    prepare: executePrepareManageCheckout,
+  });
   const executeLookup = useCallback(
     async (event: FormEvent<HTMLFormElement>): Promise<void> => {
       event.preventDefault();
@@ -297,6 +387,16 @@ export function GuestBookingManageFlow(props: {
     }
     setIsSubmitting(true);
     setPhase('paying');
+    const cachedPrep = preparedManageCheckoutEntry ?? readPaymentCheckoutPrep(manageCheckoutPrepScope);
+    if (
+      manageCheckoutPrepKey !== null &&
+      cachedPrep !== null &&
+      cachedPrep.prepKey === manageCheckoutPrepKey &&
+      cachedPrep.redirectUrl.length > 0
+    ) {
+      window.location.assign(cachedPrep.redirectUrl);
+      return;
+    }
     try {
       const result =
         manageContext.kind === 'guest'
@@ -334,7 +434,18 @@ export function GuestBookingManageFlow(props: {
     } finally {
       setIsSubmitting(false);
     }
-  }, [booking, manageContext, selectedGateway, selectedGatewayId, selectedPaymentMethodId, setIsSubmitting, setPhase]);
+  }, [
+    booking,
+    manageCheckoutPrepKey,
+    manageCheckoutPrepScope,
+    manageContext,
+    preparedManageCheckoutEntry,
+    selectedGateway,
+    selectedGatewayId,
+    selectedPaymentMethodId,
+    setIsSubmitting,
+    setPhase,
+  ]);
   const resetLookup = (): void => {
     setPhase('lookup');
     setBooking(null);
@@ -388,6 +499,7 @@ export function GuestBookingManageFlow(props: {
       ? { kind: 'account', bookingId: manageContext.bookingId }
       : { kind: 'guest', credentials: manageContext.credentials };
   return (
+    <>
     <ResultView
       booking={booking}
       bookingSessionRoomLinksEnabled={bookingSessionRoomLinksEnabled}
@@ -443,6 +555,8 @@ export function GuestBookingManageFlow(props: {
         void executePay();
       }}
     />
+    <PaymentProcessingDialog open={phase === 'paying'} />
+    </>
   );
 }
 

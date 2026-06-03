@@ -5,9 +5,10 @@ import { guestBookingManageCheckoutSchema } from '@/lib/marketing/guest-booking-
 import { assertManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { resolveCheckoutAppBaseUrl } from '@/lib/server/resolve-checkout-app-base-url';
 import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
+import { createCheckoutTiming } from '@/lib/payments/checkout-timing';
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const rateLimited = await executeRateLimitOrResponse(request, 'guest_booking_lookup');
+  const rateLimited = await executeRateLimitOrResponse(request, 'payment_checkout_session');
   if (rateLimited !== null) {
     return rateLimited;
   }
@@ -25,6 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     return jsonApiValidationError(parsed.error);
   }
+  const timing = createCheckoutTiming('guest_manage_checkout');
   const result = await createPaymentCheckoutForExistingBooking({
     credentials: {
       bookingReference: parsed.data.bookingReference,
@@ -37,7 +39,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     appBaseUrl: resolveCheckoutAppBaseUrl(request, parsed.data.appBaseUrl),
     nativeInAppPaymentReturn: parsed.data.nativeInAppPaymentReturn === true,
     promoCode: parsed.data.promoCode,
+    timing,
   });
+  timing.logAndFinish();
   if (!result.ok) {
     const status =
       result.code === 'booking_not_payable'
