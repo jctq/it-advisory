@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { jsonApiValidationError, jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { getPublicBookingAvailabilitySlots } from '@/lib/data/booking-availability';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,10 @@ function compareYmd(a: string, b: string): number {
  * Public allowlist of bookable marketing slots (no busy metadata).
  */
 export async function GET(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'booking_availability');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   const url = new URL(request.url);
   const raw = {
     serviceKey: url.searchParams.get('serviceKey') ?? undefined,

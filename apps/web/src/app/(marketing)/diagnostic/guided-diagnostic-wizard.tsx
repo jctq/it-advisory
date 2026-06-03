@@ -85,6 +85,8 @@ import {
 } from '@/lib/marketing/guided-diagnostic-types';
 import { getSituationSeed } from '@/lib/marketing/situation-options';
 import { notifyError } from '@/lib/notify';
+import { appendTurnstileTokenToBody } from '@/lib/marketing/append-turnstile-token';
+import { useTurnstileExecutor } from '@/components/marketing/turnstile-field';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import {
@@ -1405,6 +1407,17 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     onGoBack();
     scheduleScrollDiagnosticWizardToTop();
   }, [onGoBack]);
+  const { isConfigured: isTurnstileConfigured, requestToken, TurnstileMount } = useTurnstileExecutor();
+  const turnstileMount = TurnstileMount();
+  const buildProtectedJsonBody = useCallback(
+    async (body: Record<string, unknown>): Promise<Record<string, unknown>> =>
+      appendTurnstileTokenToBody({
+        body,
+        isTurnstileConfigured,
+        requestToken,
+      }),
+    [isTurnstileConfigured, requestToken],
+  );
   const [isAwaitingApi, setIsAwaitingApi] = useState<boolean>(false);
   const [diagnosticDebugLog, setDiagnosticDebugLog] = useState<DiagnosticDebugLogEntry[]>([]);
   const [cacheDebugUiEnabled, setCacheDebugUiEnabled] = useState<boolean>(false);
@@ -1732,13 +1745,14 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       const trimmed = guided.initialPrompt.trim();
       const clientEmptyRoundRetryLimit = 3;
       for (let attempt = 0; attempt <= clientEmptyRoundRetryLimit; attempt += 1) {
+        const requestBody = await buildProtectedJsonBody({
+          initialPrompt: trimmed,
+          rounds: toApiRoundsFromBundles(completedBundles),
+        });
         const response = await fetch(DIAGNOSTIC_ROUND_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            initialPrompt: trimmed,
-            rounds: toApiRoundsFromBundles(completedBundles),
-          }),
+          body: JSON.stringify(requestBody),
         });
         const data = (await response.json()) as DiagnosticRoundApiBody;
         if (!response.ok) {
@@ -1828,7 +1842,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       }
       return false;
     },
-    [cacheDebugUiEnabled, guided, onGuidedChange, sessionReadOnly],
+    [buildProtectedJsonBody, cacheDebugUiEnabled, guided, onGuidedChange, sessionReadOnly],
   );
   const executeFetchTemplateSummary = useCallback(
     async (completedBundles: CompletedRoundBundle[]): Promise<GuidedDiagnosticOutcome> => {
@@ -1851,14 +1865,15 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
           'project-rescue',
         );
       }
+      const summaryRequestBody = await buildProtectedJsonBody({
+        templateName: activeTemplate.name,
+        initialPrompt: guided.initialPrompt,
+        rounds: toApiRoundsFromBundles(completedBundles),
+      });
       const response = await fetch(DIAGNOSTIC_TEMPLATE_SUMMARY_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          templateName: activeTemplate.name,
-          initialPrompt: guided.initialPrompt,
-          rounds: toApiRoundsFromBundles(completedBundles),
-        }),
+        body: JSON.stringify(summaryRequestBody),
       });
       const data = (await response.json()) as DiagnosticTemplateSummaryApiBody;
       if (!response.ok) {
@@ -1875,7 +1890,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
         data.recommendedServiceKey ?? 'project-rescue',
       );
     },
-    [activeTemplate, guided.initialPrompt, sessionReadOnly],
+    [activeTemplate, buildProtectedJsonBody, guided.initialPrompt, sessionReadOnly],
   );
   const executeStartFromPrompt = useCallback(async (): Promise<void> => {
     if (sessionReadOnly) {
@@ -2153,6 +2168,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   if (guided.outcome !== null && guided.activeRound === null) {
     return (
       <div>
+        {turnstileMount}
         <DiagnosticCacheDebugPanel
           showDebugUi={cacheDebugUiEnabled}
           entries={diagnosticDebugLog}
@@ -2179,6 +2195,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     if (!hasGuidedSnapshot) {
       return (
         <div className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-sm text-foreground">
+          {turnstileMount}
           <p className="font-medium">Saved answers could not be loaded</p>
           <p className="mt-2 text-muted-foreground">
             Try opening the diagnostic again from My diagnostics. If this keeps happening, contact support.
@@ -2254,6 +2271,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
       });
     return (
       <div>
+        {turnstileMount}
         <DiagnosticCacheDebugPanel
           showDebugUi={cacheDebugUiEnabled}
           entries={diagnosticDebugLog}
@@ -2394,6 +2412,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     if (isLoadingConfig || isAwaitingFirstTemplateRoundBootstrap) {
       return (
         <div>
+          {turnstileMount}
           <p className="mt-2 text-pretty text-muted-foreground">
             Preparing your diagnostic template and saving your progress automatically.
           </p>
@@ -2407,6 +2426,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
     if (activeTemplate === null || initialTemplateRound === null) {
       return (
         <div>
+          {turnstileMount}
           <p className="mt-2 text-pretty text-muted-foreground">
             Template mode is active, but there is no usable active template yet.
           </p>
@@ -2419,6 +2439,7 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   }
   return (
     <div>
+      {turnstileMount}
       <DiagnosticCacheDebugPanel
         showDebugUi={cacheDebugUiEnabled}
         entries={diagnosticDebugLog}

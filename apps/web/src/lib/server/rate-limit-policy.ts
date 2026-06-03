@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 export type RateLimitScope =
+  | 'global_api'
   | 'auth_login'
   | 'auth_register'
   | 'auth_profile'
@@ -8,10 +9,13 @@ export type RateLimitScope =
   | 'admin_otp_send'
   | 'admin_otp_verify'
   | 'guest_booking_lookup'
+  | 'booking_availability'
   | 'booking_create'
   | 'booking_token_lookup'
+  | 'payment_checkout_session'
   | 'diagnostic_session'
   | 'support_report'
+  | 'support_report_reply'
   | 'diagnostic_ai';
 
 const AUTH_LOGIN_LIMIT = 10 as const;
@@ -42,6 +46,14 @@ const DIAGNOSTIC_SESSION_DEFAULT_LIMIT_PER_HOUR = 60 as const;
 const DIAGNOSTIC_SESSION_WINDOW_MS = 60 * 60 * 1000;
 const AUTH_PROFILE_LIMIT = 20 as const;
 const AUTH_PROFILE_WINDOW_MS = 60 * 60 * 1000;
+const GLOBAL_API_DEFAULT_LIMIT_PER_MINUTE = 120 as const;
+const GLOBAL_API_WINDOW_MS = 60 * 1000;
+const BOOKING_AVAILABILITY_DEFAULT_LIMIT_PER_HOUR = 60 as const;
+const BOOKING_AVAILABILITY_WINDOW_MS = 60 * 60 * 1000;
+const PAYMENT_CHECKOUT_SESSION_DEFAULT_LIMIT_PER_HOUR = 10 as const;
+const PAYMENT_CHECKOUT_SESSION_WINDOW_MS = 60 * 60 * 1000;
+const SUPPORT_REPORT_REPLY_LIMIT = 10 as const;
+const SUPPORT_REPORT_REPLY_WINDOW_MS = 60 * 60 * 1000;
 
 function readEnvLimitPerHour(envName: string, defaultLimit: number): number {
   const raw = process.env[envName]?.trim() ?? '';
@@ -59,8 +71,25 @@ function readDiagnosticAiLimit(): number {
   return readEnvLimitPerHour('RATE_LIMIT_DIAGNOSTIC_AI_PER_HOUR', DIAGNOSTIC_AI_DEFAULT_LIMIT_PER_HOUR);
 }
 
+function readEnvLimitPerMinute(envName: string, defaultLimit: number): number {
+  const raw = process.env[envName]?.trim() ?? '';
+  if (raw.length === 0) {
+    return defaultLimit;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return defaultLimit;
+  }
+  return parsed;
+}
+
 export function resolveRateLimitPolicy(scope: RateLimitScope): { readonly limit: number; readonly windowMs: number } {
   switch (scope) {
+    case 'global_api':
+      return {
+        limit: readEnvLimitPerMinute('RATE_LIMIT_GLOBAL_API_PER_MINUTE', GLOBAL_API_DEFAULT_LIMIT_PER_MINUTE),
+        windowMs: GLOBAL_API_WINDOW_MS,
+      };
     case 'auth_login':
       return { limit: AUTH_LOGIN_LIMIT, windowMs: AUTH_LOGIN_WINDOW_MS };
     case 'auth_register':
@@ -75,6 +104,14 @@ export function resolveRateLimitPolicy(scope: RateLimitScope): { readonly limit:
       return { limit: ADMIN_OTP_VERIFY_LIMIT, windowMs: ADMIN_OTP_VERIFY_WINDOW_MS };
     case 'guest_booking_lookup':
       return { limit: GUEST_BOOKING_LOOKUP_LIMIT, windowMs: GUEST_BOOKING_LOOKUP_WINDOW_MS };
+    case 'booking_availability':
+      return {
+        limit: readEnvLimitPerHour(
+          'RATE_LIMIT_BOOKING_AVAILABILITY_PER_HOUR',
+          BOOKING_AVAILABILITY_DEFAULT_LIMIT_PER_HOUR,
+        ),
+        windowMs: BOOKING_AVAILABILITY_WINDOW_MS,
+      };
     case 'booking_create':
       return {
         limit: readEnvLimitPerHour('RATE_LIMIT_BOOKING_CREATE_PER_HOUR', BOOKING_CREATE_DEFAULT_LIMIT_PER_HOUR),
@@ -90,8 +127,18 @@ export function resolveRateLimitPolicy(scope: RateLimitScope): { readonly limit:
         limit: readEnvLimitPerHour('RATE_LIMIT_DIAGNOSTIC_SESSION_PER_HOUR', DIAGNOSTIC_SESSION_DEFAULT_LIMIT_PER_HOUR),
         windowMs: DIAGNOSTIC_SESSION_WINDOW_MS,
       };
+    case 'payment_checkout_session':
+      return {
+        limit: readEnvLimitPerHour(
+          'RATE_LIMIT_PAYMENT_CHECKOUT_SESSION_PER_HOUR',
+          PAYMENT_CHECKOUT_SESSION_DEFAULT_LIMIT_PER_HOUR,
+        ),
+        windowMs: PAYMENT_CHECKOUT_SESSION_WINDOW_MS,
+      };
     case 'support_report':
       return { limit: SUPPORT_REPORT_LIMIT, windowMs: SUPPORT_REPORT_WINDOW_MS };
+    case 'support_report_reply':
+      return { limit: SUPPORT_REPORT_REPLY_LIMIT, windowMs: SUPPORT_REPORT_REPLY_WINDOW_MS };
     case 'diagnostic_ai':
       return { limit: readDiagnosticAiLimit(), windowMs: DIAGNOSTIC_AI_WINDOW_MS };
   }

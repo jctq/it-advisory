@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
+import { assertTurnstileFromJsonBodyOrResponse } from '@/lib/server/assert-turnstile-request';
 
 const requestSchema = z.object({
   query: z.string().max(500),
@@ -47,6 +48,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     json = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const turnstileDenied = await assertTurnstileFromJsonBodyOrResponse({
+    request,
+    body: typeof json === 'object' && json !== null ? (json as Record<string, unknown>) : {},
+  });
+  if (turnstileDenied !== null) {
+    return turnstileDenied;
   }
   const parsed = requestSchema.safeParse(json);
   if (!parsed.success) {

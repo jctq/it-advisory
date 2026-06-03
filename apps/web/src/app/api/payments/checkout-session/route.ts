@@ -7,6 +7,7 @@ import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
 import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
 import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import { resolveCheckoutAppBaseUrl } from '@/lib/server/resolve-checkout-app-base-url';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 const postBodySchema = z.object({
   gatewayId: z.enum(PAYMENT_GATEWAY_IDS),
@@ -29,6 +30,10 @@ const postBodySchema = z.object({
 });
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'payment_checkout_session');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   let json: unknown;
   try {
     json = await request.json();

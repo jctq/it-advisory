@@ -16,6 +16,8 @@ import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 import { buildSupportCorsHeaders } from '@/lib/server/support-cors';
+import { assertTurnstileFromFormDataOrResponse } from '@/lib/server/assert-turnstile-request';
+import { resolveTurnstileSkipReason } from '@/lib/server/verify-turnstile-token';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +71,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     const source = parseSource(sourceEntry);
     if (source === null) {
       return NextResponse.json({ error: 'Invalid source. Use native or web.' }, { status: 400, headers: corsHeaders });
+    }
+    const turnstileDenied = await assertTurnstileFromFormDataOrResponse({
+      request,
+      formData,
+      skipReason: resolveTurnstileSkipReason({ source }),
+    });
+    if (turnstileDenied !== null) {
+      return new NextResponse(turnstileDenied.body, { status: turnstileDenied.status, headers: corsHeaders });
     }
     const authUser = await getAuthenticatedMarketingUser(request);
     let reporterEmail: string | null = null;

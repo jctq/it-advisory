@@ -7,6 +7,7 @@ import { getSupportSettings } from '@/lib/data/support-settings';
 import { executeSendSupportReportStaffFollowUpEmail } from '@/lib/email/execute-support-report-emails';
 import { assertSupportModuleEnabled } from '@/lib/marketing/support-module-gate';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,10 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
   const user = await getAuthenticatedMarketingUser(request);
   if (user === null) {
     return NextResponse.json({ error: 'Sign in required', code: 'auth_required' }, { status: 401 });
+  }
+  const rateLimited = await executeRateLimitOrResponse(request, 'support_report_reply');
+  if (rateLimited !== null) {
+    return rateLimited;
   }
   const { reportId } = await context.params;
   let json: unknown;

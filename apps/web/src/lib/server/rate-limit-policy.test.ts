@@ -15,6 +15,15 @@ describe('rate-limit policy', () => {
     expect(resolveRateLimitPolicy('diagnostic_ai')).toEqual({ limit: 12, windowMs: 60 * 60 * 1000 });
   });
 
+  it('returns global api limits per minute', () => {
+    vi.stubEnv('RATE_LIMIT_GLOBAL_API_PER_MINUTE', '90');
+    expect(resolveRateLimitPolicy('global_api')).toEqual({ limit: 90, windowMs: 60 * 1000 });
+  });
+
+  it('returns booking availability limits per hour', () => {
+    expect(resolveRateLimitPolicy('booking_availability')).toEqual({ limit: 60, windowMs: 60 * 60 * 1000 });
+  });
+
   it('prefers forwarded client IP as identifier', () => {
     const identifier = resolveRateLimitIdentifier(
       new Request('https://example.com', {

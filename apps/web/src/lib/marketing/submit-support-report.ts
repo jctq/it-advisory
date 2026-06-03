@@ -9,6 +9,7 @@ export type SubmitSupportReportInput = {
   readonly reporterName?: string | null;
   readonly reporterMobile?: string | null;
   readonly deviceId?: string | null;
+  readonly turnstileToken?: string | null;
 };
 
 export type SubmitSupportReportResult =
@@ -34,6 +35,9 @@ export async function submitSupportReport(input: SubmitSupportReportInput): Prom
   }
   if (input.deviceId !== undefined && input.deviceId !== null && input.deviceId.trim().length > 0) {
     formData.append('deviceId', input.deviceId.trim());
+  }
+  if (input.turnstileToken !== undefined && input.turnstileToken !== null && input.turnstileToken.trim().length > 0) {
+    formData.append('turnstileToken', input.turnstileToken.trim());
   }
   if (input.screenshot !== null) {
     const extension =

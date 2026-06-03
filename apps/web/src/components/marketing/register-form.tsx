@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { MarketingLegalDialog } from '@/components/marketing/legal/marketing-legal-dialog';
 import type { LegalDocumentId } from '@/lib/marketing/legal-document-id';
 import { notifyError } from '@/lib/notify';
+import { isTurnstileSiteKeyConfigured, TurnstileField } from '@/components/marketing/turnstile-field';
 
 type RegisterFormProps = {
   readonly nextPath: string;
@@ -54,7 +55,10 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
   const [hasAcceptedLegalTerms, setHasAcceptedLegalTerms] = useState<boolean>(false);
   const [openDocumentId, setOpenDocumentId] = useState<LegalDocumentId | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const canSubmit = email.trim().length > 0 && password.length > 0 && hasAcceptedLegalTerms;
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRequired = isTurnstileSiteKeyConfigured();
+  const canSubmit =
+    email.trim().length > 0 && password.length > 0 && hasAcceptedLegalTerms && (!turnstileRequired || turnstileToken !== null);
   const openLegalDocument = useCallback((documentId: LegalDocumentId): void => {
     setOpenDocumentId(documentId);
   }, []);
@@ -75,7 +79,13 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
         const response = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, mergeGuestProgress, acceptedLegalTerms: true }),
+          body: JSON.stringify({
+            email,
+            password,
+            mergeGuestProgress,
+            acceptedLegalTerms: true,
+            ...(turnstileToken !== null ? { turnstileToken } : {}),
+          }),
         });
         const payload: unknown = await response.json();
         if (!response.ok) {
@@ -92,7 +102,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
         setIsSubmitting(false);
       }
     },
-    [email, hasAcceptedLegalTerms, mergeGuestProgress, password, props.nextPath, router],
+    [email, hasAcceptedLegalTerms, mergeGuestProgress, password, props.nextPath, router, turnstileToken],
   );
   return (
     <form className="mx-auto flex w-full max-w-md flex-col gap-5" onSubmit={executeSubmit}>
@@ -152,6 +162,7 @@ export function RegisterForm(props: RegisterFormProps): ReactElement {
           {REQUIRED_LABEL_SUFFIX}
         </span>
       </label>
+      <TurnstileField onTokenChange={setTurnstileToken} className="flex justify-center" />
       <Button type="submit" className="w-full" disabled={isSubmitting || !canSubmit}>
         {isSubmitting ? 'Creating account…' : 'Create account'}
       </Button>

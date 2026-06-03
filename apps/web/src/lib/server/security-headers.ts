@@ -26,13 +26,17 @@ export function buildSecurityHeaders(): readonly SecurityHeader[] {
   }
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? '';
   const gaConnect = gaId.length > 0 ? ' https://www.googletagmanager.com https://www.google-analytics.com' : '';
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? '';
+  const turnstileScript = turnstileSiteKey.length > 0 ? ' https://challenges.cloudflare.com' : '';
+  const turnstileFrame = turnstileSiteKey.length > 0 ? ' https://challenges.cloudflare.com' : '';
   const cspValue = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'" + turnstileScript,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     "connect-src 'self' https:" + gaConnect,
+    "frame-src 'self'" + turnstileFrame,
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

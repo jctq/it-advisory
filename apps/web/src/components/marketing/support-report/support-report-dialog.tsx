@@ -21,6 +21,7 @@ import { buildPhilippineMobileE164FromNationalDigits, normalizePhilippineMobileN
 import { parseGuestSupportReportContact } from '@/lib/marketing/support-report-guest-contact';
 import { submitSupportReport } from '@/lib/marketing/submit-support-report';
 import { useSupportReport } from '@/components/marketing/support-report/support-report-context';
+import { isTurnstileSiteKeyConfigured, TurnstileField } from '@/components/marketing/turnstile-field';
 
 const MIN_MESSAGE_LENGTH = 3;
 const AUTH_ME_URL = '/api/auth/me';
@@ -37,6 +38,8 @@ export function SupportReportDialog(): ReactElement {
   const [screenshotBlob, setScreenshotBlob] = useState<Blob | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRequired = isTurnstileSiteKeyConfigured();
   const [captureError, setCaptureError] = useState<string | null>(null);
   const resetForm = useCallback(() => {
     setMessage('');
@@ -126,6 +129,7 @@ export function SupportReportDialog(): ReactElement {
       reporterName: guestContact?.reporterName ?? null,
       reporterEmail: guestContact?.reporterEmail ?? null,
       reporterMobile: guestContact?.reporterMobile ?? null,
+      turnstileToken,
     });
     setIsSubmitting(false);
     if (!result.ok) {
@@ -148,7 +152,8 @@ export function SupportReportDialog(): ReactElement {
     guestContactReady &&
     isGuest !== null &&
     !isCapturing &&
-    !isSubmitting;
+    !isSubmitting &&
+    (!turnstileRequired || turnstileToken !== null);
   return (
     <Dialog open={isDialogOpen} onOpenChange={(open) => !open && closeReportDialog()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
@@ -248,6 +253,7 @@ export function SupportReportDialog(): ReactElement {
               disabled={isSubmitting}
             />
           </div>
+          <TurnstileField onTokenChange={setTurnstileToken} className="flex justify-center" />
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={closeReportDialog} disabled={isSubmitting}>

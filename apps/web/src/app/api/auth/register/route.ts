@@ -9,6 +9,8 @@ import { appendMarketingAuthSessionCookie } from '@/lib/server/marketing-auth-co
 import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 import { resolveGuestVisitorIdForAuthMerge } from '@/lib/server/marketing-visitor-id';
 import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
+import { assertTurnstileFromJsonBodyOrResponse } from '@/lib/server/assert-turnstile-request';
+import { resolveTurnstileSkipReason } from '@/lib/server/verify-turnstile-token';
 
 /**
  * Creates a marketing account and issues an HTTP-only session cookie.
@@ -27,6 +29,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   const parsed = authRegisterBodySchema.safeParse(json);
   if (!parsed.success) {
     return jsonApiValidationError(parsed.error);
+  }
+  const turnstileDenied = await assertTurnstileFromJsonBodyOrResponse({
+    request,
+    body: json as Record<string, unknown>,
+    skipReason: resolveTurnstileSkipReason({ returnSessionToken: parsed.data.returnSessionToken }),
+  });
+  if (turnstileDenied !== null) {
+    return turnstileDenied;
   }
   const emailNormalized = normalizeAccountEmail(parsed.data.email);
   const userId = await insertUserAccount({

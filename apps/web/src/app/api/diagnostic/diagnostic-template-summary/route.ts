@@ -25,6 +25,7 @@ import {
   resolveProjectRescueSessionTitle,
 } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
+import { assertTurnstileFromJsonBodyOrResponse } from '@/lib/server/assert-turnstile-request';
 
 const qaSchema = z.object({
   questionId: z.string(),
@@ -65,6 +66,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     json = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const turnstileDenied = await assertTurnstileFromJsonBodyOrResponse({
+    request,
+    body: typeof json === 'object' && json !== null ? (json as Record<string, unknown>) : {},
+  });
+  if (turnstileDenied !== null) {
+    return turnstileDenied;
   }
   const parsed = requestSchema.safeParse(json);
   if (!parsed.success) {

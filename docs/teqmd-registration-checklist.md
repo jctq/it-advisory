@@ -49,7 +49,13 @@ Generated: May 30, 2026
 
 - `SUPPORT_CORS_EXTRA_ORIGINS` — comma-separated origins for native support form CORS
 - `RATE_LIMIT_DIAGNOSTIC_AI_PER_HOUR` — default `30`
+- `RATE_LIMIT_GLOBAL_API_PER_MINUTE` — coarse per-IP cap on `/api/*` in `proxy.ts` (default `120`; skips webhooks, auth, cron, health)
+- `RATE_LIMIT_BOOKING_AVAILABILITY_PER_HOUR` — default `60`
+- `RATE_LIMIT_PAYMENT_CHECKOUT_SESSION_PER_HOUR` — default `10`
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` — Cloudflare Turnstile on web register, support reports, and diagnostic AI (native skips automatically)
 - `ALLOW_API_ERROR_DETAILS=1` — include internal `details` on API errors in production (default off)
+
+**Recommended for production DDoS:** put **Cloudflare** (or similar WAF/CDN) in front of Railway so volumetric traffic is absorbed before it hits Next.js/MongoDB rate-limit writes.
 
 ### Scheduler
 

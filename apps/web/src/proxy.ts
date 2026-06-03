@@ -9,7 +9,9 @@ import {
   resolveAdminOtpSessionState,
 } from '@/lib/server/admin-otp-session';
 import { isValidAdminServiceBearer } from '@/lib/server/admin-service-token';
+import { shouldSkipGlobalApiRateLimit } from '@/lib/server/global-api-rate-limit-skip';
 import { isProductionNodeEnv } from '@/lib/server/is-production-node-env';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 const LOGIN_PATH = '/admin/login';
 const AUTH_ERROR_PATH = '/admin/auth-error';
@@ -121,6 +123,12 @@ async function handleOtpFlowPath(request: NextRequest): Promise<NextResponse> {
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
+  if (!shouldSkipGlobalApiRateLimit(pathname)) {
+    const globalLimited = await executeRateLimitOrResponse(request, 'global_api');
+    if (globalLimited !== null) {
+      return globalLimited;
+    }
+  }
   if (!isAdminPath(pathname)) {
     return continueWithAppearanceScope(request);
   }

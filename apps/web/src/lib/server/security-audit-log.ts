@@ -13,6 +13,7 @@ export type SecurityEventType =
   | 'admin_otp_verify_success'
   | 'admin_otp_verify_failure'
   | 'rate_limited'
+  | 'turnstile_failed'
   | 'cron_unauthorized'
   | 'webhook_signature_failed';
 
