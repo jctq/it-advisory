@@ -354,7 +354,17 @@ const OPEN_PAYMENT_TRANSACTION_STATUSES: readonly PaymentStatus[] = ['pending', 
 export function buildActiveOpenPaymentHoldFilter(now: Date): Record<string, unknown> {
   return {
     status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
-    $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: now } }],
+    $and: [
+      {
+        $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: now } }],
+      },
+      {
+        $or: [
+          { [`metadata.${PAYMENT_CHECKOUT_COMMITTED_METADATA_KEY}`]: { $exists: false } },
+          { [`metadata.${PAYMENT_CHECKOUT_COMMITTED_METADATA_KEY}`]: { $ne: 'false' } },
+        ],
+      },
+    ],
   };
 }
 
@@ -373,17 +383,24 @@ export async function listOpenPaymentHoldStartsUtcInRange(input: {
   const now = input.nowUtc ?? new Date();
   const excludeSessionHex = input.excludeDiagnosticSessionIdHex?.trim() ?? '';
   const db = await getDb();
+  const holdFilter = buildActiveOpenPaymentHoldFilter(now);
+  const andClauses: Record<string, unknown>[] = Array.isArray(holdFilter.$and)
+    ? [...(holdFilter.$and as Record<string, unknown>[])]
+    : [];
+  if (excludeSessionHex.length > 0) {
+    andClauses.push({
+      $or: [
+        { diagnosticSessionIdHex: { $exists: false } },
+        { diagnosticSessionIdHex: null },
+        { diagnosticSessionIdHex: { $ne: excludeSessionHex } },
+      ],
+    });
+  }
   const filter: Record<string, unknown> = {
     startsAt: { $gte: input.rangeStartUtc, $lt: input.rangeEndExclusiveUtc },
-    ...buildActiveOpenPaymentHoldFilter(now),
+    status: holdFilter.status,
+    ...(andClauses.length > 0 ? { $and: andClauses } : {}),
   };
-  if (excludeSessionHex.length > 0) {
-    filter.$or = [
-      { diagnosticSessionIdHex: { $exists: false } },
-      { diagnosticSessionIdHex: null },
-      { diagnosticSessionIdHex: { $ne: excludeSessionHex } },
-    ];
-  }
   const cursor = db
     .collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions)
     .find(filter, { projection: { startsAt: 1 } })

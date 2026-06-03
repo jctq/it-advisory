@@ -3,18 +3,17 @@ import { isMarketingSlotInPublishedAvailabilityForCheckout } from '@/lib/data/bo
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import {
   findOpenPaymentTransactionForCheckoutSlot,
-  findPaymentTransactionById,
   insertPaymentTransaction,
   type PaymentTransactionRow,
 } from '@/lib/data/payment-transactions';
-import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
+import { dispatchPaymentReminderForVisitor } from '@/lib/payments/dispatch-payment-reminder-for-visitor';
 import { createManualConfirmBooking, createPendingBookingForHoldPolicy } from '@/lib/payments/payment-completion';
 import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
 import { resumeOpenPaymentTransactionCheckout } from '@/lib/payments/payment-checkout-resume-open';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { ObjectId } from 'mongodb';
-import { countBookingsByDiagnosticSessionId } from '@/lib/data/bookings';
+import { findDiagnosticSessionPendingBookingRecord } from '@/lib/data/booking-guest-manage';
 import { extractGuidedDiagnosticRawFromDiagnosticAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { diagnoseDiagnosticSessionExistingBookingPayability } from '@/lib/data/booking-guest-manage';
 import { ensureDiagnosticSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-diagnostic-session-pending-booking-ready-for-checkout';
@@ -32,17 +31,18 @@ import { validateCheckoutGatewayMethod } from '@/lib/payments/validate-checkout-
 import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
 import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
 import { buildCheckoutCommittedMetadata, isPaymentCheckoutCommitted } from '@/lib/payments/payment-checkout-commit';
+import { syncDiagnosticSessionPaymentHold } from '@/lib/payments/sync-diagnostic-session-payment-hold';
 
 export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
 async function dispatchPaymentReminderEmailAfterCheckout(input: {
   readonly transactionId: string;
+  readonly visitorId: string;
 }): Promise<void> {
-  const transaction = await findPaymentTransactionById(input.transactionId);
-  if (transaction === null) {
-    return;
-  }
-  await executeSendBookingPaymentReminderEmail({ transaction });
+  await dispatchPaymentReminderForVisitor({
+    transactionId: input.transactionId,
+    visitorId: input.visitorId,
+  });
 }
 
 function buildTransactionRowFromInsert(
@@ -141,11 +141,17 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   const diagnosticSessionObjectId = ownedDiagnosticSession._id;
   let hasExistingBookingForSession = false;
   if (diagnosticSessionObjectId !== undefined) {
-    const existingBookingCount = await timeCheckoutSegment(timing, 'existing_booking_count', () =>
-      countBookingsByDiagnosticSessionId(diagnosticSessionObjectId),
+    await timeCheckoutSegment(timing, 'payment_hold_sync', () =>
+      syncDiagnosticSessionPaymentHold({
+        diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
+        visitorId: params.visitorId,
+      }),
     );
-    hasExistingBookingForSession = existingBookingCount > 0;
-    if (existingBookingCount > 0) {
+    const pendingBookingRecord = await timeCheckoutSegment(timing, 'pending_booking_lookup', () =>
+      findDiagnosticSessionPendingBookingRecord(params.visitorId, diagnosticSessionObjectId),
+    );
+    hasExistingBookingForSession = pendingBookingRecord !== null;
+    if (pendingBookingRecord !== null) {
       const pendingReady = await timeCheckoutSegment(timing, 'pending_booking_ready', () =>
         ensureDiagnosticSessionPendingBookingReadyForCheckout(
           params.visitorId,
@@ -173,9 +179,11 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       }
       if (!pendingReady.ok && pendingReady.code !== 'booking_not_found') {
         const payabilityCode = parseBookingPayabilityCode(pendingReady.code);
+        const isSlotUnavailable =
+          pendingReady.code === 'slot_unavailable' || pendingReady.code === 'slot_taken';
         return {
           ok: false,
-          code: 'booking_not_payable',
+          code: isSlotUnavailable ? 'booking_slot_unavailable' : 'booking_not_payable',
           error: pendingReady.message,
           ...(payabilityCode !== undefined ? { payabilityCode } : {}),
         };
@@ -281,6 +289,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     serviceKey: params.serviceKey,
     startsAtUtc: startsAt,
       diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
+      visitorId: params.visitorId,
     }),
   );
   if (!slotOk) {
@@ -420,7 +429,10 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     updatePaymentTransactionProvider(insertedId, providerResult.session),
   );
   if (params.sendPaymentReminderEmail === true) {
-    void dispatchPaymentReminderEmailAfterCheckout({ transactionId });
+    void dispatchPaymentReminderEmailAfterCheckout({
+      transactionId,
+      visitorId: params.visitorId,
+    });
   }
   return {
     ok: true,

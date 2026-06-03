@@ -22,7 +22,6 @@ const OPEN_CHECKOUT_PAYMENT_STATUSES: Filter<BookingDocument> = {
 /** Pending bookings with an open checkout that may have an expired hold window. */
 const STALE_AWAITING_PAYMENT_BOOKING_FILTER = (): Filter<BookingDocument> => ({
   status: 'pending',
-  paymentTransactionId: { $ne: null },
   ...OPEN_CHECKOUT_PAYMENT_STATUSES,
 });
 
@@ -176,7 +175,7 @@ export async function syncSingleBookingIfPaymentWindowExpired(
   if (booking === null || booking._id === undefined) {
     return { didMutate: false };
   }
-  if (booking.status !== 'pending' || booking.paymentTransactionId === undefined || booking.paymentTransactionId === null) {
+  if (booking.status !== 'pending') {
     return { didMutate: false };
   }
   if (!isOpenCheckoutPaymentStatus(booking.paymentStatus)) {
@@ -184,7 +183,11 @@ export async function syncSingleBookingIfPaymentWindowExpired(
   }
   const now = new Date();
   const holdExpiresMinutes = options?.holdExpiresMinutes ?? (await getPaymentSettings()).holdExpiresMinutes;
-  const transaction = await findPaymentTransactionById(booking.paymentTransactionId.toString());
+  const paymentTransactionId = booking.paymentTransactionId;
+  let transaction: PaymentTransactionRow | null = null;
+  if (paymentTransactionId !== undefined && paymentTransactionId !== null) {
+    transaction = await findPaymentTransactionById(paymentTransactionId.toString());
+  }
   if (
     !resolveAwaitingPaymentHoldExpired({
       booking,

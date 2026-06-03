@@ -2,6 +2,7 @@ import 'server-only';
 import { COLLECTIONS } from '@/domain/collections';
 import type { RateLimitBucketDocument } from '@/domain/types';
 import { getDb } from '@/lib/mongodb';
+import { isRateLimitDisabled } from '@/lib/server/is-rate-limit-disabled';
 import {
   resolveRateLimitIdentifier,
   resolveRateLimitPolicy,
@@ -37,7 +38,7 @@ export async function assertRateLimit(input: {
   readonly windowMs?: number;
   readonly identifier?: string;
 }): Promise<void> {
-  if (!hasMongoUri()) {
+  if (!hasMongoUri() || isRateLimitDisabled()) {
     return;
   }
   const policy = resolveRateLimitPolicy(input.scope);

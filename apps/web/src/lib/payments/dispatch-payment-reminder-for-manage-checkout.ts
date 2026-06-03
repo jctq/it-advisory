@@ -1,4 +1,4 @@
-import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
+import { findPaymentTransactionById, markPaymentCheckoutCommitted } from '@/lib/data/payment-transactions';
 import { findVerifiedGuestBookingForCheckout, type GuestBookingManageCredentials } from '@/lib/data/booking-guest-manage';
 import { findVerifiedAccountBookingForCheckout } from '@/lib/data/booking-guest-manage';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
@@ -7,15 +7,15 @@ async function dispatchPaymentReminderForVerifiedBooking(input: {
   readonly expectedBookingId: string;
   readonly transactionId: string;
 }): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: 'transaction_not_found' }> {
-  const transaction = await findPaymentTransactionById(input.transactionId.trim());
-  if (transaction === null) {
+  const committed = await markPaymentCheckoutCommitted(input.transactionId.trim());
+  if (committed === null) {
     return { ok: false, code: 'transaction_not_found' };
   }
-  const linkedBookingId = transaction.bookingId?.trim() ?? '';
+  const linkedBookingId = committed.bookingId?.trim() ?? '';
   if (linkedBookingId.length === 0 || linkedBookingId !== input.expectedBookingId) {
     return { ok: false, code: 'transaction_not_found' };
   }
-  await executeSendBookingPaymentReminderEmail({ transaction });
+  await executeSendBookingPaymentReminderEmail({ transaction: committed });
   return { ok: true };
 }
 

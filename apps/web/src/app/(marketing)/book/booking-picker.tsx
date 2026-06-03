@@ -673,8 +673,11 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       clearCheckoutDraftFromSessionStorage(diagnosticSessionRef);
     }
   }, [hasValidDiagnosticSessionParam, diagnosticSessionRef, setSelectedDate, setSelectedTime]);
-  const executeReturnToFreshCheckoutDateStep = useCallback((): void => {
+  const executeReturnToFreshCheckoutDateStep = useCallback(async (): Promise<void> => {
     manualSlotRebookRef.current = true;
+    if (hasValidDiagnosticSessionParam) {
+      await executeSyncPaymentHoldExpiry().catch(() => undefined);
+    }
     setMustPersistSlotBeforeCheckout(true);
     setHoldExpiredRequiresRebook(false);
     setPaymentHoldExpired(false);
@@ -695,9 +698,6 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       router.replace(buildMarketingBookSessionPath(diagnosticSessionRef, checkoutServiceKeyForApi));
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (hasValidDiagnosticSessionParam) {
-      void executeSyncPaymentHoldExpiry().catch(() => undefined);
-    }
   }, [
     checkoutServiceKeyForApi,
     clearCheckoutSlotSelection,
@@ -1848,6 +1848,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       serviceKey: checkoutServiceKeyForApi,
       fromYmd: from,
       toYmd: to,
+      sessionRef: hasValidDiagnosticSessionParam ? diagnosticSessionRef : null,
       signal: controller.signal,
     })
       .then((slots) => {
@@ -1868,6 +1869,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   }, [
     availabilityRefreshToken,
     checkoutServiceKeyForApi,
+    diagnosticSessionRef,
+    hasValidDiagnosticSessionParam,
     manilaFetchBounds,
     phase,
     setAvailabilityByDate,
@@ -1953,7 +1956,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
       return;
     }
     void (async (): Promise<void> => {
-      if (mustPersistSlotBeforeCheckout && hasValidDiagnosticSessionParam) {
+      if (hasValidDiagnosticSessionParam) {
         setIsPersistingCheckoutSlot(true);
         try {
           const dateYmd = formatInTimeZone(selectedDate, PRIMARY_TIMEZONE, 'yyyy-MM-dd');
@@ -1977,8 +1980,11 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           setPendingPaymentHoldDialogOpen(false);
           checkoutResumeHandledRef.current = diagnosticSessionRef;
         } catch (error: unknown) {
-          notifyError(error instanceof Error ? error.message : 'Could not save your new session time.');
-          return;
+          const message = error instanceof Error ? error.message : '';
+          if (!message.toLowerCase().includes('pending booking not found')) {
+            notifyError(message.length > 0 ? message : 'Could not save your new session time.');
+            return;
+          }
         } finally {
           setIsPersistingCheckoutSlot(false);
         }
@@ -2067,10 +2073,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         manualSlotRebookRef.current = false;
         setMustPersistSlotBeforeCheckout(false);
         setHoldExpiredRequiresRebook(false);
-        void sendPaymentReminderAfterCheckoutCommit({
-          apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
-          transactionId: cachedPrep.transactionId,
-        });
+        try {
+          await sendPaymentReminderAfterCheckoutCommit({
+            apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+            transactionId: cachedPrep.transactionId,
+          });
+        } catch {
+          notifyError('Could not start payment. Please try again.');
+          setErrorMessage('Could not start payment. Please try again.');
+          setPhase('payment');
+          return;
+        }
         window.location.href = cachedPrep.redirectUrl;
         return;
       }
@@ -2256,7 +2269,8 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
   const executeBackToDate = (): void => {
     setFieldErrors({});
     if (mustPersistSlotBeforeCheckout || holdExpiredRequiresRebook) {
-      manualSlotRebookRef.current = true;
+      void executeReturnToFreshCheckoutDateStep();
+      return;
     }
     setPhase('date');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2275,12 +2289,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     setAwaitingPaymentReservedSlot(null);
     setPendingPaymentHoldDialogOpen(false);
     if (holdExpiredRequiresRebook || mustPersistSlotBeforeCheckout) {
-      manualSlotRebookRef.current = true;
-      setHoldExpiredRequiresRebook(false);
-      setMustPersistSlotBeforeCheckout(true);
-      setSessionGateStatus('ready');
-      setPhase('date');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      void executeReturnToFreshCheckoutDateStep();
       return;
     }
     resetCheckoutSessionGate();

@@ -95,6 +95,7 @@ export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
   readonly serviceKey: string;
   readonly startsAtUtc: Date;
   readonly diagnosticSessionIdHex: string;
+  readonly visitorId?: string | null;
 }): Promise<boolean> {
   const doc = await findAdvisorBookingSettingsDocument();
   const normalized =
@@ -115,6 +116,7 @@ export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
   const instantOccupied = await isCheckoutSlotInstantOccupiedExcludingSession({
     startsAtUtc: input.startsAtUtc,
     excludeDiagnosticSessionIdHex: input.diagnosticSessionIdHex,
+    excludeVisitorId: input.visitorId,
   });
   if (instantOccupied) {
     return false;
@@ -139,6 +141,49 @@ export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
     settings: normalized,
     startsAtUtc: input.startsAtUtc,
     nowUtc,
+    activeBookingStartsUtc: active,
+  });
+}
+
+/**
+ * Checkout calendar allowlist: omits slots reserved by the current diagnostic session or visitor.
+ */
+export async function getCheckoutBookingAvailabilitySlots(input: {
+  readonly serviceKey: string;
+  readonly fromYmd: string;
+  readonly toYmd: string;
+  readonly diagnosticSessionIdHex: string;
+  readonly visitorId?: string | null;
+}): Promise<readonly PublicAvailabilitySlot[]> {
+  const doc = await findAdvisorBookingSettingsDocument();
+  const normalized =
+    doc !== null
+      ? normalizeAdvisorBookingSettings(doc)
+      : normalizeAdvisorBookingSettings(createDefaultAdvisorBookingSettingsDocument(new Date()));
+  const tz = normalized.timezone;
+  const sessionHex = input.diagnosticSessionIdHex.trim();
+  const active =
+    sessionHex.length > 0
+      ? await listActiveBookingStartsUtcInYmdWindowForCheckout({
+          serviceKey: input.serviceKey,
+          fromYmd: input.fromYmd,
+          toYmd: input.toYmd,
+          bufferDays: CAP_BUFFER_DAYS,
+          timeZone: tz,
+          excludeDiagnosticSessionIdHex: sessionHex,
+        })
+      : await listActiveBookingStartsUtcInYmdWindow({
+          serviceKey: input.serviceKey,
+          fromYmd: input.fromYmd,
+          toYmd: input.toYmd,
+          bufferDays: CAP_BUFFER_DAYS,
+          timeZone: tz,
+        });
+  return expandPublicAvailabilitySlots({
+    settings: normalized,
+    fromYmd: input.fromYmd,
+    toYmd: input.toYmd,
+    nowUtc: new Date(),
     activeBookingStartsUtc: active,
   });
 }

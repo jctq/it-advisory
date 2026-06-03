@@ -4,7 +4,8 @@ import {
   type VerifiedGuestBooking,
 } from '@/lib/data/booking-guest-manage';
 import { getPaymentSettings, type PaymentSettingsValues } from '@/lib/data/payment-settings';
-import { rescheduleOverduePendingBooking } from '@/lib/data/manage-booking-overdue-actions';
+import { reschedulePendingBookingSlotForCheckout } from '@/lib/data/manage-booking-overdue-actions';
+import { syncDiagnosticSessionPaymentHold } from '@/lib/payments/sync-diagnostic-session-payment-hold';
 import { syncSingleBookingIfPaymentWindowExpired } from '@/lib/payments/cancel-expired-payment-window-bookings';
 import type { BookingDocument } from '@/domain/types';
 import { isPendingPaymentExpiredForRebook, isReleasedBookingSlotStartsAt } from '@/lib/booking/pending-payment-expired-for-rebook';
@@ -56,6 +57,10 @@ export async function ensureDiagnosticSessionPendingBookingReadyForCheckout(
   },
 ): Promise<EnsureDiagnosticSessionPendingBookingReadyResult> {
   const requirePayable = options?.requirePayable ?? true;
+  await syncDiagnosticSessionPaymentHold({
+    diagnosticSessionIdHex: diagnosticSessionId.toString(),
+    visitorId,
+  });
   let verified = await findDiagnosticSessionPendingBookingRecord(visitorId, diagnosticSessionId);
   if (verified === null) {
     return { ok: false, code: 'booking_not_found', message: 'Pending booking not found.' };
@@ -63,9 +68,16 @@ export async function ensureDiagnosticSessionPendingBookingReadyForCheckout(
   const needsSlotUpdate =
     pendingBookingNeedsSlotRebook(verified.booking) || !doesBookingMatchCheckoutSlot(verified.booking, slot);
   if (needsSlotUpdate) {
-    const rescheduled = await rescheduleOverduePendingBooking(verified, slot, {
-      expectedVisitorId: visitorId,
-    });
+    const rescheduled = await reschedulePendingBookingSlotForCheckout(
+      verified,
+      {
+        dateYmd: slot.dateYmd,
+        timeLabel: slot.timeLabel,
+        diagnosticSessionIdHex: diagnosticSessionId.toString(),
+        visitorId,
+      },
+      { expectedVisitorId: visitorId },
+    );
     if (!rescheduled.ok) {
       return { ok: false, code: rescheduled.code, message: rescheduled.message };
     }

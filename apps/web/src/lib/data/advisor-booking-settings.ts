@@ -9,6 +9,7 @@ import {
   listOpenPaymentHoldStartsUtcInRange,
   listPaidOccupiedStartsUtcInRange,
 } from '@/lib/data/payment-transactions';
+import { RELEASED_BOOKING_SLOT_STARTS_AT } from '@/lib/booking/released-booking-slot';
 import { getDb } from '@/lib/mongodb';
 
 const ADVISOR_SETTINGS_ID = 'default' as const;
@@ -25,10 +26,12 @@ export function invalidateAdvisorBookingSettingsCheckoutCache(): void {
 /** Bookings that still reserve a calendar slot (excludes pending rows after checkout hold expired). */
 function buildActiveBookingSlotOccupancyFilter(): Record<string, unknown> {
   return {
+    startsAt: { $ne: RELEASED_BOOKING_SLOT_STARTS_AT },
     $or: [
       { status: 'confirmed' },
       {
         status: 'pending',
+        paymentStatus: { $ne: 'expired' },
         $or: [
           { paymentStatus: { $in: ['paid', 'pending', 'processing'] } },
           { paymentStatus: { $exists: false } },
@@ -108,17 +111,38 @@ function buildExcludeDiagnosticSessionBookingFilter(excludeSessionObjectId: Obje
   };
 }
 
+function buildExcludeOwnCheckoutReservationFilter(input: {
+  readonly excludeSessionObjectId: ObjectId;
+  readonly excludeVisitorId: string;
+}): Record<string, unknown> {
+  const visitorId = input.excludeVisitorId.trim();
+  if (visitorId.length === 0) {
+    return buildExcludeDiagnosticSessionBookingFilter(input.excludeSessionObjectId);
+  }
+  return {
+    $nor: [
+      { diagnosticSessionId: input.excludeSessionObjectId },
+      {
+        visitorId,
+        status: 'pending',
+      },
+    ],
+  };
+}
+
 /**
  * True when another visitor/session already occupies this instant (checkout fast path).
  */
 export async function isCheckoutSlotInstantOccupiedExcludingSession(input: {
   readonly startsAtUtc: Date;
   readonly excludeDiagnosticSessionIdHex: string;
+  readonly excludeVisitorId?: string | null;
 }): Promise<boolean> {
   if (!process.env.MONGODB_URI) {
     return false;
   }
   const excludeSessionHex = input.excludeDiagnosticSessionIdHex.trim();
+  const excludeVisitorId = input.excludeVisitorId?.trim() ?? '';
   if (excludeSessionHex.length === 0) {
     return hasGlobalActiveBookingAtSlot({ startsAtUtc: input.startsAtUtc });
   }
@@ -130,20 +154,40 @@ export async function isCheckoutSlotInstantOccupiedExcludingSession(input: {
   }
   const db = await getDb();
   const now = new Date();
+  const holdFilter = buildActiveOpenPaymentHoldFilter(now);
+  const holdAndClauses: Record<string, unknown>[] = Array.isArray(holdFilter.$and)
+    ? [...(holdFilter.$and as Record<string, unknown>[])]
+    : [];
+  const holdExclusion: Record<string, unknown> =
+    excludeVisitorId.length > 0
+      ? {
+          $nor: [
+            { diagnosticSessionIdHex: excludeSessionHex },
+            { visitorId: excludeVisitorId, status: { $in: ['pending', 'processing'] } },
+          ],
+        }
+      : {
+          $or: [
+            { diagnosticSessionIdHex: { $exists: false } },
+            { diagnosticSessionIdHex: null },
+            { diagnosticSessionIdHex: { $ne: excludeSessionHex } },
+          ],
+        };
+  holdAndClauses.push(holdExclusion);
+  const bookingExclusion = buildExcludeOwnCheckoutReservationFilter({
+    excludeSessionObjectId,
+    excludeVisitorId,
+  });
   const [bookingCount, holdCount, paidCount] = await Promise.all([
     db.collection(COLLECTIONS.bookings).countDocuments({
       ...buildActiveBookingSlotOccupancyFilter(),
       startsAt: input.startsAtUtc,
-      ...buildExcludeDiagnosticSessionBookingFilter(excludeSessionObjectId),
+      ...bookingExclusion,
     }),
     db.collection(COLLECTIONS.paymentTransactions).countDocuments({
       startsAt: input.startsAtUtc,
-      ...buildActiveOpenPaymentHoldFilter(now),
-      $or: [
-        { diagnosticSessionIdHex: { $exists: false } },
-        { diagnosticSessionIdHex: null },
-        { diagnosticSessionIdHex: { $ne: excludeSessionHex } },
-      ],
+      status: holdFilter.status,
+      ...(holdAndClauses.length > 0 ? { $and: holdAndClauses } : {}),
     }),
     db.collection(COLLECTIONS.paymentTransactions).countDocuments({
       status: 'paid',

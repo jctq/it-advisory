@@ -9,6 +9,8 @@ export type GetBookingAvailabilitySlotsParams = {
   readonly fromYmd: string;
   readonly toYmd: string;
   readonly serviceKey?: string;
+  /** When set, returns checkout availability that excludes this diagnostic session's stale holds. */
+  readonly sessionRef?: string | null;
   readonly signal?: AbortSignal;
 };
 
@@ -20,7 +22,10 @@ export async function getBookingAvailabilitySlots(
 ): Promise<readonly PublicBookingAvailabilitySlot[]> {
   const base = params.apiBaseUrl.replace(/\/$/, '');
   const serviceKey = params.serviceKey ?? 'project-rescue';
-  const url = `${base}/api/booking/availability?serviceKey=${encodeURIComponent(serviceKey)}&from=${encodeURIComponent(params.fromYmd)}&to=${encodeURIComponent(params.toYmd)}`;
+  const sessionRef = params.sessionRef?.trim() ?? '';
+  const sessionQuery =
+    sessionRef.length > 0 ? `&sessionRef=${encodeURIComponent(sessionRef)}` : '';
+  const url = `${base}/api/booking/availability?serviceKey=${encodeURIComponent(serviceKey)}&from=${encodeURIComponent(params.fromYmd)}&to=${encodeURIComponent(params.toYmd)}${sessionQuery}`;
   const response = await fetch(url, { signal: params.signal, cache: 'no-store' });
   const payload = (await response.json()) as { slots?: PublicBookingAvailabilitySlot[]; error?: string };
   if (!response.ok) {

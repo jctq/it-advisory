@@ -9,7 +9,7 @@ import {
   findBookingByVisitorSlot,
   linkDiagnosticSessionToVisitorBooking,
 } from '@/lib/data/bookings';
-import { isMarketingSlotInPublishedAvailability } from '@/lib/data/booking-availability';
+import { isMarketingSlotInPublishedAvailabilityForCheckout } from '@/lib/data/booking-availability';
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
@@ -184,9 +184,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       bookingStatus: await resolveBookingStatusForId(existingId.toString()),
     });
   }
-  const slotOk = await isMarketingSlotInPublishedAvailability({
+  const slotOk = await isMarketingSlotInPublishedAvailabilityForCheckout({
     serviceKey,
     startsAtUtc: startsAt,
+    diagnosticSessionIdHex,
+    visitorId,
   });
   if (!slotOk) {
     return NextResponse.json(

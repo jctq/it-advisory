@@ -2,9 +2,14 @@ import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentGatewayId, PaymentTransactionDocument } from '@/domain/payment-types';
 import type { BookingDocument } from '@/domain/types';
+import {
+  findPaymentTransactionById,
+  markPaymentCheckoutCommitted,
+} from '@/lib/data/payment-transactions';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
 import { buildMarketingBookSessionPath } from '@/lib/marketing/diagnostic-session-marketing-ref';
 import { isOpenPaymentTransactionHoldActive } from '@/lib/marketing/payment-hold-expiry';
+import { isPaymentCheckoutCommitted } from '@/lib/payments/payment-checkout-commit';
 import { buildPaymentProviderReturnUrls } from '@/lib/payments/payment-provider-return-urls';
 import type { CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 import { getDb } from '@/lib/mongodb';
@@ -75,6 +80,23 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   if (!isOpenPaymentTransactionHoldActive(input.transaction)) {
     return { ok: false, code: 'payment_hold_expired', error: 'The payment window has expired.' };
   }
+  const shouldCommitCheckout =
+    isPaymentCheckoutCommitted(input.metadata) &&
+    !isPaymentCheckoutCommitted(input.transaction.metadata);
+  const commitCheckoutIfNeeded = async (): Promise<void> => {
+    if (shouldCommitCheckout) {
+      await markPaymentCheckoutCommitted(input.transaction.id);
+    }
+  };
+  const sendReminderIfRequested = async (): Promise<void> => {
+    if (input.sendPaymentReminderEmail !== true) {
+      return;
+    }
+    const transaction = await findPaymentTransactionById(input.transaction.id);
+    if (transaction !== null) {
+      await executeSendBookingPaymentReminderEmail({ transaction });
+    }
+  };
   const cachedRedirectUrl = input.transaction.redirectUrl?.trim() ?? '';
   const metadataPaymentMethodId = input.transaction.metadata?.paymentMethodId?.trim() ?? '';
   const canReuseCachedRedirect =
@@ -84,6 +106,8 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
     input.transaction.amountCentavos === input.amountCentavos;
   if (canReuseCachedRedirect) {
     input.timing?.mark('gateway_create_reused');
+    await timeCheckoutSegment(input.timing, 'checkout_commit', () => commitCheckoutIfNeeded());
+    await timeCheckoutSegment(input.timing, 'payment_reminder', () => sendReminderIfRequested());
     return {
       ok: true,
       transactionId: input.transaction.id,
@@ -95,6 +119,7 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
     };
   }
   const transactionObjectId = new ObjectId(input.transaction.id);
+  await timeCheckoutSegment(input.timing, 'checkout_commit', () => commitCheckoutIfNeeded());
   await timeCheckoutSegment(input.timing, 'resume_tx_update', () =>
     updateOpenPaymentTransactionForCheckoutResume(transactionObjectId, {
     gatewayId: input.gatewayId,
@@ -144,9 +169,7 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   await timeCheckoutSegment(input.timing, 'provider_persist', () =>
     updatePaymentTransactionProvider(transactionObjectId, providerResult.session),
   );
-  if (input.sendPaymentReminderEmail === true) {
-    void executeSendBookingPaymentReminderEmail({ transaction: input.transaction });
-  }
+  await timeCheckoutSegment(input.timing, 'payment_reminder', () => sendReminderIfRequested());
   return {
     ok: true,
     transactionId: input.transaction.id,
