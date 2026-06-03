@@ -54,6 +54,15 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
   readonly markPersistedFromServer: (guided: GuidedDiagnosticV1, hasEverCompleted: boolean) => void;
   readonly resetPersistTracking: () => void;
 } {
+  const {
+    guided,
+    isSessionReady,
+    sessionReadOnlyRef,
+    sessionTargetId,
+    persistedSessionRef,
+    onPersistedSessionRef,
+    hasHydratedRef,
+  } = input;
   const hasEverCompletedRef = useRef<boolean>(false);
   const lastPersistedHashRef = useRef<string | null>(null);
   const lastCheckpointKeyRef = useRef<string | null>(null);
@@ -61,8 +70,6 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
   const inFlightRef = useRef<Promise<void> | null>(null);
   const pendingPersistRef = useRef<PersistQueueItem | null>(null);
   const runPersistQueueRef = useRef<(next: PersistQueueItem) => Promise<void>>(async () => undefined);
-  const inputRef = useRef(input);
-  inputRef.current = input;
   const clearScheduledPersist = useCallback((): void => {
     if (debounceTimerRef.current !== null) {
       clearTimeout(debounceTimerRef.current);
@@ -80,17 +87,17 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
       }
       return {
         guided,
-        sessionTargetId: inputRef.current.sessionTargetId,
-        persistedSessionRef: inputRef.current.persistedSessionRef,
+        sessionTargetId,
+        persistedSessionRef,
         hasEverCompleted: hasEverCompletedRef.current,
         completedOverride: options?.completedOverride,
       };
     },
-    [],
+    [persistedSessionRef, sessionTargetId],
   );
   const executePersist = useCallback(
     async (guided: GuidedDiagnosticV1, options?: PersistOptions): Promise<void> => {
-      if (inputRef.current.sessionReadOnlyRef.current) {
+      if (sessionReadOnlyRef.current) {
         return;
       }
       const request = buildPersistRequest(guided, options);
@@ -108,7 +115,7 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
         lastPersistedHashRef.current = payloadHash;
         lastCheckpointKeyRef.current = computeGuidedPersistCheckpointKey(guided);
         const payload: unknown = await response.json().catch(() => ({}));
-        inputRef.current.onPersistedSessionRef(parseDiagnosticSessionIdFromApiPayload(payload));
+        onPersistedSessionRef(parseDiagnosticSessionIdFromApiPayload(payload));
         return;
       }
       if (response.status === 429) {
@@ -124,7 +131,7 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
         }, retryAfterSeconds * 1000);
       }
     },
-    [buildPersistRequest, clearScheduledPersist],
+    [buildPersistRequest, clearScheduledPersist, onPersistedSessionRef, sessionReadOnlyRef],
   );
   const runPersistQueue = useCallback(
     async (next: PersistQueueItem): Promise<void> => {
@@ -134,7 +141,7 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
         const pending = pendingPersistRef.current;
         pendingPersistRef.current = null;
         if (pending !== null) {
-          await runPersistQueue(pending);
+          await runPersistQueueRef.current(pending);
         }
         return;
       }
@@ -145,12 +152,14 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
       const pending = pendingPersistRef.current;
       pendingPersistRef.current = null;
       if (pending !== null) {
-        await runPersistQueue(pending);
+        await runPersistQueueRef.current(pending);
       }
     },
     [executePersist],
   );
-  runPersistQueueRef.current = runPersistQueue;
+  useEffect(() => {
+    runPersistQueueRef.current = runPersistQueue;
+  }, [runPersistQueue]);
   const persistImmediate = useCallback(
     async (guided: GuidedDiagnosticV1, options?: PersistOptions): Promise<void> => {
       clearScheduledPersist();
@@ -178,13 +187,13 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
     hasEverCompletedRef.current = hasEverCompleted;
     const request: DiagnosticSessionPersistRequest = {
       guided,
-      sessionTargetId: inputRef.current.sessionTargetId,
-      persistedSessionRef: inputRef.current.persistedSessionRef,
+      sessionTargetId,
+      persistedSessionRef,
       hasEverCompleted,
     };
     lastPersistedHashRef.current = computeDiagnosticSessionPersistPayloadHash(request);
     lastCheckpointKeyRef.current = computeGuidedPersistCheckpointKey(guided);
-  }, []);
+  }, [persistedSessionRef, sessionTargetId]);
   const resetPersistTracking = useCallback((): void => {
     hasEverCompletedRef.current = false;
     lastPersistedHashRef.current = null;
@@ -192,33 +201,25 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
     clearScheduledPersist();
   }, [clearScheduledPersist]);
   useEffect(() => {
-    if (!input.isSessionReady || !input.hasHydratedRef.current || input.sessionReadOnlyRef.current) {
+    if (!isSessionReady || !hasHydratedRef.current || sessionReadOnlyRef.current) {
       return;
     }
-    const checkpointKey = computeGuidedPersistCheckpointKey(input.guided);
+    const checkpointKey = computeGuidedPersistCheckpointKey(guided);
     const checkpointChanged = checkpointKey !== lastCheckpointKeyRef.current;
     if (checkpointChanged) {
       lastCheckpointKeyRef.current = checkpointKey;
-      const completedOverride =
-        input.guided.outcome !== null && input.guided.activeRound === null ? true : undefined;
-      flushPersist(input.guided, { completedOverride });
+      const completedOverride = guided.outcome !== null && guided.activeRound === null ? true : undefined;
+      flushPersist(guided, { completedOverride });
       return;
     }
-    schedulePersist(input.guided);
-  }, [
-    flushPersist,
-    input.guided,
-    input.hasHydratedRef,
-    input.isSessionReady,
-    input.sessionReadOnlyRef,
-    schedulePersist,
-  ]);
+    schedulePersist(guided);
+  }, [flushPersist, guided, hasHydratedRef, isSessionReady, sessionReadOnlyRef, schedulePersist]);
   useEffect(() => {
-    if (!input.isSessionReady || input.sessionReadOnlyRef.current) {
+    if (!isSessionReady || sessionReadOnlyRef.current) {
       return;
     }
     function flushBeforeLeave(): void {
-      void persistImmediate(inputRef.current.guided, { force: true });
+      void persistImmediate(guided, { force: true });
     }
     const handleVisibilityChange = (): void => {
       if (document.visibilityState === 'hidden') {
@@ -231,7 +232,7 @@ export function useDiagnosticSessionPersist(input: UseDiagnosticSessionPersistIn
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', flushBeforeLeave);
     };
-  }, [input.guided, input.isSessionReady, input.sessionReadOnlyRef, persistImmediate]);
+  }, [guided, isSessionReady, sessionReadOnlyRef, persistImmediate]);
   useEffect(() => {
     return () => {
       clearScheduledPersist();
