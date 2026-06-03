@@ -1,6 +1,5 @@
 import { AdminLoginButtons } from '@/components/admin/admin-login-buttons';
 import { resolveAdminAuthErrorPresentation } from '@/lib/admin/resolve-admin-auth-error';
-import { buildApiUrl } from '@/lib/config/build-api-url';
 
 type SearchParams = { readonly next?: string; readonly error?: string };
 
@@ -21,7 +20,6 @@ export default async function AdminLoginPage(props: {
   const hasMicrosoft =
     (process.env.AUTH_MICROSOFT_ENTRA_ID_ID?.trim().length ?? 0) > 0 &&
     (process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET?.trim().length ?? 0) > 0;
-  const logoutUrl = buildApiUrl('/api/admin/logout');
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-6 py-12">
       <header className="space-y-1 text-center">
