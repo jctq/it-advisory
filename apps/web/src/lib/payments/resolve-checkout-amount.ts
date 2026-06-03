@@ -12,11 +12,16 @@ import { getRecordingSettings } from '@/lib/data/recording-settings';
 export type ResolvedCheckoutAmount = {
   readonly amountCentavos: number;
   readonly amountLabel: string;
+  readonly subtotalAmountCentavos: number;
+  readonly subtotalAmountLabel: string;
+  readonly discountCentavos: number;
+  readonly discountLabel: string | null;
   readonly source: CheckoutPricingSource;
   readonly appliedPromoCode?: string;
   readonly catalogServiceKey?: string;
   readonly recordingOptIn: boolean;
   readonly recordingSurchargeCentavos: number;
+  readonly recordingSurchargeLabel: string | null;
 };
 
 function isQuoteActive(quotedAmountCentavos: number | null, quoteExpiresAtIso: string | null): boolean {
@@ -72,21 +77,31 @@ async function resolveRecordingSurcharge(
 }
 
 async function buildResolvedCheckoutAmount(input: {
-  readonly amountCentavos: number;
+  readonly subtotalAmountCentavos: number;
+  readonly discountedBaseCentavos: number;
   readonly source: CheckoutPricingSource;
   readonly appliedPromoCode?: string;
   readonly catalogServiceKey?: string;
   readonly recordingOptIn: boolean;
 }): Promise<ResolvedCheckoutAmount> {
-  const withSurcharge = await resolveRecordingSurcharge(input.amountCentavos, input.recordingOptIn);
+  const discountCentavos = Math.max(0, input.subtotalAmountCentavos - input.discountedBaseCentavos);
+  const withSurcharge = await resolveRecordingSurcharge(input.discountedBaseCentavos, input.recordingOptIn);
   return {
     amountCentavos: withSurcharge.amountCentavos,
     amountLabel: formatPaymentAmountLabel(withSurcharge.amountCentavos),
+    subtotalAmountCentavos: input.subtotalAmountCentavos,
+    subtotalAmountLabel: formatPaymentAmountLabel(input.subtotalAmountCentavos),
+    discountCentavos,
+    discountLabel: discountCentavos > 0 ? formatPaymentAmountLabel(discountCentavos) : null,
     source: input.source,
     ...(input.appliedPromoCode !== undefined ? { appliedPromoCode: input.appliedPromoCode } : {}),
     ...(input.catalogServiceKey !== undefined ? { catalogServiceKey: input.catalogServiceKey } : {}),
     recordingOptIn: input.recordingOptIn,
     recordingSurchargeCentavos: withSurcharge.recordingSurchargeCentavos,
+    recordingSurchargeLabel:
+      withSurcharge.recordingSurchargeCentavos > 0
+        ? formatPaymentAmountLabel(withSurcharge.recordingSurchargeCentavos)
+        : null,
   };
 }
 
@@ -106,7 +121,8 @@ export async function resolveCheckoutAmountCentavos(input: {
     if (booking !== null && isQuoteActive(booking.quotedAmountCentavos, booking.quoteExpiresAtIso)) {
       const amountCentavos = clampAmountCentavos(booking.quotedAmountCentavos!);
       return buildResolvedCheckoutAmount({
-        amountCentavos,
+        subtotalAmountCentavos: amountCentavos,
+        discountedBaseCentavos: amountCentavos,
         source: 'custom_quote',
         recordingOptIn,
       });
@@ -121,7 +137,8 @@ export async function resolveCheckoutAmountCentavos(input: {
       throw new Error(validation.error);
     }
     return buildResolvedCheckoutAmount({
-      amountCentavos: validation.discountedAmountCentavos,
+      subtotalAmountCentavos: base.amountCentavos,
+      discountedBaseCentavos: validation.discountedAmountCentavos,
       source: 'promo',
       appliedPromoCode: validation.promo.code,
       catalogServiceKey: base.catalogServiceKey,
@@ -129,7 +146,8 @@ export async function resolveCheckoutAmountCentavos(input: {
     });
   }
   return buildResolvedCheckoutAmount({
-    amountCentavos: base.amountCentavos,
+    subtotalAmountCentavos: base.amountCentavos,
+    discountedBaseCentavos: base.amountCentavos,
     source: base.source,
     catalogServiceKey: base.catalogServiceKey,
     recordingOptIn,

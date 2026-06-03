@@ -56,6 +56,7 @@ import { PaymentProcessingDialog } from '@/components/marketing/payment-processi
 import { rescheduleMarketingCheckoutSlot } from '@teqmd/api-client/marketing-booking-api-client';
 import type { PaymentGatewayId } from '@/domain/payment-types';
 import { PROJECT_RESCUE_SERVICE_TITLE, PROJECT_RESCUE_SERVICE_TAGLINE, PROJECT_RESCUE_SESSION_DURATION } from '@teqmd/diagnostic-core/project-rescue-service-context';
+import { CheckoutOrderSummarySidebar } from '@/components/marketing/checkout-order-summary-sidebar';
 import { DiagnosticStickyActionBar } from '@/components/marketing/diagnostic-sticky-action-bar';
 import { BookingMonthFullCalendar } from '@/components/marketing/booking-month-full-calendar';
 import { BookingMonthYearNav } from '@/components/marketing/booking-month-year-nav';
@@ -63,7 +64,6 @@ import { AddToCalendarButtons } from '@/components/marketing/add-to-calendar-but
 import { BookingConfirmedServiceCard } from '@/components/marketing/booking-confirmed-service-card';
 import { HorizontalProgressStepper } from '@/components/marketing/horizontal-progress-stepper';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -2942,7 +2942,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           </div>
         ) : null}
         {visibleCheckoutPhase === 'payment' ? (
-          <div className="mt-10 grid gap-10 pb-[calc(12rem+env(safe-area-inset-bottom))] lg:grid-cols-[1fr_340px] lg:items-start lg:pb-0">
+          <div className="mt-10 grid gap-10 pb-[calc(12rem+env(safe-area-inset-bottom))] lg:grid-cols-[340px_1fr] lg:items-start lg:pb-0">
             <div className={cn('space-y-6', isPaymentHoldBlocked && 'pointer-events-none opacity-60')}>
               {isLivePaymentsCheckout && hasMultiplePaymentGateways && paymentConfig !== null ? (
                 <fieldset>
@@ -3019,7 +3019,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                 <fieldset>
                   <legend className="text-sm font-semibold text-foreground">Payment method</legend>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Choose how you want to pay. You will complete payment on {selectedGateway?.label ?? 'the provider'}.
+                    Choose how you want to pay.
                   </p>
                   <div className="mt-4 space-y-3">
                     {availablePaymentMethods.map((method) => {
@@ -3053,195 +3053,106 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   </div>
                 </fieldset>
               ) : null}
-              <div className="space-y-2">
-                <label htmlFor="promoCode" className="text-sm font-medium text-foreground">
-                  Promo code (optional)
-                </label>
-                <Input
-                  id="promoCode"
-                  value={promoCode}
-                  onChange={(event) => {
-                    setPromoCode(event.target.value);
-                  }}
-                  placeholder="Enter code"
-                  autoComplete="off"
-                />
-                {promoError !== null ? (
-                  <p className="text-xs text-destructive" role="alert">
-                    {promoError}
-                  </p>
-                ) : null}
-              </div>
               {paymentConfig?.sandboxMode ? (
                 <p className="text-xs font-medium text-amber-700">Sandbox mode — test payments only.</p>
               ) : null}
             </div>
-            <aside className="space-y-4 lg:sticky lg:top-44 lg:z-30">
-              <div className="rounded-2xl border border-border bg-muted/30 p-5">
-                <p className="text-sm font-semibold text-foreground">{checkoutServiceTitle}</p>
-                {checkoutServiceDescription.length > 0 ? (
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{checkoutServiceDescription}</p>
-                ) : null}
-                <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
-                  {isAwaitingPaymentCheckout && activePaymentHoldLabels !== null ? (
-                    <div className="col-span-2">
-                      <dt className="text-xs text-muted-foreground">Pay on or before</dt>
-                      <dd className="mt-1 font-semibold text-foreground">
-                        {activePaymentHoldLabels.dateLabel}
-                        <span className="mt-0.5 block tabular-nums">{activePaymentHoldLabels.timeLabel}</span>
-                        <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                          {activePaymentHoldLabels.timezoneLabel}
-                        </span>
-                      </dd>
-                    </div>
-                  ) : null}
-                  {isAwaitingPaymentCheckout && awaitingPaymentReservedSlotLabels !== null ? (
-                    <div className="col-span-2">
-                      <dt className="text-xs text-muted-foreground">Date &amp; time</dt>
-                      <dd className="mt-1 font-semibold text-foreground">
-                        {awaitingPaymentReservedSlotLabels.dateLabel}
-                        <span className="mt-0.5 block tabular-nums">{awaitingPaymentReservedSlotLabels.timeLabel}</span>
-                        <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                          {awaitingPaymentReservedSlotLabels.timezoneLabel}
-                        </span>
-                      </dd>
-                    </div>
-                  ) : null}
-                  {!isAwaitingPaymentCheckout && selectedCheckoutSlotLabels !== null ? (
-                    <div className="col-span-2">
-                      <dt className="text-xs text-muted-foreground">Date &amp; time</dt>
-                      <dd className="mt-1 font-semibold text-foreground">
-                        {selectedCheckoutSlotLabels.dateLabel}
-                        <span className="mt-0.5 block tabular-nums">{selectedCheckoutSlotLabels.timeLabel}</span>
-                        <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                          {selectedCheckoutSlotLabels.timezoneLabel}
-                        </span>
-                      </dd>
-                    </div>
-                  ) : null}
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Duration</dt>
-                    <dd className="mt-1 font-semibold text-foreground">{checkoutServiceDuration}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Amount</dt>
-                    <dd className="mt-1 font-semibold text-foreground">{checkoutAmountLabel}</dd>
-                  </div>
-                </dl>
-                <p className="mt-2 text-xs text-muted-foreground">Inclusive of VAT</p>
-              </div>
-              {paymentConfig?.recordingsEnabled === true ? (
-                <label
-                  className={cn(
-                    'grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 rounded-xl border border-border bg-card p-3',
-                    isPaymentHoldBlocked && 'pointer-events-none opacity-60',
-                  )}
-                >
-                  <Checkbox
-                    checked={recordingOptIn}
-                    className="row-start-1 self-center"
-                    disabled={isPaymentHoldBlocked}
-                    onCheckedChange={(checked) => setRecordingOptIn(checked === true)}
-                  />
-                  <span className="row-start-1 min-w-0 text-xs font-medium leading-snug text-foreground">
-                    AI meeting notes &amp; recording
-                    {paymentConfig.recordingOptInPriceCentavos > 0
-                      ? ` (+${paymentConfig.recordingOptInPriceLabel})`
-                      : ' (included)'}
-                  </span>
-                  <span
-                    className="col-start-2 row-start-2 text-[10px] leading-tight text-muted-foreground"
-                    title="A visible Fathom notetaker may join your video call to capture notes and a summary. By opting in, you consent to recording and transcription for this consultation."
+            <CheckoutOrderSummarySidebar
+              serviceTitle={checkoutServiceTitle}
+              serviceDescription={checkoutServiceDescription}
+              serviceDuration={checkoutServiceDuration}
+              paymentConfig={paymentConfig}
+              checkoutAmountLabel={checkoutAmountLabel}
+              payBeforeLabels={isAwaitingPaymentCheckout ? activePaymentHoldLabels : null}
+              slotLabels={
+                isAwaitingPaymentCheckout
+                  ? awaitingPaymentReservedSlotLabels
+                  : selectedCheckoutSlotLabels
+              }
+              promoCode={promoCode}
+              promoError={promoError}
+              recordingOptIn={recordingOptIn}
+              isPaymentHoldBlocked={isPaymentHoldBlocked}
+              onPromoCodeChange={setPromoCode}
+              onRecordingOptInChange={setRecordingOptIn}
+              actions={
+                <div ref={setPaymentActionsUnpinElement}>
+                  <DiagnosticStickyActionBar
+                    unpinWhenElement={paymentActionsUnpinElement}
+                    pinnedSpacerClassName="h-[11.5rem] lg:h-[4.75rem]"
+                    layoutClassName="flex w-full flex-col gap-3"
                   >
-                    Fathom may join your call. Opt-in = recording consent.
-                  </span>
-                </label>
-              ) : null}
-              <div className="hidden gap-3 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 lg:flex">
-                <Lock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Secure checkout</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Your payment is safe and encrypted. We never store your card details on this site.
-                  </p>
-                </div>
-              </div>
-              <div ref={setPaymentActionsUnpinElement}>
-                <DiagnosticStickyActionBar
-                  unpinWhenElement={paymentActionsUnpinElement}
-                  pinnedSpacerClassName="h-[11.5rem] lg:h-[4.75rem]"
-                  layoutClassName="flex w-full flex-col gap-3"
-                >
-                  <div className="flex gap-3 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 lg:hidden">
-                    <Lock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Secure checkout</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Your payment is safe and encrypted. We never store your card details on this site.
-                      </p>
+                    <div className="flex gap-3 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 lg:hidden">
+                      <Lock className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Secure checkout</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Your payment is safe and encrypted. We never store your card details on this site.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div
-                    className={
-                      isAwaitingPaymentCheckout
-                        ? 'w-full'
-                        : 'grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3'
-                    }
-                  >
-                  {isAwaitingPaymentCheckout ? (
-                    <Button
-                      type="button"
-                      className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
-                      size="lg"
-                      disabled={
-                        isPaymentHoldBlocked ||
-                        (activePaymentHold !== null && serverClockOffsetMs === null) ||
-                        (paymentConfig?.paymentsEnabled
-                          ? selectedGatewayId === null || selectedPaymentMethodId === null || !hasCheckoutSlotSelected
-                          : paymentMethod === null || !hasCheckoutSlotSelected)
+                    <div
+                      className={
+                        isAwaitingPaymentCheckout
+                          ? 'w-full'
+                          : 'grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3'
                       }
-                      onClick={() => void executePay()}
                     >
-                      <Lock className="size-4 shrink-0" aria-hidden />
-                      {paymentConfig?.paymentPolicy === 'manual_confirm'
-                        ? 'Submit booking'
-                        : `Pay ${checkoutAmountLabel}`}
-                    </Button>
-                  ) : (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
-                        onClick={executeBackToDetails}
-                      >
-                        <ChevronLeft className="size-4 shrink-0" aria-hidden />
-                        Back
-                      </Button>
-                      <Button
-                        type="button"
-                        className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
-                        size="lg"
-                        disabled={
-                          isPaymentHoldBlocked ||
-                          (activePaymentHold !== null && serverClockOffsetMs === null) ||
-                          (paymentConfig?.paymentsEnabled
-                            ? selectedGatewayId === null || selectedPaymentMethodId === null || !hasCheckoutSlotSelected
-                            : paymentMethod === null || !hasCheckoutSlotSelected)
-                        }
-                        onClick={() => void executePay()}
-                      >
-                        <Lock className="size-4 shrink-0" aria-hidden />
-                        {paymentConfig?.paymentPolicy === 'manual_confirm'
-                          ? 'Submit booking'
-                          : `Pay ${checkoutAmountLabel}`}
-                      </Button>
-                    </>
-                  )}
-                  </div>
-                </DiagnosticStickyActionBar>
-              </div>
-            </aside>
+                      {isAwaitingPaymentCheckout ? (
+                        <Button
+                          type="button"
+                          className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                          size="lg"
+                          disabled={
+                            isPaymentHoldBlocked ||
+                            (activePaymentHold !== null && serverClockOffsetMs === null) ||
+                            (paymentConfig?.paymentsEnabled
+                              ? selectedGatewayId === null || selectedPaymentMethodId === null || !hasCheckoutSlotSelected
+                              : paymentMethod === null || !hasCheckoutSlotSelected)
+                          }
+                          onClick={() => void executePay()}
+                        >
+                          <Lock className="size-4 shrink-0" aria-hidden />
+                          {paymentConfig?.paymentPolicy === 'manual_confirm'
+                            ? 'Submit booking'
+                            : `Pay ${checkoutAmountLabel}`}
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                            onClick={executeBackToDetails}
+                          >
+                            <ChevronLeft className="size-4 shrink-0" aria-hidden />
+                            Back
+                          </Button>
+                          <Button
+                            type="button"
+                            className="h-auto min-h-10 w-full min-w-0 gap-2 whitespace-normal px-3 py-2.5 text-center leading-snug"
+                            size="lg"
+                            disabled={
+                              isPaymentHoldBlocked ||
+                              (activePaymentHold !== null && serverClockOffsetMs === null) ||
+                              (paymentConfig?.paymentsEnabled
+                                ? selectedGatewayId === null || selectedPaymentMethodId === null || !hasCheckoutSlotSelected
+                                : paymentMethod === null || !hasCheckoutSlotSelected)
+                            }
+                            onClick={() => void executePay()}
+                          >
+                            <Lock className="size-4 shrink-0" aria-hidden />
+                            {paymentConfig?.paymentPolicy === 'manual_confirm'
+                              ? 'Submit booking'
+                              : `Pay ${checkoutAmountLabel}`}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </DiagnosticStickyActionBar>
+                </div>
+              }
+            />
           </div>
         ) : null}
       </div>

@@ -28,9 +28,14 @@ export async function GET(request: Request): Promise<NextResponse> {
       ...recordingConfig,
       checkoutAmountCentavos: resolved.amountCentavos,
       checkoutAmountLabel: resolved.amountLabel,
+      subtotalAmountCentavos: resolved.subtotalAmountCentavos,
+      subtotalAmountLabel: resolved.subtotalAmountLabel,
+      discountCentavos: resolved.discountCentavos,
+      discountLabel: resolved.discountLabel,
       pricingSource: resolved.source,
       recordingOptIn: resolved.recordingOptIn,
       recordingSurchargeCentavos: resolved.recordingSurchargeCentavos,
+      recordingSurchargeLabel: resolved.recordingSurchargeLabel,
       ...(resolved.appliedPromoCode !== undefined ? { appliedPromoCode: resolved.appliedPromoCode } : {}),
     });
   } catch (error: unknown) {

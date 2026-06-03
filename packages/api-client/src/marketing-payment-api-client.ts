@@ -8,11 +8,18 @@ export type PaymentConfigPublic = {
   readonly currency: 'PHP';
   readonly checkoutAmountCentavos: number;
   readonly checkoutAmountLabel: string;
+  readonly subtotalAmountCentavos: number;
+  readonly subtotalAmountLabel: string;
+  readonly discountCentavos: number;
+  readonly discountLabel: string | null;
+  readonly appliedPromoCode?: string;
   readonly holdExpiresMinutes: number;
   readonly sandboxMode: boolean;
   readonly recordingsEnabled: boolean;
   readonly recordingOptInPriceCentavos: number;
   readonly recordingOptInPriceLabel: string;
+  readonly recordingSurchargeCentavos?: number;
+  readonly recordingSurchargeLabel?: string | null;
   readonly gateways: readonly {
     readonly id: PaymentGatewayId;
     readonly label: string;
