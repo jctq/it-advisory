@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { AdvisorBookingSettingsDocument } from '@/domain/types';
 import {
+  buildActiveOpenPaymentHoldFilter,
   hasGlobalOpenPaymentHoldAtSlot,
   listOpenPaymentHoldStartsUtcInRange,
   listPaidOccupiedStartsUtcInRange,
@@ -11,6 +12,15 @@ import {
 import { getDb } from '@/lib/mongodb';
 
 const ADVISOR_SETTINGS_ID = 'default' as const;
+const ADVISOR_SETTINGS_CHECKOUT_CACHE_TTL_MS = 60_000 as const;
+let advisorBookingSettingsCheckoutCache: {
+  readonly doc: AdvisorBookingSettingsDocument | null;
+  readonly cachedAtMs: number;
+} | null = null;
+
+export function invalidateAdvisorBookingSettingsCheckoutCache(): void {
+  advisorBookingSettingsCheckoutCache = null;
+}
 
 /** Bookings that still reserve a calendar slot (excludes pending rows after checkout hold expired). */
 function buildActiveBookingSlotOccupancyFilter(): Record<string, unknown> {
@@ -49,11 +59,20 @@ export async function findAdvisorBookingSettingsDocument(): Promise<AdvisorBooki
   if (!process.env.MONGODB_URI) {
     return null;
   }
+  const nowMs = Date.now();
+  if (
+    advisorBookingSettingsCheckoutCache !== null &&
+    nowMs - advisorBookingSettingsCheckoutCache.cachedAtMs < ADVISOR_SETTINGS_CHECKOUT_CACHE_TTL_MS
+  ) {
+    return advisorBookingSettingsCheckoutCache.doc;
+  }
   const db = await getDb();
   const doc = await db.collection<AdvisorBookingSettingsDocument>(COLLECTIONS.advisorBookingSettings).findOne({
     _id: ADVISOR_SETTINGS_ID,
   });
-  return doc ?? null;
+  const resolved = doc ?? null;
+  advisorBookingSettingsCheckoutCache = { doc: resolved, cachedAtMs: nowMs };
+  return resolved;
 }
 
 /**
@@ -71,11 +90,87 @@ export async function replaceAdvisorBookingSettingsDocument(
     { ...doc, _id: ADVISOR_SETTINGS_ID } as AdvisorBookingSettingsDocument,
     { upsert: true },
   );
+  invalidateAdvisorBookingSettingsCheckoutCache();
   const next = await findAdvisorBookingSettingsDocument();
   if (next === null) {
     throw new Error('Failed to read advisor booking settings after save.');
   }
   return next;
+}
+
+function buildExcludeDiagnosticSessionBookingFilter(excludeSessionObjectId: ObjectId): Record<string, unknown> {
+  return {
+    $or: [
+      { diagnosticSessionId: { $exists: false } },
+      { diagnosticSessionId: null },
+      { diagnosticSessionId: { $ne: excludeSessionObjectId } },
+    ],
+  };
+}
+
+/**
+ * True when another visitor/session already occupies this instant (checkout fast path).
+ */
+export async function isCheckoutSlotInstantOccupiedExcludingSession(input: {
+  readonly startsAtUtc: Date;
+  readonly excludeDiagnosticSessionIdHex: string;
+}): Promise<boolean> {
+  if (!process.env.MONGODB_URI) {
+    return false;
+  }
+  const excludeSessionHex = input.excludeDiagnosticSessionIdHex.trim();
+  if (excludeSessionHex.length === 0) {
+    return hasGlobalActiveBookingAtSlot({ startsAtUtc: input.startsAtUtc });
+  }
+  let excludeSessionObjectId: ObjectId;
+  try {
+    excludeSessionObjectId = new ObjectId(excludeSessionHex);
+  } catch {
+    return hasGlobalActiveBookingAtSlot({ startsAtUtc: input.startsAtUtc });
+  }
+  const db = await getDb();
+  const now = new Date();
+  const [bookingCount, holdCount, paidCount] = await Promise.all([
+    db.collection(COLLECTIONS.bookings).countDocuments({
+      ...buildActiveBookingSlotOccupancyFilter(),
+      startsAt: input.startsAtUtc,
+      ...buildExcludeDiagnosticSessionBookingFilter(excludeSessionObjectId),
+    }),
+    db.collection(COLLECTIONS.paymentTransactions).countDocuments({
+      startsAt: input.startsAtUtc,
+      ...buildActiveOpenPaymentHoldFilter(now),
+      $or: [
+        { diagnosticSessionIdHex: { $exists: false } },
+        { diagnosticSessionIdHex: null },
+        { diagnosticSessionIdHex: { $ne: excludeSessionHex } },
+      ],
+    }),
+    db.collection(COLLECTIONS.paymentTransactions).countDocuments({
+      status: 'paid',
+      startsAt: input.startsAtUtc,
+    }),
+  ]);
+  if (bookingCount > 0 || holdCount > 0) {
+    return true;
+  }
+  if (paidCount === 0) {
+    return false;
+  }
+  const paidRow = await db.collection(COLLECTIONS.paymentTransactions).findOne(
+    { status: 'paid', startsAt: input.startsAtUtc },
+    { projection: { bookingId: 1 } },
+  );
+  if (paidRow === null) {
+    return false;
+  }
+  if (paidRow.bookingId === undefined || paidRow.bookingId === null) {
+    return true;
+  }
+  const linkedBooking = await db.collection(COLLECTIONS.bookings).findOne(
+    { _id: paidRow.bookingId },
+    { projection: { status: 1 } },
+  );
+  return linkedBooking === null || linkedBooking.status !== 'cancelled';
 }
 
 function mergeUniqueSortedStartsUtc(...groups: readonly (readonly Date[])[]): Date[] {

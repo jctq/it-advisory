@@ -356,20 +356,18 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       ownedDiagnosticSession.answers !== undefined
         ? extractGuidedDiagnosticRawFromDiagnosticAnswers(ownedDiagnosticSession.answers)
         : null;
-    await timeCheckoutSegment(timing, 'hold_booking', () =>
-      createPendingBookingForHoldPolicy({
-        transaction: row,
-        expiresAt,
-        startsAt,
-        diagnosticContext: {
-          diagnosticSessionId: diagnosticSessionObjectId ?? null,
-          snapshot: diagnosticSnapshot,
-        },
-        skipPrimarySlotLookup: !hasExistingBookingForSession,
-        recordingOptIn: resolvedPricing.recordingOptIn === true,
-        timing,
-      }),
-    );
+    await createPendingBookingForHoldPolicy({
+      transaction: row,
+      expiresAt,
+      startsAt,
+      diagnosticContext: {
+        diagnosticSessionId: diagnosticSessionObjectId ?? null,
+        snapshot: diagnosticSnapshot,
+      },
+      skipPrimarySlotLookup: !hasExistingBookingForSession,
+      recordingOptIn: resolvedPricing.recordingOptIn === true,
+      timing,
+    });
   }
   const { successUrl, cancelUrl } = buildPaymentProviderReturnUrls({
     appBaseUrl: params.appBaseUrl,

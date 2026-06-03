@@ -9,9 +9,11 @@ import { formatInTimeZone } from 'date-fns-tz';
 import {
   addCalendarDaysToYmd,
   findAdvisorBookingSettingsDocument,
+  isCheckoutSlotInstantOccupiedExcludingSession,
   listActiveBookingStartsUtcInYmdWindow,
   listActiveBookingStartsUtcInYmdWindowForCheckout,
 } from '@/lib/data/advisor-booking-settings';
+import type { NormalizedAdvisorBookingSettings } from '@teqmd/domain/booking-schedule';
 
 const CAP_BUFFER_DAYS = 14 as const;
 
@@ -74,10 +76,20 @@ export async function isMarketingSlotInPublishedAvailability(input: {
   });
 }
 
+function hasBookingCapRestrictionsForInstant(
+  settings: NormalizedAdvisorBookingSettings,
+  startsAtUtc: Date,
+  timeZone: string,
+): boolean {
+  const dayKey = formatInTimeZone(startsAtUtc, timeZone, 'yyyy-MM-dd');
+  const weekKey = formatInTimeZone(startsAtUtc, timeZone, "RRRR-'W'II");
+  return settings.dailyBookingCapOverrides.has(dayKey) || settings.weeklyBookingCapOverrides.has(weekKey);
+}
+
 /**
  * Checkout availability: same as {@link isMarketingSlotInPublishedAvailability} but allows a slot
  * already reserved by the current diagnostic session (retry during an active hold window).
- * Loads occupancy for the slot's ISO week only (weekly caps), not ±14 days around a single day.
+ * Uses instant occupancy counts when no daily/weekly cap overrides apply (typical production path).
  */
 export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
   readonly serviceKey: string;
@@ -90,6 +102,26 @@ export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
       ? normalizeAdvisorBookingSettings(doc)
       : normalizeAdvisorBookingSettings(createDefaultAdvisorBookingSettingsDocument(new Date()));
   const tz = normalized.timezone;
+  const nowUtc = new Date();
+  const inPublishedSchedule = isUtcInstantBookable({
+    settings: normalized,
+    startsAtUtc: input.startsAtUtc,
+    nowUtc,
+    activeBookingStartsUtc: [],
+  });
+  if (!inPublishedSchedule) {
+    return false;
+  }
+  const instantOccupied = await isCheckoutSlotInstantOccupiedExcludingSession({
+    startsAtUtc: input.startsAtUtc,
+    excludeDiagnosticSessionIdHex: input.diagnosticSessionIdHex,
+  });
+  if (instantOccupied) {
+    return false;
+  }
+  if (!hasBookingCapRestrictionsForInstant(normalized, input.startsAtUtc, tz)) {
+    return true;
+  }
   const dayKey = formatInTimeZone(input.startsAtUtc, tz, 'yyyy-MM-dd');
   const isoDow = Number.parseInt(formatInTimeZone(input.startsAtUtc, tz, 'i'), 10);
   const daysFromMonday = isoDow === 7 ? 6 : isoDow - 1;
@@ -106,7 +138,7 @@ export async function isMarketingSlotInPublishedAvailabilityForCheckout(input: {
   return isUtcInstantBookable({
     settings: normalized,
     startsAtUtc: input.startsAtUtc,
-    nowUtc: new Date(),
+    nowUtc,
     activeBookingStartsUtc: active,
   });
 }

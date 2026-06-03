@@ -346,7 +346,7 @@ export async function fetchLatestPaymentTransactionsByDiagnosticSessionIds(
 
 const OPEN_PAYMENT_TRANSACTION_STATUSES: readonly PaymentStatus[] = ['pending', 'processing'];
 
-function buildActiveOpenPaymentHoldFilter(now: Date): Record<string, unknown> {
+export function buildActiveOpenPaymentHoldFilter(now: Date): Record<string, unknown> {
   return {
     status: { $in: OPEN_PAYMENT_TRANSACTION_STATUSES },
     $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: now } }],

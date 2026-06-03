@@ -23,6 +23,7 @@ async function ensureIndexes(): Promise<void> {
   ]);
   await db.collection(COLLECTIONS.bookings).createIndexes([
     { key: { diagnosticSessionId: 1, createdAt: 1 }, name: 'bookings_diagnostic_session_created' },
+    { key: { startsAt: 1, status: 1 }, name: 'bookings_starts_at_status' },
   ]);
   await db.collection(COLLECTIONS.bookingRefunds).createIndexes([
     { key: { status: 1, requestedAt: -1 }, name: 'booking_refunds_status_requested' },
@@ -31,6 +32,7 @@ async function ensureIndexes(): Promise<void> {
   await db.collection(COLLECTIONS.paymentTransactions).createIndexes([
     { key: { visitorId: 1, status: 1, updatedAt: -1 }, name: 'payments_visitor_status_updated' },
     { key: { diagnosticSessionIdHex: 1, createdAt: -1 }, name: 'payments_diagnostic_session_created' },
+    { key: { startsAt: 1, status: 1 }, name: 'payments_starts_at_status' },
   ]);
   await db.collection(COLLECTIONS.rateLimitBuckets).createIndexes([
     {
