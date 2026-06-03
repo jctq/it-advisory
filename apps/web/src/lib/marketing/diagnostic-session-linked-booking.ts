@@ -259,6 +259,14 @@ export function isLinkedBookingCheckoutResumable(
   if (!holdOpen) {
     return false;
   }
+  if (input.latestPaymentStatus === 'paid' || input.latestPaymentStatus === 'failed') {
+    return false;
+  }
+  const latestIsActivelyOpen =
+    input.latestPaymentStatus === 'pending' || input.latestPaymentStatus === 'processing';
+  if (latestIsActivelyOpen) {
+    return true;
+  }
   if (isTerminalPaymentStatus(linked.paymentStatus as PaymentStatus | null)) {
     return false;
   }
