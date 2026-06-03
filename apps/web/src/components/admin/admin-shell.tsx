@@ -216,7 +216,7 @@ export function AdminShell(props: AdminShellProps) {
   const executeCloseMobileSidebarForTour = (): void => {
     setMobileOpen(false);
   };
-  if (pathname === '/admin/login' || pathname === '/admin/auth-error') {
+  if (pathname === '/admin/login' || pathname === '/admin/auth-error' || pathname === '/admin/verify-otp') {
     return props.children;
   }
   return (

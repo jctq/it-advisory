@@ -1,31 +1,33 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import { isAdminEmailAllowed } from '@/lib/server/admin-allowed-emails';
+import {
+  isAdminFullyAuthorized,
+  resolveAdminOtpSessionState,
+} from '@/lib/server/admin-otp-session';
 import { isValidAdminServiceBearer } from '@/lib/server/admin-service-token';
-import { isProductionNodeEnv } from '@/lib/server/is-production-node-env';
 
 export type AdminAccessResult =
   | { readonly authorized: true; readonly email: string | null; readonly viaServiceToken: boolean }
   | { readonly authorized: false; readonly response: NextResponse };
 
-function allowDevAdminOpen(): boolean {
-  return !isProductionNodeEnv() && process.env.ALLOW_DEV_ADMIN_OPEN?.trim() === '1';
-}
-
 /**
  * Ensures the request has a valid admin OAuth session or service Bearer token.
  */
 export async function requireAdminSession(request: Request): Promise<AdminAccessResult> {
+  const state = await resolveAdminOtpSessionState(request);
+  if (isAdminFullyAuthorized(state)) {
+    return { authorized: true, email: state.email, viaServiceToken: state.viaServiceToken };
+  }
+  if (state.hasAllowlistedSession && state.otpRequired && !state.otpVerified && !state.viaServiceToken) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Email verification required', code: 'admin_otp_required' },
+        { status: 401 },
+      ),
+    };
+  }
   if (isValidAdminServiceBearer(request.headers.get('authorization'))) {
     return { authorized: true, email: null, viaServiceToken: true };
-  }
-  const session = await auth();
-  const email = session?.user?.email ?? null;
-  if (email !== null && isAdminEmailAllowed(email)) {
-    return { authorized: true, email, viaServiceToken: false };
-  }
-  if (allowDevAdminOpen()) {
-    return { authorized: true, email: null, viaServiceToken: false };
   }
   return {
     authorized: false,

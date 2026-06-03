@@ -1,7 +1,9 @@
 import NextAuth, { type NextAuthConfig } from 'next-auth';
 import Google from 'next-auth/providers/google';
 import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id';
+import { hasActiveAdminOtpVerification } from '@/lib/data/admin-otp-verifications';
 import { isAdminEmailAllowed } from '@/lib/server/admin-allowed-emails';
+import { isAdminEmailOtpRequired } from '@/lib/server/admin-email-otp-config';
 import { recordSecurityEvent } from '@/lib/server/security-audit-log';
 
 function buildProviders(): NextAuthConfig['providers'] {
@@ -40,6 +42,16 @@ function buildProviders(): NextAuthConfig['providers'] {
   return providers;
 }
 
+async function resolveOtpVerified(email: string | undefined): Promise<boolean> {
+  if (!isAdminEmailOtpRequired()) {
+    return true;
+  }
+  if (email === undefined || email.length === 0) {
+    return false;
+  }
+  return hasActiveAdminOtpVerification(email);
+}
+
 const authConfig = {
   trustHost: true,
   providers: buildProviders(),
@@ -58,15 +70,21 @@ const authConfig = {
       }).catch(() => undefined);
       return allowed;
     },
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user?.email !== undefined && user.email !== null) {
         token.email = user.email;
+      }
+      if (typeof token.email === 'string') {
+        token.otpVerified = await resolveOtpVerified(token.email);
       }
       return token;
     },
     session({ session, token }) {
-      if (session.user !== undefined && typeof token.email === 'string') {
-        session.user.email = token.email;
+      if (session.user !== undefined) {
+        if (typeof token.email === 'string') {
+          session.user.email = token.email;
+        }
+        session.user.otpVerified = token.otpVerified === true;
       }
       return session;
     },

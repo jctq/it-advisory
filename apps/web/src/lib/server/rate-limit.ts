@@ -35,6 +35,7 @@ export async function assertRateLimit(input: {
   readonly scope: RateLimitScope;
   readonly limit?: number;
   readonly windowMs?: number;
+  readonly identifier?: string;
 }): Promise<void> {
   if (!hasMongoUri()) {
     return;
@@ -42,7 +43,7 @@ export async function assertRateLimit(input: {
   const policy = resolveRateLimitPolicy(input.scope);
   const limit = input.limit ?? policy.limit;
   const windowMs = input.windowMs ?? policy.windowMs;
-  const identifier = resolveRateLimitIdentifier(input.request);
+  const identifier = input.identifier ?? resolveRateLimitIdentifier(input.request);
   const nowMs = Date.now();
   const windowStartMs = Math.floor(nowMs / windowMs) * windowMs;
   const expiresAt = new Date(windowStartMs + windowMs);
@@ -70,9 +71,16 @@ export async function assertRateLimit(input: {
 export async function executeRateLimitOrResponse(
   request: Request,
   scope: RateLimitScope,
+  options?: { readonly identifier?: string; readonly limit?: number; readonly windowMs?: number },
 ): Promise<NextResponse | null> {
   try {
-    await assertRateLimit({ request, scope });
+    await assertRateLimit({
+      request,
+      scope,
+      identifier: options?.identifier,
+      limit: options?.limit,
+      windowMs: options?.windowMs,
+    });
     return null;
   } catch (error: unknown) {
     if (error instanceof RateLimitedError) {

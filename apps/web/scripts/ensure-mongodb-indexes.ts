@@ -47,6 +47,14 @@ async function ensureIndexes(): Promise<void> {
     { key: { createdAt: -1 }, name: 'security_events_created' },
     { key: { expiresAt: 1 }, expireAfterSeconds: 0, name: 'security_events_ttl' },
   ]);
+  await db.collection(COLLECTIONS.adminOtpChallenges).createIndexes([
+    { key: { email: 1 }, unique: true, name: 'admin_otp_challenges_email' },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0, name: 'admin_otp_challenges_ttl' },
+  ]);
+  await db.collection(COLLECTIONS.adminOtpVerifications).createIndexes([
+    { key: { email: 1 }, unique: true, name: 'admin_otp_verifications_email' },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0, name: 'admin_otp_verifications_ttl' },
+  ]);
   await client.close();
   console.log('MongoDB indexes ensured.');
 }

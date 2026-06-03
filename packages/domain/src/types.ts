@@ -249,6 +249,24 @@ export type SecurityEventDocument = {
   expiresAt: Date;
 };
 
+export type AdminOtpChallengeDocument = {
+  _id?: ObjectId;
+  email: string;
+  codeHash: string;
+  attemptCount: number;
+  lastSentAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt: Date;
+};
+
+export type AdminOtpVerificationDocument = {
+  _id?: ObjectId;
+  email: string;
+  verifiedAt: Date;
+  expiresAt: Date;
+};
+
 export type DiagnosticTemplateChildQuestionOptionDocument = {
   id: string;
   label: string;

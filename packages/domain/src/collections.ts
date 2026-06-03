@@ -60,4 +60,8 @@ export const COLLECTIONS = {
   adminAuthSessions: 'admin_auth_sessions',
   /** Append-only security audit events (TTL on `expiresAt`). */
   securityEvents: 'security_events',
+  /** Active admin email OTP challenges (one per allowlisted email). */
+  adminOtpChallenges: 'admin_otp_challenges',
+  /** Granted admin OTP verifications until session expiry (TTL on `expiresAt`). */
+  adminOtpVerifications: 'admin_otp_verifications',
 } as const;

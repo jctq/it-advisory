@@ -5,6 +5,8 @@ export type RateLimitScope =
   | 'auth_register'
   | 'auth_profile'
   | 'admin_login'
+  | 'admin_otp_send'
+  | 'admin_otp_verify'
   | 'guest_booking_lookup'
   | 'booking_create'
   | 'booking_token_lookup'
@@ -18,6 +20,14 @@ const AUTH_REGISTER_LIMIT = 5 as const;
 const AUTH_REGISTER_WINDOW_MS = 60 * 60 * 1000;
 const ADMIN_LOGIN_LIMIT = 5 as const;
 const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_OTP_SEND_LIMIT = 5 as const;
+const ADMIN_OTP_SEND_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_OTP_VERIFY_LIMIT = 10 as const;
+const ADMIN_OTP_VERIFY_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_OTP_EMAIL_SEND_LIMIT = 3 as const;
+const ADMIN_OTP_EMAIL_SEND_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_OTP_EMAIL_VERIFY_LIMIT = 10 as const;
+const ADMIN_OTP_EMAIL_VERIFY_WINDOW_MS = 15 * 60 * 1000;
 const GUEST_BOOKING_LOOKUP_LIMIT = 20 as const;
 const GUEST_BOOKING_LOOKUP_WINDOW_MS = 60 * 60 * 1000;
 const SUPPORT_REPORT_LIMIT = 5 as const;
@@ -59,6 +69,10 @@ export function resolveRateLimitPolicy(scope: RateLimitScope): { readonly limit:
       return { limit: AUTH_PROFILE_LIMIT, windowMs: AUTH_PROFILE_WINDOW_MS };
     case 'admin_login':
       return { limit: ADMIN_LOGIN_LIMIT, windowMs: ADMIN_LOGIN_WINDOW_MS };
+    case 'admin_otp_send':
+      return { limit: ADMIN_OTP_SEND_LIMIT, windowMs: ADMIN_OTP_SEND_WINDOW_MS };
+    case 'admin_otp_verify':
+      return { limit: ADMIN_OTP_VERIFY_LIMIT, windowMs: ADMIN_OTP_VERIFY_WINDOW_MS };
     case 'guest_booking_lookup':
       return { limit: GUEST_BOOKING_LOOKUP_LIMIT, windowMs: GUEST_BOOKING_LOOKUP_WINDOW_MS };
     case 'booking_create':
@@ -98,6 +112,14 @@ function readClientIp(request: Request): string | null {
 function hashFallbackIdentifier(request: Request): string {
   const userAgent = request.headers.get('user-agent')?.trim() ?? 'unknown';
   return createHash('sha256').update(userAgent).digest('hex').slice(0, 32);
+}
+
+export function resolveAdminOtpEmailSendPolicy(): { readonly limit: number; readonly windowMs: number } {
+  return { limit: ADMIN_OTP_EMAIL_SEND_LIMIT, windowMs: ADMIN_OTP_EMAIL_SEND_WINDOW_MS };
+}
+
+export function resolveAdminOtpEmailVerifyPolicy(): { readonly limit: number; readonly windowMs: number } {
+  return { limit: ADMIN_OTP_EMAIL_VERIFY_LIMIT, windowMs: ADMIN_OTP_EMAIL_VERIFY_WINDOW_MS };
 }
 
 /**

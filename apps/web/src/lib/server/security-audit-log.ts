@@ -9,6 +9,9 @@ const DEFAULT_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 export type SecurityEventType =
   | 'admin_login_success'
   | 'admin_login_failure'
+  | 'admin_otp_send'
+  | 'admin_otp_verify_success'
+  | 'admin_otp_verify_failure'
   | 'rate_limited'
   | 'cron_unauthorized'
   | 'webhook_signature_failed';
