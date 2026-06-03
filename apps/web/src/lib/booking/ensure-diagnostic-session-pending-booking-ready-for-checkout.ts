@@ -1,13 +1,17 @@
 import type { ObjectId } from 'mongodb';
 import {
-  buildGuestBookingManageView,
   findDiagnosticSessionPendingBookingRecord,
   type VerifiedGuestBooking,
 } from '@/lib/data/booking-guest-manage';
+import { getPaymentSettings } from '@/lib/data/payment-settings';
 import { rescheduleOverduePendingBooking } from '@/lib/data/manage-booking-overdue-actions';
+import { syncBookingIfPaymentWindowExpired } from '@/lib/payments/cancel-expired-payment-window-bookings';
 import type { BookingDocument } from '@/domain/types';
 import { isPendingPaymentExpiredForRebook, isReleasedBookingSlotStartsAt } from '@/lib/booking/pending-payment-expired-for-rebook';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
+import { evaluateBookingPayability } from '@/lib/payments/evaluate-booking-payability';
+import { COLLECTIONS } from '@/domain/collections';
+import { getDb } from '@/lib/mongodb';
 
 function pendingBookingNeedsSlotRebook(booking: BookingDocument): boolean {
   return (
@@ -70,12 +74,34 @@ export async function ensureDiagnosticSessionPendingBookingReadyForCheckout(
   if (!requirePayable) {
     return { ok: true, verified };
   }
-  const view = await buildGuestBookingManageView(verified, { expectedVisitorId: visitorId });
-  if (!view.canPayOnline) {
+  await syncBookingIfPaymentWindowExpired(verified.bookingId);
+  if (process.env.MONGODB_URI) {
+    const db = await getDb();
+    const refreshedBooking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({
+      _id: verified.booking._id,
+    });
+    if (refreshedBooking !== null && refreshedBooking._id !== undefined) {
+      verified = {
+        bookingId: verified.bookingId,
+        booking: refreshedBooking as BookingDocument & { _id: ObjectId },
+        lead: verified.lead,
+      };
+    }
+  }
+  const paymentSettings = await getPaymentSettings();
+  const payability = evaluateBookingPayability({
+    bookingId: verified.bookingId,
+    booking: verified.booking,
+    lead: verified.lead,
+    paymentPolicy: paymentSettings.paymentPolicy,
+    paymentsEnabled: paymentSettings.paymentsEnabled,
+    expectedVisitorId: visitorId,
+  });
+  if (!payability.canPayOnline) {
     return {
       ok: false,
-      code: view.payabilityCode,
-      message: view.payBlockedReason ?? 'This booking cannot be paid online.',
+      code: payability.code,
+      message: payability.reason ?? 'This booking cannot be paid online.',
     };
   }
   return { ok: true, verified };

@@ -3,7 +3,7 @@ import type {
   CreateCheckoutSessionResult,
   PaymentGatewayAdapter,
 } from '@teqmd/payments';
-import type { CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
+import { timeCheckoutSegment, type CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
 
 const GATEWAY_TIMEOUT_MS = 12_000 as const;
 const GATEWAY_MAX_ATTEMPTS = 2 as const;
@@ -53,10 +53,14 @@ export async function executeGatewayCheckoutSession(input: {
   let lastError: unknown;
   for (let attempt = 1; attempt <= GATEWAY_MAX_ATTEMPTS; attempt += 1) {
     try {
-      input.timing?.mark(attempt === 1 ? 'gateway_create' : 'gateway_create_retry');
-      const result = await executeWithTimeout(
-        input.adapter.createCheckoutSession(input.sessionInput),
-        GATEWAY_TIMEOUT_MS,
+      const result = await timeCheckoutSegment(
+        input.timing,
+        attempt === 1 ? 'gateway_create' : 'gateway_create_retry',
+        () =>
+          executeWithTimeout(
+            input.adapter.createCheckoutSession(input.sessionInput),
+            GATEWAY_TIMEOUT_MS,
+          ),
       );
       return result;
     } catch (error: unknown) {
