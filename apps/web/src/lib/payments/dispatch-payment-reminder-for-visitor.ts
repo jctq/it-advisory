@@ -1,4 +1,4 @@
-import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
+import { findPaymentTransactionById, markPaymentCheckoutCommitted } from '@/lib/data/payment-transactions';
 import { executeSendBookingPaymentReminderEmail } from '@/lib/email/send-booking-payment-reminder-email';
 
 /**
@@ -12,6 +12,10 @@ export async function dispatchPaymentReminderForVisitor(input: {
   if (transaction === null || transaction.visitorId !== input.visitorId) {
     return { ok: false, code: 'transaction_not_found' };
   }
-  await executeSendBookingPaymentReminderEmail({ transaction });
+  const committed = await markPaymentCheckoutCommitted(input.transactionId.trim());
+  if (committed === null) {
+    return { ok: false, code: 'transaction_not_found' };
+  }
+  await executeSendBookingPaymentReminderEmail({ transaction: committed });
   return { ok: true };
 }

@@ -162,6 +162,7 @@ export function buildAccountDiagnosticsBookingStatusMatch(status: BookingListSta
   if (status === 'awaiting_payment') {
     return {
       latestPaymentStatus: { $in: ['pending', 'processing'] },
+      latestPaymentCheckoutCommitted: 'true',
       'linkedBooking.status': { $nin: ['cancelled', 'completed', 'confirmed'] },
     };
   }
@@ -174,6 +175,13 @@ export function buildAccountDiagnosticsBookingStatusMatch(status: BookingListSta
         $or: [
           { latestPaymentStatus: null },
           { latestPaymentStatus: { $in: ['failed', 'expired'] } },
+          {
+            latestPaymentStatus: { $in: ['pending', 'processing'] },
+            $or: [
+              { latestPaymentCheckoutCommitted: null },
+              { latestPaymentCheckoutCommitted: { $ne: 'true' } },
+            ],
+          },
         ],
       },
       { 'linkedBooking.status': { $nin: ['cancelled', 'completed', 'confirmed'] } },

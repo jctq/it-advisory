@@ -54,6 +54,18 @@ describe('resolveAccountDiagnosticsBookingStatusLabel', () => {
     ).toBe('awaiting_payment');
   });
 
+  it('returns pending when checkout is only prepared but not committed', () => {
+    expect(
+      resolveAccountDiagnosticsBookingStatusLabel(
+        buildRow({
+          bookingStatus: 'pending',
+          paymentTransactionStatus: null,
+          isBooked: true,
+        }),
+      ),
+    ).toBe('pending');
+  });
+
   it('returns confirmed when paid', () => {
     expect(
       resolveAccountDiagnosticsBookingStatusLabel(

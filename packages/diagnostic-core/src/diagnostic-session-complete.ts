@@ -20,3 +20,22 @@ export function resolveDiagnosticSessionCompleted(
   const guided = parseGuidedDiagnosticJson(input.guidedDiagnosticRaw);
   return guided !== null && guided.outcome !== null && guided.activeRound === null;
 }
+
+/**
+ * Whether a persisted guided payload represents an explicit retake / blank reset.
+ */
+export function isGuidedDiagnosticExplicitReset(guidedDiagnosticRaw: string | null): boolean {
+  if (guidedDiagnosticRaw === null || guidedDiagnosticRaw.trim().length === 0) {
+    return true;
+  }
+  const guided = parseGuidedDiagnosticJson(guidedDiagnosticRaw);
+  if (guided === null) {
+    return true;
+  }
+  return (
+    guided.outcome === null &&
+    guided.activeRound === null &&
+    guided.completedBundles.length === 0 &&
+    guided.initialPrompt.trim().length === 0
+  );
+}

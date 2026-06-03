@@ -28,6 +28,7 @@ import {
   serializeGuidedDiagnostic,
   type GuidedDiagnosticV1,
 } from '@/lib/marketing/guided-diagnostic-types';
+import { isGuidedDiagnosticExplicitReset } from '@teqmd/diagnostic-core/diagnostic-session-complete';
 import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
 import { listVisibleTemplateRoundSummaries } from '@/lib/marketing/diagnostic-template-flow';
 import type { PaymentStatus } from '@/domain/payment-types';
@@ -317,6 +318,7 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
   const [persistedSessionRef, setPersistedSessionRef] = useState<string | null>(null);
   const marketingSessionRef = sessionTargetId ?? persistedSessionRef;
   const hasHydratedRef = useRef<boolean>(false);
+  const hasEverCompletedRef = useRef<boolean>(false);
   const lastSessionInitKeyRef = useRef<string | null>(null);
   const skipNextSessionHydrationRef = useRef<boolean>(false);
   const isRetakeQuery = searchParams.get('retake') === '1';
@@ -333,7 +335,15 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
         return;
       }
       const linearStep = computeGuidedLinearStep(next);
-      const isComplete = completed ?? resolveGuidedPersistCompleted(next);
+      const serializedGuided = serializeGuidedDiagnostic(next);
+      const isExplicitReset = isGuidedDiagnosticExplicitReset(serializedGuided);
+      if (isExplicitReset) {
+        hasEverCompletedRef.current = false;
+      }
+      const isComplete =
+        completed ??
+        (resolveGuidedPersistCompleted(next) ||
+          (hasEverCompletedRef.current && !isExplicitReset));
       const body: Record<string, unknown> = {
         answers: buildAnswersPayload(next),
         currentStep: linearStep,
@@ -372,6 +382,9 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
     }
   }, [guided.outcome, pathname, persistedSessionRef, sessionTargetId]);
   useEffect(() => {
+    if (guided.outcome !== null && guided.activeRound === null) {
+      hasEverCompletedRef.current = true;
+    }
     if (!isSessionReady || sessionReadOnlyRef.current || guided.outcome === null) {
       return;
     }
@@ -394,6 +407,7 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
       }
       if (isRetakeQuery) {
         setIsSessionReady(false);
+        hasEverCompletedRef.current = false;
         await persistGuidedRef.current(GUIDED_DIAGNOSTIC_EMPTY, false);
         if (cancelled) {
           return;
@@ -488,6 +502,9 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
         const normalized = normalizeGuidedDiagnosticRaw(rawGuided);
         const parsed =
           normalized !== undefined && normalized !== '' ? parseGuidedDiagnosticJson(normalized) : null;
+        if (parsed !== null && resolveGuidedPersistCompleted(parsed)) {
+          hasEverCompletedRef.current = true;
+        }
         setGuided((current) => mergeHydratedGuidedState(current, parsed));
       } finally {
         if (!cancelled) {
@@ -696,7 +713,7 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
       }
       setGuided((previous) =>
         applyGuidedPeekToAuthoredRoundIndex(previous, roundSummary.authoredRoundIndex, {
-          clearOutcome: !sessionReadOnlyRef.current,
+          clearOutcome: false,
         }),
       );
       window.scrollTo({ top: 0, behavior: 'smooth' });

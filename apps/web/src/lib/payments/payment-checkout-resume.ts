@@ -34,6 +34,7 @@ import { loadCheckoutPaymentContext } from '@/lib/payments/payment-checkout-cont
 import { validateCheckoutGatewayMethod } from '@/lib/payments/validate-checkout-gateway';
 import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
 import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
+import { buildCheckoutCommittedMetadata, isPaymentCheckoutCommitted } from '@/lib/payments/payment-checkout-commit';
 import { timeCheckoutSegment, type CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
 import type { CheckoutPaymentContext } from '@/lib/payments/payment-checkout-context';
 
@@ -64,6 +65,7 @@ type ResumeCheckoutCommonParams = {
   readonly checkoutContext?: CheckoutPaymentContext;
   readonly resolvedPaymentMethodLabel?: string;
   readonly sendPaymentReminderEmail?: boolean;
+  readonly checkoutCommitted?: boolean;
 };
 
 export async function createPaymentCheckoutForVerifiedBooking(
@@ -71,6 +73,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
   params: ResumeCheckoutCommonParams,
 ): Promise<CreateCheckoutSessionResult> {
   const timing = params.timing;
+  const checkoutCommitted = params.checkoutCommitted !== false;
   let checkoutContext = params.checkoutContext;
   let resolvedPaymentMethodLabel = params.resolvedPaymentMethodLabel?.trim() ?? '';
   if (checkoutContext === undefined) {
@@ -178,7 +181,8 @@ export async function createPaymentCheckoutForVerifiedBooking(
       sessionMarketingRef: sessionMarketingRef.length > 0 ? sessionMarketingRef : verified.bookingId,
       amountCentavos: resolvedPricing.amountCentavos,
       checkoutContext,
-      metadata: {
+      metadata: buildCheckoutCommittedMetadata(
+        {
         bookingDraftId,
         paymentMethodId: params.paymentMethodId,
         resumeBookingId: verified.bookingId,
@@ -193,7 +197,9 @@ export async function createPaymentCheckoutForVerifiedBooking(
         ...(resolvedPricing.recordingSurchargeCentavos > 0
           ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
           : {}),
-      },
+        },
+        checkoutCommitted || isPaymentCheckoutCommitted(existingOpenTransaction.metadata),
+      ),
       customerName: lead.name,
       customerEmail: leadEmail,
       customerCompany: typeof lead.company === 'string' && lead.company.trim().length > 0 ? lead.company.trim() : null,
@@ -228,7 +234,8 @@ export async function createPaymentCheckoutForVerifiedBooking(
     diagnosticSessionIdHex: booking.diagnosticSessionId !== undefined && booking.diagnosticSessionId !== null ? booking.diagnosticSessionId.toString() : null,
     paymentMethodLabel: resolvedPaymentMethodLabel,
     redirectUrl: null,
-    metadata: {
+    metadata: buildCheckoutCommittedMetadata(
+      {
       bookingDraftId,
       paymentMethodId: params.paymentMethodId,
       resumeBookingId: verified.bookingId,
@@ -243,7 +250,9 @@ export async function createPaymentCheckoutForVerifiedBooking(
       ...(resolvedPricing.recordingSurchargeCentavos > 0
         ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
         : {}),
-    },
+      },
+      checkoutCommitted,
+    ),
     expiresAt,
     bookingId: booking._id,
   });
@@ -296,7 +305,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
   );
   const refreshed = await findPaymentTransactionById(transactionId);
   if (refreshed !== null) {
-    if (expiresAt !== null) {
+    if (expiresAt !== null && checkoutCommitted) {
       await timeCheckoutSegment(timing, 'hold_renew', () =>
         renewBookingCheckoutHoldFromOpenTransaction({
         bookingId: booking._id,

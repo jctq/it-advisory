@@ -9,7 +9,8 @@ import type {
 } from '@/domain/types';
 import type { PaymentStatus } from '@/domain/payment-types';
 import { fetchLatestPaymentTransactionsByDiagnosticSessionIds } from '@/lib/data/payment-transactions';
-import { resolveDiagnosticSessionCompleted } from '@teqmd/diagnostic-core/diagnostic-session-complete';
+import { resolveDiagnosticSessionCompleted, isGuidedDiagnosticExplicitReset } from '@teqmd/diagnostic-core/diagnostic-session-complete';
+import { resolvePaymentStatusForCustomerLifecycle } from '@/lib/payments/payment-checkout-commit';
 import { resolveDiagnosticSessionDisplayPreview } from '@teqmd/diagnostic-core/diagnostic-session-display-preview';
 import { resolveDiagnosticSessionSummaryDisplayPreview } from '@/lib/marketing/diagnostic-session-summary-display';
 import { extractGuidedDiagnosticRawFromDiagnosticAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
@@ -474,6 +475,7 @@ type LinkedPaymentSummary = {
   readonly checkoutStartsAtIso: string;
   readonly checkoutTimezone: string;
   readonly checkoutServiceKey: string;
+  readonly metadata?: Record<string, string>;
 };
 
 function mapVisitorDiagnosticSessionSummary(
@@ -522,7 +524,10 @@ function mapVisitorDiagnosticSessionSummary(
     bookingServiceKey: linkedBooking?.bookingServiceKey ?? linkedPayment?.checkoutServiceKey ?? null,
     bookingMeetingUrl: linkedBooking?.bookingMeetingUrl ?? null,
     paymentTransactionId: linkedPayment?.paymentTransactionId ?? null,
-    paymentTransactionStatus: linkedPayment?.paymentTransactionStatus ?? null,
+    paymentTransactionStatus: resolvePaymentStatusForCustomerLifecycle(
+      linkedPayment?.paymentTransactionStatus ?? null,
+      linkedPayment?.metadata,
+    ),
     checkoutStartsAtIso: linkedPayment?.checkoutStartsAtIso ?? null,
     checkoutTimezone: linkedPayment?.checkoutTimezone ?? null,
     checkoutServiceKey: linkedPayment?.checkoutServiceKey ?? null,
@@ -567,6 +572,7 @@ export async function listDiagnosticSessionsForVisitor(
             checkoutStartsAtIso: paymentRow.startsAtIso,
             checkoutTimezone: paymentRow.timezone,
             checkoutServiceKey: paymentRow.serviceKey,
+            metadata: paymentRow.metadata,
           }
         : null;
     const linkedBooking = resolveLinkedBookingForSession(
@@ -731,7 +737,7 @@ export async function listDiagnosticSessionsForVisitorPaginated(input: {
           { $match: { $expr: { $eq: ['$diagnosticSessionIdHex', '$$sessionHex'] } } },
           { $sort: { updatedAt: -1 } },
           { $limit: 1 },
-          { $project: { status: 1 } },
+          { $project: { status: 1, 'metadata.checkoutCommitted': 1 } },
         ],
         as: 'latestPayments',
       },
@@ -740,6 +746,9 @@ export async function listDiagnosticSessionsForVisitorPaginated(input: {
       $addFields: {
         latestPaymentStatus: {
           $ifNull: [{ $arrayElemAt: ['$latestPayments.status', 0] }, null],
+        },
+        latestPaymentCheckoutCommitted: {
+          $ifNull: [{ $arrayElemAt: ['$latestPayments.metadata.checkoutCommitted', 0] }, null],
         },
       },
     },
@@ -827,6 +836,7 @@ export async function listDiagnosticSessionsForVisitorPaginated(input: {
             checkoutStartsAtIso: paymentRow.startsAtIso,
             checkoutTimezone: paymentRow.timezone,
             checkoutServiceKey: paymentRow.serviceKey,
+            metadata: paymentRow.metadata,
           }
         : null;
     const linkedBooking =
@@ -977,12 +987,19 @@ export async function upsertDiagnosticProgress(input: UpsertDiagnosticProgressIn
   const db = await getDb();
   const sessions = db.collection<DiagnosticSessionDocument>(COLLECTIONS.diagnosticSessions);
   const now = new Date();
+  const incomingGuidedRaw = extractGuidedDiagnosticRawFromDiagnosticAnswers(input.answers);
+  const derivedComplete = resolveDiagnosticSessionCompleted({
+    completedAtIso: null,
+    guidedDiagnosticRaw: incomingGuidedRaw,
+  });
+  const isExplicitReset = isGuidedDiagnosticExplicitReset(incomingGuidedRaw);
+  const effectiveIsComplete = input.isComplete || derivedComplete;
   const setFields: Record<string, unknown> = {
     answers: input.answers,
     currentStep: input.currentStep,
     updatedAt: now,
   };
-  if (input.isComplete) {
+  if (effectiveIsComplete) {
     setFields.completedAt = now;
   }
   let target: (DiagnosticSessionDocument & { _id: ObjectId }) | null = null;
@@ -1006,6 +1023,16 @@ export async function upsertDiagnosticProgress(input: UpsertDiagnosticProgressIn
     }
   }
   if (target !== null) {
+    const existingGuidedRaw = extractGuidedDiagnosticRawFromDiagnosticAnswers(target.answers);
+    const existingCompletedAtIso =
+      target.completedAt !== undefined ? target.completedAt.toISOString() : null;
+    const existingComplete = resolveDiagnosticSessionCompleted({
+      completedAtIso: existingCompletedAtIso,
+      guidedDiagnosticRaw: existingGuidedRaw,
+    });
+    if (!effectiveIsComplete && !isExplicitReset && existingComplete) {
+      return { persisted: true, sessionId: target._id.toString() };
+    }
     const templatePinToSet =
       target.diagnosticTemplateId !== undefined && target.diagnosticTemplateId !== null
         ? null
@@ -1014,16 +1041,14 @@ export async function upsertDiagnosticProgress(input: UpsertDiagnosticProgressIn
       ...setFields,
       ...(templatePinToSet !== null ? { diagnosticTemplateId: templatePinToSet } : {}),
     };
-    if (input.isComplete) {
-      await sessions.updateOne({ _id: target._id }, { $set: setWithTemplatePin });
+    if (effectiveIsComplete || isExplicitReset) {
+      const updateDoc: Record<string, unknown> = { $set: setWithTemplatePin };
+      if (isExplicitReset && !effectiveIsComplete) {
+        updateDoc.$unset = { completedAt: '' };
+      }
+      await sessions.updateOne({ _id: target._id }, updateDoc);
     } else {
-      await sessions.updateOne(
-        { _id: target._id },
-        {
-          $set: setWithTemplatePin,
-          $unset: { completedAt: '' },
-        },
-      );
+      await sessions.updateOne({ _id: target._id }, { $set: setWithTemplatePin });
     }
     await insertDiagnosticAudit({
       visitorId: input.visitorId,
@@ -1041,7 +1066,7 @@ export async function upsertDiagnosticProgress(input: UpsertDiagnosticProgressIn
     currentStep: input.currentStep,
     createdAt: now,
     updatedAt: now,
-    ...(input.isComplete ? { completedAt: now } : {}),
+    ...(effectiveIsComplete ? { completedAt: now } : {}),
     ...(insertTemplateId !== null ? { diagnosticTemplateId: insertTemplateId } : {}),
   };
   const insertResult = await sessions.insertOne(insertDoc);
@@ -1053,4 +1078,85 @@ export async function upsertDiagnosticProgress(input: UpsertDiagnosticProgressIn
   });
   await upsertVisitorSessionPointer(input.visitorId, insertResult.insertedId);
   return { persisted: true, sessionId: insertResult.insertedId.toString() };
+}
+
+/**
+ * Marks a session complete when its guided answers (or booking snapshot) show a finished outcome.
+ */
+export async function markDiagnosticSessionCompleteIfGuided(input: {
+  readonly sessionId: ObjectId;
+  readonly guidedDiagnosticRaw: string | null;
+}): Promise<void> {
+  if (!hasMongoUri()) {
+    return;
+  }
+  if (
+    !resolveDiagnosticSessionCompleted({
+      completedAtIso: null,
+      guidedDiagnosticRaw: input.guidedDiagnosticRaw,
+    })
+  ) {
+    return;
+  }
+  const db = await getDb();
+  const now = new Date();
+  await db.collection<DiagnosticSessionDocument>(COLLECTIONS.diagnosticSessions).updateOne(
+    { _id: input.sessionId, completedAt: { $exists: false } },
+    { $set: { completedAt: now, updatedAt: now } },
+  );
+}
+
+/**
+ * Restores session answers from a booking snapshot when the live session row was corrupted after booking.
+ */
+export async function repairDiagnosticSessionAnswersFromBookingSnapshot(input: {
+  readonly sessionId: ObjectId;
+  readonly visitorId: string;
+  readonly sessionAnswers: DiagnosticAnswers;
+  readonly bookingSnapshotRaw: string | null;
+}): Promise<DiagnosticAnswers> {
+  const sessionGuidedRaw = extractGuidedDiagnosticRawFromDiagnosticAnswers(input.sessionAnswers);
+  const sessionComplete = resolveDiagnosticSessionCompleted({
+    completedAtIso: null,
+    guidedDiagnosticRaw: sessionGuidedRaw,
+  });
+  const snapshotRaw = input.bookingSnapshotRaw?.trim() ?? '';
+  if (sessionComplete || snapshotRaw.length === 0) {
+    return input.sessionAnswers;
+  }
+  const snapshotComplete = resolveDiagnosticSessionCompleted({
+    completedAtIso: null,
+    guidedDiagnosticRaw: snapshotRaw,
+  });
+  if (!snapshotComplete) {
+    return input.sessionAnswers;
+  }
+  const repairedAnswers: DiagnosticAnswers = {
+    ...input.sessionAnswers,
+    guidedDiagnostic: snapshotRaw,
+  };
+  if (!hasMongoUri()) {
+    return repairedAnswers;
+  }
+  const db = await getDb();
+  const now = new Date();
+  await db.collection<DiagnosticSessionDocument>(COLLECTIONS.diagnosticSessions).updateOne(
+    { _id: input.sessionId, visitorId: input.visitorId },
+    {
+      $set: {
+        answers: repairedAnswers,
+        completedAt: now,
+        updatedAt: now,
+      },
+    },
+  );
+  return repairedAnswers;
+}
+
+/**
+ * Guided diagnostic snapshot from the primary booking linked to this session, if any.
+ */
+export async function findBookingGuidedSnapshotForDiagnosticSession(sessionId: ObjectId): Promise<string | null> {
+  const linked = await fetchPrimaryBookingByDiagnosticSessionIds([sessionId]);
+  return linked.get(sessionId.toString())?.guidedDiagnosticSnapshot ?? null;
 }

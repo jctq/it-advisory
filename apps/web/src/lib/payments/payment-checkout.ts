@@ -31,6 +31,7 @@ import { timeCheckoutSegment } from '@/lib/payments/checkout-timing';
 import { validateCheckoutGatewayMethod } from '@/lib/payments/validate-checkout-gateway';
 import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
 import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
+import { buildCheckoutCommittedMetadata, isPaymentCheckoutCommitted } from '@/lib/payments/payment-checkout-commit';
 
 export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
@@ -105,6 +106,7 @@ function buildTransactionRowFromInsert(
 
 export async function createPaymentCheckoutSession(params: CreateCheckoutSessionParams): Promise<CreateCheckoutSessionResult> {
   const timing = params.timing;
+  const checkoutCommitted = params.checkoutCommitted !== false;
   const checkoutContext = await timeCheckoutSegment(timing, 'settings_load', () =>
     loadCheckoutPaymentContext(params.gatewayId),
   );
@@ -165,6 +167,8 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           timing,
           checkoutContext,
           resolvedPaymentMethodLabel,
+          sendPaymentReminderEmail: params.sendPaymentReminderEmail,
+          checkoutCommitted,
         });
       }
       if (!pendingReady.ok && pendingReady.code !== 'booking_not_found') {
@@ -246,7 +250,8 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       amountCentavos: resolvedPricing.amountCentavos,
       checkoutContext,
       sendPaymentReminderEmail: params.sendPaymentReminderEmail === true,
-      metadata: {
+      metadata: buildCheckoutCommittedMetadata(
+        {
         bookingDraftId: existingOpenTransaction.bookingDraftId,
         paymentMethodId: params.paymentMethodId,
         pricingSource: resolvedPricing.source,
@@ -260,7 +265,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
         ...(resolvedPricing.recordingSurchargeCentavos > 0
           ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
           : {}),
-      },
+        },
+        checkoutCommitted || isPaymentCheckoutCommitted(existingOpenTransaction.metadata),
+      ),
       customerName: contact.name,
       customerEmail: contact.email,
       customerCompany: contact.company.length > 0 ? contact.company : null,
@@ -310,7 +317,8 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     diagnosticSessionIdHex: resolvedDiagnosticSessionHex,
     paymentMethodLabel: resolvedPaymentMethodLabel,
     redirectUrl: null,
-    metadata: {
+    metadata: buildCheckoutCommittedMetadata(
+      {
       bookingDraftId,
       paymentMethodId: params.paymentMethodId,
       pricingSource: resolvedPricing.source,
@@ -324,7 +332,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       ...(resolvedPricing.recordingSurchargeCentavos > 0
         ? { recordingSurchargeCentavos: String(resolvedPricing.recordingSurchargeCentavos) }
         : {}),
-    },
+      },
+      checkoutCommitted,
+    ),
       expiresAt,
     }),
   );
@@ -355,7 +365,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       bookingStatus: null,
     };
   }
-  if (settings.paymentPolicy === 'pay_after_hold' && expiresAt !== null) {
+  if (settings.paymentPolicy === 'pay_after_hold' && expiresAt !== null && checkoutCommitted) {
     const diagnosticSnapshot =
       ownedDiagnosticSession.answers !== undefined
         ? extractGuidedDiagnosticRawFromDiagnosticAnswers(ownedDiagnosticSession.answers)

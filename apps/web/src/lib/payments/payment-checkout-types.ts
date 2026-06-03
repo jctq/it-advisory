@@ -27,6 +27,8 @@ export type CreateCheckoutSessionParams = {
   readonly timing?: CheckoutTimingCollector;
   /** When true, sends the payment reminder email after checkout is ready (omit on prepare pre-warm). */
   readonly sendPaymentReminderEmail?: boolean;
+  /** When false (prepare pre-warm), lifecycle stays pending until the visitor clicks Pay. Defaults to true. */
+  readonly checkoutCommitted?: boolean;
 };
 
 export type CreateCheckoutSessionResult =

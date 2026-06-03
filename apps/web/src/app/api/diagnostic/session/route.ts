@@ -11,12 +11,16 @@ import { reconcileDiagnosticSessionPaidBookingLink } from '@/lib/payments/reconc
 import { syncDiagnosticSessionPaymentHold } from '@/lib/payments/sync-diagnostic-session-payment-hold';
 import {
   deleteDiagnosticSessionForVisitor,
+  findBookingGuidedSnapshotForDiagnosticSession,
   findLatestDiagnosticSession,
   findDiagnosticSessionForVisitor,
   insertBlankDiagnosticSessionForVisitor,
+  repairDiagnosticSessionAnswersFromBookingSnapshot,
+  syncVisitorDiagnosticCompletion,
   upsertDiagnosticProgress,
 } from '@/lib/data/diagnostic-sessions';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
+import { resolvePaymentStatusForCustomerLifecycle } from '@/lib/payments/payment-checkout-commit';
 import {
   encodeDiagnosticSessionRefForMarketingUrl,
   resolveDiagnosticSessionObjectIdHexFromMarketingRef,
@@ -49,6 +53,7 @@ function parseSessionIdQuery(request: Request): OptionalSessionIdQuery {
 
 export async function GET(request: Request): Promise<NextResponse> {
   const visitorId = await resolveMarketingVisitorId(request);
+  await syncVisitorDiagnosticCompletion(visitorId);
   const parsedId = parseSessionIdQuery(request);
   if (parsedId.status === 'invalid') {
     return NextResponse.json({ error: 'Invalid sessionId', code: 'diagnostic_session_invalid_id' }, { status: 400 });
@@ -81,15 +86,25 @@ export async function GET(request: Request): Promise<NextResponse> {
   await syncDiagnosticSessionPaymentHold({ diagnosticSessionIdHex: sessionIdHex, visitorId, now: serverNow });
   await reconcileDiagnosticSessionPaidBookingLink({ diagnosticSessionIdHex: sessionIdHex, visitorId });
   const bookedCount = await countBookingsByDiagnosticSessionId(session._id);
+  const bookingSnapshotRaw = await findBookingGuidedSnapshotForDiagnosticSession(session._id);
+  const clientAnswers = await repairDiagnosticSessionAnswersFromBookingSnapshot({
+    sessionId: session._id,
+    visitorId,
+    sessionAnswers: session.answers,
+    bookingSnapshotRaw,
+  });
   const linkedBookingSlot =
     bookedCount > 0 ? await findPrimaryBookingSlotByDiagnosticSessionId(session._id) : null;
   const latestPayment = await findLatestPaymentTransactionByDiagnosticSessionIdHex(sessionIdHex);
+  const committedPaymentStatus = resolvePaymentStatusForCustomerLifecycle(
+    latestPayment?.status ?? null,
+    latestPayment?.metadata,
+  );
   const hasOpenPaymentTransaction =
-    latestPayment !== null &&
-    (latestPayment.status === 'pending' || latestPayment.status === 'processing');
+    committedPaymentStatus === 'pending' || committedPaymentStatus === 'processing';
   const hasPendingCheckout = hasOpenPaymentTransaction && linkedBookingSlot === null;
   const pendingCheckout =
-    hasPendingCheckout && linkedBookingSlot === null
+    hasPendingCheckout && latestPayment !== null
       ? {
           transactionId: latestPayment.id,
           startsAtIso: latestPayment.startsAtIso,
@@ -119,22 +134,23 @@ export async function GET(request: Request): Promise<NextResponse> {
   const linkedPendingUnpaid =
     linkedBookingSlot !== null &&
     linkedBookingSlot.status === 'pending' &&
-    linkedBookingSlot.paymentStatus !== 'paid';
+    linkedBookingSlot.paymentStatus !== 'paid' &&
+    hasOpenPaymentTransaction;
   const isAwaitingPaymentResume =
     !paymentHoldClosed && (hasPendingCheckout || linkedPendingUnpaid);
   const resumePaymentSelection =
     isAwaitingPaymentResume && latestPayment !== null
       ? resolvePaymentSelectionFromTransaction(latestPayment)
       : null;
-  const latestPaymentTransactionStatus = latestPayment?.status ?? null;
+  const latestPaymentTransactionStatus = committedPaymentStatus;
   const latestPaymentTransactionId = latestPayment?.id ?? null;
   const readOnly = isDiagnosticSessionEditingLocked({
     bookedCount,
-    latestPaymentStatus: latestPaymentTransactionStatus,
+    latestPaymentStatus: committedPaymentStatus,
   });
   return NextResponse.json({
     session: {
-      answers: session.answers,
+      answers: clientAnswers,
       currentStep: session.currentStep,
     },
     readOnly,
@@ -205,10 +221,14 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const latestPayment = await findLatestPaymentTransactionByDiagnosticSessionIdHex(
       targetForBooking._id.toString(),
     );
+    const committedPaymentStatus = resolvePaymentStatusForCustomerLifecycle(
+      latestPayment?.status ?? null,
+      latestPayment?.metadata,
+    );
     if (
       isDiagnosticSessionEditingLocked({
         bookedCount,
-        latestPaymentStatus: latestPayment?.status ?? null,
+        latestPaymentStatus: committedPaymentStatus,
       })
     ) {
       return NextResponse.json(

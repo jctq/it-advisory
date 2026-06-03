@@ -79,6 +79,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     diagnosticSessionObjectIdHex: resolvedDiagnosticSessionHex,
     timing,
     sendPaymentReminderEmail: true,
+    checkoutCommitted: true,
   });
   timing.logAndFinish();
   if (!result.ok) {

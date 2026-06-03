@@ -15,7 +15,11 @@ import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
 import { getPaymentSettings } from '@/lib/data/payment-settings';
-import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
+import {
+  findDiagnosticSessionForVisitor,
+  markDiagnosticSessionCompleteIfGuided,
+} from '@/lib/data/diagnostic-sessions';
+import { extractGuidedDiagnosticRawFromDiagnosticAnswers } from '@/lib/marketing/extract-guided-diagnostic-raw';
 import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
 import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
@@ -220,6 +224,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   if (created === null) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
+  }
+  if (created.diagnosticSessionId !== null) {
+    const snapshot =
+      ownedDiagnosticSession.answers !== undefined
+        ? extractGuidedDiagnosticRawFromDiagnosticAnswers(ownedDiagnosticSession.answers)
+        : null;
+    await markDiagnosticSessionCompleteIfGuided({
+      sessionId: created.diagnosticSessionId,
+      guidedDiagnosticRaw: snapshot,
+    });
   }
   return NextResponse.json({
     ok: true as const,

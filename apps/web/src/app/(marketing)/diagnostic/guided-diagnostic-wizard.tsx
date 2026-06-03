@@ -2160,11 +2160,11 @@ export function GuidedDiagnosticWizard(props: GuidedDiagnosticWizardProps): Reac
   const executeOpenDiagnosticReview = useCallback((): void => {
     onGuidedChange((previous) =>
       applyGuidedOpenDiagnosticReview(previous, {
-        preserveOutcome: sessionReadOnly,
+        preserveOutcome: true,
       }),
     );
     scheduleScrollDiagnosticWizardToTop();
-  }, [onGuidedChange, sessionReadOnly]);
+  }, [onGuidedChange]);
   if (guided.outcome !== null && guided.activeRound === null) {
     return (
       <div>

@@ -3,7 +3,10 @@ import {
   GUIDED_DIAGNOSTIC_EMPTY,
   serializeGuidedDiagnostic,
 } from '@teqmd/diagnostic-core/guided-diagnostic-types';
-import { resolveDiagnosticSessionCompleted } from '@teqmd/diagnostic-core/diagnostic-session-complete';
+import {
+  isGuidedDiagnosticExplicitReset,
+  resolveDiagnosticSessionCompleted,
+} from '@teqmd/diagnostic-core/diagnostic-session-complete';
 
 describe('resolveDiagnosticSessionCompleted', () => {
   it('returns true when completedAt is set', () => {
@@ -42,6 +45,19 @@ describe('resolveDiagnosticSessionCompleted', () => {
         completedAtIso: null,
         guidedDiagnosticRaw: serializeGuidedDiagnostic(GUIDED_DIAGNOSTIC_EMPTY),
       }),
+    ).toBe(false);
+  });
+
+  it('treats blank guided payloads as explicit reset', () => {
+    expect(isGuidedDiagnosticExplicitReset(null)).toBe(true);
+    expect(isGuidedDiagnosticExplicitReset(serializeGuidedDiagnostic(GUIDED_DIAGNOSTIC_EMPTY))).toBe(true);
+    expect(
+      isGuidedDiagnosticExplicitReset(
+        serializeGuidedDiagnostic({
+          ...GUIDED_DIAGNOSTIC_EMPTY,
+          initialPrompt: 'Still in progress',
+        }),
+      ),
     ).toBe(false);
   });
 });

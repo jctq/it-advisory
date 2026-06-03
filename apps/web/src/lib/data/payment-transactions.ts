@@ -1,6 +1,10 @@
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentGatewayId, PaymentPolicy, PaymentStatus, PaymentTransactionDocument } from '@/domain/payment-types';
+import {
+  isPaymentCheckoutCommitted,
+  PAYMENT_CHECKOUT_COMMITTED_METADATA_KEY,
+} from '@/lib/payments/payment-checkout-commit';
 import { getDb } from '@/lib/mongodb';
 
 export type PaymentTransactionRow = {
@@ -306,7 +310,7 @@ export async function listStaleReconcilablePaymentTransactions(
 
 export type PaymentTransactionSummaryRow = Pick<
   PaymentTransactionRow,
-  'id' | 'status' | 'gatewayId' | 'amountCentavos' | 'bookingId' | 'startsAtIso' | 'timezone' | 'serviceKey' | 'paidAtIso'
+  'id' | 'status' | 'gatewayId' | 'amountCentavos' | 'bookingId' | 'startsAtIso' | 'timezone' | 'serviceKey' | 'paidAtIso' | 'metadata'
 >;
 
 export async function fetchLatestPaymentTransactionsByDiagnosticSessionIds(
@@ -339,6 +343,7 @@ export async function fetchLatestPaymentTransactionsByDiagnosticSessionIds(
       timezone: row.timezone,
       serviceKey: row.serviceKey,
       paidAtIso: row.paidAtIso,
+      metadata: row.metadata,
     });
   }
   return bySession;
@@ -598,4 +603,48 @@ export async function listExpiredHoldTransactions(
     .limit(200)
     .toArray();
   return docs.map((doc) => mapTransaction(doc as PaymentTransactionDocument & { _id: { toString: () => string } }));
+}
+
+/**
+ * Marks a checkout as committed when the visitor clicks Pay and activates the booking hold when applicable.
+ */
+export async function markPaymentCheckoutCommitted(transactionId: string): Promise<PaymentTransactionRow | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const existing = await findPaymentTransactionById(transactionId);
+  if (existing === null) {
+    return null;
+  }
+  if (isPaymentCheckoutCommitted(existing.metadata)) {
+    return existing;
+  }
+  const db = await getDb();
+  const now = new Date();
+  const nextMetadata: Record<string, string> = {
+    ...(existing.metadata ?? {}),
+    [PAYMENT_CHECKOUT_COMMITTED_METADATA_KEY]: 'true',
+    checkoutCommittedAt: now.toISOString(),
+  };
+  await db.collection<PaymentTransactionDocument>(COLLECTIONS.paymentTransactions).updateOne(
+    { _id: new ObjectId(transactionId) },
+    { $set: { metadata: nextMetadata, updatedAt: now } },
+  );
+  const refreshed = await findPaymentTransactionById(transactionId);
+  if (refreshed === null) {
+    return null;
+  }
+  if (
+    refreshed.bookingId !== null &&
+    refreshed.paymentPolicy === 'pay_after_hold' &&
+    refreshed.expiresAtIso !== null
+  ) {
+    const { renewBookingCheckoutHoldFromOpenTransaction } = await import('@/lib/payments/payment-completion');
+    await renewBookingCheckoutHoldFromOpenTransaction({
+      bookingId: new ObjectId(refreshed.bookingId),
+      transaction: refreshed,
+      expiresAt: new Date(refreshed.expiresAtIso),
+    });
+  }
+  return refreshed;
 }
