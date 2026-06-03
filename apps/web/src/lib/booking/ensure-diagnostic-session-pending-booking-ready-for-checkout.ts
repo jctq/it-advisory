@@ -3,9 +3,9 @@ import {
   findDiagnosticSessionPendingBookingRecord,
   type VerifiedGuestBooking,
 } from '@/lib/data/booking-guest-manage';
-import { getPaymentSettings } from '@/lib/data/payment-settings';
+import { getPaymentSettings, type PaymentSettingsValues } from '@/lib/data/payment-settings';
 import { rescheduleOverduePendingBooking } from '@/lib/data/manage-booking-overdue-actions';
-import { syncBookingIfPaymentWindowExpired } from '@/lib/payments/cancel-expired-payment-window-bookings';
+import { syncSingleBookingIfPaymentWindowExpired } from '@/lib/payments/cancel-expired-payment-window-bookings';
 import type { BookingDocument } from '@/domain/types';
 import { isPendingPaymentExpiredForRebook, isReleasedBookingSlotStartsAt } from '@/lib/booking/pending-payment-expired-for-rebook';
 import { parseBookingSlotToUtc } from '@/lib/marketing/booking-slot';
@@ -50,7 +50,10 @@ export async function ensureDiagnosticSessionPendingBookingReadyForCheckout(
   visitorId: string,
   diagnosticSessionId: ObjectId,
   slot: { readonly dateYmd: string; readonly timeLabel: string },
-  options?: { readonly requirePayable?: boolean },
+  options?: {
+    readonly requirePayable?: boolean;
+    readonly paymentSettings?: PaymentSettingsValues;
+  },
 ): Promise<EnsureDiagnosticSessionPendingBookingReadyResult> {
   const requirePayable = options?.requirePayable ?? true;
   let verified = await findDiagnosticSessionPendingBookingRecord(visitorId, diagnosticSessionId);
@@ -74,7 +77,7 @@ export async function ensureDiagnosticSessionPendingBookingReadyForCheckout(
   if (!requirePayable) {
     return { ok: true, verified };
   }
-  await syncBookingIfPaymentWindowExpired(verified.bookingId);
+  await syncSingleBookingIfPaymentWindowExpired(verified.bookingId);
   if (process.env.MONGODB_URI) {
     const db = await getDb();
     const refreshedBooking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({
@@ -88,7 +91,7 @@ export async function ensureDiagnosticSessionPendingBookingReadyForCheckout(
       };
     }
   }
-  const paymentSettings = await getPaymentSettings();
+  const paymentSettings = options?.paymentSettings ?? (await getPaymentSettings());
   const payability = evaluateBookingPayability({
     bookingId: verified.bookingId,
     booking: verified.booking,

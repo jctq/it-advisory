@@ -150,3 +150,46 @@ export async function cancelExpiredPaymentWindowBookings(
 export async function syncBookingIfPaymentWindowExpired(bookingId: string): Promise<void> {
   await cancelExpiredPaymentWindowBookings({ bookingId });
 }
+
+/**
+ * Fast path for checkout/prepare: loads one booking by id and syncs only when its hold has expired.
+ */
+export async function syncSingleBookingIfPaymentWindowExpired(bookingId: string): Promise<void> {
+  if (!process.env.MONGODB_URI) {
+    return;
+  }
+  let bookingObjectId: ObjectId;
+  try {
+    bookingObjectId = new ObjectId(bookingId.trim());
+  } catch {
+    return;
+  }
+  const db = await getDb();
+  const booking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: bookingObjectId });
+  if (booking === null || booking._id === undefined) {
+    return;
+  }
+  if (booking.status !== 'pending' || booking.paymentTransactionId === undefined || booking.paymentTransactionId === null) {
+    return;
+  }
+  if (!isOpenCheckoutPaymentStatus(booking.paymentStatus)) {
+    return;
+  }
+  const now = new Date();
+  const { holdExpiresMinutes } = await getPaymentSettings();
+  const transaction = await findPaymentTransactionById(booking.paymentTransactionId.toString());
+  if (
+    !resolveAwaitingPaymentHoldExpired({
+      booking,
+      transaction,
+      holdExpiresMinutes,
+      now,
+    })
+  ) {
+    return;
+  }
+  await syncPendingBookingForExpiredPaymentWindow(booking as BookingDocument & { readonly _id: ObjectId }, {
+    transaction,
+    now,
+  });
+}

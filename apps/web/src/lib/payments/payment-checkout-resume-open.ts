@@ -74,6 +74,25 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   if (!isOpenPaymentTransactionHoldActive(input.transaction)) {
     return { ok: false, code: 'payment_hold_expired', error: 'The payment window has expired.' };
   }
+  const cachedRedirectUrl = input.transaction.redirectUrl?.trim() ?? '';
+  const metadataPaymentMethodId = input.transaction.metadata?.paymentMethodId?.trim() ?? '';
+  const canReuseCachedRedirect =
+    cachedRedirectUrl.length > 0 &&
+    input.transaction.gatewayId === input.gatewayId &&
+    metadataPaymentMethodId === input.paymentMethodId &&
+    input.transaction.amountCentavos === input.amountCentavos;
+  if (canReuseCachedRedirect) {
+    input.timing?.mark('gateway_create_reused');
+    return {
+      ok: true,
+      transactionId: input.transaction.id,
+      redirectUrl: cachedRedirectUrl,
+      bookingId: input.transaction.bookingId,
+      manualConfirm: false,
+      mock: false,
+      bookingStatus: input.bookingStatus,
+    };
+  }
   const transactionObjectId = new ObjectId(input.transaction.id);
   await timeCheckoutSegment(input.timing, 'resume_tx_update', () =>
     updateOpenPaymentTransactionForCheckoutResume(transactionObjectId, {

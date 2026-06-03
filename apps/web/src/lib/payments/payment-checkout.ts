@@ -143,6 +143,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
           params.visitorId,
           diagnosticSessionObjectId,
           { dateYmd: params.date, timeLabel: params.time },
+          { paymentSettings: settings },
         ),
       );
       if (pendingReady.ok) {

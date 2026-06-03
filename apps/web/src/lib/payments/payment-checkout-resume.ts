@@ -129,12 +129,17 @@ export async function createPaymentCheckoutForVerifiedBooking(
         ? existingOpenTransaction.metadata
         : undefined,
   });
-  await timeCheckoutSegment(timing, 'recording_apply', () =>
-    applyBookingRecordingFieldsFromCheckout({
-      bookingId: booking._id,
-      recordingOptIn,
-    }),
-  );
+  const bookingRecordingOptIn = booking.recordingOptIn === true;
+  if (recordingOptIn !== bookingRecordingOptIn) {
+    await timeCheckoutSegment(timing, 'recording_apply', () =>
+      applyBookingRecordingFieldsFromCheckout({
+        bookingId: booking._id,
+        recordingOptIn,
+      }),
+    );
+  } else {
+    timing?.mark('recording_apply_skipped');
+  }
   let resolvedPricing;
   try {
     resolvedPricing = await timeCheckoutSegment(timing, 'pricing', () =>
