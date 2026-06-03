@@ -32,6 +32,7 @@ import { runProviderCheckout } from '@/lib/payments/run-provider-checkout';
 import { updatePaymentTransactionProvider } from '@/lib/payments/update-transaction-provider';
 import { buildCheckoutCommittedMetadata, isPaymentCheckoutCommitted } from '@/lib/payments/payment-checkout-commit';
 import { syncDiagnosticSessionPaymentHold } from '@/lib/payments/sync-diagnostic-session-payment-hold';
+import { resolveProviderCheckoutSessionContent } from '@/lib/payments/resolve-provider-checkout-session-content';
 
 export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
@@ -245,6 +246,12 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       error: error instanceof Error ? error.message : 'Invalid promo code.',
     };
   }
+  const sessionContent = await timeCheckoutSegment(timing, 'checkout_content', () =>
+    resolveProviderCheckoutSessionContent({
+      serviceKey: params.serviceKey,
+      resolvedPricing,
+    }),
+  );
   if (existingOpenTransaction !== null && isOpenPaymentTransactionHoldActive(existingOpenTransaction)) {
     return resumeOpenPaymentTransactionCheckout({
       transaction: existingOpenTransaction,
@@ -258,6 +265,8 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       amountCentavos: resolvedPricing.amountCentavos,
       checkoutContext,
       sendPaymentReminderEmail: params.sendPaymentReminderEmail === true,
+      description: sessionContent.description,
+      lineItems: sessionContent.lineItems,
       metadata: buildCheckoutCommittedMetadata(
         {
         bookingDraftId: existingOpenTransaction.bookingDraftId,
@@ -406,7 +415,8 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     sessionInput: {
       amountCentavos: resolvedPricing.amountCentavos,
       currency: 'PHP',
-      description: 'TeqMD Consultation Booking',
+      description: sessionContent.description,
+      lineItems: sessionContent.lineItems,
       cancelUrl,
       referenceId: bookingDraftId,
       metadata: {

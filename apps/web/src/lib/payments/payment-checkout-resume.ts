@@ -37,6 +37,7 @@ import { updatePaymentTransactionProvider } from '@/lib/payments/update-transact
 import { buildCheckoutCommittedMetadata, isPaymentCheckoutCommitted } from '@/lib/payments/payment-checkout-commit';
 import { timeCheckoutSegment, type CheckoutTimingCollector } from '@/lib/payments/checkout-timing';
 import type { CheckoutPaymentContext } from '@/lib/payments/payment-checkout-context';
+import { resolveProviderCheckoutSessionContent } from '@/lib/payments/resolve-provider-checkout-session-content';
 
 type ResumeCheckoutParams = {
   readonly credentials: GuestBookingManageCredentials;
@@ -162,6 +163,12 @@ export async function createPaymentCheckoutForVerifiedBooking(
       error: error instanceof Error ? error.message : 'Invalid promo code.',
     };
   }
+  const sessionContent = await timeCheckoutSegment(timing, 'checkout_content', () =>
+    resolveProviderCheckoutSessionContent({
+      serviceKey: booking.serviceKey,
+      resolvedPricing,
+    }),
+  );
   const sessionMarketingRefFromParams = params.sessionMarketingRef?.trim() ?? '';
   const sessionMarketingRefFromBooking =
     booking.diagnosticSessionId !== undefined && booking.diagnosticSessionId !== null
@@ -181,6 +188,8 @@ export async function createPaymentCheckoutForVerifiedBooking(
       sessionMarketingRef: sessionMarketingRef.length > 0 ? sessionMarketingRef : verified.bookingId,
       amountCentavos: resolvedPricing.amountCentavos,
       checkoutContext,
+      description: sessionContent.description,
+      lineItems: sessionContent.lineItems,
       metadata: buildCheckoutCommittedMetadata(
         {
         bookingDraftId,
@@ -278,7 +287,8 @@ export async function createPaymentCheckoutForVerifiedBooking(
     sessionInput: {
       amountCentavos: resolvedPricing.amountCentavos,
       currency: 'PHP',
-      description: 'TeqMD Consultation Booking',
+      description: sessionContent.description,
+      lineItems: sessionContent.lineItems,
       cancelUrl,
       referenceId: bookingDraftId,
       metadata: {

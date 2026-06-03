@@ -6,6 +6,7 @@ import type {
   ReconcileCheckoutSessionInput,
   GatewayCredentials,
 } from './types';
+import { assertCheckoutLineItemsTotal, formatLineItemsDescription } from './checkout-line-items';
 import { resolveHitpayPaymentMethods } from './payment-method-types';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -29,12 +30,16 @@ export function createHitpayAdapter(credentials: GatewayCredentials): PaymentGat
         throw new Error('HitPay API key is not configured.');
       }
       const amount = (input.amountCentavos / 100).toFixed(2);
+      const lineItems = assertCheckoutLineItemsTotal(input);
+      const purpose = input.lineItems !== undefined && input.lineItems.length > 0
+        ? formatLineItemsDescription(lineItems)
+        : input.description;
       const body = new URLSearchParams();
       body.set('amount', amount);
       body.set('currency', input.currency);
       body.set('redirect_url', input.successUrl);
       body.set('reference_number', input.referenceId);
-      body.set('purpose', input.description);
+      body.set('purpose', purpose);
       const customerName = input.customerName?.trim() ?? '';
       const customerEmail = input.customerEmail?.trim() ?? '';
       const customerPhone = input.customerPhone?.trim() ?? '';

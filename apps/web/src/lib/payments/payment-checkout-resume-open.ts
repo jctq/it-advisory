@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { PaymentGatewayId, PaymentTransactionDocument } from '@/domain/payment-types';
+import type { CheckoutSessionLineItem } from '@teqmd/payments';
 import type { BookingDocument } from '@/domain/types';
 import {
   findPaymentTransactionById,
@@ -64,6 +65,8 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   readonly nativeInAppPaymentReturn?: boolean;
   readonly sessionMarketingRef: string;
   readonly amountCentavos: number;
+  readonly description: string;
+  readonly lineItems: readonly CheckoutSessionLineItem[];
   readonly metadata: Record<string, string>;
   readonly customerName: string;
   readonly customerEmail: string;
@@ -146,7 +149,8 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
     sessionInput: {
       amountCentavos: input.amountCentavos,
       currency: 'PHP',
-      description: 'TeqMD Consultation Booking',
+      description: input.description,
+      lineItems: input.lineItems,
       cancelUrl,
       referenceId: input.transaction.bookingDraftId,
       metadata: {

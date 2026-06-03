@@ -1,9 +1,18 @@
 import type { PaymentGatewayId, PaymentStatus } from '@teqmd/domain/payment-types';
 
+export type CheckoutSessionLineItem = {
+  readonly name: string;
+  readonly amountCentavos: number;
+  readonly quantity?: number;
+  readonly description?: string;
+};
+
 export type CreateCheckoutSessionInput = {
   readonly amountCentavos: number;
   readonly currency: 'PHP';
   readonly description: string;
+  /** Itemized breakdown shown on provider checkout when supported. */
+  readonly lineItems?: readonly CheckoutSessionLineItem[];
   readonly successUrl: string;
   readonly cancelUrl: string;
   readonly referenceId: string;

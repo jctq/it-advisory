@@ -6,6 +6,7 @@ import type {
   ReconcileCheckoutSessionInput,
   GatewayCredentials,
 } from './types';
+import { assertCheckoutLineItemsTotal } from './checkout-line-items';
 import { buildPaymongoBilling } from './customer-prefill';
 import { resolvePaymongoPaymentMethodTypes } from './payment-method-types';
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -37,6 +38,7 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
       }
       const billing = buildPaymongoBilling(input);
       const paymentMethodTypes = [...resolvePaymongoPaymentMethodTypes(input.paymentMethodId)];
+      const lineItems = assertCheckoutLineItemsTotal(input);
       const response = await fetch(`${PAYMONGO_CHECKOUT_API}/checkout_sessions`, {
         method: 'POST',
         headers: {
@@ -46,14 +48,13 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
         body: JSON.stringify({
           data: {
             attributes: {
-              line_items: [
-                {
-                  amount: input.amountCentavos,
-                  currency: input.currency,
-                  name: input.description,
-                  quantity: 1,
-                },
-              ],
+              line_items: lineItems.map((item) => ({
+                amount: item.amountCentavos,
+                currency: input.currency,
+                name: item.name,
+                quantity: item.quantity ?? 1,
+                ...(item.description !== undefined ? { description: item.description } : {}),
+              })),
               payment_method_types: paymentMethodTypes,
               ...(billing !== undefined ? { billing } : {}),
               success_url: input.successUrl,

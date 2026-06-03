@@ -6,6 +6,7 @@ import type {
   ReconcileCheckoutSessionInput,
   GatewayCredentials,
 } from './types';
+import { assertCheckoutLineItemsTotal } from './checkout-line-items';
 import { splitCustomerName } from './customer-prefill';
 
 function resolveBaseUrl(sandboxMode: boolean): string {
@@ -116,6 +117,12 @@ export function createPaypalAdapter(credentials: GatewayCredentials): PaymentGat
       }
       const accessToken = await fetchPaypalAccessToken(clientId, clientSecret, input.sandboxMode);
       const amount = (input.amountCentavos / 100).toFixed(2);
+      const lineItems = assertCheckoutLineItemsTotal(input);
+      const itemTotalCentavos = lineItems.reduce(
+        (sum, item) => sum + item.amountCentavos * (item.quantity ?? 1),
+        0,
+      );
+      const itemTotal = (itemTotalCentavos / 100).toFixed(2);
       const customerEmail = input.customerEmail?.trim() ?? '';
       const customerName = input.customerName?.trim() ?? '';
       const customerPhone = input.customerPhone?.trim() ?? '';
@@ -152,7 +159,29 @@ export function createPaypalAdapter(credentials: GatewayCredentials): PaymentGat
             {
               reference_id: input.referenceId,
               description: input.description,
-              amount: { currency_code: input.currency, value: amount },
+              amount: {
+                currency_code: input.currency,
+                value: amount,
+                breakdown: {
+                  item_total: {
+                    currency_code: input.currency,
+                    value: itemTotal,
+                  },
+                },
+              },
+              items: lineItems.map((item) => {
+                const quantity = item.quantity ?? 1;
+                const unitAmountCentavos = Math.round(item.amountCentavos / quantity);
+                return {
+                  name: item.name,
+                  quantity: String(quantity),
+                  unit_amount: {
+                    currency_code: input.currency,
+                    value: (unitAmountCentavos / 100).toFixed(2),
+                  },
+                  ...(item.description !== undefined ? { description: item.description } : {}),
+                };
+              }),
               custom_id: input.referenceId,
             },
           ],

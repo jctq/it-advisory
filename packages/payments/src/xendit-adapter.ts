@@ -6,6 +6,7 @@ import type {
   ReconcileCheckoutSessionInput,
   GatewayCredentials,
 } from './types';
+import { assertCheckoutLineItemsTotal } from './checkout-line-items';
 import { buildXenditCustomer } from './customer-prefill';
 import { resolveXenditPaymentMethods } from './payment-method-types';
 
@@ -26,6 +27,7 @@ export function createXenditAdapter(credentials: GatewayCredentials): PaymentGat
       if (secretKey.length === 0) {
         throw new Error('Xendit secret key is not configured.');
       }
+      const lineItems = assertCheckoutLineItemsTotal(input);
       const response = await fetch(`${XENDIT_API_BASE}/v2/invoices`, {
         method: 'POST',
         headers: {
@@ -37,6 +39,11 @@ export function createXenditAdapter(credentials: GatewayCredentials): PaymentGat
           amount: input.amountCentavos,
           currency: input.currency,
           description: input.description,
+          items: lineItems.map((item) => ({
+            name: item.name,
+            quantity: item.quantity ?? 1,
+            price: item.amountCentavos,
+          })),
           success_redirect_url: input.successUrl,
           failure_redirect_url: input.cancelUrl,
           metadata: { ...input.metadata, paymentMethodId: input.paymentMethodId },
