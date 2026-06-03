@@ -47,7 +47,9 @@ export function AdminVerifyOtpForm(props: AdminVerifyOtpFormProps): React.ReactE
   const otpHintId = useId();
   const [code, setCode] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(
-    props.initialSendFailed ? 'We could not send a verification email. Try resending the code below.' : null,
+    props.initialSendFailed
+      ? 'We could not send a verification email. Try resending the code below.'
+      : null,
   );
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
@@ -55,7 +57,8 @@ export function AdminVerifyOtpForm(props: AdminVerifyOtpFormProps): React.ReactE
     props.initialResendLocked ? RESEND_COOLDOWN_SECONDS : 0,
   );
   const nextPath =
-    searchParams.get('next')?.startsWith('/admin') === true && !searchParams.get('next')!.startsWith('//')
+    searchParams.get('next')?.startsWith('/admin') === true &&
+    !searchParams.get('next')!.startsWith('//')
       ? searchParams.get('next')!
       : DEFAULT_NEXT_PATH;
   const executeSendCode = useCallback(async (): Promise<void> => {
@@ -63,13 +66,16 @@ export function AdminVerifyOtpForm(props: AdminVerifyOtpFormProps): React.ReactE
     setErrorMessage(null);
     try {
       const response = await fetch(buildApiUrl('/api/admin/otp/send'), { method: 'POST' });
-      const payload = (await response.json().catch(() => null)) as
-        | { readonly error?: string; readonly code?: string }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        readonly error?: string;
+        readonly code?: string;
+      } | null;
       if (!response.ok) {
         if (payload?.code === 'admin_otp_cooldown') {
           const retryAfter = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
-          setResendSeconds(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : RESEND_COOLDOWN_SECONDS);
+          setResendSeconds(
+            Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : RESEND_COOLDOWN_SECONDS,
+          );
         }
         setErrorMessage(payload?.error ?? 'Unable to send verification code. Please try again.');
         return;
@@ -106,9 +112,14 @@ export function AdminVerifyOtpForm(props: AdminVerifyOtpFormProps): React.ReactE
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: submittedCode }),
         });
-        const payload = (await response.json().catch(() => null)) as { readonly error?: string } | null;
+        const payload = (await response.json().catch(() => null)) as {
+          readonly error?: string;
+        } | null;
         if (!response.ok) {
-          setErrorMessage(payload?.error ?? 'That code is invalid or has expired. Request a new code and try again.');
+          setErrorMessage(
+            payload?.error ??
+              'That code is invalid or has expired. Request a new code and try again.',
+          );
           return;
         }
         await update();
@@ -182,7 +193,9 @@ export function AdminVerifyOtpForm(props: AdminVerifyOtpFormProps): React.ReactE
               void executeVerify(value);
             }}
             aria-invalid={errorMessage !== null}
-            aria-describedby={[otpHintId, errorMessage !== null ? otpErrorId : null].filter(Boolean).join(' ')}
+            aria-describedby={[otpHintId, errorMessage !== null ? otpErrorId : null]
+              .filter(Boolean)
+              .join(' ')}
             disabled={isSubmitting}
             containerClassName="justify-center"
           >
@@ -200,8 +213,8 @@ export function AdminVerifyOtpForm(props: AdminVerifyOtpFormProps): React.ReactE
           </InputOTP>
           <div className="flex flex-col items-center gap-2">
             <p className="text-center text-xs text-muted-foreground">
-              Tap a box to focus, then use your keyboard&apos;s delete key to correct a digit. You can also paste the
-              code from your email.
+              Tap a box to focus, then use your keyboard&apos;s delete key to correct a digit. You
+              can also paste the code from your email.
             </p>
             {code.length > 0 ? (
               <Button
@@ -232,7 +245,11 @@ export function AdminVerifyOtpForm(props: AdminVerifyOtpFormProps): React.ReactE
           >
             <RefreshCw className={cn('size-4 shrink-0', isSending && 'animate-spin')} aria-hidden />
             <span aria-live="polite" className="tabular-nums">
-              {isSending ? 'Sending code…' : resendSeconds > 0 ? `Resend in ${resendSeconds}s` : 'Resend code'}
+              {isSending
+                ? 'Sending code…'
+                : resendSeconds > 0
+                  ? `Resend in ${resendSeconds}s`
+                  : 'Resend code'}
             </span>
           </Button>
         </div>

@@ -30,7 +30,7 @@ describe('admin onboarding', () => {
     ).map((step) => step.target);
     expect(navTargets).toContain('nav-support-reports');
     expect(navTargets).toContain('nav-debug');
-    expect(ADMIN_ONBOARDING_STEP_DEFINITIONS.length).toBe(49);
+    expect(ADMIN_ONBOARDING_STEP_DEFINITIONS.length).toBe(48);
   });
 
   it('marks every drive step with disableActiveInteraction', () => {

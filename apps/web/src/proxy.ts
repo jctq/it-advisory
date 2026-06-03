@@ -28,7 +28,9 @@ function isApiAdminPath(pathname: string): boolean {
 }
 
 function isAdminPath(pathname: string): boolean {
-  return pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`) || isApiAdminPath(pathname);
+  return (
+    pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`) || isApiAdminPath(pathname)
+  );
 }
 
 function isLoginPath(pathname: string): boolean {
@@ -41,14 +43,20 @@ function isLoginPath(pathname: string): boolean {
 }
 
 function isOtpFlowPath(pathname: string): boolean {
-  return pathname === VERIFY_OTP_PATH || pathname === OTP_SEND_API_PATH || pathname === OTP_VERIFY_API_PATH;
+  return (
+    pathname === VERIFY_OTP_PATH ||
+    pathname === OTP_SEND_API_PATH ||
+    pathname === OTP_VERIFY_API_PATH
+  );
 }
 
 function allowDevAdminOpen(): boolean {
   return !isProductionNodeEnv() && process.env.ALLOW_DEV_ADMIN_OPEN?.trim() === '1';
 }
 
-function denyApi(code: 'admin_session_required' | 'admin_otp_required' = 'admin_session_required'): NextResponse {
+function denyApi(
+  code: 'admin_session_required' | 'admin_otp_required' = 'admin_session_required',
+): NextResponse {
   return NextResponse.json({ error: 'Unauthorized', code }, { status: 401 });
 }
 
@@ -80,7 +88,12 @@ function isAdminOAuthConfigured(): boolean {
 }
 
 function resolveSafeNextPath(rawNext: string | null): string {
-  if (rawNext === null || rawNext.length === 0 || !rawNext.startsWith('/admin') || rawNext.startsWith('//')) {
+  if (
+    rawNext === null ||
+    rawNext.length === 0 ||
+    !rawNext.startsWith('/admin') ||
+    rawNext.startsWith('//')
+  ) {
     return DEFAULT_ADMIN_NEXT_PATH;
   }
   return rawNext;
@@ -116,37 +129,52 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
   if (isOtpFlowPath(pathname)) {
     if (!isAdminEmailOtpRequired()) {
-      return isApiAdminPath(pathname) ? denyApi('admin_session_required') : denyWeb(request, DEFAULT_ADMIN_NEXT_PATH);
+      return isApiAdminPath(pathname)
+        ? denyApi('admin_session_required')
+        : denyWeb(request, DEFAULT_ADMIN_NEXT_PATH);
     }
     return handleOtpFlowPath(request);
   }
-  if (!isAdminOAuthConfigured() && !allowDevAdminOpen() && !isValidAdminServiceBearer(request.headers.get('authorization'))) {
+  if (
+    !isAdminOAuthConfigured() &&
+    !allowDevAdminOpen() &&
+    !isValidAdminServiceBearer(request.headers.get('authorization'))
+  ) {
     if (isApiAdminPath(pathname)) {
       return NextResponse.json(
-        { error: 'Admin OAuth is not configured. Set AUTH_* provider credentials and ADMIN_ALLOWED_EMAILS.', code: 'admin_oauth_unset' },
+        {
+          error:
+            'Admin OAuth is not configured. Set AUTH_* provider credentials and ADMIN_ALLOWED_EMAILS.',
+          code: 'admin_oauth_unset',
+        },
         { status: 503 },
       );
     }
-    return new NextResponse('Admin OAuth is not configured. Set AUTH_* provider credentials and ADMIN_ALLOWED_EMAILS.', {
-      status: 503,
-    });
+    return new NextResponse(
+      'Admin OAuth is not configured. Set AUTH_* provider credentials and ADMIN_ALLOWED_EMAILS.',
+      {
+        status: 503,
+      },
+    );
   }
   const state = await resolveAdminOtpSessionState(request);
   if (isAdminFullyAuthorized(state)) {
     return continueWithAppearanceScope(request);
   }
   if (isAdminOtpPending(state)) {
-    return isApiAdminPath(pathname) ? denyApi('admin_otp_required') : denyWeb(request, VERIFY_OTP_PATH);
+    return isApiAdminPath(pathname)
+      ? denyApi('admin_otp_required')
+      : denyWeb(request, VERIFY_OTP_PATH);
   }
   const session = await auth();
   if (isAdminEmailAllowed(session?.user?.email)) {
-    return isApiAdminPath(pathname) ? denyApi('admin_otp_required') : denyWeb(request, VERIFY_OTP_PATH);
+    return isApiAdminPath(pathname)
+      ? denyApi('admin_otp_required')
+      : denyWeb(request, VERIFY_OTP_PATH);
   }
   return isApiAdminPath(pathname) ? denyApi('admin_session_required') : denyWeb(request);
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|brand/|scripts/).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|brand/|scripts/).*)'],
 };
