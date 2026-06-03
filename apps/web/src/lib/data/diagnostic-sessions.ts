@@ -1050,12 +1050,16 @@ export async function upsertDiagnosticProgress(input: UpsertDiagnosticProgressIn
     } else {
       await sessions.updateOne({ _id: target._id }, { $set: setWithTemplatePin });
     }
-    await insertDiagnosticAudit({
-      visitorId: input.visitorId,
-      sessionId: target._id,
-      step: input.currentStep,
-      answersSnapshot: input.answers,
-    });
+    const shouldWriteAudit =
+      target.currentStep !== input.currentStep || effectiveIsComplete || isExplicitReset;
+    if (shouldWriteAudit) {
+      await insertDiagnosticAudit({
+        visitorId: input.visitorId,
+        sessionId: target._id,
+        step: input.currentStep,
+        answersSnapshot: input.answers,
+      });
+    }
     await upsertVisitorSessionPointer(input.visitorId, target._id);
     return { persisted: true, sessionId: target._id.toString() };
   }

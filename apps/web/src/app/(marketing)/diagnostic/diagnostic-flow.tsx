@@ -3,6 +3,8 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useMarketingDiagnostic } from '@/hooks/marketing/use-marketing-diagnostic';
+import { useDiagnosticSessionPersist } from '@/hooks/marketing/use-diagnostic-session-persist';
+import { DIAGNOSTIC_SESSION_PERSIST_API_URL } from '@/lib/marketing/diagnostic-session-persist';
 import Link from 'next/link';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import {
@@ -21,14 +23,11 @@ import {
   applyGuidedGoBack,
   applyGuidedPeekToAuthoredRoundIndex,
   buildDiagnosticAnswerLookup,
-  buildDiagnosticThreadJson,
   computeGuidedLinearStep,
   findPreviousVisibleQuestionIndex,
   parseGuidedDiagnosticJson,
-  serializeGuidedDiagnostic,
   type GuidedDiagnosticV1,
 } from '@/lib/marketing/guided-diagnostic-types';
-import { isGuidedDiagnosticExplicitReset } from '@teqmd/diagnostic-core/diagnostic-session-complete';
 import type { PublicDiagnosticTemplateValue } from '@/lib/diagnostic-template-types';
 import { listVisibleTemplateRoundSummaries } from '@/lib/marketing/diagnostic-template-flow';
 import type { PaymentStatus } from '@/domain/payment-types';
@@ -48,7 +47,7 @@ import {
 } from '@/lib/marketing/diagnostic-session-linked-booking';
 import { GuidedDiagnosticWizard } from './guided-diagnostic-wizard';
 
-const DIAGNOSTIC_SESSION_API_URL = '/api/diagnostic/session';
+const DIAGNOSTIC_SESSION_API_URL = DIAGNOSTIC_SESSION_PERSIST_API_URL;
 const DIAGNOSTIC_CONFIG_API_URL = '/api/diagnostic/diagnostic-config';
 const DIAGNOSTIC_TEMPLATE_API_URL = '/api/diagnostic/diagnostic-template';
 
@@ -64,11 +63,6 @@ function parseDiagnosticSessionIdFromApiPayload(payload: unknown): string | null
   return isPlausibleMarketingDiagnosticSessionRef(trimmed) ? trimmed : null;
 }
 
-function resolveGuidedPersistCompleted(guided: GuidedDiagnosticV1): boolean {
-  return guided.outcome !== null && guided.activeRound === null;
-}
-
-/** Avoid clobbering a terminal recommendation when a stale session hydrate races the summary API. */
 function mergeHydratedGuidedState(
   current: GuidedDiagnosticV1,
   parsed: GuidedDiagnosticV1 | null,
@@ -228,15 +222,6 @@ function buildRoundProgressSteps(params: {
   }));
 }
 
-function buildAnswersPayload(guided: GuidedDiagnosticV1): Record<string, string | number | boolean | string[]> {
-  return {
-    guidedDiagnostic: serializeGuidedDiagnostic(guided),
-    situation: guided.outcome?.mappedSituation ?? '',
-    situationAdvisorSummary: guided.outcome?.advisorSummary ?? '',
-    situationDiagnosticThread: buildDiagnosticThreadJson(guided),
-  };
-}
-
 /**
  * Mongo may return guidedDiagnostic as a string or as a nested document depending on how it was stored.
  */
@@ -252,6 +237,10 @@ function normalizeGuidedDiagnosticRaw(raw: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+function resolveGuidedPersistCompleted(guided: GuidedDiagnosticV1): boolean {
+  return guided.outcome !== null && guided.activeRound === null;
 }
 
 export type DiagnosticFlowProps = {
@@ -318,7 +307,6 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
   const [persistedSessionRef, setPersistedSessionRef] = useState<string | null>(null);
   const marketingSessionRef = sessionTargetId ?? persistedSessionRef;
   const hasHydratedRef = useRef<boolean>(false);
-  const hasEverCompletedRef = useRef<boolean>(false);
   const lastSessionInitKeyRef = useRef<string | null>(null);
   const skipNextSessionHydrationRef = useRef<boolean>(false);
   const isRetakeQuery = searchParams.get('retake') === '1';
@@ -329,46 +317,23 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
     }
     setPersistedSessionRef((current) => current ?? sessionId);
   }, []);
-  const persistGuided = useCallback(
-    async (next: GuidedDiagnosticV1, completed?: boolean): Promise<void> => {
-      if (sessionReadOnlyRef.current) {
-        return;
-      }
-      const linearStep = computeGuidedLinearStep(next);
-      const serializedGuided = serializeGuidedDiagnostic(next);
-      const isExplicitReset = isGuidedDiagnosticExplicitReset(serializedGuided);
-      if (isExplicitReset) {
-        hasEverCompletedRef.current = false;
-      }
-      const isComplete =
-        completed ??
-        (resolveGuidedPersistCompleted(next) ||
-          (hasEverCompletedRef.current && !isExplicitReset));
-      const body: Record<string, unknown> = {
-        answers: buildAnswersPayload(next),
-        currentStep: linearStep,
-        completed: isComplete,
-      };
-      const activeSessionRef = sessionTargetId ?? persistedSessionRef;
-      if (activeSessionRef !== null) {
-        body.sessionId = activeSessionRef;
-      }
-      const response = await fetch(DIAGNOSTIC_SESSION_API_URL, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (response.ok) {
-        const payload: unknown = await response.json().catch(() => ({}));
-        capturePersistedSessionRef(parseDiagnosticSessionIdFromApiPayload(payload));
-      }
-    },
-    [capturePersistedSessionRef, persistedSessionRef, sessionReadOnlyRef, sessionTargetId],
-  );
-  const persistGuidedRef = useRef(persistGuided);
+  const {
+    persistImmediate,
+    markPersistedFromServer,
+    resetPersistTracking,
+  } = useDiagnosticSessionPersist({
+    guided,
+    isSessionReady,
+    sessionReadOnlyRef,
+    sessionTargetId,
+    persistedSessionRef,
+    onPersistedSessionRef: capturePersistedSessionRef,
+    hasHydratedRef,
+  });
+  const persistImmediateRef = useRef(persistImmediate);
   useEffect(() => {
-    persistGuidedRef.current = persistGuided;
-  }, [persistGuided]);
+    persistImmediateRef.current = persistImmediate;
+  }, [persistImmediate]);
   useEffect(() => {
     if (guided.outcome === null || sessionTargetId !== null || persistedSessionRef === null) {
       return;
@@ -382,15 +347,6 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
     }
   }, [guided.outcome, pathname, persistedSessionRef, sessionTargetId]);
   useEffect(() => {
-    if (guided.outcome !== null && guided.activeRound === null) {
-      hasEverCompletedRef.current = true;
-    }
-    if (!isSessionReady || sessionReadOnlyRef.current || guided.outcome === null) {
-      return;
-    }
-    void persistGuidedRef.current(guided, true);
-  }, [guided, isSessionReady, sessionReadOnlyRef]);
-  useEffect(() => {
     if (lastSessionInitKeyRef.current === sessionInitKey && hasHydratedRef.current) {
       return;
     }
@@ -402,17 +358,18 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
       setSessionReadOnly(false);
       setShowBookingActions(true);
       setLinkedBookingSlot(null);
+      resetPersistTracking();
       if (sessionTargetId === null) {
         setPersistedSessionRef(null);
       }
       if (isRetakeQuery) {
         setIsSessionReady(false);
-        hasEverCompletedRef.current = false;
-        await persistGuidedRef.current(GUIDED_DIAGNOSTIC_EMPTY, false);
+        await persistImmediateRef.current(GUIDED_DIAGNOSTIC_EMPTY, { completedOverride: false });
         if (cancelled) {
           return;
         }
         setGuided(GUIDED_DIAGNOSTIC_EMPTY);
+        markPersistedFromServer(GUIDED_DIAGNOSTIC_EMPTY, false);
         hasHydratedRef.current = true;
         skipNextSessionHydrationRef.current = true;
         setIsSessionReady(true);
@@ -464,6 +421,7 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
           setShowBookingActions(true);
           setLinkedBookingSlot(null);
           setLatestPaymentTransactionStatus(null);
+          markPersistedFromServer(GUIDED_DIAGNOSTIC_EMPTY, false);
           hasHydratedRef.current = true;
           setIsSessionReady(true);
           return;
@@ -482,6 +440,7 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
           setShowBookingActions(true);
           setLinkedBookingSlot(null);
           setLatestPaymentTransactionStatus(null);
+          markPersistedFromServer(GUIDED_DIAGNOSTIC_EMPTY, false);
           hasHydratedRef.current = true;
           setIsSessionReady(true);
           return;
@@ -502,10 +461,12 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
         const normalized = normalizeGuidedDiagnosticRaw(rawGuided);
         const parsed =
           normalized !== undefined && normalized !== '' ? parseGuidedDiagnosticJson(normalized) : null;
-        if (parsed !== null && resolveGuidedPersistCompleted(parsed)) {
-          hasEverCompletedRef.current = true;
-        }
-        setGuided((current) => mergeHydratedGuidedState(current, parsed));
+        let hydratedGuided: GuidedDiagnosticV1 = GUIDED_DIAGNOSTIC_EMPTY;
+        setGuided((current) => {
+          hydratedGuided = mergeHydratedGuidedState(current, parsed);
+          return hydratedGuided;
+        });
+        markPersistedFromServer(hydratedGuided, resolveGuidedPersistCompleted(hydratedGuided));
       } finally {
         if (!cancelled) {
           hasHydratedRef.current = true;
@@ -520,6 +481,8 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
   }, [
     isRetakeQuery,
     capturePersistedSessionRef,
+    markPersistedFromServer,
+    resetPersistTracking,
     router,
     sessionInitKey,
     sessionReadOnlyRef,
@@ -567,33 +530,6 @@ export function DiagnosticFlow(props: DiagnosticFlowProps = {}): ReactElement {
       cancelled = true;
     };
   }, [marketingSessionRef, setActiveTemplate, setDiagnosticAiEnabled]);
-  useEffect(() => {
-    if (!isSessionReady || !hasHydratedRef.current || sessionReadOnlyRef.current) {
-      return;
-    }
-    const handle = setTimeout(() => {
-      void persistGuided(guided);
-    }, 280);
-    return () => clearTimeout(handle);
-  }, [guided, isSessionReady, persistGuided, sessionReadOnlyRef]);
-  useEffect(() => {
-    if (!isSessionReady || typeof document === 'undefined' || sessionReadOnlyRef.current) {
-      return;
-    }
-    function flushBeforeLeave(): void {
-      void persistGuided(guided);
-    }
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') {
-        flushBeforeLeave();
-      }
-    });
-    window.addEventListener('pagehide', flushBeforeLeave);
-    return () => {
-      document.removeEventListener('visibilitychange', flushBeforeLeave);
-      window.removeEventListener('pagehide', flushBeforeLeave);
-    };
-  }, [guided, isSessionReady, persistGuided, sessionReadOnlyRef]);
   const progressPercent = useMemo(() => {
     if (guided.outcome !== null) {
       return 100;
