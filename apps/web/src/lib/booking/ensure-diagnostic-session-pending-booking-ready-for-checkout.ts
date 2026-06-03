@@ -77,8 +77,11 @@ export async function ensureDiagnosticSessionPendingBookingReadyForCheckout(
   if (!requirePayable) {
     return { ok: true, verified };
   }
-  await syncSingleBookingIfPaymentWindowExpired(verified.bookingId);
-  if (process.env.MONGODB_URI) {
+  const paymentSettings = options?.paymentSettings ?? (await getPaymentSettings());
+  const paymentWindowSync = await syncSingleBookingIfPaymentWindowExpired(verified.bookingId, {
+    holdExpiresMinutes: paymentSettings.holdExpiresMinutes,
+  });
+  if (paymentWindowSync.didMutate && process.env.MONGODB_URI) {
     const db = await getDb();
     const refreshedBooking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({
       _id: verified.booking._id,
@@ -91,7 +94,6 @@ export async function ensureDiagnosticSessionPendingBookingReadyForCheckout(
       };
     }
   }
-  const paymentSettings = options?.paymentSettings ?? (await getPaymentSettings());
   const payability = evaluateBookingPayability({
     bookingId: verified.bookingId,
     booking: verified.booking,

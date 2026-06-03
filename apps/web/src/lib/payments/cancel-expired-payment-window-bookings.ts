@@ -151,32 +151,39 @@ export async function syncBookingIfPaymentWindowExpired(bookingId: string): Prom
   await cancelExpiredPaymentWindowBookings({ bookingId });
 }
 
+export type SyncSingleBookingPaymentWindowResult = {
+  readonly didMutate: boolean;
+};
+
 /**
  * Fast path for checkout/prepare: loads one booking by id and syncs only when its hold has expired.
  */
-export async function syncSingleBookingIfPaymentWindowExpired(bookingId: string): Promise<void> {
+export async function syncSingleBookingIfPaymentWindowExpired(
+  bookingId: string,
+  options?: { readonly holdExpiresMinutes?: number },
+): Promise<SyncSingleBookingPaymentWindowResult> {
   if (!process.env.MONGODB_URI) {
-    return;
+    return { didMutate: false };
   }
   let bookingObjectId: ObjectId;
   try {
     bookingObjectId = new ObjectId(bookingId.trim());
   } catch {
-    return;
+    return { didMutate: false };
   }
   const db = await getDb();
   const booking = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: bookingObjectId });
   if (booking === null || booking._id === undefined) {
-    return;
+    return { didMutate: false };
   }
   if (booking.status !== 'pending' || booking.paymentTransactionId === undefined || booking.paymentTransactionId === null) {
-    return;
+    return { didMutate: false };
   }
   if (!isOpenCheckoutPaymentStatus(booking.paymentStatus)) {
-    return;
+    return { didMutate: false };
   }
   const now = new Date();
-  const { holdExpiresMinutes } = await getPaymentSettings();
+  const holdExpiresMinutes = options?.holdExpiresMinutes ?? (await getPaymentSettings()).holdExpiresMinutes;
   const transaction = await findPaymentTransactionById(booking.paymentTransactionId.toString());
   if (
     !resolveAwaitingPaymentHoldExpired({
@@ -186,10 +193,11 @@ export async function syncSingleBookingIfPaymentWindowExpired(bookingId: string)
       now,
     })
   ) {
-    return;
+    return { didMutate: false };
   }
   await syncPendingBookingForExpiredPaymentWindow(booking as BookingDocument & { readonly _id: ObjectId }, {
     transaction,
     now,
   });
+  return { didMutate: true };
 }
