@@ -12,6 +12,7 @@ import {
   createGuestBookingManageCheckout,
   prepareAccountBookingManageCheckout,
   prepareGuestBookingManageCheckout,
+  sendManagePaymentReminderAfterCheckoutCommit,
   lookupAccountManagedBooking,
   lookupGuestBooking,
   syncAccountProfileToManagedBooking,
@@ -394,6 +395,21 @@ export function GuestBookingManageFlow(props: {
       cachedPrep.prepKey === manageCheckoutPrepKey &&
       cachedPrep.redirectUrl.length > 0
     ) {
+      void sendManagePaymentReminderAfterCheckoutCommit(
+        manageContext.kind === 'guest'
+          ? {
+              apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+              kind: 'guest',
+              credentials: manageContext.credentials,
+              transactionId: cachedPrep.transactionId,
+            }
+          : {
+              apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+              kind: 'account',
+              bookingId: manageContext.bookingId,
+              transactionId: cachedPrep.transactionId,
+            },
+      );
       window.location.assign(cachedPrep.redirectUrl);
       return;
     }

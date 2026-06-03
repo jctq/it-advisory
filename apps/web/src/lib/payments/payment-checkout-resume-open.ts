@@ -67,6 +67,7 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   readonly bookingStatus: BookingDocument['status'] | null;
   readonly checkoutContext: CheckoutPaymentContext;
   readonly timing?: CheckoutTimingCollector;
+  readonly sendPaymentReminderEmail?: boolean;
 }): Promise<CreateCheckoutSessionResult> {
   if (input.transaction.visitorId !== input.visitorId) {
     return { ok: false, code: 'transaction_not_found', error: 'Could not load payment session.' };
@@ -143,7 +144,9 @@ export async function resumeOpenPaymentTransactionCheckout(input: {
   await timeCheckoutSegment(input.timing, 'provider_persist', () =>
     updatePaymentTransactionProvider(transactionObjectId, providerResult.session),
   );
-  void executeSendBookingPaymentReminderEmail({ transaction: input.transaction });
+  if (input.sendPaymentReminderEmail === true) {
+    void executeSendBookingPaymentReminderEmail({ transaction: input.transaction });
+  }
   return {
     ok: true,
     transactionId: input.transaction.id,

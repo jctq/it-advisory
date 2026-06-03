@@ -3,6 +3,7 @@ import { isMarketingSlotInPublishedAvailabilityForCheckout } from '@/lib/data/bo
 import { insertMarketingBookingLead, type MarketingBookingLeadContact } from '@/lib/data/leads';
 import {
   findOpenPaymentTransactionForCheckoutSlot,
+  findPaymentTransactionById,
   insertPaymentTransaction,
   type PaymentTransactionRow,
 } from '@/lib/data/payment-transactions';
@@ -33,12 +34,14 @@ import { updatePaymentTransactionProvider } from '@/lib/payments/update-transact
 
 export type { CreateCheckoutSessionParams, CreateCheckoutSessionResult } from '@/lib/payments/payment-checkout-types';
 
-function dispatchPaymentReminderEmailAfterCheckout(input: {
-  readonly transaction: PaymentTransactionRow;
-}): void {
-  void executeSendBookingPaymentReminderEmail({
-    transaction: input.transaction,
-  });
+async function dispatchPaymentReminderEmailAfterCheckout(input: {
+  readonly transactionId: string;
+}): Promise<void> {
+  const transaction = await findPaymentTransactionById(input.transactionId);
+  if (transaction === null) {
+    return;
+  }
+  await executeSendBookingPaymentReminderEmail({ transaction });
 }
 
 function buildTransactionRowFromInsert(
@@ -242,6 +245,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
       sessionMarketingRef,
       amountCentavos: resolvedPricing.amountCentavos,
       checkoutContext,
+      sendPaymentReminderEmail: params.sendPaymentReminderEmail === true,
       metadata: {
         bookingDraftId: existingOpenTransaction.bookingDraftId,
         paymentMethodId: params.paymentMethodId,
@@ -405,7 +409,9 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
   await timeCheckoutSegment(timing, 'provider_persist', () =>
     updatePaymentTransactionProvider(insertedId, providerResult.session),
   );
-  dispatchPaymentReminderEmailAfterCheckout({ transaction: row });
+  if (params.sendPaymentReminderEmail === true) {
+    void dispatchPaymentReminderEmailAfterCheckout({ transactionId });
+  }
   return {
     ok: true,
     transactionId,

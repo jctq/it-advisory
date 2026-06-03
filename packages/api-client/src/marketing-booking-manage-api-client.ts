@@ -336,6 +336,42 @@ export async function prepareGuestBookingManageCheckout(params: {
   };
 }
 
+export async function sendManagePaymentReminderAfterCheckoutCommit(
+  params:
+    | {
+        readonly apiBaseUrl: string;
+        readonly kind: 'guest';
+        readonly credentials: GuestBookingManageCredentials;
+        readonly transactionId: string;
+      }
+    | {
+        readonly apiBaseUrl: string;
+        readonly kind: 'account';
+        readonly bookingId: string;
+        readonly transactionId: string;
+      },
+): Promise<void> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/bookings/manage/checkout/payment-reminder');
+  const body =
+    params.kind === 'guest'
+      ? {
+          bookingReference: params.credentials.bookingReference,
+          email: params.credentials.email,
+          phoneLastFour: params.credentials.phoneLastFour,
+          transactionId: params.transactionId,
+        }
+      : {
+          bookingId: params.bookingId,
+          transactionId: params.transactionId,
+        };
+  await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export type BookingCancellationErrorCode =
   | 'cancellation_too_late'
   | 'invalid_booking_reference'

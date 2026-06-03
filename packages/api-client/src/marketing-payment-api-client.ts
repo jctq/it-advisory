@@ -222,6 +222,30 @@ export type PreparePaymentCheckoutSessionResult = {
   readonly mock?: boolean;
 };
 
+/**
+ * Sends the payment reminder after the customer clicks Pay (prepare pre-warm does not send email).
+ */
+export async function sendPaymentReminderAfterCheckoutCommit(params: {
+  readonly apiBaseUrl: string;
+  readonly transactionId: string;
+  readonly deviceId?: string | null;
+  readonly marketingSessionToken?: string | null;
+  readonly signal?: AbortSignal;
+}): Promise<void> {
+  const url = buildApiUrl(params.apiBaseUrl, '/api/payments/checkout-session/payment-reminder');
+  await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...buildDeviceIdHeaders(params.deviceId),
+      ...buildMarketingAuthHeaders(params.marketingSessionToken),
+    },
+    body: JSON.stringify({ transactionId: params.transactionId }),
+    signal: params.signal,
+  });
+}
+
 export async function preparePaymentCheckoutSession(
   params: PreparePaymentCheckoutSessionParams,
 ): Promise<PreparePaymentCheckoutSessionResult> {

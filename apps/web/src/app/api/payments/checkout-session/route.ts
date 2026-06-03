@@ -78,6 +78,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     recordingOptIn: parsed.data.recordingOptIn === true,
     diagnosticSessionObjectIdHex: resolvedDiagnosticSessionHex,
     timing,
+    sendPaymentReminderEmail: true,
   });
   timing.logAndFinish();
   if (!result.ok) {

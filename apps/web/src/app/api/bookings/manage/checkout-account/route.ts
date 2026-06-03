@@ -43,6 +43,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     nativeInAppPaymentReturn: parsed.data.nativeInAppPaymentReturn === true,
     promoCode: parsed.data.promoCode,
     timing,
+    sendPaymentReminderEmail: true,
   });
   timing.logAndFinish();
   if (!result.ok) {

@@ -47,6 +47,7 @@ type ResumeCheckoutParams = {
   readonly promoCode?: string | null;
   readonly recordingOptIn?: boolean;
   readonly timing?: CheckoutTimingCollector;
+  readonly sendPaymentReminderEmail?: boolean;
 };
 
 type ResumeCheckoutCommonParams = {
@@ -62,6 +63,7 @@ type ResumeCheckoutCommonParams = {
   /** When set, skips a second Mongo load + credential decrypt on the marketing funnel handoff. */
   readonly checkoutContext?: CheckoutPaymentContext;
   readonly resolvedPaymentMethodLabel?: string;
+  readonly sendPaymentReminderEmail?: boolean;
 };
 
 export async function createPaymentCheckoutForVerifiedBooking(
@@ -198,6 +200,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
       customerPhone: typeof lead.phone === 'string' ? lead.phone.trim() : '',
       bookingStatus: verified.booking.status,
       timing,
+      sendPaymentReminderEmail: params.sendPaymentReminderEmail === true,
     });
   }
   timing?.mark('db_writes');
@@ -302,7 +305,9 @@ export async function createPaymentCheckoutForVerifiedBooking(
         }),
       );
     }
-    void executeSendBookingPaymentReminderEmail({ transaction: refreshed });
+    if (params.sendPaymentReminderEmail === true) {
+      void executeSendBookingPaymentReminderEmail({ transaction: refreshed });
+    }
   }
   return {
     ok: true,
@@ -339,6 +344,7 @@ export async function createPaymentCheckoutForExistingBooking(
     promoCode: params.promoCode,
     recordingOptIn: params.recordingOptIn,
     timing: params.timing,
+    sendPaymentReminderEmail: params.sendPaymentReminderEmail,
   });
 }
 
@@ -353,6 +359,7 @@ export async function createPaymentCheckoutForAccountBooking(params: {
   readonly promoCode?: string | null;
   readonly recordingOptIn?: boolean;
   readonly timing?: CheckoutTimingCollector;
+  readonly sendPaymentReminderEmail?: boolean;
 }): Promise<CreateCheckoutSessionResult> {
   const verified = await findVerifiedAccountBookingForCheckout(params.bookingId, params.visitorId);
   if (verified === null) {
@@ -375,5 +382,6 @@ export async function createPaymentCheckoutForAccountBooking(params: {
     promoCode: params.promoCode,
     recordingOptIn: params.recordingOptIn,
     timing: params.timing,
+    sendPaymentReminderEmail: params.sendPaymentReminderEmail,
   });
 }

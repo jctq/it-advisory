@@ -25,6 +25,8 @@ export type CreateCheckoutSessionParams = {
   /** When set, skips redundant diagnostic session fetch (route already validated). */
   readonly diagnosticSessionObjectIdHex?: string;
   readonly timing?: CheckoutTimingCollector;
+  /** When true, sends the payment reminder email after checkout is ready (omit on prepare pre-warm). */
+  readonly sendPaymentReminderEmail?: boolean;
 };
 
 export type CreateCheckoutSessionResult =

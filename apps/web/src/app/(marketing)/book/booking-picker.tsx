@@ -43,6 +43,7 @@ import {
   fetchPaymentTransactionStatus,
   isPaymentConfigPromoInvalidError,
   preparePaymentCheckoutSession,
+  sendPaymentReminderAfterCheckoutCommit,
   PaymentConfigFetchError,
   type PaymentConfigPublic,
 } from '@teqmd/api-client/marketing-payment-api-client';
@@ -2066,6 +2067,10 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         manualSlotRebookRef.current = false;
         setMustPersistSlotBeforeCheckout(false);
         setHoldExpiredRequiresRebook(false);
+        void sendPaymentReminderAfterCheckoutCommit({
+          apiBaseUrl: MARKETING_CLIENT_API_BASE_URL,
+          transactionId: cachedPrep.transactionId,
+        });
         window.location.href = cachedPrep.redirectUrl;
         return;
       }
