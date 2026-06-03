@@ -5,6 +5,7 @@ import {
   isLinkedBookingNeedsSlotRebook,
   isPendingCheckoutResumable,
   resolveCanDeleteDiagnosticSession,
+  resolveRecordingOptInForMarketingCheckoutResume,
   type LinkedBookingSlotSnapshot,
   type PendingCheckoutSnapshot,
 } from './diagnostic-session-linked-booking';
@@ -38,7 +39,28 @@ const pendingCheckout: PendingCheckoutSnapshot = {
   customerPhone: '+639171234567',
   expiresAtIso: '2026-06-01T03:00:00.000Z',
   bookingId: null,
+  recordingOptIn: false,
 };
+
+describe('resolveRecordingOptInForMarketingCheckoutResume', () => {
+  it('returns true when any resume source opted in', () => {
+    expect(
+      resolveRecordingOptInForMarketingCheckoutResume({
+        linkedBookingRecordingOptIn: false,
+        pendingCheckoutRecordingOptIn: true,
+      }),
+    ).toBe(true);
+    expect(
+      resolveRecordingOptInForMarketingCheckoutResume({
+        draftRecordingOptIn: true,
+      }),
+    ).toBe(true);
+  });
+
+  it('returns false when no resume source opted in', () => {
+    expect(resolveRecordingOptInForMarketingCheckoutResume({})).toBe(false);
+  });
+});
 
 describe('isLinkedBookingCheckoutResumable', () => {
   it('returns false when the payment hold window has closed', () => {

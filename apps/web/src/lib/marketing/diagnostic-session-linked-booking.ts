@@ -65,7 +65,21 @@ export type PendingCheckoutSnapshot = {
   readonly customerPhone: string | null;
   readonly expiresAtIso: string | null;
   readonly bookingId: string | null;
+  readonly recordingOptIn: boolean;
 };
+
+/** Restores the AI meeting-notes checkbox after payment cancel or returning from diagnostic. */
+export function resolveRecordingOptInForMarketingCheckoutResume(input: {
+  readonly linkedBookingRecordingOptIn?: boolean;
+  readonly pendingCheckoutRecordingOptIn?: boolean;
+  readonly draftRecordingOptIn?: boolean;
+}): boolean {
+  return (
+    input.linkedBookingRecordingOptIn === true ||
+    input.pendingCheckoutRecordingOptIn === true ||
+    input.draftRecordingOptIn === true
+  );
+}
 
 export function parsePendingCheckoutSnapshot(value: unknown): PendingCheckoutSnapshot | null {
   if (value === null || value === undefined || typeof value !== 'object') {
@@ -100,6 +114,7 @@ export function parsePendingCheckoutSnapshot(value: unknown): PendingCheckoutSna
     expiresAtIso:
       typeof row.expiresAtIso === 'string' && row.expiresAtIso.trim().length > 0 ? row.expiresAtIso.trim() : null,
     bookingId: bookingIdRaw.length > 0 ? bookingIdRaw : null,
+    recordingOptIn: row.recordingOptIn === true,
   };
 }
 

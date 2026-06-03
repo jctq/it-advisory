@@ -20,6 +20,7 @@ import {
   upsertDiagnosticProgress,
 } from '@/lib/data/diagnostic-sessions';
 import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
+import { parseRecordingOptInFromTransactionMetadata } from '@/lib/booking/apply-booking-recording-fields';
 import { resolvePaymentStatusForCustomerLifecycle } from '@/lib/payments/payment-checkout-commit';
 import {
   encodeDiagnosticSessionRefForMarketingUrl,
@@ -116,6 +117,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           customerPhone: latestPayment.customerPhone,
           expiresAtIso: latestPayment.expiresAtIso,
           bookingId: latestPayment.bookingId,
+          recordingOptIn: parseRecordingOptInFromTransactionMetadata(latestPayment.metadata),
         }
       : null;
   const serverNowIso = serverNow.toISOString();

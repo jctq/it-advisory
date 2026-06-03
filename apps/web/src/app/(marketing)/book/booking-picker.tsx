@@ -98,6 +98,7 @@ import {
   parsePendingCheckoutSnapshot,
   pendingCheckoutHasManageContact,
   pendingCheckoutToCheckoutDraft,
+  resolveRecordingOptInForMarketingCheckoutResume,
   type LinkedBookingSlotSnapshot,
   type PendingCheckoutSnapshot,
 } from '@/lib/marketing/diagnostic-session-linked-booking';
@@ -184,6 +185,7 @@ type CheckoutDraftSnapshot = {
   readonly company: string;
   readonly phone: string;
   readonly serviceKey: string;
+  readonly recordingOptIn?: boolean;
 };
 
 function buildCheckoutDraftStorageKey(sessionRef: string): string {
@@ -217,6 +219,7 @@ function readCheckoutDraftFromSessionStorage(sessionRef: string): CheckoutDraftS
       company: typeof row.company === 'string' ? row.company.trim() : '',
       phone: typeof row.phone === 'string' ? row.phone.trim() : '',
       serviceKey: typeof row.serviceKey === 'string' && row.serviceKey.trim().length > 0 ? row.serviceKey.trim() : DEFAULT_SERVICE_KEY,
+      recordingOptIn: row.recordingOptIn === true,
     };
   } catch {
     return null;
@@ -738,7 +741,23 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
     if (draft.phone.length > 0) {
       setPhone(draft.phone);
     }
-  }, [setCompany, setEmail, setFullName, setPhone, setSelectedDate, setSelectedTime, setVisibleManilaYearMonth]);
+    if (draft.recordingOptIn === true) {
+      setRecordingOptIn(true);
+    }
+  }, [setCompany, setEmail, setFullName, setPhone, setRecordingOptIn, setSelectedDate, setSelectedTime, setVisibleManilaYearMonth]);
+  useEffect(() => {
+    if (!hasValidDiagnosticSessionParam || selectedDate === null || selectedTime === null) {
+      return;
+    }
+    const existingDraft = readCheckoutDraftFromSessionStorage(diagnosticSessionRef);
+    if (existingDraft === null) {
+      return;
+    }
+    writeCheckoutDraftToSessionStorage(diagnosticSessionRef, {
+      ...existingDraft,
+      recordingOptIn,
+    });
+  }, [diagnosticSessionRef, hasValidDiagnosticSessionParam, recordingOptIn, selectedDate, selectedTime]);
   const hydrateConfirmationFromLinkedBooking = useCallback((linked: LinkedBookingSlotSnapshot): void => {
     setConfirmedServiceKey(linked.serviceKey);
     setConfirmedBookingReference(formatBookingReferenceId(linked.bookingId));
@@ -1153,11 +1172,17 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
                   serverNowMs: resolvedGateServerNowMs,
                 })
               ) {
+                const storedDraftForResume = readCheckoutDraftFromSessionStorage(ref);
+                setRecordingOptIn(
+                  resolveRecordingOptInForMarketingCheckoutResume({
+                    linkedBookingRecordingOptIn: linkedBooking.recordingOptIn,
+                    draftRecordingOptIn: storedDraftForResume?.recordingOptIn,
+                  }),
+                );
                 if (checkoutResumeHandledRef.current !== ref) {
                   checkoutResumeHandledRef.current = ref;
                   applyResumePaymentSelection();
                   restoreCheckoutDraftFromSnapshot(linkedBookingToCheckoutDraft(linkedBooking));
-                  setRecordingOptIn(linkedBooking.recordingOptIn === true);
                   setIsAwaitingPaymentCheckout(false);
                   setActivePaymentHold(null);
                   setPendingPaymentHoldDialogOpen(false);
@@ -1220,7 +1245,12 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
               checkoutResumeHandledRef.current = ref;
               applyResumePaymentSelection();
               restoreCheckoutDraftFromSnapshot(linkedBookingToCheckoutDraft(linkedBooking));
-              setRecordingOptIn(linkedBooking.recordingOptIn === true);
+              setRecordingOptIn(
+                resolveRecordingOptInForMarketingCheckoutResume({
+                  linkedBookingRecordingOptIn: linkedBooking.recordingOptIn,
+                  draftRecordingOptIn: readCheckoutDraftFromSessionStorage(ref)?.recordingOptIn,
+                }),
+              );
               const deferPaymentHold = searchParams.get('deferPaymentHold') === '1';
               if (!deferPaymentHold) {
                 const linkedExpiresAtIso =
@@ -1329,6 +1359,12 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
             checkoutResumeHandledRef.current = ref;
             applyResumePaymentSelection();
             restoreCheckoutDraftFromSnapshot(pendingCheckoutToCheckoutDraft(pendingCheckout));
+            setRecordingOptIn(
+              resolveRecordingOptInForMarketingCheckoutResume({
+                pendingCheckoutRecordingOptIn: pendingCheckout.recordingOptIn,
+                draftRecordingOptIn: readCheckoutDraftFromSessionStorage(ref)?.recordingOptIn,
+              }),
+            );
             const checkoutExpiresAtIso =
               paymentHoldExpiresAtIso.length > 0
                 ? paymentHoldExpiresAtIso
@@ -2021,6 +2057,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
         company: company.trim(),
         phone: trimmedPhone,
         serviceKey: checkoutServiceKeyForApi,
+        recordingOptIn,
       });
     }
     setPhase('payment');
@@ -2069,6 +2106,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           company: company.trim(),
           phone: phone.trim(),
           serviceKey: checkoutServiceKeyForApi,
+          recordingOptIn,
         });
         manualSlotRebookRef.current = false;
         setMustPersistSlotBeforeCheckout(false);
@@ -2136,6 +2174,7 @@ export function BookingPicker(props: BookingPickerProps = {}): ReactElement {
           company: company.trim(),
           phone: phone.trim(),
           serviceKey: checkoutServiceKeyForApi,
+          recordingOptIn,
         });
         manualSlotRebookRef.current = false;
         setMustPersistSlotBeforeCheckout(false);
