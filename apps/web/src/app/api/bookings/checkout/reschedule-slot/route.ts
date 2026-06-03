@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError, jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { ensureDiagnosticSessionPendingBookingReadyForCheckout } from '@/lib/booking/ensure-diagnostic-session-pending-booking-ready-for-checkout';
 import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
@@ -22,7 +23,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     const parsed = postBodySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+      return jsonApiValidationError(parsed.error);
     }
     const sessionHex = resolveDiagnosticSessionObjectIdHexFromMarketingRef(parsed.data.sessionRef);
     if (sessionHex === null) {
@@ -51,9 +52,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: true as const });
   } catch (error: unknown) {
     console.error('[checkout/reschedule-slot] failed', error);
-    return NextResponse.json(
-      { error: 'Could not save your new session time.', code: 'internal_error' },
-      { status: 500 },
-    );
+    return jsonApiErrorFromUnknown(error, {
+      error: 'Could not save your new session time.',
+      status: 500,
+      code: 'internal_error',
+    });
   }
 }

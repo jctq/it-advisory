@@ -3,6 +3,7 @@ import { convertToModelMessages, streamText, type UIMessage } from 'ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildAdvisorSystemPrompt, DEFAULT_ADVISOR_CONTEXT } from '@/lib/ai/advisor-prompt';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const DEFAULT_ADVISOR_MODEL = 'gpt-4.1';
 const DEFAULT_TEMPERATURE = 0.6;
@@ -35,6 +36,10 @@ function resolveAdvisorModel(): string {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();

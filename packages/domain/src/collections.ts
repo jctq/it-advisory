@@ -54,4 +54,10 @@ export const COLLECTIONS = {
   supportSettings: 'support_settings',
   /** Singleton `{ _id: 'default' }` — site-wide SEO defaults and marketing page meta overrides (admin). */
   seoSettings: 'seo_settings',
+  /** Sliding-window rate limit counters (TTL on `expiresAt`). */
+  rateLimitBuckets: 'rate_limit_buckets',
+  /** Opaque admin panel sessions (`admin_session` cookie). */
+  adminAuthSessions: 'admin_auth_sessions',
+  /** Append-only security audit events (TTL on `expiresAt`). */
+  securityEvents: 'security_events',
 } as const;

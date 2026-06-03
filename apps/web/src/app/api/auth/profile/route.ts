@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { syncAccountProfileToVisitorLeads } from '@/lib/data/sync-account-profile-to-leads';
 import { findUserByEmailNormalized, findUserById, normalizeAccountEmail, updateUserProfileFields } from '@/lib/data/users';
@@ -7,6 +8,7 @@ import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 import { buildMarketingUserPublicFromDocument } from '@/lib/marketing/marketing-user-public';
 import { parsePhilippineMobileE164 } from '@/lib/marketing/philippine-profile-phone';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 function isMongoDuplicateKeyError(err: unknown): boolean {
   return typeof err === 'object' && err !== null && 'code' in err && (err as { readonly code?: number }).code === 11000;
@@ -43,6 +45,10 @@ const profilePatchSchema = z
  * Updates signed-in marketing profile fields (name, email, company, phone). Phone must be Philippine +63 mobile.
  */
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'auth_profile');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   const auth = await getAuthenticatedMarketingUser(request);
   if (auth === null) {
     return NextResponse.json({ error: 'Sign in required', code: 'auth_required' }, { status: 401 });
@@ -55,7 +61,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   }
   const parsed = profilePatchSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const userId = new ObjectId(auth.id);
   const doc = await findUserById(userId);

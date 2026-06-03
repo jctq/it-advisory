@@ -6,6 +6,7 @@ import { parseFathomWebhookPayload } from '@/lib/fathom/parse-fathom-webhook-pay
 import { findBookingById } from '@/lib/data/bookings';
 import { resolveFathomCredentialsForRuntime } from '@/lib/data/recording-settings';
 import { executeSendBookingFathomNotesEmail } from '@/lib/email/send-booking-fathom-notes-email';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const patchSchema = z.object({
   fathomRecordingId: z.string().min(1).max(120).optional(),
@@ -18,6 +19,10 @@ type RouteContext = {
 };
 
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   const { bookingId } = await context.params;
   let json: unknown;
   try {

@@ -18,22 +18,38 @@ Generated: May 30, 2026
 ### Atlas extras (create in Atlas console)
 
 - Network access for your host IPs
-- Indexes: quiz_sessions, quiz_audit, visitor_sessions, leads, bookings (partial unique on serviceKey + startsAt), blog_posts, diagnostic_round_cache (vector index if using semantic cache)
+- Indexes: run `pnpm db:ensure-indexes` (includes `rate_limit_buckets` TTL and `admin_auth_sessions` TTL)
+- Indexes: diagnostic_sessions, bookings, diagnostic_round_cache (vector index if using semantic cache), blog_posts, etc.
 
 ### Server secrets (generate yourself — not third-party signups)
 
+**Required in production** (validated at startup via `apps/web/src/instrumentation.ts`):
+
 | Environment variable | Min length | Needed for |
 |---------------------|------------|------------|
-| `ADMIN_TOKEN` | long random string | `/admin` and `/api/admin/*` (503 in production if unset) |
-| `PAYMENT_CREDENTIALS_MASTER_KEY` | 32+ characters | Saving payment API keys in Admin → Payments |
+| `AUTH_SECRET` | 32+ characters | Auth.js session signing |
+| `ADMIN_ALLOWED_EMAILS` | comma-separated | Allowlisted admin OAuth emails |
+| Google or Microsoft OAuth | — | At least one of `AUTH_GOOGLE_*` or `AUTH_MICROSOFT_ENTRA_ID_*` |
+| `ADMIN_SERVICE_TOKEN` (optional) | 32+ characters | M2M `Authorization: Bearer` for `/api/admin/*` scripts |
+| `CRON_SECRET` | 16+ characters | `POST /api/cron/payment-holds` (401 if missing/wrong) |
+| `MONGODB_URI` | — | All persisted data |
+| `NEXT_PUBLIC_APP_URL` | `https://` URL | Metadata, redirects, webhooks, CORS |
+| `PAYMENT_CREDENTIALS_MASTER_KEY` | 32+ characters | Encrypted payment keys in Admin → Payments |
+| `DIAGNOSTIC_SESSION_URL_SECRET` | 16+ characters | Opaque diagnostic session URLs |
+| `BOOKING_SESSION_ACCESS_SECRET` | 16+ characters | Signed booking session email links |
+
+**Also required for admin settings blobs:**
+
+| Environment variable | Min length | Needed for |
+|---------------------|------------|------------|
 | `EMAIL_CREDENTIALS_MASTER_KEY` | 32+ characters | Saving email API keys in Admin → Email |
 | `MEETINGS_CREDENTIALS_MASTER_KEY` | 32+ characters | Zoom / Meet / Teams + Fathom credentials |
 
-**Optional but recommended:**
+**Optional:**
 
-- `CRON_SECRET` — protects `POST /api/cron/payment-holds`
-- `BOOKING_SESSION_ACCESS_SECRET` — signed links in confirmation emails
-- `DIAGNOSTIC_SESSION_URL_SECRET` — opaque quiz session URLs in marketing
+- `SUPPORT_CORS_EXTRA_ORIGINS` — comma-separated origins for native support form CORS
+- `RATE_LIMIT_DIAGNOSTIC_AI_PER_HOUR` — default `30`
+- `ALLOW_API_ERROR_DETAILS=1` — include internal `details` on API errors in production (default off)
 
 ### Scheduler
 
@@ -43,7 +59,7 @@ Register a **Railway Cron** (or equivalent) job:
 pnpm --filter web cron:payment-holds
 ```
 
-Use the same environment variables as the web service. Optional HTTP trigger:
+Use the same environment variables as the web service (including `CRON_SECRET`). HTTP trigger:
 
 ```bash
 curl -X POST "https://YOUR_APP/api/cron/payment-holds" \
@@ -213,7 +229,7 @@ Set `EXPO_PUBLIC_API_BASE_URL` in `apps/native/.env.local` to your deployed web 
 
 ## Recommended go-live order
 
-1. Atlas + hosting + `NEXT_PUBLIC_APP_URL` + master keys + `ADMIN_TOKEN`
+1. Atlas + hosting + `NEXT_PUBLIC_APP_URL` + master keys + `AUTH_SECRET` + OAuth + `ADMIN_ALLOWED_EMAILS`
 2. One payment gateway + webhooks + Payments settings + payment-holds cron
 3. One email provider + verified domain + Email settings (disable sandbox when ready)
 4. One meeting provider + test booking end-to-end
@@ -221,6 +237,15 @@ Set `EXPO_PUBLIC_API_BASE_URL` in `apps/native/.env.local` to your deployed web 
 6. GA4 if you want marketing analytics
 7. Fathom only if you offer recording opt-in at checkout
 8. App Store / Play Store when shipping native builds
+
+---
+
+## Admin OAuth setup (staging verification)
+
+1. **Google:** Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client (Web). Authorized redirect URI: `https://<your-host>/api/auth/callback/google`. Set `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.
+2. **Microsoft:** Azure App Registration → Authentication → redirect URI `https://<your-host>/api/auth/callback/microsoft-entra-id`. Set `AUTH_MICROSOFT_ENTRA_ID_ID`, `AUTH_MICROSOFT_ENTRA_ID_SECRET`, and tenant issuer in `AUTH_MICROSOFT_ENTRA_ID_ISSUER`.
+3. Set `ADMIN_ALLOWED_EMAILS` to comma-separated operator emails (lowercase normalized at runtime).
+4. **Staging checks:** allowlisted email signs in; non-allowlisted email is denied; `/api/admin/*` POST without session returns 401; `Authorization: Bearer <ADMIN_SERVICE_TOKEN>` still works for scripts; `pnpm db:ensure-indexes` creates `security_events` TTL.
 
 ---
 

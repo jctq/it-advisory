@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { deleteTestimonial, findTestimonialById, updateTestimonial } from '@/lib/data/testimonials';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,10 @@ export async function GET(_request: Request, context: RouteContext): Promise<Nex
 }
 
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   const { testimonialId } = await context.params;
   let json: unknown = {};
   try {
@@ -53,6 +58,10 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
 }
 
 export async function DELETE(_request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(_request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   const { testimonialId } = await context.params;
   try {
     await deleteTestimonial(testimonialId);

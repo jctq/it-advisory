@@ -10,6 +10,7 @@ import {
   replaceAdvisorBookingSettingsDocument,
 } from '@/lib/data/advisor-booking-settings';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -135,6 +136,10 @@ export async function GET(): Promise<NextResponse> {
  * Upserts advisor booking settings (singleton).
  */
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { getPaymentSettingsPublicView } from '@/lib/data/payment-settings';
 import { getRecordingSettingsPublicView } from '@/lib/data/recording-settings';
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
@@ -33,7 +34,6 @@ export async function GET(request: Request): Promise<NextResponse> {
       ...(resolved.appliedPromoCode !== undefined ? { appliedPromoCode: resolved.appliedPromoCode } : {}),
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: 'Failed to load payment config.', details: message }, { status: 500 });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to load payment config.', status: 500 });
   }
 }

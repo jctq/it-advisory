@@ -1,33 +1,17 @@
-import { timingSafeEqual } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { isAdminEmailAllowed } from '@/lib/server/admin-allowed-emails';
+import { isValidAdminServiceBearer } from '@/lib/server/admin-service-token';
+import { isProductionNodeEnv } from '@/lib/server/is-production-node-env';
 
-const ADMIN_COOKIE_NAME = 'admin_token';
 const LOGIN_PATH = '/admin/login';
+const AUTH_ERROR_PATH = '/admin/auth-error';
 const LOGIN_API_PATH = '/api/admin/login';
+const LOGOUT_API_PATH = '/api/admin/logout';
 const ADMIN_PREFIX = '/admin';
 const ADMIN_API_PREFIX = '/api/admin';
 const APPEARANCE_SCOPE_HEADER = 'x-teqmd-appearance-scope';
-
-function constantTimeEquals(a: string, b: string): boolean {
-  const aBuffer = Buffer.from(a, 'utf8');
-  const bBuffer = Buffer.from(b, 'utf8');
-  if (aBuffer.length !== bBuffer.length) {
-    return false;
-  }
-  return timingSafeEqual(aBuffer, bBuffer);
-}
-
-function extractBearer(authHeader: string | null): string | null {
-  if (authHeader === null) {
-    return null;
-  }
-  if (!authHeader.toLowerCase().startsWith('bearer ')) {
-    return null;
-  }
-  const token = authHeader.slice('bearer '.length).trim();
-  return token.length > 0 ? token : null;
-}
 
 function isApiAdminPath(pathname: string): boolean {
   return pathname === ADMIN_API_PREFIX || pathname.startsWith(`${ADMIN_API_PREFIX}/`);
@@ -38,12 +22,21 @@ function isAdminPath(pathname: string): boolean {
 }
 
 function isLoginPath(pathname: string): boolean {
-  return pathname === LOGIN_PATH || pathname === LOGIN_API_PATH;
+  return (
+    pathname === LOGIN_PATH ||
+    pathname === AUTH_ERROR_PATH ||
+    pathname === LOGIN_API_PATH ||
+    pathname === LOGOUT_API_PATH
+  );
+}
+
+function allowDevAdminOpen(): boolean {
+  return !isProductionNodeEnv() && process.env.ALLOW_DEV_ADMIN_OPEN?.trim() === '1';
 }
 
 function denyApi(): NextResponse {
   return NextResponse.json(
-    { error: 'Unauthorized', code: 'admin_token_required' },
+    { error: 'Unauthorized', code: 'admin_session_required' },
     { status: 401 },
   );
 }
@@ -56,10 +49,6 @@ function denyWeb(request: NextRequest): NextResponse {
   return NextResponse.redirect(url);
 }
 
-function allowDevWithoutToken(): boolean {
-  return process.env.NODE_ENV !== 'production';
-}
-
 function continueWithAppearanceScope(request: NextRequest): NextResponse {
   const requestHeaders = new Headers(request.headers);
   const scope = request.nextUrl.pathname.startsWith('/admin') ? 'admin' : 'marketing';
@@ -69,11 +58,35 @@ function continueWithAppearanceScope(request: NextRequest): NextResponse {
   });
 }
 
+async function isAdminAuthorized(request: NextRequest): Promise<boolean> {
+  if (isValidAdminServiceBearer(request.headers.get('authorization'))) {
+    return true;
+  }
+  const session = await auth();
+  if (isAdminEmailAllowed(session?.user?.email)) {
+    return true;
+  }
+  if (allowDevAdminOpen()) {
+    return true;
+  }
+  return false;
+}
+
+function isAdminOAuthConfigured(): boolean {
+  const googleId = process.env.AUTH_GOOGLE_ID?.trim() ?? '';
+  const googleSecret = process.env.AUTH_GOOGLE_SECRET?.trim() ?? '';
+  const microsoftId = process.env.AUTH_MICROSOFT_ENTRA_ID_ID?.trim() ?? '';
+  const microsoftSecret = process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET?.trim() ?? '';
+  const hasGoogle = googleId.length > 0 && googleSecret.length > 0;
+  const hasMicrosoft = microsoftId.length > 0 && microsoftSecret.length > 0;
+  return hasGoogle || hasMicrosoft;
+}
+
 /**
  * Next.js 16+ network boundary (Node runtime).
- * Sets appearance scope for SSR and gates admin routes behind `ADMIN_TOKEN`.
+ * Gates admin routes behind NextAuth (allowlisted email) or service Bearer token.
  */
-export function proxy(request: NextRequest): NextResponse {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
   if (!isAdminPath(pathname)) {
     return continueWithAppearanceScope(request);
@@ -81,25 +94,18 @@ export function proxy(request: NextRequest): NextResponse {
   if (isLoginPath(pathname)) {
     return continueWithAppearanceScope(request);
   }
-  const expected = process.env.ADMIN_TOKEN?.trim();
-  if (!expected || expected.length === 0) {
-    if (allowDevWithoutToken()) {
-      return continueWithAppearanceScope(request);
-    }
+  if (!isAdminOAuthConfigured() && !allowDevAdminOpen() && !isValidAdminServiceBearer(request.headers.get('authorization'))) {
     if (isApiAdminPath(pathname)) {
       return NextResponse.json(
-        { error: 'ADMIN_TOKEN is not configured on the server.', code: 'admin_token_unset' },
+        { error: 'Admin OAuth is not configured. Set AUTH_* provider credentials and ADMIN_ALLOWED_EMAILS.', code: 'admin_oauth_unset' },
         { status: 503 },
       );
     }
-    return new NextResponse('Admin gate not configured. Set ADMIN_TOKEN in the environment.', {
+    return new NextResponse('Admin OAuth is not configured. Set AUTH_* provider credentials and ADMIN_ALLOWED_EMAILS.', {
       status: 503,
     });
   }
-  const cookieToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
-  const headerToken = extractBearer(request.headers.get('authorization'));
-  const provided = cookieToken ?? headerToken;
-  if (provided !== null && constantTimeEquals(provided, expected)) {
+  if (await isAdminAuthorized(request)) {
     return continueWithAppearanceScope(request);
   }
   return isApiAdminPath(pathname) ? denyApi() : denyWeb(request);

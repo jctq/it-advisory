@@ -9,6 +9,7 @@ import {
   DIAGNOSTIC_QUESTIONS_PER_ROUND_MIN,
 } from '@/domain/diagnostic-settings-bounds';
 import { getAppSettingsAdminView, updateAppSettings } from '@/lib/data/app-settings';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const patchSchema = z.object({
   siteName: z.string().max(200).optional(),
@@ -44,6 +45,10 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();

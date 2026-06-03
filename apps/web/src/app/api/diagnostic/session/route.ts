@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { countBookingsByDiagnosticSessionId, findPrimaryBookingSlotByDiagnosticSessionId } from '@/lib/data/bookings';
 import { findLatestPaymentTransactionByDiagnosticSessionIdHex } from '@/lib/data/payment-transactions';
@@ -20,6 +21,7 @@ import {
   encodeDiagnosticSessionRefForMarketingUrl,
   resolveDiagnosticSessionObjectIdHexFromMarketingRef,
 } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 const patchBodySchema = z.object({
   answers: z.record(z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])),
@@ -168,6 +170,10 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'diagnostic_session');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   const visitorId = await resolveMarketingVisitorId(request);
   let json: unknown;
   try {
@@ -177,7 +183,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   }
   const parsed = patchBodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const { answers, currentStep, completed, sessionId: sessionIdRaw } = parsed.data;
   let resolvedTargetSessionHex: string | undefined;
@@ -232,6 +238,10 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'diagnostic_session');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   const visitorId = await resolveMarketingVisitorId(request);
   const parsedId = parseSessionIdQuery(request);
   if (parsedId.status === 'invalid') {

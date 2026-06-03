@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { accountBookingManageLookupSchema } from '@/lib/marketing/guest-booking-manage-schema';
 import { resolveBookingOwnedByVisitor, isGuestBookingNotFound } from '@/lib/data/booking-guest-manage';
 import { abandonOverduePendingBooking } from '@/lib/data/manage-booking-overdue-actions';
@@ -22,7 +23,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = accountBookingManageLookupSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const visitorId = buildAccountVisitorId(user.id);
   const resolved = await resolveBookingOwnedByVisitor(parsed.data.bookingId, visitorId);

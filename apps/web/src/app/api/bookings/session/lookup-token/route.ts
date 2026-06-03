@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { findGuestBookingManageViewForSessionToken } from '@/lib/data/booking-guest-manage';
 import { verifyBookingSessionAccessToken } from '@/lib/marketing/booking-session-access-token';
 import { guestBookingSessionTokenLookupSchema } from '@/lib/marketing/guest-booking-manage-schema';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 /**
  * Loads session-room view from a signed email access token (no login or guest credentials).
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'booking_token_lookup');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   let json: unknown;
   try {
     json = await request.json();
@@ -15,7 +21,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = guestBookingSessionTokenLookupSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const verified = verifyBookingSessionAccessToken(parsed.data.token);
   if (verified === null) {

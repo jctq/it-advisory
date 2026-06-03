@@ -1,6 +1,7 @@
 import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import {
   buildTemplateFallbackAdvisorSummary,
@@ -23,6 +24,7 @@ import {
   resolveProjectRescueGoodFitBullets,
   resolveProjectRescueSessionTitle,
 } from '@teqmd/diagnostic-core/project-rescue-service-context';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 const qaSchema = z.object({
   questionId: z.string(),
@@ -54,6 +56,10 @@ function resolveDiagnosticModel(): string {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'diagnostic_ai');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   let json: unknown;
   try {
     json = await request.json();
@@ -62,7 +68,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = requestSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const { templateName, initialPrompt, rounds } = parsed.data;
   const fallbackSummary = buildTemplateFallbackAdvisorSummary(templateName, initialPrompt, rounds);

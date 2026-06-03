@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { createPaymentCheckoutForExistingBooking } from '@/lib/payments/payment-checkout-resume';
 import { guestBookingManageCheckoutSchema } from '@/lib/marketing/guest-booking-manage-schema';
 import { assertManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
 import { resolveCheckoutAppBaseUrl } from '@/lib/server/resolve-checkout-app-base-url';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'guest_booking_lookup');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   const disabledResponse = await assertManageBookingEnabled();
   if (disabledResponse !== null) {
     return disabledResponse;
@@ -17,7 +23,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = guestBookingManageCheckoutSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const result = await createPaymentCheckoutForExistingBooking({
     credentials: {

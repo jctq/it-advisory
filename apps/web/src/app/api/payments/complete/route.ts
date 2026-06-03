@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
 import { applyPaymentStatusToBooking, completeMockPayment } from '@/lib/payments/payment-completion';
@@ -18,7 +19,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = postBodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const visitorId = await resolveMarketingVisitorId(request);
   if (parsed.data.mock === true && process.env.NODE_ENV === 'development') {

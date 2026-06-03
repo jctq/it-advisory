@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { getCatalogServiceByKey, getPublicCatalogServices } from '@/lib/data/public-catalog-services';
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -11,7 +12,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     const catalog = await getPublicCatalogServices();
     return NextResponse.json(catalog);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: 'Failed to load services.', details: message }, { status: 500 });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to load services.', status: 500 });
   }
 }

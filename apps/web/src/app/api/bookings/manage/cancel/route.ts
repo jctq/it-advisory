@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { guestBookingCancellationSchema } from '@/lib/marketing/guest-booking-manage-schema';
 import { requestGuestBookingCancellation } from '@/lib/booking/request-booking-cancellation';
 import { assertManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 function resolveHttpStatus(code: string): number {
   if (code === 'booking_not_found') {
@@ -14,6 +16,10 @@ function resolveHttpStatus(code: string): number {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'guest_booking_lookup');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   const disabledResponse = await assertManageBookingEnabled();
   if (disabledResponse !== null) {
     return disabledResponse;
@@ -26,7 +32,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = guestBookingCancellationSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const result = await requestGuestBookingCancellation({
     credentials: {

@@ -8,6 +8,7 @@ import {
 import { updatePaymentSettings, getPaymentSettingsAdminView } from '@/lib/data/payment-settings';
 import { resolvePaymentAdapter } from '@teqmd/payments';
 import { getGatewayCredentials } from '@/lib/data/payment-settings';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const gatewayCredentialsSchema = z.record(z.string(), z.string()).nullable().optional();
 
@@ -48,6 +49,10 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();

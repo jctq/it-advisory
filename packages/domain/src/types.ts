@@ -220,6 +220,35 @@ export type UserAuthSessionDocument = {
   expiresAt: Date;
 };
 
+/** Server-side admin panel session (cookie does not store `ADMIN_TOKEN`). */
+export type AdminAuthSessionDocument = {
+  _id?: ObjectId;
+  /** SHA-256 (hex) of the raw secret token bytes issued to the browser. */
+  tokenHash: string;
+  createdAt: Date;
+  expiresAt: Date;
+};
+
+export type RateLimitBucketDocument = {
+  _id?: ObjectId;
+  scope: string;
+  identifier: string;
+  windowStartMs: number;
+  count: number;
+  expiresAt: Date;
+};
+
+export type SecurityEventDocument = {
+  _id?: ObjectId;
+  type: string;
+  path: string;
+  identifier: string;
+  outcome: string;
+  metadata: Record<string, string>;
+  createdAt: Date;
+  expiresAt: Date;
+};
+
 export type DiagnosticTemplateChildQuestionOptionDocument = {
   id: string;
   label: string;

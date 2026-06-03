@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createBlogImage, getMaxBlogImageBytes, isAllowedBlogImageContentType } from '@/lib/data/blog-images';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   try {
     const formData = await request.formData();
     const fileEntry = formData.get('file');

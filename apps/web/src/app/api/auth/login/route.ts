@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { authEmailPasswordBodySchema } from '@/lib/marketing/auth-api-schema';
 import { mergeVisitorIdentityIntoAccount } from '@/lib/data/merge-visitor-identity';
 import { createUserAuthSession } from '@/lib/data/user-auth-sessions';
@@ -8,11 +9,16 @@ import { appendMarketingAuthSessionCookie } from '@/lib/server/marketing-auth-co
 import { buildAccountVisitorId } from '@/lib/server/marketing-auth';
 import { verifyPasswordPlain } from '@/lib/server/password-credentials';
 import { resolveGuestVisitorIdForAuthMerge } from '@/lib/server/marketing-visitor-id';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 /**
  * Issues an HTTP-only session cookie for an existing account.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'auth_login');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   let json: unknown;
   try {
     json = await request.json();
@@ -21,7 +27,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = authEmailPasswordBodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const emailNormalized = normalizeAccountEmail(parsed.data.email);
   const user = await findUserByEmailNormalized(emailNormalized);

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { PAYMENT_GATEWAY_IDS } from '@/domain/payment-types';
 import { createPaymentCheckoutSession } from '@/lib/payments/payment-checkout';
@@ -36,7 +37,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = postBodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const resolvedDiagnosticSessionHex = resolveDiagnosticSessionObjectIdHexFromMarketingRef(parsed.data.diagnosticSessionId);
   if (resolvedDiagnosticSessionHex === null) {

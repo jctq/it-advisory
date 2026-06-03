@@ -5,6 +5,7 @@ import { getGatewayCredentials } from '@/lib/data/payment-settings';
 import { processWebhookPaymentEvent } from '@/lib/payments/payment-completion';
 import { appendPaymentLog, summarizePaymentLogHeaders } from '@/lib/payments/record-payment-log';
 import { resolvePaymentAdapter } from '@teqmd/payments';
+import { recordSecurityEvent } from '@/lib/server/security-audit-log';
 
 const RAW_PAYLOAD_SNIPPET_MAX_LENGTH = 4000 as const;
 
@@ -38,6 +39,12 @@ export async function handlePaymentGatewayWebhook(input: {
     const adapter = resolvePaymentAdapter(input.gatewayId, credentials);
     const event = adapter.parseWebhook({ bodyText: input.bodyText, headers: input.headers });
     if (event === null) {
+      void recordSecurityEvent({
+        type: 'webhook_signature_failed',
+        path: `/api/webhooks/${input.gatewayId}`,
+        outcome: 'failure',
+        metadata: { gatewayId: input.gatewayId },
+      }).catch(() => undefined);
       appendPaymentLog({
         ...logBase,
         outcome: 'parse_failed',

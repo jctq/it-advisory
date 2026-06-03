@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createBlogPost, isValidBlogPostSlug, listBlogPosts } from '@/lib/data/blog-posts';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,10 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown = {};
   try {
     json = await request.json();

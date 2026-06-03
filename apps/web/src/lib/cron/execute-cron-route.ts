@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { CronJobId } from '@/domain/cron-types';
 import { finalizeCronJobRun, insertCronJobRun } from '@/lib/cron/record-cron-job-run';
 import { resolveCronTriggerSource, verifyCronRequest } from '@/lib/cron/verify-cron-request';
+import { recordSecurityEvent } from '@/lib/server/security-audit-log';
 
 function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.length > 0) {
@@ -23,6 +24,13 @@ export async function executeCronRoute(input: {
     triggerSource,
   });
   if (!auth.authorized) {
+    void recordSecurityEvent({
+      type: 'cron_unauthorized',
+      request: input.request,
+      path: new URL(input.request.url).pathname,
+      outcome: 'blocked',
+      metadata: { jobId: input.jobId },
+    }).catch(() => undefined);
     await finalizeCronJobRun({ runId, status: 'unauthorized' });
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

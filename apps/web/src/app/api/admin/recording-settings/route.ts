@@ -7,6 +7,7 @@ import {
   RecordingSettingsCredentialValidationError,
   updateRecordingSettings,
 } from '@/lib/data/recording-settings';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const ACTIVE_PROVIDER_SCHEMA = z.enum(['none', ...RECORDING_PROVIDER_IDS]);
 
@@ -35,6 +36,10 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();

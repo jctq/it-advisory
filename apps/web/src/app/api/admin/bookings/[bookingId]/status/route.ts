@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { updateBookingStatusByAdmin } from '@/lib/payments/payment-completion';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const patchSchema = z.object({
   status: z.enum(['pending', 'confirmed', 'completed', 'cancelled']),
@@ -11,6 +12,10 @@ type RouteContext = {
 };
 
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   const { bookingId } = await context.params;
   let json: unknown;
   try {

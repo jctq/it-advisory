@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { activateDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 type RouteContext = {
   params: Promise<{
@@ -8,6 +9,10 @@ type RouteContext = {
 };
 
 export async function POST(_request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(_request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   const { templateId } = await context.params;
   try {
     const template = await activateDiagnosticTemplate(templateId);

@@ -1,7 +1,9 @@
 import { openai } from '@ai-sdk/openai';
 import { generateText, stepCountIs } from 'ai';
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 const requestSchema = z.object({
   query: z.string().max(500),
@@ -25,6 +27,10 @@ function collectSourceUrls(sources: readonly { readonly url?: string }[]): strin
 export const maxDuration = 60;
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'diagnostic_ai');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
       {
@@ -44,7 +50,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = requestSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const trimmed = parsed.data.query.trim();
   if (trimmed.length < 4) {

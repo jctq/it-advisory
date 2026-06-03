@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { AdminShell } from '@/components/admin/admin-shell';
+import { AdminSessionProvider } from '@/components/providers/admin-session-provider';
 import { resolveAdminLayoutDocumentAppearance } from '@/lib/brand/resolve-root-layout-document-appearance';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 
@@ -16,5 +17,9 @@ type AdminLayoutProps = {
 
 export default async function AdminLayout(props: AdminLayoutProps) {
   const initialAppearance = await resolveAdminLayoutDocumentAppearance();
-  return <AdminShell initialAppearance={initialAppearance}>{props.children}</AdminShell>;
+  return (
+    <AdminSessionProvider>
+      <AdminShell initialAppearance={initialAppearance}>{props.children}</AdminShell>
+    </AdminSessionProvider>
+  );
 }

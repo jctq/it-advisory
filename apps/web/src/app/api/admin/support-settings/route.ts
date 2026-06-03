@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupportSettingsAdminView, updateSupportSettings } from '@/lib/data/support-settings';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const patchSchema = z.object({
   notificationEmails: z.string().max(4000).optional(),
@@ -23,6 +24,10 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();

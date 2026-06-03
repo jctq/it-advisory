@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { completeBookingRefundByAdmin } from '@/lib/data/booking-refunds';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,10 @@ function resolveHttpStatus(code: string): number {
 }
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   const { refundId } = await context.params;
   let json: unknown;
   try {

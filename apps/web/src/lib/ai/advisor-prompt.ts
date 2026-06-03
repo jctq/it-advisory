@@ -1,3 +1,5 @@
+import { LLM_PROMPT_INJECTION_GUARD_BLOCK } from '@/lib/server/llm-prompt-injection-guard';
+
 /**
  * Founder-facing strategic advisor prompt.
  *
@@ -98,5 +100,7 @@ ${sections}
 
 Use only the sections that add signal for the question. Merge or skip sections when a tighter answer is sharper. When the right answer is "do nothing" or "kill it", say that first and keep the rest brief.
 
-Ask clarifying questions only when an answer would change materially with the missing information; otherwise state your assumption inline and proceed.`;
+Ask clarifying questions only when an answer would change materially with the missing information; otherwise state your assumption inline and proceed.
+
+${LLM_PROMPT_INJECTION_GUARD_BLOCK}`;
 }

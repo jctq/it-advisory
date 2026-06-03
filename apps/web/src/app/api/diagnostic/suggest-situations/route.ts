@@ -1,6 +1,7 @@
 import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import {
   SITUATION_OPTIONS,
@@ -11,6 +12,7 @@ import {
   mergeSituationSuggestions,
   rankSituationsForQuery,
 } from '@/lib/marketing/situation-options';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 const requestSchema = z.object({
   query: z.string().max(500),
@@ -67,6 +69,10 @@ function normalizeAiChoices(
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'diagnostic_ai');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   let json: unknown;
   try {
     json = await request.json();
@@ -75,7 +81,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = requestSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const trimmed = parsed.data.query.trim();
   const orderedCanonical = mergeSituationSuggestions(rankSituationsForQuery(trimmed, 6), [...getSituationSeed()]);

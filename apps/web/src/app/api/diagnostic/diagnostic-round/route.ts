@@ -8,6 +8,7 @@ import {
 } from '@teqmd/diagnostic-core/project-rescue-service-context';
 import { generateObject } from 'ai';
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError, jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import type { DiagnosticRoundCachedPayload } from '@/domain/types';
 import {
@@ -21,6 +22,8 @@ import { getAppSettings } from '@/lib/data/app-settings';
 import { formatDiagnosticThread } from '@/lib/marketing/diagnostic-thread';
 import { SITUATION_OPTIONS } from '@/lib/marketing/situation-options';
 import { respondDiagnosticSuccess } from '@/lib/server/diagnostic-round-response';
+import { LLM_PROMPT_INJECTION_GUARD_BLOCK } from '@/lib/server/llm-prompt-injection-guard';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 const qaSchema = z.object({
   questionId: z.string(),
@@ -75,6 +78,10 @@ function normalizeSituation(value: string | null | undefined): string {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'diagnostic_ai');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   let json: unknown;
   try {
     json = await request.json();
@@ -83,7 +90,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = requestSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const { initialPrompt, rounds } = parsed.data;
   const roundsCompleted = rounds.length;
@@ -178,7 +185,9 @@ Situation selection (when complete=true):
 
 When complete=true: questions must be an empty array; mappedSituation and summaryForAdvisor must be non-null strings; briefAssessment, sessionTitle, and goodFitBullets (exactly 3 strings) must be non-null (sessionTitle = brief headline for this specialized advisory session; briefAssessment = hero subtitle — both must align with "Advisor specialty" in the fixed offering block; distinct from summaryForAdvisor). summaryForAdvisor must synthesize the intake thread and relate it to the offering above: call out which session focus areas matter most, what remains ambiguous until validated live, and what a successful first session should clarify.
 
-When complete=false: set mappedSituation, summaryForAdvisor, briefAssessment, sessionTitle, and goodFitBullets to null; fill questions with exactly ${maxQuestionsPerRound} items unless finishing early.`,
+When complete=false: set mappedSituation, summaryForAdvisor, briefAssessment, sessionTitle, and goodFitBullets to null; fill questions with exactly ${maxQuestionsPerRound} items unless finishing early.
+
+${LLM_PROMPT_INJECTION_GUARD_BLOCK}`,
         prompt: `${thread}${forceInstruction}`,
       });
       if (object.complete) {
@@ -282,15 +291,11 @@ When complete=false: set mappedSituation, summaryForAdvisor, briefAssessment, se
       { status: 502 },
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[api/diagnostic/diagnostic-round]', message, error);
-    return NextResponse.json(
-      {
-        error: 'Diagnostic generation failed.',
-        code: 'generation_error',
-        details: process.env.NODE_ENV === 'development' ? message : undefined,
-      },
-      { status: 502 },
-    );
+    console.error('[api/diagnostic/diagnostic-round]', error);
+    return jsonApiErrorFromUnknown(error, {
+      error: 'Diagnostic generation failed.',
+      status: 502,
+      code: 'generation_error',
+    });
   }
 }

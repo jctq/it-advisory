@@ -32,6 +32,21 @@ async function ensureIndexes(): Promise<void> {
     { key: { visitorId: 1, status: 1, updatedAt: -1 }, name: 'payments_visitor_status_updated' },
     { key: { diagnosticSessionIdHex: 1, createdAt: -1 }, name: 'payments_diagnostic_session_created' },
   ]);
+  await db.collection(COLLECTIONS.rateLimitBuckets).createIndexes([
+    {
+      key: { scope: 1, identifier: 1, windowStartMs: 1 },
+      unique: true,
+      name: 'rate_limit_buckets_scope_identifier_window',
+    },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0, name: 'rate_limit_buckets_ttl' },
+  ]);
+  await db.collection(COLLECTIONS.adminAuthSessions).createIndexes([
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0, name: 'admin_auth_sessions_ttl' },
+  ]);
+  await db.collection(COLLECTIONS.securityEvents).createIndexes([
+    { key: { createdAt: -1 }, name: 'security_events_created' },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0, name: 'security_events_ttl' },
+  ]);
   await client.close();
   console.log('MongoDB indexes ensured.');
 }

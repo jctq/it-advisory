@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { deleteDiagnosticTemplate, updateDiagnosticTemplate } from '@/lib/data/diagnostic-templates';
 import type { DiagnosticTemplateInput } from '@/lib/diagnostic-template-types';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const selectionModeSchema = z.enum(['single', 'multiple']);
 const questionTypeSchema = z.enum(['multiple-choice', 'nested-options', 'ranked-options']);
@@ -196,6 +197,10 @@ function validateTemplateVisibilityRules(payload: UpdateTemplatePayload): string
 }
 
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();
@@ -270,6 +275,10 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
 }
 
 export async function DELETE(_request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(_request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   const { templateId } = await context.params;
   try {
     await deleteDiagnosticTemplate(templateId);

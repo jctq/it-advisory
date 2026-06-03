@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError, jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { addReporterReplyToSupportReport } from '@/lib/data/support-reports';
 import { SupportReportReporterReplyThrottledError } from '@/lib/data/support-report-reporter-reply-policy';
@@ -35,7 +36,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
   }
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   try {
     const settings = await getSupportSettings();
@@ -72,6 +73,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     const message = error instanceof Error ? error.message : 'Unknown error';
     const status =
       message.includes('at least') || message.includes('at most') || message.includes('required') ? 400 : 500;
-    return NextResponse.json({ error: 'Failed to send follow-up.', details: message }, { status });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to send follow-up.', status });
   }
 }

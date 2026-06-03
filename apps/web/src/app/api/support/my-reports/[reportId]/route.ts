@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { computeSupportReportReporterReplyPolicy } from '@/lib/data/support-report-reporter-reply-policy';
 import {
   findSupportReportByIdForReporter,
@@ -42,7 +43,6 @@ export async function GET(request: Request, context: RouteContext): Promise<Next
     const replyPolicy = computeSupportReportReporterReplyPolicy(report, settings);
     return NextResponse.json({ report, replyPolicy });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: 'Failed to load report.', details: message }, { status: 500 });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to load report.', status: 500 });
   }
 }

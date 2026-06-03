@@ -76,7 +76,7 @@ curl -sS -X POST "https://YOUR_APP.up.railway.app/api/cron/payment-holds" \
   -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-Set `CRON_SECRET` in production when using the HTTP route; when unset, the route accepts any caller (dev only).
+Set `CRON_SECRET` in production (required for HTTP cron). When unset in development, the route accepts any caller.
 
 ## Native app
 
@@ -98,7 +98,7 @@ Replace payment mocks with live gateways when ready.
 
 ## Auth
 
-Admin and customer accounts are planned but not wired yet. The current `src/proxy.ts` (Next.js 16 network boundary) enforces a single shared `ADMIN_TOKEN` for `/admin/...` and `/api/admin/...` routes. Swap for a real session/identity provider (NextAuth/Clerk) when ready.
+Marketing accounts use email/password with server-side sessions (`user_auth_sessions`). Admin access is gated in `src/proxy.ts` (Next.js 16 network boundary): sign in at `/admin/login` with Google or Microsoft OAuth (Auth.js v5). Only emails listed in `ADMIN_ALLOWED_EMAILS` may sign in. Scripts and automation may use `Authorization: Bearer <ADMIN_SERVICE_TOKEN>` (legacy `ADMIN_TOKEN` alias). Production startup validates required secrets via `src/instrumentation.ts` (`AUTH_SECRET`, OAuth provider credentials, allowlist, master keys, cron secret).
 
 ## Admin advisor
 
@@ -106,4 +106,4 @@ Founder-facing strategic chat at `/admin/advisor`, separate from the customer di
 
 - **Model:** `OPENAI_ADVISOR_MODEL` (default `gpt-4.1`). Customer intake stays on `OPENAI_DIAGNOSTIC_MODEL` (default `gpt-4o-mini`) to keep the funnel cheap.
 - **System prompt:** rendered from typed `AdvisorContext` in `apps/web/src/lib/ai/advisor-prompt.ts` — no `[INSERT NAME]` literals at runtime.
-- **Auth:** set `ADMIN_TOKEN` to a long random string. Visit `/admin/login`, paste the token; the server sets an HttpOnly cookie. Unset in production yields 503; in development the gate is permissive so you can iterate locally.
+- **Auth:** configure `AUTH_SECRET` (32+ characters), `ADMIN_ALLOWED_EMAILS`, and at least one OAuth provider (`AUTH_GOOGLE_*` or `AUTH_MICROSOFT_ENTRA_ID_*`). Visit `/admin/login` and sign in with an allowlisted account. Log out via `POST /api/admin/logout`. Optional `ADMIN_SERVICE_TOKEN` for `curl` admin scripts. In development, `ALLOW_DEV_ADMIN_OPEN=1` bypasses OAuth when providers are unset.

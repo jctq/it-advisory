@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { readBlogImageBuffer } from '@/lib/data/blog-images';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,6 @@ export async function GET(_request: Request, context: RouteContext): Promise<Nex
       },
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: 'Failed to load image.', details: message }, { status: 500 });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to load image.', status: 500 });
   }
 }

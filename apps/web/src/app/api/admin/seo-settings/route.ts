@@ -11,6 +11,7 @@ import {
   SEO_TWITTER_HANDLE_MAX_LENGTH,
   SEO_VERIFICATION_MAX_LENGTH,
 } from '@/lib/seo/seo-defaults';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const pageOverrideSchema = z.object({
   title: z.string().max(SEO_TITLE_MAX_LENGTH).optional(),
@@ -52,6 +53,10 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();

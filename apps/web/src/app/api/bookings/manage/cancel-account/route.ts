@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { accountBookingCancellationSchema } from '@/lib/marketing/guest-booking-manage-schema';
 import { requestAccountBookingCancellation } from '@/lib/booking/request-booking-cancellation';
 import { assertManageBookingEnabled } from '@/lib/marketing/manage-booking-gate';
@@ -31,7 +32,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = accountBookingCancellationSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const visitorId = buildAccountVisitorId(user.id);
   const result = await requestAccountBookingCancellation({

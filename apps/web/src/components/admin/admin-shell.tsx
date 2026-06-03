@@ -24,6 +24,7 @@ import {
 } from '@/lib/admin/document-appearance';
 import type { ResolvedLayoutDocumentAppearance } from '@/lib/brand/resolve-root-layout-document-appearance';
 import { AdminAppearanceControls } from '@/components/admin/admin-appearance-controls';
+import { AdminLogoutButton } from '@/components/admin/admin-logout-button';
 import { AdminOnboardingGuideButton } from '@/components/admin/admin-onboarding-guide-button';
 import { AdminOnboardingProvider } from '@/components/admin/admin-onboarding-provider';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
@@ -215,7 +216,7 @@ export function AdminShell(props: AdminShellProps) {
   const executeCloseMobileSidebarForTour = (): void => {
     setMobileOpen(false);
   };
-  if (pathname === '/admin/login') {
+  if (pathname === '/admin/login' || pathname === '/admin/auth-error') {
     return props.children;
   }
   return (
@@ -278,6 +279,7 @@ export function AdminShell(props: AdminShellProps) {
                       onThemeChange={executeChangeColorTheme}
                     />
                   </div>
+                  <AdminLogoutButton />
                 </div>
               </div>
             </div>

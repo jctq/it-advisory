@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { addStaffReplyToSupportReport } from '@/lib/data/support-reports';
 import { resolveSupportNotificationEmails } from '@/lib/data/support-settings';
 import { executeSendSupportReportReporterReplyEmail } from '@/lib/email/execute-support-report-emails';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,10 @@ type RouteContext = {
 };
 
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   const { reportId } = await context.params;
   let json: unknown;
   try {

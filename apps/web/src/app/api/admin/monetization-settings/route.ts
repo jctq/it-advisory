@@ -5,6 +5,7 @@ import {
   getMonetizationSettingsAdminView,
   updateMonetizationSettings,
 } from '@/lib/data/monetization-settings';
+import { rejectUnlessAdminSession } from '@/lib/server/require-admin-session';
 
 const catalogServiceSchema = z.object({
   serviceKey: z.string().min(1).max(120),
@@ -48,6 +49,10 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const adminDenied = await rejectUnlessAdminSession(request);
+  if (adminDenied !== null) {
+    return adminDenied;
+  }
   let json: unknown;
   try {
     json = await request.json();

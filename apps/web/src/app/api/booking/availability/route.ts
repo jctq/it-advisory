@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError, jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { getPublicBookingAvailabilitySlots } from '@/lib/data/booking-availability';
 
@@ -35,7 +36,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   };
   const parsed = querySchema.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   if (compareYmd(parsed.data.from, parsed.data.to) > 0) {
     return NextResponse.json({ error: '`from` must be on or before `to`.' }, { status: 400 });
@@ -59,7 +60,6 @@ export async function GET(request: Request): Promise<NextResponse> {
       },
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: 'Failed to load availability.', details: message }, { status: 500 });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to load availability.', status: 500 });
   }
 }

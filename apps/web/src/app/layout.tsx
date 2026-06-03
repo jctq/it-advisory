@@ -66,7 +66,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: TEQMD_APPEARANCE_BOOTSTRAP_SCRIPT }} />
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: TEQMD_APPEARANCE_BOOTSTRAP_SCRIPT }}
+        />
       </head>
       <body className={`${sans.className} ${mono.variable} min-h-dvh antialiased`}>
         <RootAppearanceHydrator />

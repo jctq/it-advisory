@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import type { BookingDocument } from '@/domain/types';
 import {
@@ -16,6 +17,7 @@ import { resolveMarketingVisitorId } from '@/lib/server/marketing-visitor-id';
 import { getPaymentSettings } from '@/lib/data/payment-settings';
 import { findDiagnosticSessionForVisitor } from '@/lib/data/diagnostic-sessions';
 import { resolveDiagnosticSessionObjectIdHexFromMarketingRef } from '@/lib/server/diagnostic-session-marketing-ref-crypto';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
 
 const PAYMENT_METHOD_IDS = ['card', 'gcash', 'maya', 'bank_transfer', 'paypal'] as const;
 
@@ -78,6 +80,10 @@ const postBodySchema = z
  * Persists a marketing booking and copies the latest diagnostic (full rounds, questions, options) for admin CRM.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const rateLimited = await executeRateLimitOrResponse(request, 'booking_create');
+  if (rateLimited !== null) {
+    return rateLimited;
+  }
   let json: unknown;
   try {
     json = await request.json();
@@ -86,7 +92,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = postBodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const resolvedDiagnosticSession = resolveDiagnosticSessionObjectIdHexFromMarketingRef(parsed.data.diagnosticSessionId);
   if (resolvedDiagnosticSession === null) {

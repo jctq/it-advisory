@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { CronTriggerSource } from '@/domain/cron-types';
+import { isProductionNodeEnv } from '@/lib/server/is-production-node-env';
 
 export type VerifyCronRequestResult =
   | { readonly authorized: true }
@@ -17,6 +18,9 @@ function constantTimeEquals(a: string, b: string): boolean {
 export function verifyCronRequest(request: Request): VerifyCronRequestResult {
   const cronSecret = process.env.CRON_SECRET?.trim() ?? '';
   if (cronSecret.length === 0) {
+    if (isProductionNodeEnv()) {
+      return { authorized: false };
+    }
     return { authorized: true };
   }
   const header = request.headers.get('authorization') ?? '';

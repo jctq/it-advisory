@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { z } from 'zod';
 import { listSupportReportsForReporter } from '@/lib/data/support-reports';
 import { assertSupportModuleEnabled } from '@/lib/marketing/support-module-gate';
@@ -45,7 +46,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
     return NextResponse.json(result);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: 'Failed to load reports.', details: message }, { status: 500 });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to load reports.', status: 500 });
   }
 }

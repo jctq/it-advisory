@@ -1,4 +1,7 @@
 import type { NextConfig } from 'next';
+import { buildSecurityHeaders } from './src/lib/server/security-headers';
+
+const securityHeaders = buildSecurityHeaders();
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -22,9 +25,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: '/:path*',
+        headers: [...securityHeaders],
+      },
+      {
         source: '/brand/:path*',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+          ...securityHeaders,
         ],
       },
     ];

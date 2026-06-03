@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { countUnreadSupportReportsForReporter } from '@/lib/data/support-reports';
 import { assertSupportModuleEnabled } from '@/lib/marketing/support-module-gate';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -21,7 +22,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
     return NextResponse.json({ unreadCount });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: 'Failed to load unread count.', details: message }, { status: 500 });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to load unread count.', status: 500 });
   }
 }

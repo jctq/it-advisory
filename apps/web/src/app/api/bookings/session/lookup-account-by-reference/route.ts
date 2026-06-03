@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiValidationError } from '@/lib/server/api-error-response';
 import { findGuestBookingManageViewForAccountVisitorByReference } from '@/lib/data/booking-guest-manage';
 import { accountBookingSessionReferenceLookupSchema } from '@/lib/marketing/guest-booking-manage-schema';
 import { buildAccountVisitorId, getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
@@ -19,7 +20,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const parsed = accountBookingSessionReferenceLookupSchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 });
+    return jsonApiValidationError(parsed.error);
   }
   const visitorId = buildAccountVisitorId(user.id);
   const view = await findGuestBookingManageViewForAccountVisitorByReference(

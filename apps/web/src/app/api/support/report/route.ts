@@ -12,7 +12,10 @@ import { findUserById } from '@/lib/data/users';
 import { executeSendSupportReportSubmissionEmails } from '@/lib/email/execute-support-report-emails';
 import { parseGuestSupportReportContact } from '@/lib/marketing/support-report-guest-contact';
 import { assertSupportModuleEnabled } from '@/lib/marketing/support-module-gate';
+import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
+import { executeRateLimitOrResponse } from '@/lib/server/rate-limit';
+import { buildSupportCorsHeaders } from '@/lib/server/support-cors';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,24 +38,16 @@ function readOptionalFormString(formData: FormData, key: string): string | null 
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function buildCorsHeaders(request: Request): Headers {
-  const headers = new Headers();
-  const origin = request.headers.get('origin')?.trim();
-  if (origin !== undefined && origin.length > 0) {
-    headers.set('Access-Control-Allow-Origin', origin);
-    headers.set('Vary', 'Origin');
-    headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Device-Id, Authorization');
-  }
-  return headers;
-}
-
 export async function OPTIONS(request: Request): Promise<NextResponse> {
-  return new NextResponse(null, { status: 204, headers: buildCorsHeaders(request) });
+  return new NextResponse(null, { status: 204, headers: buildSupportCorsHeaders(request) });
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const corsHeaders = buildCorsHeaders(request);
+  const corsHeaders = buildSupportCorsHeaders(request);
+  const rateLimited = await executeRateLimitOrResponse(request, 'support_report');
+  if (rateLimited !== null) {
+    return new NextResponse(rateLimited.body, { status: rateLimited.status, headers: corsHeaders });
+  }
   const disabledResponse = await assertSupportModuleEnabled();
   if (disabledResponse !== null) {
     return new NextResponse(disabledResponse.body, {
@@ -154,7 +149,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       message.includes('empty')
         ? 400
         : 500;
-    return NextResponse.json({ error: 'Failed to submit report.', details: message }, { status, headers: corsHeaders });
+    return jsonApiErrorFromUnknown(error, {
+      error: 'Failed to submit report.',
+      status,
+      headers: corsHeaders,
+    });
   }
 }
 

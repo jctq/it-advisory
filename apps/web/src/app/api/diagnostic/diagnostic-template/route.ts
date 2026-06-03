@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jsonApiErrorFromUnknown } from '@/lib/server/api-error-response';
 import {
   getPublicActiveDiagnosticTemplate,
   getPublicDiagnosticTemplateById,
@@ -35,7 +36,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
     return NextResponse.json({ template });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: 'Failed to load active diagnostic template.', details: message }, { status: 500 });
+    return jsonApiErrorFromUnknown(error, { error: 'Failed to load active diagnostic template.', status: 500 });
   }
 }
