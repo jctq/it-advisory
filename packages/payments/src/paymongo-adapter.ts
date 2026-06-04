@@ -54,6 +54,9 @@ export function createPaymongoAdapter(credentials: GatewayCredentials): PaymentG
                 name: item.name,
                 quantity: item.quantity ?? 1,
                 ...(item.description !== undefined ? { description: item.description } : {}),
+                ...(item.imageUrl !== undefined && item.imageUrl.length > 0
+                  ? { images: [item.imageUrl] }
+                  : {}),
               })),
               payment_method_types: paymentMethodTypes,
               ...(billing !== undefined ? { billing } : {}),

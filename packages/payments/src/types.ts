@@ -5,6 +5,8 @@ export type CheckoutSessionLineItem = {
   readonly amountCentavos: number;
   readonly quantity?: number;
   readonly description?: string;
+  /** Public HTTPS URL for provider checkout product image (PayMongo supports one per line). */
+  readonly imageUrl?: string;
 };
 
 export type CreateCheckoutSessionInput = {

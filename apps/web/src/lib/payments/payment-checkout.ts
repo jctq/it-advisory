@@ -250,6 +250,7 @@ export async function createPaymentCheckoutSession(params: CreateCheckoutSession
     resolveProviderCheckoutSessionContent({
       serviceKey: params.serviceKey,
       resolvedPricing,
+      assetBaseUrl: params.appBaseUrl,
     }),
   );
   if (existingOpenTransaction !== null && isOpenPaymentTransactionHoldActive(existingOpenTransaction)) {

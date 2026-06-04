@@ -14,10 +14,12 @@ export type { ProviderCheckoutSessionContent };
 export async function resolveProviderCheckoutSessionContent(input: {
   readonly serviceKey: string;
   readonly resolvedPricing: ResolvedCheckoutAmount;
+  readonly assetBaseUrl: string;
 }): Promise<ProviderCheckoutSessionContent> {
   const serviceTitle = await resolveCheckoutServiceTitle(input.serviceKey);
   return buildProviderCheckoutSessionContent({
     serviceTitle,
     resolvedPricing: input.resolvedPricing,
+    assetBaseUrl: input.assetBaseUrl,
   });
 }

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildProviderCheckoutSessionContent } from './build-provider-checkout-session-content';
 import type { ResolvedCheckoutAmount } from './resolve-checkout-amount';
 
+const TEST_ASSET_BASE_URL = 'https://checkout.example.com';
+
 function buildResolvedPricing(overrides: Partial<ResolvedCheckoutAmount> = {}): ResolvedCheckoutAmount {
   return {
     amountCentavos: 600_000,
@@ -19,13 +21,19 @@ function buildResolvedPricing(overrides: Partial<ResolvedCheckoutAmount> = {}): 
 }
 
 describe('buildProviderCheckoutSessionContent', () => {
-  it('builds a single service line item', () => {
+  it('builds a single service line item with a consultation product image', () => {
     const content = buildProviderCheckoutSessionContent({
       serviceTitle: 'Project Rescue Consultation',
       resolvedPricing: buildResolvedPricing(),
+      assetBaseUrl: TEST_ASSET_BASE_URL,
     });
     expect(content.lineItems).toEqual([
-      { name: 'Project Rescue Consultation', amountCentavos: 600_000, quantity: 1 },
+      {
+        name: 'Project Rescue Consultation',
+        amountCentavos: 600_000,
+        quantity: 1,
+        imageUrl: 'https://checkout.example.com/checkout/line-items/consultation.png',
+      },
     ]);
     expect(content.description).toBe('Project Rescue Consultation');
   });
@@ -40,12 +48,16 @@ describe('buildProviderCheckoutSessionContent', () => {
         appliedPromoCode: 'SAVE10',
         source: 'promo',
       }),
+      assetBaseUrl: TEST_ASSET_BASE_URL,
     });
     expect(content.lineItems[0]?.name).toBe('Project Rescue Consultation (SAVE10)');
     expect(content.lineItems[0]?.amountCentavos).toBe(540_000);
+    expect(content.lineItems[0]?.imageUrl).toBe(
+      'https://checkout.example.com/checkout/line-items/consultation.png',
+    );
   });
 
-  it('adds a recording surcharge line item', () => {
+  it('adds a recording surcharge line item with distinct product images', () => {
     const content = buildProviderCheckoutSessionContent({
       serviceTitle: 'Project Rescue Consultation',
       resolvedPricing: buildResolvedPricing({
@@ -54,10 +66,21 @@ describe('buildProviderCheckoutSessionContent', () => {
         recordingSurchargeCentavos: 50_000,
         recordingSurchargeLabel: '₱500.00',
       }),
+      assetBaseUrl: TEST_ASSET_BASE_URL,
     });
     expect(content.lineItems).toEqual([
-      { name: 'Project Rescue Consultation', amountCentavos: 600_000, quantity: 1 },
-      { name: 'AI meeting notes & recording', amountCentavos: 50_000, quantity: 1 },
+      {
+        name: 'Project Rescue Consultation',
+        amountCentavos: 600_000,
+        quantity: 1,
+        imageUrl: 'https://checkout.example.com/checkout/line-items/consultation.png',
+      },
+      {
+        name: 'AI meeting notes & recording',
+        amountCentavos: 50_000,
+        quantity: 1,
+        imageUrl: 'https://checkout.example.com/checkout/line-items/recording.png',
+      },
     ]);
     expect(content.description).toBe('Project Rescue Consultation · AI meeting notes & recording');
   });

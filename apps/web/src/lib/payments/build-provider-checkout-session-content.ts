@@ -1,7 +1,8 @@
 import type { CheckoutSessionLineItem } from '@teqmd/payments';
+import { resolveCheckoutLineItemImageUrl } from '@/lib/payments/checkout-line-item-images';
 import type { ResolvedCheckoutAmount } from '@/lib/payments/resolve-checkout-amount';
 
-const RECORDING_LINE_ITEM_NAME = 'AI meeting notes & recording' as const;
+export const RECORDING_LINE_ITEM_NAME = 'AI meeting notes & recording' as const;
 
 export type ProviderCheckoutSessionContent = {
   readonly description: string;
@@ -24,14 +25,17 @@ function buildServiceLineName(serviceTitle: string, appliedPromoCode: string | u
 export function buildProviderCheckoutSessionContent(input: {
   readonly serviceTitle: string;
   readonly resolvedPricing: ResolvedCheckoutAmount;
+  readonly assetBaseUrl: string;
 }): ProviderCheckoutSessionContent {
   const discountedServiceCentavos =
     input.resolvedPricing.amountCentavos - input.resolvedPricing.recordingSurchargeCentavos;
+  const consultationImageUrl = resolveCheckoutLineItemImageUrl(input.assetBaseUrl, 'consultation');
   const lineItems: CheckoutSessionLineItem[] = [
     {
       name: buildServiceLineName(input.serviceTitle, input.resolvedPricing.appliedPromoCode),
       amountCentavos: discountedServiceCentavos,
       quantity: 1,
+      imageUrl: consultationImageUrl,
     },
   ];
   if (input.resolvedPricing.recordingSurchargeCentavos > 0) {
@@ -39,6 +43,7 @@ export function buildProviderCheckoutSessionContent(input: {
       name: RECORDING_LINE_ITEM_NAME,
       amountCentavos: input.resolvedPricing.recordingSurchargeCentavos,
       quantity: 1,
+      imageUrl: resolveCheckoutLineItemImageUrl(input.assetBaseUrl, 'recording'),
     });
   }
   const description = lineItems.map((item) => item.name).join(' · ');

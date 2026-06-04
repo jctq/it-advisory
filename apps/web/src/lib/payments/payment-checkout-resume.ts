@@ -167,6 +167,7 @@ export async function createPaymentCheckoutForVerifiedBooking(
     resolveProviderCheckoutSessionContent({
       serviceKey: booking.serviceKey,
       resolvedPricing,
+      assetBaseUrl: params.appBaseUrl,
     }),
   );
   const sessionMarketingRefFromParams = params.sessionMarketingRef?.trim() ?? '';
