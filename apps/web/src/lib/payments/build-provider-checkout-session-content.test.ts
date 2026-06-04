@@ -32,7 +32,7 @@ describe('buildProviderCheckoutSessionContent', () => {
         name: 'Project Rescue Consultation',
         amountCentavos: 600_000,
         quantity: 1,
-        imageUrl: 'https://checkout.example.com/checkout/line-items/consultation.png',
+        imageUrl: 'https://checkout.example.com/checkout/line-items/consultation.png?v=3',
       },
     ]);
     expect(content.description).toBe('Project Rescue Consultation');
@@ -53,7 +53,7 @@ describe('buildProviderCheckoutSessionContent', () => {
     expect(content.lineItems[0]?.name).toBe('Project Rescue Consultation (SAVE10)');
     expect(content.lineItems[0]?.amountCentavos).toBe(540_000);
     expect(content.lineItems[0]?.imageUrl).toBe(
-      'https://checkout.example.com/checkout/line-items/consultation.png',
+      'https://checkout.example.com/checkout/line-items/consultation.png?v=3',
     );
   });
 
@@ -73,13 +73,13 @@ describe('buildProviderCheckoutSessionContent', () => {
         name: 'Project Rescue Consultation',
         amountCentavos: 600_000,
         quantity: 1,
-        imageUrl: 'https://checkout.example.com/checkout/line-items/consultation.png',
+        imageUrl: 'https://checkout.example.com/checkout/line-items/consultation.png?v=3',
       },
       {
         name: 'AI meeting notes & recording',
         amountCentavos: 50_000,
         quantity: 1,
-        imageUrl: 'https://checkout.example.com/checkout/line-items/recording.png',
+        imageUrl: 'https://checkout.example.com/checkout/line-items/recording.png?v=3',
       },
     ]);
     expect(content.description).toBe('Project Rescue Consultation · AI meeting notes & recording');
