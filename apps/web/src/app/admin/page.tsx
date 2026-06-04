@@ -9,5 +9,5 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminIndexPage() {
   const data = await getAdminDashboardData();
-  return <AdminDashboard data={data} />;
+  return <AdminDashboard data={data} generatedAtIso={new Date().toISOString()} />;
 }

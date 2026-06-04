@@ -10,6 +10,7 @@ import { useMemo, type ReactElement } from 'react';
 import { DataTable } from '@/components/admin/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CopyToClipboardButton } from '@/components/ui/copy-to-clipboard-button';
 import type { BookingRefundRow } from '@/lib/data/booking-refunds';
 import { PRIMARY_TIMEZONE } from '@/lib/timezone';
 
@@ -83,14 +84,20 @@ export function AdminRefundsTable(props: AdminRefundsTableProps): ReactElement {
       }),
       columnHelper.accessor('bookingReference', {
         header: 'Reference',
-        cell: (info) => (
-          <Link
-            href={`/admin/bookings/${info.row.original.bookingId}`}
-            className="font-mono text-xs font-medium text-primary underline-offset-4 hover:underline"
-          >
-            {info.getValue()}
-          </Link>
-        ),
+        cell: (info) => {
+          const reference = info.getValue();
+          return (
+            <div className="flex items-center gap-0.5">
+              <Link
+                href={`/admin/bookings/${info.row.original.bookingId}`}
+                className="font-mono text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {reference}
+              </Link>
+              <CopyToClipboardButton value={reference} ariaLabel="Copy booking reference" className="size-7" />
+            </div>
+          );
+        },
       }),
       columnHelper.accessor('customerName', {
         header: 'Contact',

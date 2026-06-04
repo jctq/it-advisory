@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { ChevronRight, History, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { BlogPostRevisionDiffView } from '@/components/admin/blog-post-revision-diff-view';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -130,7 +131,7 @@ export function BlogPostEditHistoryDialog(props: BlogPostEditHistoryDialogProps)
               Saved changes only — each entry is recorded when you click Save.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+          <AdminScrollArea className="min-h-0 flex-1" viewportClassName="px-2 py-2">
             {isLoadingList ? (
               <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -166,7 +167,7 @@ export function BlogPostEditHistoryDialog(props: BlogPostEditHistoryDialogProps)
                 ))}
               </ul>
             )}
-          </div>
+          </AdminScrollArea>
         </DialogContent>
       </Dialog>
       <Dialog
@@ -191,7 +192,7 @@ export function BlogPostEditHistoryDialog(props: BlogPostEditHistoryDialogProps)
                 : 'Comparing previous and saved values'}
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+          <AdminScrollArea className="min-h-0 flex-1" viewportClassName="px-4 py-4 sm:px-6">
             {isLoadingDetail ? (
               <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -200,7 +201,7 @@ export function BlogPostEditHistoryDialog(props: BlogPostEditHistoryDialogProps)
             ) : revisionDetail !== null ? (
               <BlogPostRevisionDiffView revision={revisionDetail} />
             ) : null}
-          </div>
+          </AdminScrollArea>
           <div className="shrink-0 border-t border-border px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setSelectedRevisionId(null)}>
               Back to list

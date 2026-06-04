@@ -5,7 +5,10 @@ import type { BookingDocument, BookingRefundDocument } from '@/domain/types';
 import { findBookingById } from '@/lib/data/bookings';
 import { findLeadById, type MarketingLeadContactRow } from '@/lib/data/leads';
 import { findPaymentTransactionById, updatePaymentTransactionStatus } from '@/lib/data/payment-transactions';
-import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
+import {
+  bookingIdMatchesReferenceInput,
+  formatBookingReferenceId,
+} from '@/lib/marketing/booking-reference';
 import type { AdminPaginatedList } from '@/lib/admin/admin-paginated-list';
 import { getDb } from '@/lib/mongodb';
 
@@ -33,6 +36,8 @@ export type BookingRefundRow = {
 };
 
 export type BookingRefundListStatusFilter = 'all' | 'awaiting' | 'completed';
+
+export type BookingRefundListSearchField = 'reference' | 'contact' | 'email' | 'status';
 
 export type BookingRefundStatusCounts = {
   readonly all: number;
@@ -153,35 +158,37 @@ export async function createBookingRefundRequest(
   }
 }
 
-export async function listBookingRefundsForAdmin(input: {
-  readonly page: number;
-  readonly pageSize: number;
-  readonly status: BookingRefundListStatusFilter;
-}): Promise<BookingRefundAdminPage | null> {
-  if (!process.env.MONGODB_URI) {
-    return null;
+function bookingRefundRowMatchesSearch(
+  row: BookingRefundRow,
+  searchField: BookingRefundListSearchField,
+  searchQuery: string,
+): boolean {
+  const normalizedQuery = searchQuery.trim();
+  if (normalizedQuery.length === 0) {
+    return true;
   }
-  const page = Math.max(1, input.page);
-  const pageSize = Math.min(100, Math.max(1, input.pageSize));
-  const skip = (page - 1) * pageSize;
-  const filter: Record<string, unknown> =
-    input.status === 'all' ? {} : { status: input.status };
+  const needle = normalizedQuery.toLowerCase();
+  if (searchField === 'reference') {
+    return (
+      row.bookingReference.toLowerCase().includes(needle) ||
+      bookingIdMatchesReferenceInput(row.bookingId, normalizedQuery)
+    );
+  }
+  if (searchField === 'contact') {
+    return row.customerName.toLowerCase().includes(needle);
+  }
+  if (searchField === 'email') {
+    return (row.customerEmail ?? '').toLowerCase().includes(needle);
+  }
+  return row.status.toLowerCase().includes(needle);
+}
+
+async function buildBookingRefundRowsForAdmin(
+  refundDocs: readonly (BookingRefundDocument & { _id: ObjectId })[],
+): Promise<BookingRefundRow[]> {
   const db = await getDb();
-  const collection = db.collection<BookingRefundDocument>(COLLECTIONS.bookingRefunds);
-  const [totalCount, refundDocs, countsByStatus] = await Promise.all([
-    collection.countDocuments(filter),
-    collection.find(filter).sort({ requestedAt: -1 }).skip(skip).limit(pageSize).toArray(),
-    Promise.all([
-      collection.countDocuments({}),
-      collection.countDocuments({ status: 'awaiting' }),
-      collection.countDocuments({ status: 'completed' }),
-    ]).then(([all, awaiting, completed]) => ({ all, awaiting, completed })),
-  ]);
   const rows: BookingRefundRow[] = [];
   for (const refundDoc of refundDocs) {
-    if (refundDoc._id === undefined) {
-      continue;
-    }
     const bookingDoc = await db.collection<BookingDocument>(COLLECTIONS.bookings).findOne({ _id: refundDoc.bookingId });
     if (bookingDoc === null || bookingDoc._id === undefined) {
       continue;
@@ -189,12 +196,67 @@ export async function listBookingRefundsForAdmin(input: {
     const lead = bookingDoc.leadId !== undefined ? await findLeadById(bookingDoc.leadId.toString()) : null;
     rows.push(
       mapRefundRow(
-        refundDoc as BookingRefundDocument & { _id: ObjectId },
+        refundDoc,
         bookingDoc as BookingDocument & { _id: ObjectId },
         lead,
       ),
     );
   }
+  return rows;
+}
+
+export async function listBookingRefundsForAdmin(input: {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly status: BookingRefundListStatusFilter;
+  readonly searchField?: BookingRefundListSearchField;
+  readonly searchQuery?: string;
+}): Promise<BookingRefundAdminPage | null> {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+  const page = Math.max(1, input.page);
+  const pageSize = Math.min(100, Math.max(1, input.pageSize));
+  const skip = (page - 1) * pageSize;
+  const searchField = input.searchField ?? 'reference';
+  const searchQuery = input.searchQuery?.trim() ?? '';
+  const hasSearchQuery = searchQuery.length > 0;
+  const filter: Record<string, unknown> =
+    input.status === 'all' ? {} : { status: input.status };
+  const db = await getDb();
+  const collection = db.collection<BookingRefundDocument>(COLLECTIONS.bookingRefunds);
+  const countsByStatus = await Promise.all([
+    collection.countDocuments({}),
+    collection.countDocuments({ status: 'awaiting' }),
+    collection.countDocuments({ status: 'completed' }),
+  ]).then(([all, awaiting, completed]) => ({ all, awaiting, completed }));
+  if (hasSearchQuery) {
+    const refundDocs = await collection.find(filter).sort({ requestedAt: -1 }).toArray();
+    const typedRefundDocs = refundDocs.filter(
+      (refundDoc): refundDoc is BookingRefundDocument & { _id: ObjectId } => refundDoc._id !== undefined,
+    );
+    const allRows = await buildBookingRefundRowsForAdmin(typedRefundDocs);
+    const filteredRows = allRows.filter((row) => bookingRefundRowMatchesSearch(row, searchField, searchQuery));
+    const totalCount = filteredRows.length;
+    const rows = filteredRows.slice(skip, skip + pageSize);
+    const totalPages = totalCount === 0 ? 1 : Math.ceil(totalCount / pageSize);
+    return {
+      rows,
+      totalCount,
+      page,
+      pageSize,
+      totalPages,
+      countsByStatus,
+    };
+  }
+  const [totalCount, refundDocs] = await Promise.all([
+    collection.countDocuments(filter),
+    collection.find(filter).sort({ requestedAt: -1 }).skip(skip).limit(pageSize).toArray(),
+  ]);
+  const typedRefundDocs = refundDocs.filter(
+    (refundDoc): refundDoc is BookingRefundDocument & { _id: ObjectId } => refundDoc._id !== undefined,
+  );
+  const rows = await buildBookingRefundRowsForAdmin(typedRefundDocs);
   const totalPages = totalCount === 0 ? 1 : Math.ceil(totalCount / pageSize);
   return {
     rows,

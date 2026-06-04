@@ -1,6 +1,15 @@
 'use client';
 
-import { useLayoutEffect, useMemo, useState, useSyncExternalStore, useCallback, type ReactNode } from 'react';
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useCallback,
+  type ReactNode,
+} from 'react';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Menu } from 'lucide-react';
 import {
@@ -134,6 +143,7 @@ function resolveAdminTitle(pathname: string): string {
 
 export function AdminShell(props: AdminShellProps) {
   const pathname = usePathname();
+  const mainScrollViewportRef = useRef<HTMLDivElement>(null);
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [collapsedOverride, setCollapsedOverride] = useState<boolean | null>(null);
   const [colorModeOverride, setColorModeOverride] = useState<AdminColorMode | null>(null);
@@ -181,6 +191,23 @@ export function AdminShell(props: AdminShellProps) {
       syncMarketingDocumentAppearanceFromStorage();
     };
   }, [colorTheme, isDark]);
+  const isAuthRoute =
+    pathname === '/admin/login' || pathname === '/admin/auth-error' || pathname === '/admin/verify-otp';
+  useLayoutEffect(() => {
+    if (isAuthRoute) {
+      return;
+    }
+    document.documentElement.classList.add('admin-app-shell');
+    return () => {
+      document.documentElement.classList.remove('admin-app-shell');
+    };
+  }, [isAuthRoute]);
+  useLayoutEffect(() => {
+    if (isAuthRoute) {
+      return;
+    }
+    mainScrollViewportRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pathname, isAuthRoute]);
   const executeToggleCollapsed = (): void => {
     const nextCollapsed = !collapsed;
     window.localStorage.setItem(ADMIN_SIDEBAR_STORAGE_KEY, nextCollapsed ? 'true' : 'false');
@@ -216,7 +243,7 @@ export function AdminShell(props: AdminShellProps) {
   const executeCloseMobileSidebarForTour = (): void => {
     setMobileOpen(false);
   };
-  if (pathname === '/admin/login' || pathname === '/admin/auth-error' || pathname === '/admin/verify-otp') {
+  if (isAuthRoute) {
     return props.children;
   }
   return (
@@ -227,9 +254,9 @@ export function AdminShell(props: AdminShellProps) {
     >
       <div
         suppressHydrationWarning
-        className={cn('min-h-dvh bg-muted/30 scheme-light dark:bg-background dark:scheme-dark')}
+        className={cn('h-dvh overflow-hidden bg-muted/30 scheme-light dark:bg-background dark:scheme-dark')}
       >
-        <div className="flex min-h-dvh [--admin-sticky-top:4rem]">
+        <div className="flex h-dvh overflow-hidden [--admin-sticky-top:4rem]">
         <AdminSidebar
           collapsed={collapsed}
           mobileOpen={mobileOpen}
@@ -238,13 +265,13 @@ export function AdminShell(props: AdminShellProps) {
         />
         <div
           className={cn(
-            'flex min-h-dvh min-w-0 flex-1 flex-col [--admin-sidebar-width:0px]',
+            'flex h-dvh min-h-0 min-w-0 flex-1 flex-col overflow-hidden [--admin-sidebar-width:0px]',
             collapsed ? 'md:[--admin-sidebar-width:5rem]' : 'md:[--admin-sidebar-width:18rem]',
           )}
         >
           <div
             data-admin-tour="admin-header"
-            className="sticky top-0 z-20 border-b border-border/80 bg-background/90 shadow-[0_1px_0_0_rgb(0_0_0/0.03)] backdrop-blur-md dark:shadow-[0_1px_0_0_rgb(255_255_255/0.04)]"
+            className="z-20 shrink-0 border-b border-border/80 bg-background/90 shadow-[0_1px_0_0_rgb(0_0_0/0.03)] backdrop-blur-md dark:shadow-[0_1px_0_0_rgb(255_255_255/0.04)]"
           >
             <div className="mx-auto flex min-h-16 w-full flex-col gap-4 px-4 py-3 sm:px-6 lg:px-8">
               <div className="flex items-center justify-between gap-3">
@@ -284,10 +311,14 @@ export function AdminShell(props: AdminShellProps) {
               </div>
             </div>
           </div>
-          <main className="flex min-h-0 flex-1 flex-col">
-            <div className="flex min-h-0 flex-1 flex-col bg-background/80 px-3 py-4">
-              {props.children}
-            </div>
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <AdminScrollArea
+              viewportRef={mainScrollViewportRef}
+              className="min-h-0 flex-1"
+              viewportClassName="pr-0"
+            >
+              <div className="bg-background/80 px-3 py-4">{props.children}</div>
+            </AdminScrollArea>
           </main>
         </div>
         </div>

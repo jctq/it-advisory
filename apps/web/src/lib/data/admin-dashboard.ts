@@ -4,8 +4,11 @@ import {
 } from '@teqmd/domain/booking-schedule';
 import { addDays, parse } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
+import type { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/domain/collections';
 import type { BookingDocument, LeadDocument, DiagnosticSessionDocument } from '@/domain/types';
+import { resolveAdminBookingCalendarEventTitle } from '@/lib/admin/resolve-admin-booking-calendar-event-title';
+import { mapBookingDocsToAdminCalendarRows } from '@/lib/data/bookings';
 import { getDb } from '@/lib/mongodb';
 
 const ADMIN_TIMEZONE = 'Asia/Manila';
@@ -33,7 +36,7 @@ export type AdminDashboardRecentLead = {
 
 export type AdminDashboardRecentBooking = {
   readonly id: string;
-  readonly serviceKey: string;
+  readonly title: string;
   readonly startsAtIso: string;
   readonly status: BookingDocument['status'];
 };
@@ -77,13 +80,42 @@ function mapRecentLead(
 
 function mapRecentBooking(
   doc: BookingDocument & { _id: { toString: () => string } },
+  titleByBookingId: ReadonlyMap<string, string>,
 ): AdminDashboardRecentBooking {
+  const bookingId = doc._id.toString();
   return {
-    id: doc._id.toString(),
-    serviceKey: doc.serviceKey,
+    id: bookingId,
+    title: titleByBookingId.get(bookingId) ?? 'Consultation',
     startsAtIso: doc.startsAt.toISOString(),
     status: doc.status,
   };
+}
+
+function dedupeBookingDocsById(
+  docs: readonly (BookingDocument & { _id: { toString: () => string } })[],
+): readonly (BookingDocument & { _id: ObjectId })[] {
+  const uniqueById = new Map<string, BookingDocument & { _id: ObjectId }>();
+  for (const doc of docs) {
+    const bookingId = doc._id.toString();
+    if (uniqueById.has(bookingId)) {
+      continue;
+    }
+    uniqueById.set(bookingId, doc as BookingDocument & { _id: ObjectId });
+  }
+  return [...uniqueById.values()];
+}
+
+async function resolveDashboardBookingTitlesById(
+  docs: readonly (BookingDocument & { _id: { toString: () => string } })[],
+): Promise<ReadonlyMap<string, string>> {
+  const uniqueDocs = dedupeBookingDocsById(docs);
+  if (uniqueDocs.length === 0) {
+    return new Map();
+  }
+  const calendarRows = await mapBookingDocsToAdminCalendarRows(uniqueDocs);
+  return new Map(
+    calendarRows.map((row) => [row.id, resolveAdminBookingCalendarEventTitle(row)] as const),
+  );
 }
 
 function resolveCurrentWeekBoundsUtc(nowUtc: Date): {
@@ -167,6 +199,10 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       .limit(THIS_WEEK_BOOKINGS_LIMIT)
       .toArray(),
   ]);
+  const titleByBookingId = await resolveDashboardBookingTitlesById([
+    ...recentBookingDocs,
+    ...thisWeekBookingDocs,
+  ]);
   return {
     stats: {
       leadsTotal,
@@ -180,13 +216,13 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     },
     weekRange,
     bookingsThisWeek: thisWeekBookingDocs.map((doc) =>
-      mapRecentBooking(doc as BookingDocument & { _id: { toString: () => string } }),
+      mapRecentBooking(doc as BookingDocument & { _id: { toString: () => string } }, titleByBookingId),
     ),
     recentLeads: recentLeadDocs.map((doc) =>
       mapRecentLead(doc as LeadDocument & { _id: { toString: () => string } }),
     ),
     recentBookings: recentBookingDocs.map((doc) =>
-      mapRecentBooking(doc as BookingDocument & { _id: { toString: () => string } }),
+      mapRecentBooking(doc as BookingDocument & { _id: { toString: () => string } }, titleByBookingId),
     ),
   };
 }

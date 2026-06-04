@@ -1,7 +1,8 @@
 'use client';
 
 import { Plus, Trash2 } from 'lucide-react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,19 @@ import { cn } from '@/lib/utils';
 type TemplateWorkspaceInspectorProps = {
   readonly className?: string;
 };
+
+function TemplateWorkspaceInspectorPanel(props: {
+  readonly className?: string;
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <aside className={cn('flex h-full min-h-0 flex-col border-l', WORKSPACE_PANEL_CLASS, props.className)}>
+      <AdminScrollArea className="min-h-0 flex-1" viewportClassName="flex flex-col gap-4 p-4">
+        {props.children}
+      </AdminScrollArea>
+    </aside>
+  );
+}
 
 export function TemplateWorkspaceInspector(props: TemplateWorkspaceInspectorProps): ReactElement {
   const { template, selection, updateTemplate, setSelection } = useTemplateEditor();
@@ -122,7 +136,7 @@ function RoundInspector(props: InspectorBaseProps & { readonly roundId: string; 
     roundId: round.id,
   });
   return (
-    <aside className={cn('flex flex-col gap-4 overflow-y-auto border-l p-4', WORKSPACE_PANEL_CLASS, props.className)}>
+    <TemplateWorkspaceInspectorPanel className={props.className}>
       <Header
         title="Round"
         onRemove={() => {
@@ -219,7 +233,7 @@ function RoundInspector(props: InspectorBaseProps & { readonly roundId: string; 
         </div>
       </div>
       <p className="text-xs text-muted-foreground">{round.questions.length} questions in this round</p>
-    </aside>
+    </TemplateWorkspaceInspectorPanel>
   );
 }
 
@@ -241,7 +255,7 @@ function QuestionInspector(
     targetQuestionId: question.id,
   });
   return (
-    <aside className={cn('flex flex-col gap-4 overflow-y-auto border-l p-4', WORKSPACE_PANEL_CLASS, props.className)}>
+    <TemplateWorkspaceInspectorPanel className={props.className}>
       <Header
         title="Question"
         onRemove={() => {
@@ -363,7 +377,7 @@ function QuestionInspector(
         }
         summary={buildVisibilityRuleSummary({ availableQuestions, rule: question.showWhen })}
       />
-    </aside>
+    </TemplateWorkspaceInspectorPanel>
   );
 }
 
@@ -431,7 +445,7 @@ function OptionInspector(
   const shouldShowExampleBullets = question.type === 'multiple-choice';
   const shouldShowPanelTitle = question.type === 'nested-options';
   return (
-    <aside className={cn('flex flex-col gap-4 overflow-y-auto border-l p-4', WORKSPACE_PANEL_CLASS, props.className)}>
+    <TemplateWorkspaceInspectorPanel className={props.className}>
       <Header
         title="Option"
         onRemove={() => {
@@ -682,7 +696,7 @@ function OptionInspector(
           </TabsContent>
         ) : null}
       </Tabs>
-    </aside>
+    </TemplateWorkspaceInspectorPanel>
   );
 }
 
@@ -899,7 +913,7 @@ function ChildQuestionInspector(
   const child = found.option.childQuestion;
   const { round, question, option } = found;
   return (
-    <aside className={cn('flex flex-col gap-4 overflow-y-auto border-l p-4', WORKSPACE_PANEL_CLASS, props.className)}>
+    <TemplateWorkspaceInspectorPanel className={props.className}>
       <Header title="Follow-up question" />
       <Field label="Prompt">
         <Textarea
@@ -1116,7 +1130,7 @@ function ChildQuestionInspector(
           ))
         )}
       </div>
-    </aside>
+    </TemplateWorkspaceInspectorPanel>
   );
 }
 

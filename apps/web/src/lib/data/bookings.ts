@@ -257,7 +257,7 @@ function resolveBookingCalendarDisplayPreview(
   });
 }
 
-async function mapBookingDocsToAdminCalendarRows(
+export async function mapBookingDocsToAdminCalendarRows(
   bookingDocs: readonly (BookingDocument & { _id: ObjectId })[],
 ): Promise<AdminBookingCalendarRow[]> {
   if (bookingDocs.length === 0) {

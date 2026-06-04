@@ -3,6 +3,7 @@
 import { ImageIcon, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { AppImageLightboxCard } from '@/components/ui/app-image-lightbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -156,6 +157,7 @@ function AdminSupportChatBubble(props: { readonly message: AdminSupportChatMessa
 }
 
 export function AdminSupportReportDetail(props: AdminSupportReportDetailProps): ReactElement {
+  const conversationViewportRef = useRef<HTMLDivElement>(null);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
   const [report, setReport] = useState<SupportReportRecord>(props.report);
   const [replyMessage, setReplyMessage] = useState('');
@@ -172,6 +174,11 @@ export function AdminSupportReportDetail(props: AdminSupportReportDetailProps): 
     });
   }, [props.report]);
   useEffect(() => {
+    const viewport = conversationViewportRef.current;
+    if (viewport !== null) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+      return;
+    }
     scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [chatMessages.length]);
   const executeSubmitReply = useCallback(async (): Promise<void> => {
@@ -241,8 +248,10 @@ export function AdminSupportReportDetail(props: AdminSupportReportDetailProps): 
               <p className="truncate font-mono text-xs text-muted-foreground">{report.route}</p>
             </div>
           </header>
-          <div
-            className="flex min-h-[min(320px,45dvh)] flex-1 flex-col gap-4 overflow-y-auto px-4 py-5 md:min-h-0 md:px-5"
+          <AdminScrollArea
+            viewportRef={conversationViewportRef}
+            className="min-h-[min(320px,45dvh)] flex-1 md:min-h-0"
+            viewportClassName="flex flex-col gap-4 px-4 py-5 md:px-5"
             role="log"
             aria-label="Support conversation"
             aria-live="polite"
@@ -251,7 +260,7 @@ export function AdminSupportReportDetail(props: AdminSupportReportDetailProps): 
               <AdminSupportChatBubble key={message.id} message={message} />
             ))}
             <div ref={scrollAnchorRef} aria-hidden className="h-px shrink-0" />
-          </div>
+          </AdminScrollArea>
           <footer className="border-t border-border bg-muted/20 px-4 py-4 md:px-5">
             <form className="space-y-3" onSubmit={handleSubmit}>
               <Textarea

@@ -21,6 +21,7 @@ import {
   Settings,
   Users,
 } from 'lucide-react';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { Button } from '@/components/ui/button';
 import {
   brandAssetUrl,
@@ -155,13 +156,13 @@ export function AdminSidebar(props: AdminSidebarProps) {
       <aside
         data-admin-tour="sidebar"
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex border-r border-sidebar-border/90 bg-sidebar/95 text-sidebar-foreground backdrop-blur md:sticky md:top-0 md:z-35 md:h-dvh',
+          'fixed inset-y-0 left-0 z-50 flex h-dvh overflow-hidden border-r border-sidebar-border/90 bg-sidebar/95 text-sidebar-foreground backdrop-blur md:sticky md:top-0 md:z-35 md:h-dvh',
           'transition-[width,transform] duration-200 ease-out',
           props.collapsed ? 'w-20' : 'w-72',
           props.mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         )}
       >
-        <div className="flex w-full flex-col">
+        <div className="flex h-full min-h-0 w-full flex-col">
           <div
             className={cn(
               'flex items-center border-b border-sidebar-border/80 px-4 py-4',
@@ -227,7 +228,8 @@ export function AdminSidebar(props: AdminSidebarProps) {
               </div>
             ) : null}
           </div>
-          <nav className="flex-1 space-y-1 px-3 py-4">
+          <AdminScrollArea className="min-h-0 flex-1" viewportClassName="px-3 py-4 pr-0">
+            <nav className="space-y-1">
             {ADMIN_SIDEBAR_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = isItemActive(pathname, item.href);
@@ -253,7 +255,8 @@ export function AdminSidebar(props: AdminSidebarProps) {
                 </Link>
               );
             })}
-          </nav>
+            </nav>
+          </AdminScrollArea>
         </div>
       </aside>
     </>

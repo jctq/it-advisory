@@ -87,10 +87,11 @@ export function AdminBookingStatusForm(props: AdminBookingStatusFormProps): Reac
           {isSaving ? 'Saving…' : 'Save status'}
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Confirmed sets payment to paid. Completed marks the session as done without changing payment. Cancelled
-        expires any open checkout and frees the slot for reporting.
-      </p>
+      <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
+        <li>Confirmed marks the booking paid and keeps the slot reserved.</li>
+        <li>Completed closes the session without changing payment.</li>
+        <li>Cancelled expires open checkout and frees the slot.</li>
+      </ul>
     </div>
   );
 }

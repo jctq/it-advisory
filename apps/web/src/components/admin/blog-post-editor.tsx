@@ -4,6 +4,7 @@ import { ArrowLeft, Circle, ExternalLink, History, Loader2 } from 'lucide-react'
 import Link from 'next/link';
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { AdminBlogMarkdownEditor } from '@/components/admin/admin-blog-markdown-editor';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { BlogPostEditHistoryDialog } from '@/components/admin/blog-post-edit-history-dialog';
 import { BlogPostEditorSidebar } from '@/components/admin/blog-post-editor-sidebar';
 import {
@@ -274,9 +275,9 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
               </TabsContent>
               <TabsContent
                 value="preview"
-                className="mt-0 row-start-2 min-h-0 overflow-y-auto focus-visible:outline-none data-[state=inactive]:hidden"
+                className="mt-0 row-start-2 flex min-h-0 flex-col overflow-hidden focus-visible:outline-none data-[state=inactive]:hidden"
               >
-                <div className="p-6 sm:p-8">
+                <AdminScrollArea className="min-h-0 flex-1" viewportClassName="p-6 sm:p-8">
                   {contentMarkdown.trim().length > 0 ? (
                     <article className="mx-auto space-y-4">
                       {showTitle && title.trim().length > 0 ? (
@@ -293,7 +294,7 @@ export function BlogPostEditor(props: BlogPostEditorProps): ReactElement {
                       <p className="max-w-sm text-xs text-muted-foreground">Add content in the Write tab, then switch here to see how it will look on the site.</p>
                     </div>
                   )}
-                </div>
+                </AdminScrollArea>
               </TabsContent>
             </Tabs>
           </div>

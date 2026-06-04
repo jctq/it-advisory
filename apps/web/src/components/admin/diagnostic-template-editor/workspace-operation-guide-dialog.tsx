@@ -10,6 +10,7 @@ import {
   ReorderQuestionGuideIllustration,
   ReorderRoundGuideIllustration,
 } from '@/components/admin/diagnostic-template-editor/workspace-operation-guide-illustrations';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { WorkspaceTooltip } from '@/components/admin/diagnostic-template-editor/workspace-tooltip';
 import {
   WORKSPACE_CHROME_BUTTON_CLASS,
@@ -134,7 +135,7 @@ export function WorkspaceOperationGuideDialog(props: WorkspaceOperationGuideDial
             How to build and rearrange rounds, questions, and options on the diagnostic template canvas.
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <AdminScrollArea className="min-h-0 flex-1" viewportClassName="px-6 py-4">
           <ol className="space-y-8">
             {WORKSPACE_OPERATION_GUIDES.map((guide, index) => (
               <li key={guide.id} className="scroll-mt-4">
@@ -158,7 +159,7 @@ export function WorkspaceOperationGuideDialog(props: WorkspaceOperationGuideDial
               </li>
             ))}
           </ol>
-        </div>
+        </AdminScrollArea>
       </DialogContent>
     </Dialog>
   );

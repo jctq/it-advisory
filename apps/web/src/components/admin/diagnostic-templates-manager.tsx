@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -1741,15 +1742,16 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
               {isEditorMode && selectedTemplate.rounds.length > 0 ? (
                 <nav
                   aria-label="Diagnostic template outline"
-                  className="rounded-2xl border border-border bg-muted/20 p-4 xl:sticky xl:top-24 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto"
+                  className="flex flex-col rounded-2xl border border-border bg-muted/20 p-4 xl:sticky xl:top-24 xl:max-h-[calc(100vh-8rem)] xl:overflow-hidden"
                 >
-                  <div className="space-y-1">
+                  <div className="shrink-0 space-y-1">
                     <p className="text-sm font-semibold text-foreground">Rounds and questions</p>
                     <p className="text-xs text-muted-foreground">
                       Click any item to jump directly to that section in the editor.
                     </p>
                   </div>
-                  <div className="mt-4 space-y-3">
+                  <AdminScrollArea className="min-h-0 flex-1" viewportClassName="mt-4">
+                  <div className="space-y-3">
                     {selectedTemplate.rounds.map((round, roundIndex) => {
                       const roundSectionId = buildTemplateSectionId({
                         kind: 'round',
@@ -1843,6 +1845,7 @@ export function DiagnosticTemplatesManager(props: DiagnosticTemplatesManagerProp
                       Add round
                     </Button>
                   </div>
+                  </AdminScrollArea>
                 </nav>
               ) : null}
               <div className="space-y-6">

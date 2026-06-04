@@ -1,7 +1,7 @@
 'use client';
 
-import { CircleCheckBig, CircleHelp, Inbox } from 'lucide-react';
-import { useMemo, useState, type ReactElement } from 'react';
+import { CircleCheckBig, CircleHelp, Inbox, Search } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { AdminRefundsTable } from '@/components/admin/admin-refunds-table';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,11 +14,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAdminRefundsQuery } from '@/hooks/admin/use-admin-refunds-query';
 import { useAdminDebugTablePagination } from '@/hooks/admin/use-admin-debug-table-pagination';
 import { buildApiUrl } from '@/lib/config/build-api-url';
+import { ADMIN_DEBUG_SEARCH_DEBOUNCE_MS } from '@/lib/admin/admin-paginated-list';
 import type {
+  BookingRefundListSearchField,
   BookingRefundListStatusFilter,
   BookingRefundRow,
   BookingRefundStatusCounts,
@@ -45,6 +48,23 @@ const STATUS_FILTER_OPTIONS: readonly StatusFilterOption[] = [
   { id: 'completed', label: 'Completed refunds', shortLabel: 'Completed', icon: CircleCheckBig },
 ];
 
+type RefundSearchFieldOption = {
+  readonly id: BookingRefundListSearchField;
+  readonly label: string;
+  readonly placeholder: string;
+};
+
+const REFUND_SEARCH_FIELD_OPTIONS: readonly RefundSearchFieldOption[] = [
+  { id: 'reference', label: 'Reference', placeholder: 'Booking reference…' },
+  { id: 'contact', label: 'Contact', placeholder: 'Contact name…' },
+  { id: 'email', label: 'Email', placeholder: 'Email address…' },
+  { id: 'status', label: 'Status', placeholder: 'awaiting or completed…' },
+];
+
+function resolveRefundSearchPlaceholder(searchField: BookingRefundListSearchField): string {
+  return REFUND_SEARCH_FIELD_OPTIONS.find((option) => option.id === searchField)?.placeholder ?? 'Search…';
+}
+
 function formatAmountPhp(centavos: number): string {
   return `₱${(centavos / 100).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -61,15 +81,28 @@ function resolveStatusCount(
  */
 export function AdminRefundsWorkspace(): ReactElement {
   const [statusFilter, setStatusFilter] = useState<BookingRefundListStatusFilter>('all');
-  const filterSignature = statusFilter;
+  const [searchField, setSearchField] = useState<BookingRefundListSearchField>('reference');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, ADMIN_DEBUG_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
+  const hasActiveSearch = debouncedSearch.length > 0;
+  const filterSignature = hasActiveSearch
+    ? `${statusFilter}\0${searchField}\0${debouncedSearch}`
+    : statusFilter;
   const [pagination, setPagination] = useAdminDebugTablePagination(filterSignature);
   const queryFilters = useMemo(
     () => ({
       page: pagination.pageIndex + 1,
       pageSize: pagination.pageSize,
       status: statusFilter,
+      ...(hasActiveSearch ? { searchField, search: debouncedSearch } : {}),
     }),
-    [pagination.pageIndex, pagination.pageSize, statusFilter],
+    [debouncedSearch, hasActiveSearch, pagination.pageIndex, pagination.pageSize, searchField, statusFilter],
   );
   const query = useAdminRefundsQuery(queryFilters);
   const rows = query.data?.rows ?? [];
@@ -138,12 +171,12 @@ export function AdminRefundsWorkspace(): ReactElement {
               )}
             </p>
           </div>
-          <div
-            className="border-b border-border/80 px-3 py-2"
-            role="group"
-            aria-label="Filter refunds by status"
-          >
-            <div className="-mx-1 flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex flex-wrap items-center gap-2 border-b border-border/80 px-3 py-2">
+            <div
+              className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              role="group"
+              aria-label="Filter refunds by status"
+            >
               {STATUS_FILTER_OPTIONS.map((option) => {
                 const Icon = option.icon;
                 const isActive = statusFilter === option.id;
@@ -183,6 +216,37 @@ export function AdminRefundsWorkspace(): ReactElement {
                 );
               })}
             </div>
+            <div className="flex min-w-0 w-full items-center gap-2 sm:w-auto sm:min-w-[18rem] sm:max-w-md lg:ml-auto">
+              <NativeSelect
+                id="admin-refunds-search-field"
+                value={searchField}
+                onChange={(event) => setSearchField(event.target.value as BookingRefundListSearchField)}
+                className="h-9 w-30 shrink-0"
+                aria-label="Search field"
+              >
+                {REFUND_SEARCH_FIELD_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </NativeSelect>
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  id="admin-refunds-search"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder={resolveRefundSearchPlaceholder(searchField)}
+                  className="h-9 pl-9"
+                  aria-label={`Search refunds by ${searchField}`}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+            </div>
           </div>
           {query.isError ? (
             <p className="px-3 py-4 text-sm text-destructive" role="alert">
@@ -192,7 +256,11 @@ export function AdminRefundsWorkspace(): ReactElement {
             <AdminRefundsTable
               rows={rows}
               isLoading={isLoading}
-              emptyMessage="No refund requests found."
+              emptyMessage={
+                debouncedSearch.length > 0
+                  ? 'No refund requests matched your search.'
+                  : 'No refund requests found.'
+              }
               manualPagination
               pageCount={totalPages}
               totalCount={totalCount}

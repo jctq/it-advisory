@@ -4,6 +4,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import Link from 'next/link';
 import { useMemo, type ReactElement } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { CopyToClipboardButton } from '@/components/ui/copy-to-clipboard-button';
 import { DataTable } from '@/components/admin/data-table';
 import { resolveAdminBookingCalendarEventTitle } from '@/lib/admin/resolve-admin-booking-calendar-event-title';
 import type { AdminBookingCalendarRow } from '@/lib/data/bookings';
@@ -70,12 +71,15 @@ export function AdminBookingsTable(props: AdminBookingsTableProps): ReactElement
           const booking = info.row.original;
           const reference = formatBookingReferenceId(booking.id);
           return (
-            <Link
-              href={`/admin/bookings/${booking.id}`}
-              className="font-mono text-xs font-medium text-primary underline-offset-4 hover:underline"
-            >
-              {reference}
-            </Link>
+            <div className="flex items-center gap-0.5">
+              <Link
+                href={`/admin/bookings/${booking.id}`}
+                className="font-mono text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {reference}
+              </Link>
+              <CopyToClipboardButton value={reference} ariaLabel="Copy booking reference" className="size-7" />
+            </div>
           );
         },
       }),

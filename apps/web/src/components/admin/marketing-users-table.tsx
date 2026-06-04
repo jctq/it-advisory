@@ -2,13 +2,23 @@
 
 import { createColumnHelper } from '@tanstack/react-table';
 import Link from 'next/link';
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
+import { AdminTableKeywordSearch, type AdminTableKeywordSearchOption } from '@/components/admin/admin-table-keyword-search';
 import { DataTable } from '@/components/admin/data-table';
+import { useDebouncedTableSearch } from '@/hooks/admin/use-debounced-table-search';
+import { valueContainsTableKeyword } from '@/lib/admin/matches-table-keyword-search';
 import type { MarketingUserListRow } from '@/lib/data/marketing-users-admin';
 
 type MarketingUsersTableProps = {
   readonly initialData: MarketingUserListRow[];
 };
+
+type MarketingUserSearchField = 'email' | 'userId';
+
+const MARKETING_USER_SEARCH_OPTIONS: readonly AdminTableKeywordSearchOption<MarketingUserSearchField>[] = [
+  { id: 'email', label: 'Email', placeholder: 'Email address…' },
+  { id: 'userId', label: 'User id', placeholder: 'Mongo user id…' },
+];
 
 const columnHelper = createColumnHelper<MarketingUserListRow>();
 
@@ -18,7 +28,31 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
   timeZone: 'Asia/Manila',
 });
 
+function marketingUserRowMatchesSearch(
+  row: MarketingUserListRow,
+  searchField: MarketingUserSearchField,
+  searchQuery: string,
+): boolean {
+  const needle = searchQuery.trim().toLowerCase();
+  if (needle.length === 0) {
+    return true;
+  }
+  if (searchField === 'email') {
+    return valueContainsTableKeyword(row.email, needle);
+  }
+  return valueContainsTableKeyword(row.id, needle);
+}
+
 export function MarketingUsersTable(props: MarketingUsersTableProps): ReactElement {
+  const { searchInput, setSearchInput, debouncedSearch, hasActiveSearch } = useDebouncedTableSearch();
+  const [searchField, setSearchField] = useState<MarketingUserSearchField>('email');
+  const filteredData = useMemo(() => {
+    if (!hasActiveSearch) {
+      return props.initialData.slice();
+    }
+    return props.initialData.filter((row) => marketingUserRowMatchesSearch(row, searchField, debouncedSearch));
+  }, [debouncedSearch, hasActiveSearch, props.initialData, searchField]);
+  const tableKey = hasActiveSearch ? `${searchField}:${debouncedSearch}` : 'all';
   const columns = useMemo(
     () => [
       columnHelper.accessor('email', {
@@ -49,11 +83,30 @@ export function MarketingUsersTable(props: MarketingUsersTableProps): ReactEleme
     [],
   );
   return (
-    <div data-admin-tour="page-users-table">
+    <div data-admin-tour="page-users-table" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{filteredData.length.toLocaleString()}</span>{' '}
+          {filteredData.length === 1 ? 'user' : 'users'}
+        </p>
+        <AdminTableKeywordSearch
+          id="admin-marketing-users-search"
+          options={MARKETING_USER_SEARCH_OPTIONS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          searchInput={searchInput}
+          onSearchInputChange={setSearchInput}
+        />
+      </div>
       <DataTable
+        key={tableKey}
         columns={columns}
-        data={props.initialData.slice()}
-        emptyMessage="No marketing accounts yet (or MONGODB_URI is unset)."
+        data={filteredData}
+        emptyMessage={
+          hasActiveSearch
+            ? 'No marketing accounts matched your search.'
+            : 'No marketing accounts yet (or MONGODB_URI is unset).'
+        }
       />
     </div>
   );

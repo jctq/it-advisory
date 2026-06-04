@@ -2,13 +2,29 @@
 
 import { createColumnHelper } from '@tanstack/react-table';
 import Link from 'next/link';
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
+import { AdminTableKeywordSearch, type AdminTableKeywordSearchOption } from '@/components/admin/admin-table-keyword-search';
 import { DataTable } from '@/components/admin/data-table';
+import { useDebouncedTableSearch } from '@/hooks/admin/use-debounced-table-search';
+import { valueContainsTableKeyword } from '@/lib/admin/matches-table-keyword-search';
 import type { DiagnosticSessionListRow } from '@/lib/data/diagnostic-session-types';
+import {
+  bookingIdMatchesReferenceInput,
+  formatBookingReferenceId,
+} from '@/lib/marketing/booking-reference';
 
 type DiagnosticSessionsTableProps = {
   readonly initialData: DiagnosticSessionListRow[];
 };
+
+type SessionSearchField = 'visitor' | 'session' | 'step' | 'booked';
+
+const SESSION_SEARCH_OPTIONS: readonly AdminTableKeywordSearchOption<SessionSearchField>[] = [
+  { id: 'visitor', label: 'Visitor', placeholder: 'Visitor id…' },
+  { id: 'session', label: 'Session', placeholder: 'Session title or summary…' },
+  { id: 'step', label: 'Step', placeholder: 'Step number…' },
+  { id: 'booked', label: 'Booked', placeholder: 'yes, no, or booking reference…' },
+];
 
 const columnHelper = createColumnHelper<DiagnosticSessionListRow>();
 
@@ -18,7 +34,51 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-PH', {
   timeZone: 'Asia/Manila',
 });
 
+function sessionRowMatchesSearch(
+  row: DiagnosticSessionListRow,
+  searchField: SessionSearchField,
+  searchQuery: string,
+): boolean {
+  const needle = searchQuery.trim().toLowerCase();
+  if (needle.length === 0) {
+    return true;
+  }
+  if (searchField === 'visitor') {
+    return valueContainsTableKeyword(row.visitorId, needle);
+  }
+  if (searchField === 'session') {
+    return (
+      valueContainsTableKeyword(row.sessionTitlePreview, needle) ||
+      valueContainsTableKeyword(row.situationPreview, needle) ||
+      valueContainsTableKeyword(row.situationLabel, needle)
+    );
+  }
+  if (searchField === 'step') {
+    return valueContainsTableKeyword(String(row.currentStep), needle);
+  }
+  if (!row.isBooked || row.bookingId === null) {
+    return 'no unbooked —'.includes(needle);
+  }
+  const bookingReference = formatBookingReferenceId(row.bookingId);
+  return (
+    valueContainsTableKeyword('yes', needle) ||
+    valueContainsTableKeyword('booked', needle) ||
+    valueContainsTableKeyword(row.bookingId, needle) ||
+    valueContainsTableKeyword(bookingReference, needle) ||
+    bookingIdMatchesReferenceInput(row.bookingId, searchQuery.trim())
+  );
+}
+
 export function DiagnosticSessionsTable(props: DiagnosticSessionsTableProps): ReactElement {
+  const { searchInput, setSearchInput, debouncedSearch, hasActiveSearch } = useDebouncedTableSearch();
+  const [searchField, setSearchField] = useState<SessionSearchField>('visitor');
+  const filteredData = useMemo(() => {
+    if (!hasActiveSearch) {
+      return props.initialData.slice();
+    }
+    return props.initialData.filter((row) => sessionRowMatchesSearch(row, searchField, debouncedSearch));
+  }, [debouncedSearch, hasActiveSearch, props.initialData, searchField]);
+  const tableKey = hasActiveSearch ? `${searchField}:${debouncedSearch}` : 'all';
   const columns = useMemo(
     () => [
       columnHelper.accessor('updatedAtIso', {
@@ -106,11 +166,28 @@ export function DiagnosticSessionsTable(props: DiagnosticSessionsTableProps): Re
     [],
   );
   return (
-    <div data-admin-tour="page-sessions-table">
+    <div data-admin-tour="page-sessions-table" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{filteredData.length.toLocaleString()}</span>{' '}
+          {filteredData.length === 1 ? 'session' : 'sessions'}
+        </p>
+        <AdminTableKeywordSearch
+          id="admin-sessions-search"
+          options={SESSION_SEARCH_OPTIONS}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          searchInput={searchInput}
+          onSearchInputChange={setSearchInput}
+        />
+      </div>
       <DataTable
+        key={tableKey}
         columns={columns}
-        data={props.initialData.slice()}
-        emptyMessage="No sessions in MongoDB yet (or MONGODB_URI is unset)."
+        data={filteredData}
+        emptyMessage={
+          hasActiveSearch ? 'No sessions matched your search.' : 'No sessions in MongoDB yet (or MONGODB_URI is unset).'
+        }
       />
     </div>
   );

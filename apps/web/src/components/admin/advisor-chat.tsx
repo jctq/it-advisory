@@ -2,14 +2,17 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Streamdown } from 'streamdown';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { buildApiUrl } from '@/lib/config/build-api-url';
 import { cn } from '@/lib/utils';
 
 const ADVISOR_API_URL: string = buildApiUrl('/api/admin/advisor/chat');
+const ADVISOR_CHAT_SCROLL_FRAME_CLASS =
+  'h-[min(52dvh,36rem)] max-h-[min(52dvh,36rem)] min-h-[12rem] shrink-0 overflow-hidden';
 
 type Role = 'system' | 'user' | 'assistant';
 
@@ -46,6 +49,7 @@ function isStreaming(parts: ReadonlyArray<{ readonly type: string }>): boolean {
 }
 
 export function AdvisorChat() {
+  const chatViewportRef = useRef<HTMLDivElement>(null);
   const transport = useMemo(() => new DefaultChatTransport({ api: ADVISOR_API_URL }), []);
   const { messages, sendMessage, status, error, stop, regenerate } = useChat({
     transport,
@@ -58,6 +62,15 @@ export function AdvisorChat() {
     text: extractText(m.parts),
     streaming: isStreaming(m.parts),
   }));
+  const lastBubbleText = bubbles.length > 0 ? bubbles[bubbles.length - 1]?.text ?? '' : '';
+  useEffect(() => {
+    const viewport = chatViewportRef.current;
+    if (viewport === null || bubbles.length === 0) {
+      return;
+    }
+    const scrollBehavior = status === 'streaming' ? 'auto' : 'smooth';
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior: scrollBehavior });
+  }, [bubbles.length, lastBubbleText, status]);
   function submit(): void {
     const trimmed = input.trim();
     if (trimmed.length === 0 || isBusy) {
@@ -79,21 +92,29 @@ export function AdvisorChat() {
   return (
     <section
       data-admin-tour="page-advisor-chat"
-      className="flex flex-1 flex-col gap-4 rounded-lg border bg-card p-4 shadow-xs"
+      className="flex flex-col gap-4 overflow-hidden rounded-xl border border-border/80 bg-card p-4 shadow-xs sm:p-5"
     >
-      <div className="flex min-h-[40dvh] flex-col gap-3 overflow-y-auto" aria-live="polite">
-        {bubbles.length === 0 ? (
-          <EmptyState />
-        ) : (
-          bubbles.map((b) => <MessageBubble key={b.id} bubble={b} />)
-        )}
+      <div className={ADVISOR_CHAT_SCROLL_FRAME_CLASS}>
+        <AdminScrollArea
+          viewportRef={chatViewportRef}
+          className="h-full w-full overflow-hidden"
+          viewportClassName="h-full max-h-full pr-4"
+        >
+          <div className="flex flex-col gap-4" aria-live="polite">
+            {bubbles.length === 0 ? (
+              <EmptyState />
+            ) : (
+              bubbles.map((bubble) => <MessageBubble key={bubble.id} bubble={bubble} />)
+            )}
+          </div>
+        </AdminScrollArea>
       </div>
       {error !== undefined && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="shrink-0 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {error.message}
         </div>
       )}
-      <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
+      <form className="relative z-10 flex shrink-0 flex-col gap-2 border-t border-border/60 bg-card pt-4" onSubmit={handleSubmit}>
         <Textarea
           name="prompt"
           placeholder="Ask the advisor — e.g. 'Should I keep the diagnostic cache or rip it out?' (Cmd/Ctrl+Enter to send)"
@@ -155,16 +176,23 @@ function EmptyState() {
 function MessageBubble({ bubble }: { readonly bubble: Bubble }) {
   const isUser = bubble.role === 'user';
   return (
-    <div className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}>
+    <div className={cn('flex w-full shrink-0', isUser ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[85%] rounded-md border px-3 py-2 text-sm wrap-break-word',
+          'max-w-[min(85%,42rem)] overflow-hidden rounded-xl border px-4 py-3 text-sm wrap-break-word shadow-xs',
           isUser
-            ? 'whitespace-pre-wrap bg-primary text-primary-foreground border-primary'
-            : 'bg-background',
+            ? 'whitespace-pre-wrap border-primary bg-primary text-primary-foreground'
+            : 'border-border/80 bg-muted/25',
         )}
       >
-        <p className="mb-1 text-[10px] uppercase tracking-wider opacity-70">{bubble.role}</p>
+        <p
+          className={cn(
+            'mb-2 text-[10px] font-semibold uppercase tracking-wider',
+            isUser ? 'text-primary-foreground/75' : 'text-muted-foreground',
+          )}
+        >
+          {isUser ? 'You' : 'Advisor'}
+        </p>
         {bubble.text.length === 0 ? (
           <span className="opacity-60">…</span>
         ) : isUser ? (
@@ -183,7 +211,7 @@ function AssistantMarkdown({ text, streaming }: { readonly text: string; readonl
       mode={streaming ? 'streaming' : 'static'}
       parseIncompleteMarkdown
       className={cn(
-        'space-y-3 leading-relaxed',
+        'max-w-full space-y-4 overflow-hidden leading-relaxed break-words',
         '[&_h1]:mt-2 [&_h1]:text-lg [&_h1]:font-semibold',
         '[&_h2]:mt-2 [&_h2]:text-base [&_h2]:font-semibold',
         '[&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:uppercase [&_h3]:tracking-wide [&_h3]:text-muted-foreground',

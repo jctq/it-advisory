@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { DataTable } from '@/components/admin/data-table';
+import { AdminScrollArea } from '@/components/admin/admin-scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -156,15 +157,16 @@ function PaymentLogDetailDialog(props: {
   const row = props.row;
   return (
     <Dialog open={row !== null} onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         {row !== null ? (
           <>
-            <DialogHeader>
+            <DialogHeader className="shrink-0 px-6 pt-6">
               <DialogTitle>Payment log</DialogTitle>
               <DialogDescription>
                 {row.gatewayLabel} · {DATE_TIME_FORMATTER.format(new Date(row.receivedAtIso))} · HTTP {row.httpStatus}
               </DialogDescription>
             </DialogHeader>
+            <AdminScrollArea className="min-h-0 flex-1" viewportClassName="px-6 pb-6">
             <dl className="grid gap-4 sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Outcome</dt>
@@ -221,12 +223,15 @@ function PaymentLogDetailDialog(props: {
               {row.rawPayloadSnippet !== null && row.rawPayloadSnippet.length > 0 ? (
                 <div className="sm:col-span-2">
                   <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Raw payload snippet</dt>
-                  <dd className="mt-1 max-h-48 overflow-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs whitespace-pre-wrap text-foreground">
-                    {row.rawPayloadSnippet}
+                  <dd className="mt-1">
+                    <AdminScrollArea className="max-h-48 rounded-md border border-border bg-muted/30" viewportClassName="p-3 font-mono text-xs whitespace-pre-wrap text-foreground">
+                      {row.rawPayloadSnippet}
+                    </AdminScrollArea>
                   </dd>
                 </div>
               ) : null}
             </dl>
+            </AdminScrollArea>
           </>
         ) : null}
       </DialogContent>

@@ -2300,3 +2300,24 @@ html:has(.admin-blog-mdx-editor-overlay) [class*='tooltipContent'] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/** Admin app shell: main column scrolls in ScrollArea; suppress native document scrollbar. */
+html.admin-app-shell,
+html.admin-app-shell body {
+  overflow: hidden;
+  height: 100%;
+}
+
+[data-slot='scroll-area-viewport'] {
+  scrollbar-width: none;
+}
+
+[data-slot='scroll-area-viewport']::-webkit-scrollbar {
+  display: none;
+}
+
+/** Radix wraps viewport children in a table-sized div; block layout avoids scroll overflow bleed. */
+[data-slot='scroll-area-viewport'] > div {
+  display: block !important;
+  min-height: unset !important;
+}

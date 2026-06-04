@@ -951,7 +951,7 @@ function TemplateWorkspaceCanvas(): ReactElement {
       </div>
       <TemplateWorkspaceInspector
         className={cn(
-          'h-full min-h-0 w-full shrink-0 overflow-y-auto border-t lg:w-[min(100%,340px)] lg:border-l lg:border-t-0',
+          'h-full min-h-0 w-full shrink-0 border-t lg:w-[min(100%,340px)] lg:border-l lg:border-t-0',
           WORKSPACE_PANEL_CLASS,
         )}
       />

@@ -14,6 +14,8 @@ import {
 import { syncBookingIfPaymentWindowExpired } from '@/lib/payments/cancel-expired-payment-window-bookings';
 import { findBookingById } from '@/lib/data/bookings';
 import { findPaymentTransactionById } from '@/lib/data/payment-transactions';
+import { resolveAdminBookingOverviewContext } from '@/lib/admin/resolve-admin-booking-overview-context';
+import { resolveBookingPaymentBreakdown } from '@/lib/payments/resolve-booking-payment-breakdown';
 import { resolveCheckoutAmountCentavos } from '@/lib/payments/resolve-checkout-amount';
 import { formatBookingReferenceId } from '@/lib/marketing/booking-reference';
 
@@ -62,6 +64,12 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
   const paymentAmountCentavos =
     linkedTransaction?.amountCentavos ??
     (booking.quotedAmountCentavos !== null ? booking.quotedAmountCentavos : catalogPricing.amountCentavos);
+  const paymentBreakdown = await resolveBookingPaymentBreakdown({
+    booking,
+    transaction: linkedTransaction,
+    totalCentavos: paymentAmountCentavos,
+  });
+  const overview = await resolveAdminBookingOverviewContext(booking);
   let calendarBundle: BookingDetailCalendarBundle | null = null;
   if (booking.status === 'confirmed') {
     const built = buildBookingCalendarLinkBundle({
@@ -84,7 +92,7 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
       <AdminPageHeader
         eyebrow="CRM"
         title="Booking details"
-        description="Service slot, visitor id, and the full guided diagnostic as captured at confirmation (every round, question, and option)."
+        description="Session schedule, client contact, payment, and the guided diagnostic captured at booking."
       />
       <div className="flex flex-wrap gap-3 text-sm">
         <Link href="/admin/bookings" className="font-medium text-primary underline-offset-4 hover:underline">
@@ -104,8 +112,10 @@ export default async function AdminBookingDetailPage(props: AdminBookingDetailPa
           meetingUrl={meetingUrl}
           recordingShareUrl={recordingShareUrl}
           paymentAmountCentavos={paymentAmountCentavos}
+          paymentBreakdown={paymentBreakdown}
           catalogAmountLabel={catalogPricing.amountLabel}
           calendarBundle={calendarBundle}
+          overview={overview}
         />
       </Suspense>
     </section>
