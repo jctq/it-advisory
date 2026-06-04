@@ -15,7 +15,6 @@ type FooterLink = { readonly href: string; readonly label: string };
 
 const START_HERE_FOOTER_LINKS: readonly FooterLink[] = [
   { href: '/diagnostic', label: 'Take the Assessment' },
-  { href: '/book', label: 'Book a Consultation' },
   { href: '/login', label: 'Sign In' },
 ] as const;
 
