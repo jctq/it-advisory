@@ -10,13 +10,18 @@ import {
   resolveMarketingCaseStudiesNavEnabled,
 } from '@/lib/marketing/marketing-explore-nav-links';
 import { readReviewsModuleEnabled } from '@/lib/marketing/reviews-module-gate';
+import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 
 type FooterLink = { readonly href: string; readonly label: string };
 
-const START_HERE_FOOTER_LINKS: readonly FooterLink[] = [
-  { href: '/diagnostic', label: 'Take the Assessment' },
-  { href: '/login', label: 'Sign In' },
-] as const;
+function buildStartHereFooterLinks(isSignedIn: boolean): readonly FooterLink[] {
+  return [
+    { href: '/diagnostic', label: 'Take the Assessment' },
+    isSignedIn
+      ? { href: '/account/diagnostics', label: 'My Account' }
+      : { href: '/login', label: 'Sign In' },
+  ] as const;
+}
 
 const FOOTER_NAV_LINK_CLASS =
   'inline-block rounded-sm py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background';
@@ -29,9 +34,10 @@ function isMarketingInPageHashHref(href: string): boolean {
  * Multi-column marketing footer inspired by premium agency one-page layouts.
  */
 export async function MarketingSiteFooter(): Promise<ReactElement> {
-  const [reviewsModuleEnabled, testimonials] = await Promise.all([
+  const [reviewsModuleEnabled, testimonials, marketingUser] = await Promise.all([
     readReviewsModuleEnabled(),
     listPublishedMarketingTestimonials(),
+    getAuthenticatedMarketingUser(),
   ]);
   const caseStudiesNavEnabled = resolveMarketingCaseStudiesNavEnabled({
     reviewsModuleEnabled,
@@ -39,7 +45,7 @@ export async function MarketingSiteFooter(): Promise<ReactElement> {
   });
   const footerLinkGroups: readonly { readonly title: string; readonly links: readonly FooterLink[] }[] = [
     { title: 'Explore', links: buildMarketingExploreNavLinks(caseStudiesNavEnabled) },
-    { title: 'Start Here', links: START_HERE_FOOTER_LINKS },
+    { title: 'Start Here', links: buildStartHereFooterLinks(marketingUser !== null) },
   ];
   return (
     <footer className="border-t border-border bg-muted/30">

@@ -1,9 +1,11 @@
 import type { ReactElement } from 'react';
+import { redirect } from 'next/navigation';
 import { MarketingAuthLegalNotice } from '@/components/marketing/legal/marketing-auth-legal-notice';
 import { buildNoIndexMetadata } from '@/lib/seo/site-seo';
 import { PrivacyPolicyContent } from '@/components/marketing/legal/privacy-policy-content';
 import { TermsOfUseContent } from '@/components/marketing/legal/terms-of-use-content';
 import { RegisterForm } from '@/components/marketing/register-form';
+import { getAuthenticatedMarketingUser } from '@/lib/server/marketing-auth';
 import { resolveSafeInternalNextPath } from '@/lib/marketing/safe-internal-path';
 
 type RegisterPageProps = {
@@ -18,6 +20,10 @@ export const metadata = buildNoIndexMetadata({
 export default async function RegisterPage(props: RegisterPageProps): Promise<ReactElement> {
   const searchParams = await props.searchParams;
   const nextPath = resolveSafeInternalNextPath(searchParams.next);
+  const authenticatedUser = await getAuthenticatedMarketingUser();
+  if (authenticatedUser !== null) {
+    redirect(nextPath);
+  }
   return (
     <main className="mx-auto max-w-6xl px-6 py-16">
       <div className="mx-auto max-w-lg text-center">
